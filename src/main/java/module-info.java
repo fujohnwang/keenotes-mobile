@@ -9,6 +9,6 @@ module com.keenotes.mobile {
     requires com.gluonhq.attach.storage;
     requires com.gluonhq.attach.util;
 
-    opens com.keenotes.mobile to javafx.fxml;
-    exports com.keenotes.mobile;
+    exports cn.keevol.keenotes.mobilefx;
+    opens cn.keevol.keenotes.mobilefx to javafx.fxml;
 }

@@ -1,4 +1,4 @@
-package com.keenotes.mobile;
+package cn.keevol.keenotes.mobilefx;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;

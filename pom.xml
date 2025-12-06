@@ -18,7 +18,7 @@
         <javafx.version>23.0.1</javafx.version>
         <gluonfx.plugin.version>1.0.25</gluonfx.plugin.version>
         <attach.version>4.0.21</attach.version>
-        <main.class>com.keenotes.mobile.Main</main.class>
+        <main.class>cn.keevol.keenotes.mobilefx.Main</main.class>
     </properties>
 
     <dependencies>

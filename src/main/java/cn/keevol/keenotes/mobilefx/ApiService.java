@@ -1,4 +1,4 @@
-package com.keenotes.mobile;
+package cn.keevol.keenotes.mobilefx;
 
 import java.net.URI;
 import java.net.http.HttpClient;
