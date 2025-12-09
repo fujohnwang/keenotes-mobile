@@ -7,6 +7,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -105,5 +107,58 @@ public class ApiService {
                 .replace("\r", "\\r")
                 .replace("\t", "\\t")
                 + "\"";
+    }
+
+    /**
+     * Search result record.
+     */
+    public record SearchResult(String id, String title, String snippet, String content) {}
+
+    /**
+     * Mock search notes API.
+     */
+    public CompletableFuture<List<SearchResult>> searchNotes(String query) {
+        return CompletableFuture.supplyAsync(() -> {
+            // Simulate network delay
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            // Mock data
+            List<SearchResult> mockResults = new ArrayList<>();
+            String lowerQuery = query.toLowerCase();
+
+            // Sample mock notes
+            List<SearchResult> allNotes = List.of(
+                new SearchResult("1", "Meeting Notes", 
+                    "Discussed project timeline and deliverables...",
+                    "Meeting Notes\n\nDiscussed project timeline and deliverables for Q1. Action items:\n- Complete design review\n- Update documentation\n- Schedule follow-up meeting"),
+                new SearchResult("2", "Shopping List", 
+                    "Groceries to buy this weekend...",
+                    "Shopping List\n\n- Milk\n- Bread\n- Eggs\n- Vegetables\n- Fruits"),
+                new SearchResult("3", "Ideas for App", 
+                    "New feature ideas for the mobile app...",
+                    "Ideas for App\n\n1. Dark mode support\n2. Cloud sync\n3. Tags and categories\n4. Export to PDF"),
+                new SearchResult("4", "Book Recommendations", 
+                    "Books to read this year...",
+                    "Book Recommendations\n\n- Clean Code by Robert Martin\n- The Pragmatic Programmer\n- Design Patterns"),
+                new SearchResult("5", "Travel Plans", 
+                    "Upcoming trip planning notes...",
+                    "Travel Plans\n\nDestination: Tokyo\nDates: March 15-22\nTodo:\n- Book flights\n- Reserve hotel\n- Plan itinerary")
+            );
+
+            // Filter by query
+            for (SearchResult note : allNotes) {
+                if (note.title().toLowerCase().contains(lowerQuery) ||
+                    note.snippet().toLowerCase().contains(lowerQuery) ||
+                    note.content().toLowerCase().contains(lowerQuery)) {
+                    mockResults.add(note);
+                }
+            }
+
+            return mockResults;
+        });
     }
 }
