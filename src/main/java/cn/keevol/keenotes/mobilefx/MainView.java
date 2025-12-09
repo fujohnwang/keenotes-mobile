@@ -204,11 +204,21 @@ public class MainView extends BorderPane {
         searchPane.toFront();
     }
 
+    private static final int PAGE_SIZE = 20;
+    private int currentPage = 0;
+    private String currentQuery = "";
+
     private void performSearch() {
         String query = searchField.getText().trim();
         if (query.isEmpty()) {
             showNotePane();
             return;
+        }
+
+        // Reset pagination for new query
+        if (!query.equals(currentQuery)) {
+            currentPage = 0;
+            currentQuery = query;
         }
 
         // Switch to search pane and show loading
@@ -228,16 +238,73 @@ public class MainView extends BorderPane {
                 noResults.getStyleClass().add("no-results");
                 searchResultsContainer.getChildren().add(noResults);
             } else {
-                Label countLabel = new Label(results.size() + " result(s) found");
+                int totalResults = results.size();
+                int startIndex = currentPage * PAGE_SIZE;
+                int endIndex = Math.min(startIndex + PAGE_SIZE, totalResults);
+                
+                // Show count info
+                String countText = totalResults <= PAGE_SIZE 
+                    ? totalResults + " result(s) found"
+                    : String.format("Showing %d-%d of %d results", startIndex + 1, endIndex, totalResults);
+                Label countLabel = new Label(countText);
                 countLabel.getStyleClass().add("search-count");
                 searchResultsContainer.getChildren().add(countLabel);
 
-                for (ApiService.SearchResult result : results) {
-                    VBox resultCard = createSearchResultCard(result);
+                // Display current page results
+                for (int i = startIndex; i < endIndex; i++) {
+                    VBox resultCard = createSearchResultCard(results.get(i));
                     searchResultsContainer.getChildren().add(resultCard);
+                }
+
+                // Add "Load More" button if there are more results
+                if (endIndex < totalResults) {
+                    Button loadMoreBtn = new Button("Load More (" + (totalResults - endIndex) + " remaining)");
+                    loadMoreBtn.getStyleClass().add("load-more-button");
+                    loadMoreBtn.setMaxWidth(Double.MAX_VALUE);
+                    loadMoreBtn.setOnAction(e -> {
+                        currentPage++;
+                        loadMoreResults(results);
+                    });
+                    searchResultsContainer.getChildren().add(loadMoreBtn);
                 }
             }
         }));
+    }
+
+    private void loadMoreResults(java.util.List<ApiService.SearchResult> results) {
+        // Remove the "Load More" button
+        searchResultsContainer.getChildren().removeIf(node -> 
+            node instanceof Button && ((Button) node).getStyleClass().contains("load-more-button"));
+
+        int totalResults = results.size();
+        int startIndex = currentPage * PAGE_SIZE;
+        int endIndex = Math.min(startIndex + PAGE_SIZE, totalResults);
+
+        // Update count label
+        if (!searchResultsContainer.getChildren().isEmpty() && 
+            searchResultsContainer.getChildren().get(0) instanceof Label) {
+            Label countLabel = (Label) searchResultsContainer.getChildren().get(0);
+            String countText = String.format("Showing %d-%d of %d results", 1, endIndex, totalResults);
+            countLabel.setText(countText);
+        }
+
+        // Add more results
+        for (int i = startIndex; i < endIndex; i++) {
+            VBox resultCard = createSearchResultCard(results.get(i));
+            searchResultsContainer.getChildren().add(resultCard);
+        }
+
+        // Add new "Load More" button if there are still more results
+        if (endIndex < totalResults) {
+            Button loadMoreBtn = new Button("Load More (" + (totalResults - endIndex) + " remaining)");
+            loadMoreBtn.getStyleClass().add("load-more-button");
+            loadMoreBtn.setMaxWidth(Double.MAX_VALUE);
+            loadMoreBtn.setOnAction(e -> {
+                currentPage++;
+                loadMoreResults(results);
+            });
+            searchResultsContainer.getChildren().add(loadMoreBtn);
+        }
     }
 
     private VBox createSearchResultCard(ApiService.SearchResult result) {

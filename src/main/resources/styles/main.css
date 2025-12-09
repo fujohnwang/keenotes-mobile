@@ -171,6 +171,37 @@
     -fx-text-fill: -fx-background;
 }
 
+.load-more-button {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-text-fill: -fx-primary;
+    -fx-font-size: 14px;
+    -fx-padding: 12 16;
+    -fx-background-radius: 8px;
+    -fx-border-color: -fx-border;
+    -fx-border-radius: 8px;
+    -fx-cursor: hand;
+}
+
+.load-more-button:hover {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-primary;
+}
+
+/* Copyright footer */
+.copyright-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.copyright-link {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-primary;
+}
+
+.copyright-link:hover {
+    -fx-text-fill: -fx-text-primary;
+}
+
 .header-title {
     -fx-font-size: 20px;
     -fx-font-weight: bold;
