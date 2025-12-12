@@ -41,11 +41,28 @@ public class SettingsView extends BorderPane {
         saveButton.setMaxWidth(Double.MAX_VALUE);
         saveButton.setOnAction(e -> saveSettings());
 
+        // Copyright footer
+        Label copyrightLabel = new Label("©2025 王福强(Fuqiang Wang)  All Rights Reserved");
+        copyrightLabel.getStyleClass().add("copyright-label");
+
+        Label websiteLabel = new Label("https://afoo.me");
+        websiteLabel.getStyleClass().add("copyright-link");
+
+        VBox footer = new VBox(4, copyrightLabel, websiteLabel);
+        footer.setAlignment(Pos.CENTER);
+        footer.setPadding(new Insets(24, 0, 0, 0));
+
+        // Spacer to push footer to bottom
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+
         VBox form = new VBox(16,
                 createFieldGroup("Endpoint URL", endpointField),
                 createFieldGroup("Token", tokenField),
                 saveButton,
-                statusLabel
+                statusLabel,
+                spacer,
+                footer
         );
         form.setPadding(new Insets(24));
         form.setAlignment(Pos.TOP_CENTER);

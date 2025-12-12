@@ -7,6 +7,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -105,5 +107,97 @@ public class ApiService {
                 .replace("\r", "\\r")
                 .replace("\t", "\\t")
                 + "\"";
+    }
+
+    /**
+     * Search result record.
+     */
+    public record SearchResult(String id, String content, String createdAt) {}
+
+    /**
+     * Mock search notes API.
+     */
+    public CompletableFuture<List<SearchResult>> searchNotes(String query) {
+        return CompletableFuture.supplyAsync(() -> {
+            // Simulate network delay
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            // Mock data
+            List<SearchResult> mockResults = new ArrayList<>();
+            String lowerQuery = query.toLowerCase();
+
+            // Sample mock notes (same format as Note for consistency)
+            List<SearchResult> allNotes = List.of(
+                new SearchResult("1", 
+                    "Meeting Notes\n\nDiscussed project timeline and deliverables for Q1. Action items:\n- Complete design review\n- Update documentation\n- Schedule follow-up meeting",
+                    "2025-12-12 10:30"),
+                new SearchResult("2", 
+                    "Shopping List\n\n- Milk\n- Bread\n- Eggs\n- Vegetables\n- Fruits",
+                    "2025-12-11 15:20"),
+                new SearchResult("3", 
+                    "Ideas for App\n\n1. Dark mode support\n2. Cloud sync\n3. Tags and categories\n4. Export to PDF",
+                    "2025-12-10 20:15"),
+                new SearchResult("4", 
+                    "Book Recommendations\n\n- Clean Code by Robert Martin\n- The Pragmatic Programmer\n- Design Patterns",
+                    "2025-12-09 14:00"),
+                new SearchResult("5", 
+                    "Travel Plans\n\nDestination: Tokyo\nDates: March 15-22\nTodo:\n- Book flights\n- Reserve hotel\n- Plan itinerary",
+                    "2025-12-08 09:45")
+            );
+
+            // Filter by query
+            for (SearchResult note : allNotes) {
+                if (note.content().toLowerCase().contains(lowerQuery)) {
+                    mockResults.add(note);
+                }
+            }
+
+            return mockResults;
+        });
+    }
+
+    /**
+     * Note record for review.
+     */
+    public record Note(String id, String content, String createdAt) {}
+
+    /**
+     * Mock get notes API for review.
+     */
+    public CompletableFuture<List<Note>> getNotes(int days) {
+        return CompletableFuture.supplyAsync(() -> {
+            // Simulate network delay
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            // Mock data - notes from past N days
+            List<Note> mockNotes = new ArrayList<>();
+            
+            mockNotes.add(new Note("1", 
+                "今天完成了项目的第一阶段开发，主要实现了用户登录和注册功能。",
+                "2025-12-12 10:30"));
+            mockNotes.add(new Note("2", 
+                "学习了 JavaFX 的布局系统，包括 VBox、HBox、BorderPane 等容器的使用方法。",
+                "2025-12-11 15:20"));
+            mockNotes.add(new Note("3", 
+                "读完了《Clean Code》第三章，关于函数的设计原则：\n1. 函数应该短小\n2. 只做一件事\n3. 使用描述性名称",
+                "2025-12-10 20:15"));
+            mockNotes.add(new Note("4", 
+                "周会讨论要点：\n- Q1 目标确认\n- 资源分配\n- 风险评估",
+                "2025-12-09 14:00"));
+            mockNotes.add(new Note("5", 
+                "GluonFX 打包 iOS 应用的步骤记录，需要配置 GRAALVM_HOME 和 Xcode。",
+                "2025-12-08 09:45"));
+
+            // In real implementation, filter by days
+            return mockNotes;
+        });
     }
 }

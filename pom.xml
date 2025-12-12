@@ -126,29 +126,47 @@
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>com.gluonhq.attach</groupId>
-                    <artifactId>display</artifactId>
-                    <version>${attach.version}</version>
-                    <classifier>desktop</classifier>
-                    <scope>runtime</scope>
-                </dependency>
-                <dependency>
-                    <groupId>com.gluonhq.attach</groupId>
-                    <artifactId>lifecycle</artifactId>
-                    <version>${attach.version}</version>
-                    <classifier>desktop</classifier>
-                    <scope>runtime</scope>
-                </dependency>
-                <dependency>
-                    <groupId>com.gluonhq.attach</groupId>
-                    <artifactId>storage</artifactId>
-                    <version>${attach.version}</version>
-                    <classifier>desktop</classifier>
-                    <scope>runtime</scope>
-                </dependency>
-            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <configuration>
+                            <mainClass>${main.class}</mainClass>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>repackage</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+<!--            <dependencies>-->
+<!--                <dependency>-->
+<!--                    <groupId>com.gluonhq.attach</groupId>-->
+<!--                    <artifactId>display</artifactId>-->
+<!--                    <version>${attach.version}</version>-->
+<!--                    <classifier>desktop</classifier>-->
+<!--                    <scope>runtime</scope>-->
+<!--                </dependency>-->
+<!--                <dependency>-->
+<!--                    <groupId>com.gluonhq.attach</groupId>-->
+<!--                    <artifactId>lifecycle</artifactId>-->
+<!--                    <version>${attach.version}</version>-->
+<!--                    <classifier>desktop</classifier>-->
+<!--                    <scope>runtime</scope>-->
+<!--                </dependency>-->
+<!--                <dependency>-->
+<!--                    <groupId>com.gluonhq.attach</groupId>-->
+<!--                    <artifactId>storage</artifactId>-->
+<!--                    <version>${attach.version}</version>-->
+<!--                    <classifier>desktop</classifier>-->
+<!--                    <scope>runtime</scope>-->
+<!--                </dependency>-->
+<!--            </dependencies>-->
         </profile>
 
         <!-- Android profile -->
@@ -177,6 +195,12 @@
                         <artifactId>gluonfx-maven-plugin</artifactId>
                         <configuration>
                             <target>ios</target>
+                            <releaseConfiguration>
+                                <bundleName>KeeNotes</bundleName>
+                                <bundleVersion>1.0.0</bundleVersion>
+                                <bundleShortVersion>1.0</bundleShortVersion>
+                                <skipSigning>true</skipSigning>
+                            </releaseConfiguration>
                         </configuration>
                     </plugin>
                 </plugins>

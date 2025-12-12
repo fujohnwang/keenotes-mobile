@@ -1,0 +1,53 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 1. 基础环境：Java 21
+      # 既然用最新版，我们全线统一用 Java 21
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      # 2. 核心步骤：下载并配置 Gluon 专用 GraalVM
+      # 请务必确保下载的是【linux-amd64】或【linux-x64】版本，不要下载 aarch64！
+      - name: Install Gluon GraalVM
+        run: |
+          # 👇👇👇 在这里填入你找到的最新版 Gluon GraalVM 下载链接 👇👇👇
+          # 注意：必须是 Linux x64/AMD64 版本 (因为 GitHub Runner 是 Intel 芯片)
+          DOWNLOAD_URL="https://github.com/gluonhq/graal/releases/download/gluon-23%2B25.1-dev-2409082136/graalvm-java23-linux-amd64-gluon-23+25.1-dev.tar.gz"
+          
+          # 下载
+          wget -q -O gluon-graalvm.tar.gz $DOWNLOAD_URL
+          
+          # 解压
+          mkdir -p gluon-gvm
+          tar -xzf gluon-graalvm.tar.gz -C gluon-gvm --strip-components=1
+          
+          # 设置环境变量
+          echo "GRAALVM_HOME=$PWD/gluon-gvm" >> $GITHUB_ENV
+
+      # 3. 构建
+      # 插件 1.0.28 + 最新 Gluon GraalVM = 成功
+      - name: Build APK
+        run: mvn -Pandroid clean gluonfx:build gluonfx:package
+      
+      # 4. 上传
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: keenotes-android-apk
+          path: target/gluonfx/aarch64-android/**/*.apk
