@@ -1,19 +1,47 @@
 name: Android Build
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup Java
-        uses: actions/setup-java@v3
+      # 1. 检出代码 (升级到 v4)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. 配置 GluonFX 环境 (推荐使用官方 Action)
+      # 这个 Action 会自动处理 GraalVM 和 Android SDK 的环境变量，比单纯 setup-java 更稳
+      - name: Setup GluonFX
+        uses: gluonhq/setup-gluonfx-action@v1
         with:
-          distribution: 'graalvm'
-          java-version: '21' # 或根据你的项目调整
+          java-version: '21' # 根据你的 pom.xml 实际需求调整，如 '21'
+          target: android
+          # gluonfx-maven-plugin 通常会自动下载 GraalVM，但在 CI 中显式设置更好
+
+      # 3. 缓存 Maven 依赖 (加速构建)
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # 4. 执行构建
       - name: Build APK
         run: mvn gluonfx:build -Pandroid && mvn gluonfx:package -Pandroid
+
+      # 5. 上传构建产物 (修复报错的关键：升级到 v4)
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: keenotes-android
+          name: keenotes-android-apk
+          # 路径通常是这个，如果你的 artifactId 不同，请自行检查 target 下的路径
           path: target/gluonfx/aarch64-android/gvm/*.apk
+          # 可选：设置保留天数，避免占用空间
+          retention-days: 5
