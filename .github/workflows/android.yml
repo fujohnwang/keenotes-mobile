@@ -11,19 +11,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出代码
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. 配置 Java 环境 (修复点：升级到 21)
-      # GluonFX 插件 1.0.23+ 版本开始强制要求构建环境为 Java 21+
-      - name: Setup Java
+      # 🔴 关键修复：使用 graalvm 发行版
+      # 这会自动设置 GRAALVM_HOME 环境变量，并安装 native-image 工具
+      - name: Setup GraalVM
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin' 
-          java-version: '21'  # <--- 这里必须是 21
+          distribution: 'graalvm' 
+          java-version: '21'
+          github-token: ${{ secrets.GITHUB_TOKEN }} # 避免下载 GraalVM 时遇到 API 限制
 
-      # 3. 缓存依赖
       - name: Cache Maven and Gluon dependencies
         uses: actions/cache@v4
         with:
@@ -34,18 +33,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-gluon-
 
-      # 4. 执行构建
-      # 通常 gluonfx:build 包含了编译 native image
-      # gluonfx:package 负责打包成 apk (这一步通常依赖 build 的产物)
       - name: Build APK
+        # 增加 -e -X 参数以便如果再次出错能看到更详细的日志
         run: mvn -Pandroid gluonfx:build gluonfx:package
 
-      # 5. 上传 APK 产物
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: keenotes-android-apk
-          # 注意：如果在 package 阶段生成了 apk，路径通常如下，但也有可能在 target/gluonfx/aarch64-android/ 下
-          # 建议使用通配符匹配
           path: target/gluonfx/aarch64-android/**/*.apk
           retention-days: 5
