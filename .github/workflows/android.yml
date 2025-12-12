@@ -14,14 +14,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🔴 关键修复：使用 graalvm 发行版
-      # 这会自动设置 GRAALVM_HOME 环境变量，并安装 native-image 工具
+      # 修正：去掉了错误的 github-token 参数
+      # 使用 graalvm 发行版以确保设置 GRAALVM_HOME
       - name: Setup GraalVM
         uses: actions/setup-java@v4
         with:
           distribution: 'graalvm' 
           java-version: '21'
-          github-token: ${{ secrets.GITHUB_TOKEN }} # 避免下载 GraalVM 时遇到 API 限制
 
       - name: Cache Maven and Gluon dependencies
         uses: actions/cache@v4
@@ -34,8 +33,8 @@ jobs:
             ${{ runner.os }}-maven-gluon-
 
       - name: Build APK
-        # 增加 -e -X 参数以便如果再次出错能看到更详细的日志
-        run: mvn -Pandroid gluonfx:build gluonfx:package
+        # 增加 -e 以便在出错时显示详细错误堆栈
+        run: mvn -Pandroid gluonfx:build gluonfx:package -e
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
