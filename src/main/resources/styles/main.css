@@ -436,3 +436,74 @@
 .text-area .scroll-pane .content {
     -fx-background-color: transparent;
 }
+
+
+/* Bottom Tab Bar */
+.bottom-tab-bar {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-border-width: 1 0 0 0;
+    -fx-min-height: 50px;
+    -fx-pref-height: 50px;
+}
+
+.tab-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-size: 14px;
+    -fx-padding: 12 0;
+    -fx-cursor: hand;
+    -fx-border-width: 0;
+    -fx-background-radius: 0;
+}
+
+.tab-button:hover {
+    -fx-text-fill: -fx-text-primary;
+}
+
+.tab-button.active {
+    -fx-text-fill: -fx-primary;
+    -fx-font-weight: bold;
+    -fx-border-color: -fx-primary;
+    -fx-border-width: 2 0 0 0;
+}
+
+/* Review View */
+.days-input {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-background-radius: 8px;
+    -fx-border-color: -fx-border;
+    -fx-border-radius: 8px;
+    -fx-padding: 8;
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-primary;
+    -fx-alignment: center;
+}
+
+.days-input:focused {
+    -fx-border-color: -fx-primary;
+}
+
+.days-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.refresh-button {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: -fx-background;
+    -fx-font-size: 14px;
+    -fx-padding: 8 16;
+    -fx-background-radius: 8px;
+    -fx-cursor: hand;
+}
+
+.refresh-button:hover {
+    -fx-background-color: -fx-primary-dark;
+}
+
+.note-date {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-primary;
+    -fx-font-weight: bold;
+}

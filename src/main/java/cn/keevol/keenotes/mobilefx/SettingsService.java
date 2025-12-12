@@ -16,6 +16,8 @@ public class SettingsService {
     private static final String SETTINGS_FILE = "keenotes.properties";
     private static final String KEY_ENDPOINT_URL = "endpoint.url";
     private static final String KEY_TOKEN = "token";
+    private static final String KEY_REVIEW_DAYS = "review.days";
+    private static final int DEFAULT_REVIEW_DAYS = 7;
 
     private static SettingsService instance;
     private final Properties properties;
@@ -80,5 +82,17 @@ public class SettingsService {
 
     public boolean isConfigured() {
         return !getEndpointUrl().isBlank() && !getToken().isBlank();
+    }
+
+    public int getReviewDays() {
+        try {
+            return Integer.parseInt(properties.getProperty(KEY_REVIEW_DAYS, String.valueOf(DEFAULT_REVIEW_DAYS)));
+        } catch (NumberFormatException e) {
+            return DEFAULT_REVIEW_DAYS;
+        }
+    }
+
+    public void setReviewDays(int days) {
+        properties.setProperty(KEY_REVIEW_DAYS, String.valueOf(days));
     }
 }
