@@ -15,17 +15,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. 配置基础 Java 环境
-      # 这里只需要一个普通的 JDK 来运行 Maven 即可
-      # Gluon 插件会自动下载它专门用于构建 Android 的 GraalVM 发行版
+      # 2. 配置 Java 环境 (修复点：升级到 21)
+      # GluonFX 插件 1.0.23+ 版本开始强制要求构建环境为 Java 21+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin' 
-          java-version: '17' # 建议与你本地开发使用的版本保持一致 (17 或 21)
+          java-version: '21'  # <--- 这里必须是 21
 
-      # 3. 缓存依赖 (非常重要，加速构建)
-      # 缓存 Maven 仓库以及 Gluon 自动下载的 GraalVM (~/.gluon)
+      # 3. 缓存依赖
       - name: Cache Maven and Gluon dependencies
         uses: actions/cache@v4
         with:
@@ -37,14 +35,17 @@ jobs:
             ${{ runner.os }}-maven-gluon-
 
       # 4. 执行构建
-      # ubuntu-latest 镜像自带 Android SDK，Gluon 插件会自动识别 ANDROID_HOME 环境变量
+      # 通常 gluonfx:build 包含了编译 native image
+      # gluonfx:package 负责打包成 apk (这一步通常依赖 build 的产物)
       - name: Build APK
-        run: mvn gluonfx:build -Pandroid && mvn gluonfx:package -Pandroid
+        run: mvn -Pandroid gluonfx:build gluonfx:package
 
       # 5. 上传 APK 产物
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: keenotes-android-apk
-          path: target/gluonfx/aarch64-android/gvm/*.apk
+          # 注意：如果在 package 阶段生成了 apk，路径通常如下，但也有可能在 target/gluonfx/aarch64-android/ 下
+          # 建议使用通配符匹配
+          path: target/gluonfx/aarch64-android/**/*.apk
           retention-days: 5
