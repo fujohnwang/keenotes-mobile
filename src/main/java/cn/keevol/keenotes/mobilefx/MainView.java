@@ -308,19 +308,15 @@ public class MainView extends BorderPane {
     }
 
     private VBox createSearchResultCard(ApiService.SearchResult result) {
-        // Expand indicator
-        Label expandIcon = new Label("▶");
-        expandIcon.getStyleClass().add("expand-icon");
+        // Date label (same style as ReviewView)
+        Label dateLabel = new Label(result.createdAt());
+        dateLabel.getStyleClass().add("note-date");
 
-        // Preview text (first 2-3 lines of content, collapsed state)
+        // Content preview
         String previewText = getPreviewText(result.content(), 100);
         Label previewLabel = new Label(previewText);
         previewLabel.getStyleClass().add("search-result-preview");
         previewLabel.setWrapText(true);
-        HBox.setHgrow(previewLabel, Priority.ALWAYS);
-
-        HBox previewRow = new HBox(8, expandIcon, previewLabel);
-        previewRow.setAlignment(Pos.TOP_LEFT);
 
         // Full content (hidden by default)
         Label contentLabel = new Label(result.content());
@@ -349,22 +345,21 @@ public class MainView extends BorderPane {
         actionRow.setVisible(false);
         actionRow.setManaged(false);
 
-        VBox card = new VBox(8, previewRow, contentBox, actionRow);
+        VBox card = new VBox(8, dateLabel, previewLabel, contentBox, actionRow);
         card.getStyleClass().add("search-result-card");
         card.setPadding(new Insets(16));
 
         // Track expanded state
         final boolean[] expanded = {false};
 
-        // Click anywhere on card to expand/collapse (except copy button)
+        // Click to expand/collapse
         card.setOnMouseClicked(e -> {
             if (e.getTarget() == copyBtn || copyBtn.isHover()) {
                 return;
             }
             expanded[0] = !expanded[0];
-            expandIcon.setText(expanded[0] ? "▼" : "▶");
-            previewRow.setVisible(!expanded[0]);
-            previewRow.setManaged(!expanded[0]);
+            previewLabel.setVisible(!expanded[0]);
+            previewLabel.setManaged(!expanded[0]);
             contentBox.setVisible(expanded[0]);
             contentBox.setManaged(expanded[0]);
             actionRow.setVisible(expanded[0]);

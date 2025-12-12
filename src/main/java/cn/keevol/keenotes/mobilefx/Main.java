@@ -78,14 +78,18 @@ public class Main extends Application {
 
     private void showRecordTab() {
         contentPane.getChildren().setAll(mainView);
-        recordTabBtn.getStyleClass().add("active");
         reviewTabBtn.getStyleClass().remove("active");
+        if (!recordTabBtn.getStyleClass().contains("active")) {
+            recordTabBtn.getStyleClass().add("active");
+        }
     }
 
     private void showReviewTab() {
         contentPane.getChildren().setAll(reviewView);
-        reviewTabBtn.getStyleClass().add("active");
         recordTabBtn.getStyleClass().remove("active");
+        if (!reviewTabBtn.getStyleClass().contains("active")) {
+            reviewTabBtn.getStyleClass().add("active");
+        }
         reviewView.refresh();
     }
 

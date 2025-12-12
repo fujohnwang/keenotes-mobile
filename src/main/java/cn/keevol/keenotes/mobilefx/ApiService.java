@@ -112,7 +112,7 @@ public class ApiService {
     /**
      * Search result record.
      */
-    public record SearchResult(String id, String title, String snippet, String content) {}
+    public record SearchResult(String id, String content, String createdAt) {}
 
     /**
      * Mock search notes API.
@@ -130,30 +130,28 @@ public class ApiService {
             List<SearchResult> mockResults = new ArrayList<>();
             String lowerQuery = query.toLowerCase();
 
-            // Sample mock notes
+            // Sample mock notes (same format as Note for consistency)
             List<SearchResult> allNotes = List.of(
-                new SearchResult("1", "Meeting Notes", 
-                    "Discussed project timeline and deliverables...",
-                    "Meeting Notes\n\nDiscussed project timeline and deliverables for Q1. Action items:\n- Complete design review\n- Update documentation\n- Schedule follow-up meeting"),
-                new SearchResult("2", "Shopping List", 
-                    "Groceries to buy this weekend...",
-                    "Shopping List\n\n- Milk\n- Bread\n- Eggs\n- Vegetables\n- Fruits"),
-                new SearchResult("3", "Ideas for App", 
-                    "New feature ideas for the mobile app...",
-                    "Ideas for App\n\n1. Dark mode support\n2. Cloud sync\n3. Tags and categories\n4. Export to PDF"),
-                new SearchResult("4", "Book Recommendations", 
-                    "Books to read this year...",
-                    "Book Recommendations\n\n- Clean Code by Robert Martin\n- The Pragmatic Programmer\n- Design Patterns"),
-                new SearchResult("5", "Travel Plans", 
-                    "Upcoming trip planning notes...",
-                    "Travel Plans\n\nDestination: Tokyo\nDates: March 15-22\nTodo:\n- Book flights\n- Reserve hotel\n- Plan itinerary")
+                new SearchResult("1", 
+                    "Meeting Notes\n\nDiscussed project timeline and deliverables for Q1. Action items:\n- Complete design review\n- Update documentation\n- Schedule follow-up meeting",
+                    "2025-12-12 10:30"),
+                new SearchResult("2", 
+                    "Shopping List\n\n- Milk\n- Bread\n- Eggs\n- Vegetables\n- Fruits",
+                    "2025-12-11 15:20"),
+                new SearchResult("3", 
+                    "Ideas for App\n\n1. Dark mode support\n2. Cloud sync\n3. Tags and categories\n4. Export to PDF",
+                    "2025-12-10 20:15"),
+                new SearchResult("4", 
+                    "Book Recommendations\n\n- Clean Code by Robert Martin\n- The Pragmatic Programmer\n- Design Patterns",
+                    "2025-12-09 14:00"),
+                new SearchResult("5", 
+                    "Travel Plans\n\nDestination: Tokyo\nDates: March 15-22\nTodo:\n- Book flights\n- Reserve hotel\n- Plan itinerary",
+                    "2025-12-08 09:45")
             );
 
             // Filter by query
             for (SearchResult note : allNotes) {
-                if (note.title().toLowerCase().contains(lowerQuery) ||
-                    note.snippet().toLowerCase().contains(lowerQuery) ||
-                    note.content().toLowerCase().contains(lowerQuery)) {
+                if (note.content().toLowerCase().contains(lowerQuery)) {
                     mockResults.add(note);
                 }
             }
