@@ -1,0 +1,19 @@
+name: Android Build
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'graalvm'
+          java-version: '21' # 或根据你的项目调整
+      - name: Build APK
+        run: mvn gluonfx:build -Pandroid && mvn gluonfx:package -Pandroid
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: keenotes-android
+          path: target/gluonfx/aarch64-android/gvm/*.apk
