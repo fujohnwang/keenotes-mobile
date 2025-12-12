@@ -443,9 +443,34 @@ public class MainView extends BorderPane {
         echoContent.getStyleClass().add("echo-content");
         echoContent.setWrapText(true);
 
-        VBox card = new VBox(4, echoTitle, echoContent);
+        Label copiedHint = new Label("✓ Copied!");
+        copiedHint.getStyleClass().add("copied-label");
+        copiedHint.setVisible(false);
+        copiedHint.setManaged(false);
+
+        VBox card = new VBox(4, echoTitle, echoContent, copiedHint);
         card.getStyleClass().add("note-card");
         card.setPadding(new Insets(12));
+
+        // Double-click to copy content
+        card.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                Clipboard clipboard = Clipboard.getSystemClipboard();
+                ClipboardContent clipboardContent = new ClipboardContent();
+                clipboardContent.putString(content);
+                clipboard.setContent(clipboardContent);
+
+                copiedHint.setVisible(true);
+                copiedHint.setManaged(true);
+
+                PauseTransition pause = new PauseTransition(Duration.millis(1500));
+                pause.setOnFinished(ev -> {
+                    copiedHint.setVisible(false);
+                    copiedHint.setManaged(false);
+                });
+                pause.play();
+            }
+        });
 
         echoContainer.getChildren().add(card);
     }
