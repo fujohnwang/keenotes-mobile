@@ -14,34 +14,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. 安装 GraalVM 21
-      - name: Setup GraalVM
+      # 1. 使用标准的 Java 环境
+      # 插件 1.0.26 会自行处理 GraalVM 的下载和配置
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'graalvm' 
+          distribution: 'temurin'
           java-version: '21'
 
-      # 2. 🔴 关键修复步骤：显式设置 GRAALVM_HOME
-      # GluonFX 插件强制检查 GRAALVM_HOME 变量，我们手动将其指向 JAVA_HOME
-      - name: Set GRAALVM_HOME
-        run: echo "GRAALVM_HOME=$JAVA_HOME" >> $GITHUB_ENV
-
-      # 3. 缓存依赖
-      - name: Cache Maven and Gluon dependencies
+      # 2. 缓存 (这里我去掉了 .gluon 的缓存恢复，强制让插件下载最新、正确的文件)
+      # 避免旧的缓存文件导致冲突
+      - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.m2/repository
-            ~/.gluon
-          key: ${{ runner.os }}-maven-gluon-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-gluon-
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
 
-      # 4. 执行构建
-      # 注意：因为我们手动指定了 GraalVM，Gluon 可能不再自动下载，直接使用环境中的版本
+      # 3. 执行构建
+      # 添加 'clean' 确保没有残留的缓存文件干扰
       - name: Build APK
-        run: mvn -Pandroid gluonfx:build gluonfx:package -e
+        run: mvn -Pandroid clean gluonfx:build gluonfx:package
 
+      # 4. 上传
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
