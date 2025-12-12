@@ -10,11 +10,12 @@
 # 当前使用 amd64 版本（通过 Rosetta 2 运行，不推荐）
 export GRAALVM_HOME="/Library/Java/JavaVirtualMachines/graalvm-java23-darwin-aarch64-gluon-23+25.1-dev/Contents/Home"
 
-# mvn gluonfx:build && mvn gluonfx:package
+mvn gluonfx:build && mvn gluonfx:package
 
 #echo "build android app"
 #mvn gluonfx:build -Pandroid && mvn gluonfx:package -Pandroid
 
 echo "build ios app"
+mvn clean
 mvn gluonfx:build -Pios
 mvn gluonfx:package -Pios
