@@ -14,14 +14,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 修正：去掉了错误的 github-token 参数
-      # 使用 graalvm 发行版以确保设置 GRAALVM_HOME
+      # 1. 安装 GraalVM 21
       - name: Setup GraalVM
         uses: actions/setup-java@v4
         with:
           distribution: 'graalvm' 
           java-version: '21'
 
+      # 2. 🔴 关键修复步骤：显式设置 GRAALVM_HOME
+      # GluonFX 插件强制检查 GRAALVM_HOME 变量，我们手动将其指向 JAVA_HOME
+      - name: Set GRAALVM_HOME
+        run: echo "GRAALVM_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      # 3. 缓存依赖
       - name: Cache Maven and Gluon dependencies
         uses: actions/cache@v4
         with:
@@ -32,8 +37,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-gluon-
 
+      # 4. 执行构建
+      # 注意：因为我们手动指定了 GraalVM，Gluon 可能不再自动下载，直接使用环境中的版本
       - name: Build APK
-        # 增加 -e 以便在出错时显示详细错误堆栈
         run: mvn -Pandroid gluonfx:build gluonfx:package -e
 
       - name: Upload APK
