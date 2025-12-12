@@ -22,6 +22,8 @@
     -fx-background-color: -fx-surface;
     -fx-border-color: -fx-border;
     -fx-border-width: 0 0 1 0;
+    -fx-min-height: 56px;
+    -fx-pref-height: 56px;
 }
 
 /* Search field */
