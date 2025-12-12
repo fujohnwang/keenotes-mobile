@@ -16,7 +16,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
         <javafx.version>23.0.1</javafx.version>
-        <gluonfx.plugin.version>1.0.28</gluonfx.plugin.version>
+        <gluonfx.plugin.version>1.0.25</gluonfx.plugin.version>
         <attach.version>4.0.21</attach.version>
         <main.class>cn.keevol.keenotes.mobilefx.Main</main.class>
     </properties>
