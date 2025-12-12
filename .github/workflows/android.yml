@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'graalvm'
-          java-version: '21'
+          java-version: '25'
 
       # 2. ⚡️ 核心修正：强制绑定 GRAALVM_HOME
       # Gluon 插件死板地寻找 GRAALVM_HOME 变量，而 setup-java 设置的是 JAVA_HOME
@@ -28,16 +28,6 @@ jobs:
       - name: Set GRAALVM_HOME
         run: |
           echo "GRAALVM_HOME=$JAVA_HOME" >> $GITHUB_ENV
-
-      # 3. 缓存 Maven 和 Gluon
-      - name: Cache Maven dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.m2/repository
-            ~/.gluon
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
 
       # 4. 执行构建
       # 加上 -e 显示详细错误
