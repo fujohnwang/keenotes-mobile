@@ -115,89 +115,291 @@ public class ApiService {
     public record SearchResult(String id, String content, String createdAt) {}
 
     /**
-     * Mock search notes API.
-     */
-    public CompletableFuture<List<SearchResult>> searchNotes(String query) {
-        return CompletableFuture.supplyAsync(() -> {
-            // Simulate network delay
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-
-            // Mock data
-            List<SearchResult> mockResults = new ArrayList<>();
-            String lowerQuery = query.toLowerCase();
-
-            // Sample mock notes (same format as Note for consistency)
-            List<SearchResult> allNotes = List.of(
-                new SearchResult("1", 
-                    "Meeting Notes\n\nDiscussed project timeline and deliverables for Q1. Action items:\n- Complete design review\n- Update documentation\n- Schedule follow-up meeting",
-                    "2025-12-12 10:30"),
-                new SearchResult("2", 
-                    "Shopping List\n\n- Milk\n- Bread\n- Eggs\n- Vegetables\n- Fruits",
-                    "2025-12-11 15:20"),
-                new SearchResult("3", 
-                    "Ideas for App\n\n1. Dark mode support\n2. Cloud sync\n3. Tags and categories\n4. Export to PDF",
-                    "2025-12-10 20:15"),
-                new SearchResult("4", 
-                    "Book Recommendations\n\n- Clean Code by Robert Martin\n- The Pragmatic Programmer\n- Design Patterns",
-                    "2025-12-09 14:00"),
-                new SearchResult("5", 
-                    "Travel Plans\n\nDestination: Tokyo\nDates: March 15-22\nTodo:\n- Book flights\n- Reserve hotel\n- Plan itinerary",
-                    "2025-12-08 09:45")
-            );
-
-            // Filter by query
-            for (SearchResult note : allNotes) {
-                if (note.content().toLowerCase().contains(lowerQuery)) {
-                    mockResults.add(note);
-                }
-            }
-
-            return mockResults;
-        });
-    }
-
-    /**
      * Note record for review.
      */
     public record Note(String id, String content, String createdAt) {}
 
     /**
-     * Mock get notes API for review.
+     * Check if API is configured.
      */
-    public CompletableFuture<List<Note>> getNotes(int days) {
-        return CompletableFuture.supplyAsync(() -> {
-            // Simulate network delay
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+    private boolean isConfigured() {
+        String endpointUrl = settings.getEndpointUrl();
+        return endpointUrl != null && !endpointUrl.isBlank();
+    }
+
+    /**
+     * Build base URL for API calls (removes trailing slash if present).
+     */
+    private String getBaseUrl() {
+        String url = settings.getEndpointUrl();
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
+    /**
+     * Search notes API - uses real API if configured, otherwise mock data.
+     */
+    public CompletableFuture<List<SearchResult>> searchNotes(String query) {
+        if (!isConfigured()) {
+            return searchNotesMock(query);
+        }
+        return searchNotesReal(query);
+    }
+
+    private CompletableFuture<List<SearchResult>> searchNotesReal(String query) {
+        try {
+            String baseUrl = getBaseUrl();
+            String token = settings.getToken();
+            String url = baseUrl + "/search?q=" + java.net.URLEncoder.encode(query, "UTF-8") + "&size=100";
+
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(TIMEOUT)
+                    .GET();
+
+            if (token != null && !token.isBlank()) {
+                requestBuilder.header("Authorization", "Bearer " + token);
             }
 
-            // Mock data - notes from past N days
-            List<Note> mockNotes = new ArrayList<>();
-            
-            mockNotes.add(new Note("1", 
-                "今天完成了项目的第一阶段开发，主要实现了用户登录和注册功能。",
-                "2025-12-12 10:30"));
-            mockNotes.add(new Note("2", 
-                "学习了 JavaFX 的布局系统，包括 VBox、HBox、BorderPane 等容器的使用方法。",
-                "2025-12-11 15:20"));
-            mockNotes.add(new Note("3", 
-                "读完了《Clean Code》第三章，关于函数的设计原则：\n1. 函数应该短小\n2. 只做一件事\n3. 使用描述性名称",
-                "2025-12-10 20:15"));
-            mockNotes.add(new Note("4", 
-                "周会讨论要点：\n- Q1 目标确认\n- 资源分配\n- 风险评估",
-                "2025-12-09 14:00"));
-            mockNotes.add(new Note("5", 
-                "GluonFX 打包 iOS 应用的步骤记录，需要配置 GRAALVM_HOME 和 Xcode。",
-                "2025-12-08 09:45"));
+            return httpClient.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                            return parseSearchResults(response.body());
+                        }
+                        return List.<SearchResult>of();
+                    })
+                    .exceptionally(ex -> {
+                        System.err.println("Search API error: " + ex.getMessage());
+                        return List.of();
+                    });
+        } catch (Exception e) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+    }
 
-            // In real implementation, filter by days
-            return mockNotes;
+    private List<SearchResult> parseSearchResults(String json) {
+        List<SearchResult> results = new ArrayList<>();
+        try {
+            // Simple JSON parsing without external library
+            int resultsStart = json.indexOf("\"results\"");
+            if (resultsStart == -1) return results;
+
+            int arrayStart = json.indexOf("[", resultsStart);
+            int arrayEnd = findMatchingBracket(json, arrayStart);
+            if (arrayStart == -1 || arrayEnd == -1) return results;
+
+            String arrayContent = json.substring(arrayStart + 1, arrayEnd);
+            parseJsonArray(arrayContent, results, true);
+        } catch (Exception e) {
+            System.err.println("Parse error: " + e.getMessage());
+        }
+        return results;
+    }
+
+    /**
+     * Get notes API - uses real API if configured, otherwise mock data.
+     */
+    public CompletableFuture<List<Note>> getNotes(int days) {
+        if (!isConfigured()) {
+            return getNotesMock(days);
+        }
+        return getNotesReal(days);
+    }
+
+    private CompletableFuture<List<Note>> getNotesReal(int days) {
+        try {
+            String baseUrl = getBaseUrl();
+            String token = settings.getToken();
+            String url = baseUrl + "/notes?days=" + days + "&size=100";
+
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(TIMEOUT)
+                    .GET();
+
+            if (token != null && !token.isBlank()) {
+                requestBuilder.header("Authorization", "Bearer " + token);
+            }
+
+            return httpClient.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                            return parseNotes(response.body());
+                        }
+                        return List.<Note>of();
+                    })
+                    .exceptionally(ex -> {
+                        System.err.println("Notes API error: " + ex.getMessage());
+                        return List.of();
+                    });
+        } catch (Exception e) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+    }
+
+    private List<Note> parseNotes(String json) {
+        List<Note> results = new ArrayList<>();
+        try {
+            int resultsStart = json.indexOf("\"results\"");
+            if (resultsStart == -1) return results;
+
+            int arrayStart = json.indexOf("[", resultsStart);
+            int arrayEnd = findMatchingBracket(json, arrayStart);
+            if (arrayStart == -1 || arrayEnd == -1) return results;
+
+            String arrayContent = json.substring(arrayStart + 1, arrayEnd);
+            List<SearchResult> searchResults = new ArrayList<>();
+            parseJsonArray(arrayContent, searchResults, false);
+            
+            for (SearchResult sr : searchResults) {
+                results.add(new Note(sr.id(), sr.content(), sr.createdAt()));
+            }
+        } catch (Exception e) {
+            System.err.println("Parse error: " + e.getMessage());
+        }
+        return results;
+    }
+
+    private void parseJsonArray(String arrayContent, List<SearchResult> results, boolean isSearch) {
+        int pos = 0;
+        while (pos < arrayContent.length()) {
+            int objStart = arrayContent.indexOf("{", pos);
+            if (objStart == -1) break;
+
+            int objEnd = findMatchingBrace(arrayContent, objStart);
+            if (objEnd == -1) break;
+
+            String objStr = arrayContent.substring(objStart, objEnd + 1);
+            SearchResult result = parseNoteObject(objStr);
+            if (result != null) {
+                results.add(result);
+            }
+            pos = objEnd + 1;
+        }
+    }
+
+    private SearchResult parseNoteObject(String objStr) {
+        String id = extractJsonString(objStr, "id");
+        String content = extractJsonString(objStr, "content");
+        String createdAt = extractJsonString(objStr, "createdAt");
+        
+        if (content != null) {
+            // Format createdAt for display
+            if (createdAt != null && createdAt.contains("T")) {
+                createdAt = createdAt.replace("T", " ");
+                if (createdAt.length() > 16) {
+                    createdAt = createdAt.substring(0, 16);
+                }
+            }
+            return new SearchResult(id != null ? id : "", content, createdAt != null ? createdAt : "");
+        }
+        return null;
+    }
+
+    private String extractJsonString(String json, String key) {
+        String searchKey = "\"" + key + "\"";
+        int keyPos = json.indexOf(searchKey);
+        if (keyPos == -1) return null;
+
+        int colonPos = json.indexOf(":", keyPos);
+        if (colonPos == -1) return null;
+
+        int valueStart = json.indexOf("\"", colonPos);
+        if (valueStart == -1) return null;
+
+        int valueEnd = findStringEnd(json, valueStart + 1);
+        if (valueEnd == -1) return null;
+
+        String value = json.substring(valueStart + 1, valueEnd);
+        // Unescape JSON string
+        return value.replace("\\n", "\n").replace("\\r", "\r")
+                    .replace("\\t", "\t").replace("\\\"", "\"").replace("\\\\", "\\");
+    }
+
+    private int findStringEnd(String json, int start) {
+        for (int i = start; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '\\' && i + 1 < json.length()) {
+                i++; // Skip escaped character
+            } else if (c == '"') {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int findMatchingBracket(String json, int start) {
+        if (start == -1 || json.charAt(start) != '[') return -1;
+        int depth = 1;
+        for (int i = start + 1; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '"') {
+                i = findStringEnd(json, i + 1);
+                if (i == -1) return -1;
+            } else if (c == '[') {
+                depth++;
+            } else if (c == ']') {
+                depth--;
+                if (depth == 0) return i;
+            }
+        }
+        return -1;
+    }
+
+    private int findMatchingBrace(String json, int start) {
+        if (start == -1 || json.charAt(start) != '{') return -1;
+        int depth = 1;
+        for (int i = start + 1; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '"') {
+                i = findStringEnd(json, i + 1);
+                if (i == -1) return -1;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) return i;
+            }
+        }
+        return -1;
+    }
+
+    // ========== Mock Data Methods ==========
+
+    private CompletableFuture<List<SearchResult>> searchNotesMock(String query) {
+        return CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(300); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+
+            List<SearchResult> mockResults = new ArrayList<>();
+            String lowerQuery = query.toLowerCase();
+
+            List<SearchResult> allNotes = List.of(
+                new SearchResult("1", "Meeting Notes\n\nDiscussed project timeline and deliverables for Q1.", "2025-12-12 10:30"),
+                new SearchResult("2", "Shopping List\n\n- Milk\n- Bread\n- Eggs", "2025-12-11 15:20"),
+                new SearchResult("3", "Ideas for App\n\n1. Dark mode\n2. Cloud sync", "2025-12-10 20:15"),
+                new SearchResult("4", "Book Recommendations\n\n- Clean Code\n- Design Patterns", "2025-12-09 14:00"),
+                new SearchResult("5", "Travel Plans\n\nDestination: Tokyo", "2025-12-08 09:45")
+            );
+
+            for (SearchResult note : allNotes) {
+                if (note.content().toLowerCase().contains(lowerQuery)) {
+                    mockResults.add(note);
+                }
+            }
+            return mockResults;
+        });
+    }
+
+    private CompletableFuture<List<Note>> getNotesMock(int days) {
+        return CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(300); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+
+            return List.of(
+                new Note("1", "今天完成了项目的第一阶段开发。", "2025-12-12 10:30"),
+                new Note("2", "学习了 JavaFX 的布局系统。", "2025-12-11 15:20"),
+                new Note("3", "读完了《Clean Code》第三章。", "2025-12-10 20:15"),
+                new Note("4", "周会讨论要点：Q1 目标确认。", "2025-12-09 14:00"),
+                new Note("5", "GluonFX 打包 iOS 应用的步骤记录。", "2025-12-08 09:45")
+            );
         });
     }
 }
