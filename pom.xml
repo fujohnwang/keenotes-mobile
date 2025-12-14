@@ -82,6 +82,18 @@
     </pluginRepositories>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <includes>
+                    <include>**/*.css</include>
+                    <include>**/*.ttf</include>
+                    <include>**/*.otf</include>
+                    <include>**/*.png</include>
+                    <include>**/*.json</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -109,6 +121,12 @@
                         <list>lifecycle</list>
                         <list>storage</list>
                     </attachList>
+                    <resourcesList>
+                        <list>styles/.*\\.css</list>
+                        <list>fonts/.*\\.ttf</list>
+                        <list>fonts/.*\\.otf</list>
+                        <list>icons/.*\\.png</list>
+                    </resourcesList>
                     <releaseConfiguration>
                         <bundleName>KeeNotes</bundleName>
                         <bundleVersion>1.0.0</bundleVersion>
