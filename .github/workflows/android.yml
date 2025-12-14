@@ -8,21 +8,20 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest # 确保使用最新版 x64 环境
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. 改回 Java 17
-      # 原因：Android Gradle 插件对 Java 21 的支持可能存在版本匹配问题，17 是目前最稳的。
+      # 1. 恢复使用 Java 21 (为了能编译你的 Java 21 代码)
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
-      # 2. 安装 Gluon GraalVM (Linux AMD64)
+      # 2. 安装 Gluon GraalVM
       - name: Install Gluon GraalVM
         run: |
           DOWNLOAD_URL="https://github.com/gluonhq/graal/releases/download/gluon-23%2B25.1-dev-2409082136/graalvm-java23-linux-amd64-gluon-23+25.1-dev.tar.gz"
@@ -32,28 +31,37 @@ jobs:
           echo "GRAALVM_HOME=$PWD/gluon-gvm" >> $GITHUB_ENV
 
       # 3. 构建 APK
-      # 关键修改：增加 -Dgluonfx.target.android.sdk 指定使用系统自带 SDK
       - name: Build APK
         env:
-          # GitHub Actions 的 ubuntu-latest 自带了 Android SDK，路径通常在这里
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          # 直接引用 GitHub Action 环境自带的 Android SDK 路径变量
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         run: |
+          echo "Using Android SDK at: $ANDROID_SDK_ROOT"
+          
+          # 关键技巧：
+          # 虽然我们用 Java 21 运行 Maven，但我们强制 Gradle 使用 Java 17 (如果系统里有的话) 
+          # 或者我们直接尝试用 Java 21 跑。
+          # 如果之前是因为下载 SDK 失败，这次指定了 SDK 路径应该能跳过下载。
+          
           mvn -Pandroid clean gluonfx:build gluonfx:package \
-            -Dgluonfx.target.android.sdk=$ANDROID_SDK_ROOT
+            -Dgluonfx.target.android.sdk=$ANDROID_SDK_ROOT \
+            -e
 
-      # 4. 【调试关键】如果构建失败，打印 Gluon 的详细日志文件
-      # 如果这步不加，你永远不知道为什么 package-task 失败
+      # 4. 容错打印日志
+      # 加了 if 判断，只有当目录存在时才打印，防止报错干扰判断
       - name: Print Gluon Error Logs
         if: failure()
         run: |
-          echo "Finding log files..."
-          find target/gluonfx -name "*.log"
-          echo "Printing log contents:"
-          find target/gluonfx -name "*.log" -exec echo "================ {} ================" \; -exec cat {} \;
+          if [ -d "target/gluonfx" ]; then
+            echo "Finding log files..."
+            find target/gluonfx -name "*.log" -exec echo "================ {} ================" \; -exec cat {} \;
+          else
+            echo "target/gluonfx directory does not exist. The build failed before Gluon could start."
+            echo "Please check the 'Build APK' step logs directly."
+          fi
 
       # 5. 上传
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: keenotes-android-apk
