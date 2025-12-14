@@ -124,8 +124,9 @@
                     <resourcesList>
                         <list>styles/main.css</list>
                         <list>fonts/MiSans-Regular.ttf</list>
+                        <list>fonts/.*\\.ttf</list>
                         <list>icons/app-icon.png</list>
-                        <list>META-INF/native-image/.*</list>
+                        <list>META-INF/.*</list>
                     </resourcesList>
                     <reflectionList>
                         <list>javafx.scene.text.Font</list>

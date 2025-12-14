@@ -1,0 +1,15 @@
+{
+  "resources": {
+    "includes": [
+      {"pattern": "\\Qfonts/MiSans-Regular.ttf\\E"},
+      {"pattern": "\\Qstyles/main.css\\E"},
+      {"pattern": "\\Qicons/app-icon.png\\E"},
+      {"pattern": ".*\\.ttf$"},
+      {"pattern": ".*\\.otf$"},
+      {"pattern": ".*\\.css$"},
+      {"pattern": ".*\\.png$"},
+      {"pattern": ".*\\.fxml$"}
+    ]
+  },
+  "bundles": []
+}
