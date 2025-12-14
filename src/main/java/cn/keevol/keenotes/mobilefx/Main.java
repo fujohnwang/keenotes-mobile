@@ -119,7 +119,8 @@ public class Main extends Application {
 
     private void loadCustomFont() {
         try {
-            var fontStream = getClass().getResourceAsStream("/fonts/MiSans-Regular.ttf");
+            // var fontStream = getClass().getResourceAsStream("/fonts/MiSans-Regular.ttf");
+            var fontStream = getClass().getResourceAsStream("/fonts/NotoSansSC-Regular.ttf");
             if (fontStream != null) {
                 Font font = Font.loadFont(fontStream, 14);
                 if (font != null) {
