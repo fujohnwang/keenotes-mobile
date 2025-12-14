@@ -22,6 +22,9 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
+
+
+
         root = new BorderPane();
         contentPane = new StackPane();
 
