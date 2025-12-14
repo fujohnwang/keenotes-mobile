@@ -9,6 +9,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.layout.*;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 public class Main extends Application {
@@ -22,6 +23,11 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
+        // Load Chinese font for Android/iOS native builds
+        loadCustomFont();
+
+
+
         root = new BorderPane();
         contentPane = new StackPane();
 
@@ -109,6 +115,57 @@ public class Main extends Application {
     @Override
     public void stop() {
         System.out.println("Application stopped.");
+    }
+
+    private void loadCustomFont() {
+        // On Android, Font.loadFont() from InputStream doesn't work properly
+        // Need to copy font to local file system first, then load from file URI
+        String fontResourcePath = "/fonts/MiSans-Regular.ttf";
+        
+        try {
+            var fontStream = getClass().getResourceAsStream(fontResourcePath);
+            if (fontStream == null) {
+                System.err.println("Font resource not found: " + fontResourcePath);
+                return;
+            }
+
+            // For Android/iOS: copy to temp file and load from file URI
+            if (Platform.isAndroid() || Platform.isIOS()) {
+                java.io.File tempDir = new java.io.File(System.getProperty("java.io.tmpdir", "/tmp"));
+                java.io.File fontFile = new java.io.File(tempDir, "MiSans-Regular.ttf");
+                
+                // Copy font to temp file
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(fontFile)) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = fontStream.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                }
+                fontStream.close();
+                
+                // Load from file URI (this works on Android)
+                Font font = Font.loadFont(fontFile.toURI().toString(), 14);
+                if (font != null) {
+                    System.out.println("Loaded font from file: " + font.getName());
+                    return;
+                } else {
+                    System.err.println("Font.loadFont returned null for file: " + fontFile.getAbsolutePath());
+                }
+            } else {
+                // Desktop: load directly from stream
+                Font font = Font.loadFont(fontStream, 14);
+                fontStream.close();
+                if (font != null) {
+                    System.out.println("Loaded font from stream: " + font.getName());
+                    return;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading font: " + e.getMessage());
+            e.printStackTrace();
+        }
+        System.err.println("Failed to load custom font");
     }
 
     public static void main(String[] args) {
