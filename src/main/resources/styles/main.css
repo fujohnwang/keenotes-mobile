@@ -13,13 +13,17 @@
     -fx-accent-glow: rgba(0, 212, 255, 0.15);
 }
 
-@font-face {
-    font-family: 'MiSans';
-    src: url('/fonts/MiSans-Regular.ttf');
+/* Font loaded programmatically in Main.java */
+.root {
+    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-.root * {
-    -fx-font-family: 'MiSans', sans-serif;
+* {
+    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.label, .text, .button, .text-field, .text-area {
+    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
 .main-view {

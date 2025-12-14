@@ -9,6 +9,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.layout.*;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 public class Main extends Application {
@@ -22,6 +23,8 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
+        // Load Chinese font for Android/iOS native builds
+        loadCustomFont();
 
 
 
@@ -112,6 +115,25 @@ public class Main extends Application {
     @Override
     public void stop() {
         System.out.println("Application stopped.");
+    }
+
+    private void loadCustomFont() {
+        try {
+            var fontStream = getClass().getResourceAsStream("/fonts/MiSans-Regular.ttf");
+            if (fontStream != null) {
+                Font font = Font.loadFont(fontStream, 14);
+                if (font != null) {
+                    System.out.println("Loaded font: " + font.getName());
+                } else {
+                    System.err.println("Failed to load MiSans font");
+                }
+                fontStream.close();
+            } else {
+                System.err.println("Font file not found: /fonts/MiSans-Regular.ttf");
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading font: " + e.getMessage());
+        }
     }
 
     public static void main(String[] args) {
