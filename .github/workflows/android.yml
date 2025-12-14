@@ -8,46 +8,52 @@ on:
 
 jobs:
   build:
-    #    runs-on: ubuntu-24.04-arm
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # 确保使用最新版 x64 环境
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. 基础环境：Java 21
-      # 既然用最新版，我们全线统一用 Java 21
+      # 1. 改回 Java 17
+      # 原因：Android Gradle 插件对 Java 21 的支持可能存在版本匹配问题，17 是目前最稳的。
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
-      # 2. 核心步骤：下载并配置 Gluon 专用 GraalVM
-      # 请务必确保下载的是【linux-amd64】或【linux-x64】版本，不要下载 aarch64！
+      # 2. 安装 Gluon GraalVM (Linux AMD64)
       - name: Install Gluon GraalVM
         run: |
-          # 👇👇👇 在这里填入你找到的最新版 Gluon GraalVM 下载链接 👇👇👇
-          # 注意：必须是 Linux x64/AMD64 版本 (因为 GitHub Runner 是 Intel 芯片)
           DOWNLOAD_URL="https://github.com/gluonhq/graal/releases/download/gluon-23%2B25.1-dev-2409082136/graalvm-java23-linux-amd64-gluon-23+25.1-dev.tar.gz"
-          
-          # 下载
           wget -q -O gluon-graalvm.tar.gz $DOWNLOAD_URL
-          
-          # 解压
           mkdir -p gluon-gvm
           tar -xzf gluon-graalvm.tar.gz -C gluon-gvm --strip-components=1
-          
-          # 设置环境变量
           echo "GRAALVM_HOME=$PWD/gluon-gvm" >> $GITHUB_ENV
 
-      # 3. 构建
-      # 插件 1.0.28 + 最新 Gluon GraalVM = 成功
+      # 3. 构建 APK
+      # 关键修改：增加 -Dgluonfx.target.android.sdk 指定使用系统自带 SDK
       - name: Build APK
-        run: mvn -Pandroid clean gluonfx:build gluonfx:package
-      
-      # 4. 上传
+        env:
+          # GitHub Actions 的 ubuntu-latest 自带了 Android SDK，路径通常在这里
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: |
+          mvn -Pandroid clean gluonfx:build gluonfx:package \
+            -Dgluonfx.target.android.sdk=$ANDROID_SDK_ROOT
+
+      # 4. 【调试关键】如果构建失败，打印 Gluon 的详细日志文件
+      # 如果这步不加，你永远不知道为什么 package-task 失败
+      - name: Print Gluon Error Logs
+        if: failure()
+        run: |
+          echo "Finding log files..."
+          find target/gluonfx -name "*.log"
+          echo "Printing log contents:"
+          find target/gluonfx -name "*.log" -exec echo "================ {} ================" \; -exec cat {} \;
+
+      # 5. 上传
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: keenotes-android-apk
