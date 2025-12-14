@@ -118,23 +118,31 @@ public class Main extends Application {
     }
 
     private void loadCustomFont() {
-        try {
-            // var fontStream = getClass().getResourceAsStream("/fonts/MiSans-Regular.ttf");
-            var fontStream = getClass().getResourceAsStream("/fonts/NotoSansSC-Regular.ttf");
-            if (fontStream != null) {
-                Font font = Font.loadFont(fontStream, 14);
-                if (font != null) {
-                    System.out.println("Loaded font: " + font.getName());
-                } else {
-                    System.err.println("Failed to load MiSans font");
+        String[] fontPaths = {
+            "/fonts/MiSans-Regular.ttf",
+            "fonts/MiSans-Regular.ttf",
+            "/assets/fonts/MiSans-Regular.ttf"
+        };
+        
+        for (String path : fontPaths) {
+            try {
+                var fontStream = getClass().getResourceAsStream(path);
+                if (fontStream == null) {
+                    fontStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(path.startsWith("/") ? path.substring(1) : path);
                 }
-                fontStream.close();
-            } else {
-                System.err.println("Font file not found: /fonts/MiSans-Regular.ttf");
+                if (fontStream != null) {
+                    Font font = Font.loadFont(fontStream, 14);
+                    fontStream.close();
+                    if (font != null) {
+                        System.out.println("Loaded font from " + path + ": " + font.getName());
+                        return;
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error loading font from " + path + ": " + e.getMessage());
             }
-        } catch (Exception e) {
-            System.err.println("Error loading font: " + e.getMessage());
         }
+        System.err.println("Failed to load custom font from any path");
     }
 
     public static void main(String[] args) {

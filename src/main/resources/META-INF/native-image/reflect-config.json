@@ -1,0 +1,17 @@
+[
+  {
+    "name": "javafx.scene.text.Font",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.sun.javafx.font.PrismFontFactory",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.sun.javafx.font.freetype.FTFactory",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  }
+]

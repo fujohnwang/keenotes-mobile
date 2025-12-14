@@ -13,17 +13,17 @@
     -fx-accent-glow: rgba(0, 212, 255, 0.15);
 }
 
-/* Font loaded programmatically in Main.java */
+/* Font: custom font loaded in Main.java, with Android/iOS system font fallbacks */
 .root {
-    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'Source Han Sans CN', 'Droid Sans Fallback', 'PingFang SC', 'Heiti SC', 'Microsoft YaHei', sans-serif;
 }
 
 * {
-    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'Source Han Sans CN', 'Droid Sans Fallback', 'PingFang SC', 'Heiti SC', 'Microsoft YaHei', sans-serif;
 }
 
 .label, .text, .button, .text-field, .text-area {
-    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'Source Han Sans CN', 'Droid Sans Fallback', 'PingFang SC', 'Heiti SC', 'Microsoft YaHei', sans-serif;
 }
 
 .main-view {

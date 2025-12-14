@@ -122,11 +122,14 @@
                         <list>storage</list>
                     </attachList>
                     <resourcesList>
-                        <list>styles/.*\\.css</list>
-                        <list>fonts/.*\\.ttf</list>
-                        <list>fonts/.*\\.otf</list>
-                        <list>icons/.*\\.png</list>
+                        <list>styles/main.css</list>
+                        <list>fonts/MiSans-Regular.ttf</list>
+                        <list>icons/app-icon.png</list>
+                        <list>META-INF/native-image/.*</list>
                     </resourcesList>
+                    <reflectionList>
+                        <list>javafx.scene.text.Font</list>
+                    </reflectionList>
                     <releaseConfiguration>
                         <bundleName>KeeNotes</bundleName>
                         <bundleVersion>1.0.0</bundleVersion>
