@@ -66,6 +66,23 @@ public class MainView extends BorderPane {
         Platform.runLater(() -> noteInput.requestFocus());
     }
 
+    /**
+     * Check if currently showing search results pane.
+     */
+    public boolean isInSearchPane() {
+        return searchPane.isVisible();
+    }
+
+    /**
+     * Go back from search pane to note pane (for system back gesture).
+     */
+    public void goBackFromSearch() {
+        if (isInSearchPane()) {
+            searchField.clear();
+            showNotePane();
+        }
+    }
+
     private HBox createHeader() {
         // Configure search field
         searchField.setPromptText("Search notes...");
