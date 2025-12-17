@@ -52,18 +52,16 @@ public class Main extends Application {
         // Handle Android back button (mapped to ESCAPE in JavaFX)
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.ESCAPE || event.getCode() == KeyCode.BACK_SPACE) {
-                if (inSettingsView) {
-                    backFromSettings();
+                if (handleBackNavigation()) {
                     event.consume();
                 }
-                // If not in settings, let the system handle it (exit app)
+                // If not consumed, let the system handle it (exit app)
             }
         });
 
         // Handle iOS swipe right gesture for back navigation
         scene.addEventFilter(SwipeEvent.SWIPE_RIGHT, event -> {
-            if (inSettingsView) {
-                backFromSettings();
+            if (handleBackNavigation()) {
                 event.consume();
             }
         });
@@ -135,6 +133,25 @@ public class Main extends Application {
         } else {
             showRecordTab();
         }
+    }
+
+    /**
+     * Handle back navigation for both Android back button and iOS swipe gesture.
+     * @return true if navigation was handled, false if should exit app
+     */
+    private boolean handleBackNavigation() {
+        // Priority 1: Settings view
+        if (inSettingsView) {
+            backFromSettings();
+            return true;
+        }
+        // Priority 2: Search results in MainView
+        if (mainView.isInSearchPane()) {
+            mainView.goBackFromSearch();
+            return true;
+        }
+        // Not handled - let system handle (exit app)
+        return false;
     }
 
     @Override
