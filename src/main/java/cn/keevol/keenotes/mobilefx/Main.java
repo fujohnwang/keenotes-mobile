@@ -8,6 +8,9 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.SwipeEvent;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
@@ -20,6 +23,7 @@ public class Main extends Application {
     private ReviewView reviewView;
     private Button recordTabBtn;
     private Button reviewTabBtn;
+    private boolean inSettingsView = false;
 
     @Override
     public void start(Stage stage) {
@@ -44,6 +48,25 @@ public class Main extends Application {
 
         Scene scene = new Scene(root, 375, 667);
         scene.getStylesheets().add(getClass().getResource("/styles/main.css").toExternalForm());
+
+        // Handle Android back button (mapped to ESCAPE in JavaFX)
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.ESCAPE || event.getCode() == KeyCode.BACK_SPACE) {
+                if (inSettingsView) {
+                    backFromSettings();
+                    event.consume();
+                }
+                // If not in settings, let the system handle it (exit app)
+            }
+        });
+
+        // Handle iOS swipe right gesture for back navigation
+        scene.addEventFilter(SwipeEvent.SWIPE_RIGHT, event -> {
+            if (inSettingsView) {
+                backFromSettings();
+                event.consume();
+            }
+        });
 
         stage.setTitle("KeeNotes");
         stage.setScene(scene);
@@ -100,11 +123,13 @@ public class Main extends Application {
     }
 
     private void showSettingsView() {
+        inSettingsView = true;
         SettingsView settingsView = new SettingsView(this::backFromSettings);
         contentPane.getChildren().setAll(settingsView);
     }
 
     private void backFromSettings() {
+        inSettingsView = false;
         if (reviewTabBtn.getStyleClass().contains("active")) {
             showReviewTab();
         } else {
