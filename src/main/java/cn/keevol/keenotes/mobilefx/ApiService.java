@@ -21,12 +21,14 @@ public class ApiService {
 
     private final HttpClient httpClient;
     private final SettingsService settings;
+    private final CryptoService cryptoService;
 
     public ApiService() {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(TIMEOUT)
                 .build();
         this.settings = SettingsService.getInstance();
+        this.cryptoService = new CryptoService();
     }
 
     /**
@@ -65,7 +67,21 @@ public class ApiService {
 
         try {
             String timestamp = LocalDateTime.now().format(TS_FORMATTER);
-            String jsonPayload = buildJsonPayload(content, timestamp);
+            
+            // Encrypt content if encryption is enabled
+            String contentToSend = content;
+            boolean encrypted = false;
+            if (cryptoService.isEncryptionEnabled()) {
+                try {
+                    contentToSend = cryptoService.encrypt(content);
+                    encrypted = true;
+                } catch (Exception e) {
+                    return CompletableFuture.completedFuture(
+                            ApiResult.failure("Encryption failed: " + e.getMessage()));
+                }
+            }
+            
+            String jsonPayload = buildJsonPayload(contentToSend, timestamp, encrypted);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(endpointUrl))
@@ -75,10 +91,11 @@ public class ApiService {
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();
 
+            final String originalContent = content;
             return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                     .thenApply(response -> {
                         if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                            return ApiResult.success(content);
+                            return ApiResult.success(originalContent);
                         } else {
                             return ApiResult.failure("Server error: " + response.statusCode());
                         }
@@ -90,12 +107,13 @@ public class ApiService {
         }
     }
 
-    private String buildJsonPayload(String text, String timestamp) {
+    private String buildJsonPayload(String text, String timestamp, boolean encrypted) {
         // Simple JSON construction without external library
         return String.format(
-                "{\"channel\":\"mobile\",\"text\":%s,\"ts\":\"%s\"}",
+                "{\"channel\":\"mobile\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":%s}",
                 escapeJson(text),
-                timestamp
+                timestamp,
+                encrypted
         );
     }
 
@@ -281,8 +299,22 @@ public class ApiService {
         String id = extractJsonString(objStr, "id");
         String content = extractJsonString(objStr, "content");
         String createdAt = extractJsonString(objStr, "createdAt");
+        boolean encrypted = extractJsonBoolean(objStr, "encrypted");
         
         if (content != null) {
+            // Decrypt content if encrypted and password is set
+            if (encrypted && cryptoService.isEncryptionEnabled()) {
+                try {
+                    content = cryptoService.decrypt(content);
+                } catch (Exception e) {
+                    // If decryption fails, show placeholder
+                    content = "[Encrypted - decryption failed]";
+                }
+            } else if (encrypted) {
+                // Encrypted but no password set
+                content = "[Encrypted - password required]";
+            }
+            
             // Format createdAt for display
             if (createdAt != null && createdAt.contains("T")) {
                 createdAt = createdAt.replace("T", " ");
@@ -293,6 +325,26 @@ public class ApiService {
             return new SearchResult(id != null ? id : "", content, createdAt != null ? createdAt : "");
         }
         return null;
+    }
+    
+    private boolean extractJsonBoolean(String json, String key) {
+        String searchKey = "\"" + key + "\"";
+        int keyPos = json.indexOf(searchKey);
+        if (keyPos == -1) return false;
+
+        int colonPos = json.indexOf(":", keyPos);
+        if (colonPos == -1) return false;
+
+        // Find the boolean value after colon
+        int valueStart = colonPos + 1;
+        while (valueStart < json.length() && Character.isWhitespace(json.charAt(valueStart))) {
+            valueStart++;
+        }
+        
+        if (valueStart < json.length() - 3 && json.substring(valueStart, valueStart + 4).equals("true")) {
+            return true;
+        }
+        return false;
     }
 
     private String extractJsonString(String json, String key) {
