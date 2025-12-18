@@ -520,3 +520,11 @@
     -fx-text-fill: -fx-primary;
     -fx-font-weight: bold;
 }
+
+
+/* Field hint */
+.field-hint {
+    -fx-font-size: 11px;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-style: italic;
+}

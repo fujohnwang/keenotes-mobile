@@ -12,6 +12,8 @@ public class SettingsView extends BorderPane {
 
     private final TextField endpointField;
     private final PasswordField tokenField;
+    private final PasswordField encryptionPasswordField;
+    private final PasswordField encryptionPasswordConfirmField;
     private final Label statusLabel;
     private final SettingsService settings;
     private final Runnable onBack;
@@ -33,6 +35,14 @@ public class SettingsView extends BorderPane {
         tokenField.setPromptText("Your API token");
         tokenField.getStyleClass().add("input-field");
 
+        encryptionPasswordField = new PasswordField();
+        encryptionPasswordField.setPromptText("E2E encryption password (optional)");
+        encryptionPasswordField.getStyleClass().add("input-field");
+
+        encryptionPasswordConfirmField = new PasswordField();
+        encryptionPasswordConfirmField.setPromptText("Confirm encryption password");
+        encryptionPasswordConfirmField.getStyleClass().add("input-field");
+
         statusLabel = new Label();
         statusLabel.getStyleClass().add("status-label");
 
@@ -50,18 +60,18 @@ public class SettingsView extends BorderPane {
 
         VBox footer = new VBox(4, copyrightLabel, websiteLabel);
         footer.setAlignment(Pos.CENTER);
-        footer.setPadding(new Insets(24, 0, 0, 0));
 
-        // Spacer to push footer to bottom
-        Region spacer = new Region();
-        VBox.setVgrow(spacer, Priority.ALWAYS);
+        // Encryption hint
+        Label encryptionHint = new Label("Leave both empty to disable E2E encryption");
+        encryptionHint.getStyleClass().add("field-hint");
 
         VBox form = new VBox(16,
                 createFieldGroup("Endpoint URL", endpointField),
                 createFieldGroup("Token", tokenField),
+                createFieldGroup("Encryption Password", encryptionPasswordField),
+                createFieldGroupWithHint("Confirm Password", encryptionPasswordConfirmField, encryptionHint),
                 saveButton,
                 statusLabel,
-                spacer,
                 footer
         );
         form.setPadding(new Insets(24));
@@ -100,17 +110,45 @@ public class SettingsView extends BorderPane {
         return group;
     }
 
+    private VBox createFieldGroupWithHint(String labelText, Control field, Label hint) {
+        Label label = new Label(labelText);
+        label.getStyleClass().add("field-label");
+        VBox group = new VBox(6, label, field, hint);
+        return group;
+    }
+
     private void loadSettings() {
         endpointField.setText(settings.getEndpointUrl());
         tokenField.setText(settings.getToken());
+        String savedPassword = settings.getEncryptionPassword();
+        encryptionPasswordField.setText(savedPassword);
+        encryptionPasswordConfirmField.setText(savedPassword);
     }
 
     private void saveSettings() {
+        String password = encryptionPasswordField.getText();
+        String confirmPassword = encryptionPasswordConfirmField.getText();
+        
+        // Validate password match
+        if (!password.equals(confirmPassword)) {
+            encryptionPasswordField.clear();
+            encryptionPasswordConfirmField.clear();
+            encryptionPasswordField.requestFocus();
+            statusLabel.setText("Passwords do not match");
+            statusLabel.getStyleClass().removeAll("error", "success");
+            statusLabel.getStyleClass().add("error");
+            return;
+        }
+        
         settings.setEndpointUrl(endpointField.getText().trim());
         settings.setToken(tokenField.getText());
+        settings.setEncryptionPassword(password);
         settings.save();
         
-        statusLabel.setText("Settings saved ✓");
+        String msg = settings.isEncryptionEnabled() 
+            ? "Settings saved ✓ (E2E encryption enabled)"
+            : "Settings saved ✓";
+        statusLabel.setText(msg);
         statusLabel.getStyleClass().removeAll("error", "success");
         statusLabel.getStyleClass().add("success");
     }

@@ -32,15 +32,17 @@ Authorization: Bearer {token}
 {
   "channel": "mobile",
   "text": "笔记内容",
-  "ts": "2025-12-06 18:30:00"
+  "ts": "2025-12-06 18:30:00",
+  "encrypted": false
 }
 ```
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | channel | string | 来源渠道，固定为 "mobile" |
-| text | string | 笔记内容 |
+| text | string | 笔记内容（如 encrypted=true，则为 AES-GCM 加密后的 Base64 字符串） |
 | ts | string | 时间戳，格式 "yyyy-MM-dd HH:mm:ss" |
+| encrypted | boolean | 是否为加密内容，默认 false |
 
 ### Response
 
@@ -103,9 +105,10 @@ Authorization: Bearer {token}
 | size | int | 每页数量 |
 | results | array | 搜索结果列表 |
 | results[].id | string | 笔记唯一标识 |
-| results[].content | string | 笔记完整内容 |
+| results[].content | string | 笔记完整内容（如 encrypted=true，则为加密内容） |
 | results[].createdAt | string | 创建时间 (ISO 8601) |
 | results[].updatedAt | string | 更新时间 (ISO 8601) |
+| results[].encrypted | boolean | 是否为加密内容 |
 
 **无结果 (200)**
 ```json
@@ -170,14 +173,40 @@ Authorization: Bearer {token}
 | size | int | 每页数量 |
 | results | array | 笔记列表 |
 | results[].id | string | 笔记唯一标识 |
-| results[].content | string | 笔记完整内容 |
+| results[].content | string | 笔记完整内容（如 encrypted=true，则为加密内容） |
 | results[].createdAt | string | 创建时间 (ISO 8601) |
+| results[].encrypted | boolean | 是否为加密内容 |
 
 ---
 
 ## Notes
 
-- 当前客户端搜索和回顾功能使用 Mock 数据，尚未对接真实 API
 - 搜索支持 debounce（500ms），避免频繁请求
 - 客户端分页显示每页 20 条，支持 "Load More" 加载更多
 - 回顾天数默认 7 天，用户可自定义并持久化保存
+
+---
+
+## E2E Encryption
+
+KeeNotes 支持端到端加密（E2E），加密密码仅存储在客户端本地，服务器端无法解密内容。
+
+### 加密方式
+
+- 算法：AES-256-GCM
+- 密钥派生：PBKDF2WithHmacSHA256（65536 iterations）
+- 格式：Base64(salt[16] + iv[12] + ciphertext)
+
+### 工作流程
+
+1. 用户在 Settings 中设置加密密码
+2. 发送笔记时，客户端使用密码加密内容，设置 `encrypted: true`
+3. 服务器原样存储加密内容
+4. 查询时，服务器返回 `encrypted` 字段标识
+5. 客户端根据 `encrypted` 字段决定是否解密显示
+
+### 注意事项
+
+- 密码丢失将无法恢复加密内容
+- 不同设备需使用相同密码才能解密
+- 服务器端无法对加密内容进行全文搜索

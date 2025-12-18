@@ -84,13 +84,13 @@ public class Main extends Application {
 
 
     private HBox createBottomTabBar() {
-        recordTabBtn = new Button("记录");
+        recordTabBtn = new Button("记录/Take");
         recordTabBtn.getStyleClass().addAll("tab-button", "active");
         recordTabBtn.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(recordTabBtn, Priority.ALWAYS);
         recordTabBtn.setOnAction(e -> showRecordTab());
 
-        reviewTabBtn = new Button("回顾");
+        reviewTabBtn = new Button("回顾/Review");
         reviewTabBtn.getStyleClass().add("tab-button");
         reviewTabBtn.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(reviewTabBtn, Priority.ALWAYS);

@@ -17,6 +17,7 @@ public class SettingsService {
     private static final String KEY_ENDPOINT_URL = "endpoint.url";
     private static final String KEY_TOKEN = "token";
     private static final String KEY_REVIEW_DAYS = "review.days";
+    private static final String KEY_ENCRYPTION_PASSWORD = "encryption.password";
     private static final int DEFAULT_REVIEW_DAYS = 7;
 
     private static SettingsService instance;
@@ -94,5 +95,22 @@ public class SettingsService {
 
     public void setReviewDays(int days) {
         properties.setProperty(KEY_REVIEW_DAYS, String.valueOf(days));
+    }
+
+    public String getEncryptionPassword() {
+        return properties.getProperty(KEY_ENCRYPTION_PASSWORD, "");
+    }
+
+    public void setEncryptionPassword(String password) {
+        if (password == null || password.isEmpty()) {
+            properties.remove(KEY_ENCRYPTION_PASSWORD);
+        } else {
+            properties.setProperty(KEY_ENCRYPTION_PASSWORD, password);
+        }
+    }
+
+    public boolean isEncryptionEnabled() {
+        String pwd = getEncryptionPassword();
+        return pwd != null && !pwd.isEmpty();
     }
 }
