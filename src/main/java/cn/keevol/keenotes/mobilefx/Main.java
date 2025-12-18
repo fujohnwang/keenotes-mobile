@@ -50,8 +50,10 @@ public class Main extends Application {
         scene.getStylesheets().add(getClass().getResource("/styles/main.css").toExternalForm());
 
         // Handle Android back button (mapped to ESCAPE in JavaFX)
+        // Note: Only ESCAPE is used for back navigation, not BACK_SPACE
+        // BACK_SPACE should work normally in text fields for deleting characters
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() == KeyCode.ESCAPE || event.getCode() == KeyCode.BACK_SPACE) {
+            if (event.getCode() == KeyCode.ESCAPE) {
                 if (handleBackNavigation()) {
                     event.consume();
                 }
