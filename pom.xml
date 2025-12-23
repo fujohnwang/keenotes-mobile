@@ -220,6 +220,11 @@
                         <artifactId>gluonfx-maven-plugin</artifactId>
                         <configuration>
                             <target>android</target>
+                            <!-- ✅ 新增这一行：强制该类在运行时初始化 -->
+                            <arg>--initialize-at-run-time=cn.keevol.keenotes.mobilefx.LocalCacheService</arg>
+                            
+                            <!-- 如果报错依旧，可能还需要把 SQLite 驱动也加进去 -->
+                            <arg>--initialize-at-run-time=org.sqlite.JDBC</arg>
                         </configuration>
                     </plugin>
                 </plugins>
