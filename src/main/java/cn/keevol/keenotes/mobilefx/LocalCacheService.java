@@ -28,13 +28,12 @@ public class LocalCacheService {
     private LocalCacheService() {
         this.cryptoService = new CryptoService();
         this.dbPath = resolveDbPath();
-        
     }
 
     public static synchronized LocalCacheService getInstance() {
         if (instance == null) {
             instance = new LocalCacheService();
-            initDatabase();
+            instance.initDatabase();
         }
         return instance;
     }
