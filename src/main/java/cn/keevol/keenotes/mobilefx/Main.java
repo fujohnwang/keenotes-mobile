@@ -1,8 +1,8 @@
 package cn.keevol.keenotes.mobilefx;
 
 import com.gluonhq.attach.lifecycle.LifecycleService;
-import com.gluonhq.attach.util.Platform;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -19,10 +19,10 @@ public class Main extends Application {
 
     private StackPane contentPane;
     private BorderPane root;
-    private MainView mainView;
-    private ReviewView reviewView;
+    private MainViewV2 mainView;
     private Button recordTabBtn;
     private Button reviewTabBtn;
+    private WebSocketClientService wsClient;
     private boolean inSettingsView = false;
 
     @Override
@@ -36,8 +36,43 @@ public class Main extends Application {
         contentPane = new StackPane();
 
         // Create views
-        mainView = new MainView(this::showSettingsView);
-        reviewView = new ReviewView();
+        mainView = new MainViewV2(this::showSettingsView);
+        // reviewView is now integrated into MainViewV2
+
+        // Initialize WebSocket client
+        wsClient = new WebSocketClientService();
+        wsClient.addListener(new WebSocketClientService.SyncListener() {
+            @Override
+            public void onConnectionStatus(boolean connected) {
+                System.out.println("WebSocket connected: " + connected);
+            }
+
+            @Override
+            public void onSyncProgress(int current, int total) {
+                System.out.println("Sync progress: " + current + "/" + total);
+            }
+
+            @Override
+            public void onSyncComplete(int total, long lastSyncId) {
+                System.out.println("Sync complete: " + total + " notes, lastSyncId=" + lastSyncId);
+            }
+
+            @Override
+            public void onRealtimeUpdate(long id, String content) {
+                System.out.println("Realtime update: note " + id);
+            }
+
+            @Override
+            public void onError(String message) {
+                System.err.println("WebSocket error: " + message);
+            }
+        });
+
+        // Connect WebSocket after UI is ready
+        Platform.runLater(() -> {
+            System.out.println("Attempting to connect WebSocket...");
+            wsClient.connect();
+        });
 
         // Bottom tab bar
         root.setBottom(createBottomTabBar());
@@ -71,7 +106,7 @@ public class Main extends Application {
         stage.setTitle("KeeNotes");
         stage.setScene(scene);
 
-        if (Platform.isDesktop()) {
+        if (com.gluonhq.attach.util.Platform.isDesktop()) {
             var iconStream = getClass().getResourceAsStream("/icons/app-icon.png");
             if (iconStream != null) {
                 stage.getIcons().add(new Image(iconStream));
@@ -106,7 +141,12 @@ public class Main extends Application {
     }
 
     private void showRecordTab() {
-        contentPane.getChildren().setAll(mainView);
+        // Ensure MainViewV2 is showing
+        if (!contentPane.getChildren().contains(mainView)) {
+            contentPane.getChildren().setAll(mainView);
+        }
+        // Tell MainViewV2 to show note pane
+        mainView.showRecordTab();
         reviewTabBtn.getStyleClass().remove("active");
         if (!recordTabBtn.getStyleClass().contains("active")) {
             recordTabBtn.getStyleClass().add("active");
@@ -114,12 +154,16 @@ public class Main extends Application {
     }
 
     private void showReviewTab() {
-        contentPane.getChildren().setAll(reviewView);
+        // Ensure MainViewV2 is showing
+        if (!contentPane.getChildren().contains(mainView)) {
+            contentPane.getChildren().setAll(mainView);
+        }
+        // Tell MainViewV2 to show review pane
+        mainView.showReviewPane();
         recordTabBtn.getStyleClass().remove("active");
         if (!reviewTabBtn.getStyleClass().contains("active")) {
             reviewTabBtn.getStyleClass().add("active");
         }
-        reviewView.refresh();
     }
 
     private void showSettingsView() {
@@ -130,10 +174,12 @@ public class Main extends Application {
 
     private void backFromSettings() {
         inSettingsView = false;
+        // Ensure MainViewV2 is showing
+        contentPane.getChildren().setAll(mainView);
         if (reviewTabBtn.getStyleClass().contains("active")) {
-            showReviewTab();
+            mainView.showReviewPane();
         } else {
-            showRecordTab();
+            mainView.showRecordTab();
         }
     }
 
@@ -158,6 +204,10 @@ public class Main extends Application {
 
     @Override
     public void stop() {
+        System.out.println("Application stopping...");
+        if (wsClient != null) {
+            wsClient.shutdown();
+        }
         System.out.println("Application stopped.");
     }
 
@@ -174,7 +224,7 @@ public class Main extends Application {
             }
 
             // For Android/iOS: copy to temp file and load from file URI
-            if (Platform.isAndroid() || Platform.isIOS()) {
+            if (com.gluonhq.attach.util.Platform.isAndroid() || com.gluonhq.attach.util.Platform.isIOS()) {
                 java.io.File tempDir = new java.io.File(System.getProperty("java.io.tmpdir", "/tmp"));
                 java.io.File fontFile = new java.io.File(tempDir, "MiSans-Regular.ttf");
                 
