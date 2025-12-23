@@ -24,41 +24,58 @@ public class MainViewV2 extends BorderPane {
     private final StackPane contentPane;
     private final VBox notePane;
     private final VBox reviewPane;
+    private final VBox searchPane;
     private final TextArea noteInput;
     private final Button submitBtn;
     private final Label statusLabel;
     private final VBox echoContainer;
     private final VBox reviewResultsContainer;
+    private final VBox searchResultsContainer;
 
     private final ApiServiceV2 apiService;
     private final LocalCacheService localCache;
     private final Runnable onOpenSettings;
-    private final Runnable onOpenSearch;
 
-    public MainViewV2(Runnable onOpenSettings, Runnable onOpenSearch) {
+    // Header components
+    private HBox header;
+    private TextField searchField;
+    private Button clearSearchBtn;
+    private Button settingsBtn;
+    private PauseTransition searchDebounce;
+
+    public MainViewV2(Runnable onOpenSettings) {
         this.onOpenSettings = onOpenSettings;
-        this.onOpenSearch = onOpenSearch;
         this.apiService = new ApiServiceV2();
         this.localCache = LocalCacheService.getInstance();
         getStyleClass().add("main-view");
 
         // Initialize components
         reviewResultsContainer = new VBox(12);
+        searchResultsContainer = new VBox(12);
         contentPane = new StackPane();
         noteInput = new TextArea();
         submitBtn = new Button("Save Note");
         statusLabel = new Label();
         echoContainer = new VBox(8);
 
-        // Header with tabs and settings
-        setTop(createHeader());
+        // Initialize search debounce
+        searchDebounce = new PauseTransition(Duration.millis(500));
+        searchDebounce.setOnFinished(e -> {
+            System.out.println("[DEBUG debounce finished] calling performSearch()");
+            performSearch();
+        });
+
+        // Header with search/settings
+        createHeader();
+        setTop(header);
 
         // Create panes
         notePane = createNotePane();
         reviewPane = createReviewPane();
+        searchPane = createSearchPane();
 
         // Stack all panes
-        contentPane.getChildren().addAll(reviewPane, notePane);
+        contentPane.getChildren().addAll(searchPane, reviewPane, notePane);
         setCenter(contentPane);
 
         // Show note pane by default
@@ -66,14 +83,12 @@ public class MainViewV2 extends BorderPane {
 
         // Set initial focus
         Platform.runLater(() -> noteInput.requestFocus());
+
+        int noteCount = localCache.getLocalNoteCount();
+        System.out.println("[DEBUG constructor] MainViewV2 created, local note count=" + noteCount);
     }
 
-    private HBox createHeader() {
-        // Search button (left) - calls onOpenSearch
-        Button searchBtn = new Button("Search");
-        searchBtn.getStyleClass().add("tab-button");
-        searchBtn.setOnAction(e -> onOpenSearch.run());
-
+    private void createHeader() {
         // Settings button (right)
         javafx.scene.shape.SVGPath gearIcon = new javafx.scene.shape.SVGPath();
         gearIcon.setContent("M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66z");
@@ -81,7 +96,7 @@ public class MainViewV2 extends BorderPane {
         gearIcon.setScaleX(1.2);
         gearIcon.setScaleY(1.2);
 
-        Button settingsBtn = new Button();
+        settingsBtn = new Button();
         settingsBtn.setGraphic(gearIcon);
         settingsBtn.getStyleClass().add("icon-button");
         settingsBtn.setOnAction(e -> onOpenSettings.run());
@@ -89,22 +104,79 @@ public class MainViewV2 extends BorderPane {
         settingsBtn.setOnMouseEntered(e -> gearIcon.setFill(javafx.scene.paint.Color.web("#00D4FF")));
         settingsBtn.setOnMouseExited(e -> gearIcon.setFill(javafx.scene.paint.Color.web("#8B949E")));
 
-        // Left side: Search button
-        HBox leftBox = new HBox(8, searchBtn);
-        leftBox.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(leftBox, Priority.ALWAYS);
+        // Search field - always visible in header
+        searchField = new TextField();
+        searchField.setPromptText("Search notes...");
+        searchField.getStyleClass().add("search-field");
+        searchField.setVisible(true);
+        searchField.setManaged(true);
 
-        // Right side: Settings button
-        HBox rightBox = new HBox(8, settingsBtn);
-        rightBox.setAlignment(Pos.CENTER_RIGHT);
+        clearSearchBtn = new Button("✕");
+        clearSearchBtn.getStyleClass().add("clear-search-btn");
+        clearSearchBtn.setVisible(false);
+        clearSearchBtn.setManaged(false);
+        clearSearchBtn.setOnAction(e -> {
+            searchField.clear();
+            searchResultsContainer.getChildren().clear();
+        });
 
-        // Header: Left (search button) + Right (settings button)
-        HBox header = new HBox(8, leftBox, rightBox);
-        header.getStyleClass().add("header");
-        header.setAlignment(Pos.CENTER_LEFT);
-        header.setPadding(new Insets(8, 12, 8, 12));
-        return header;
+        searchField.textProperty().addListener((obs, oldVal, newVal) -> {
+            boolean hasText = newVal != null && !newVal.trim().isEmpty();
+            System.out.println("[DEBUG textProperty] oldVal='" + oldVal + "', newVal='" + newVal + "', hasText=" + hasText + ", searchDebounce=" + searchDebounce);
+            clearSearchBtn.setVisible(hasText);
+            clearSearchBtn.setManaged(hasText);
+
+            if (!hasText) {
+                System.out.println("[DEBUG textProperty] clearing results and showing note pane");
+                if (searchDebounce != null) {
+                    searchDebounce.stop();
+                }
+                searchResultsContainer.getChildren().clear();
+                showNotePane();
+            } else {
+                System.out.println("[DEBUG textProperty] showing search pane and starting debounce");
+                showSearchPane();
+                if (searchDebounce != null) {
+                    searchDebounce.stop();  // Stop any existing
+                    searchDebounce.playFromStart();  // Restart
+                    System.out.println("[DEBUG textProperty] debounce playFromStart() called");
+                } else {
+                    System.out.println("[DEBUG textProperty] ERROR: searchDebounce is null!");
+                }
+            }
+        });
+
+        searchField.setOnAction(e -> {
+            System.out.println("[DEBUG onAction] Enter pressed in search field");
+            searchDebounce.stop();
+            performSearch();
+        });
+
+        // Build header - always with search field
+        rebuildHeader();
     }
+
+    private void rebuildHeader() {
+        // Clear existing children
+        if (header == null) {
+            header = new HBox(8);
+            header.getStyleClass().add("header");
+            header.setAlignment(Pos.CENTER_LEFT);
+            header.setPadding(new Insets(8, 12, 8, 12));
+            setTop(header);
+        }
+
+        header.getChildren().clear();
+
+        // Always show: Search field + Clear button + Settings
+        HBox searchBox = new HBox(4, searchField, clearSearchBtn);
+        searchBox.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(searchBox, Priority.ALWAYS);
+        header.getChildren().addAll(searchBox, settingsBtn);
+
+        System.out.println("[DEBUG rebuildHeader] header rebuilt, searchField=" + searchField + ", visible=" + searchField.isVisible());
+    }
+
 
     private VBox createNotePane() {
         noteInput.setPromptText("Write your note here...\nAll content will be encrypted before leaving your device.");
@@ -163,7 +235,71 @@ public class MainViewV2 extends BorderPane {
         return pane;
     }
 
+    private VBox createSearchPane() {
+        searchResultsContainer.setPadding(new Insets(8, 16, 16, 16));
+        searchResultsContainer.getStyleClass().add("search-results");
+
+        ScrollPane scrollPane = new ScrollPane(searchResultsContainer);
+        scrollPane.setFitToWidth(true);
+        scrollPane.getStyleClass().add("content-scroll");
+
+        VBox pane = new VBox(scrollPane);
+        VBox.setVgrow(scrollPane, Priority.ALWAYS);
+        pane.getStyleClass().add("search-pane");
+        return pane;
+    }
+
+    private void performSearch() {
+        String query = searchField.getText().trim();
+        System.out.println("[DEBUG performSearch] query='" + query + "'");
+        if (query.isEmpty()) {
+            searchResultsContainer.getChildren().clear();
+            return;
+        }
+
+        searchResultsContainer.getChildren().clear();
+        Label loadingLabel = new Label("Searching locally...");
+        loadingLabel.getStyleClass().add("search-loading");
+        searchResultsContainer.getChildren().add(loadingLabel);
+
+        List<LocalCacheService.NoteData> results = localCache.searchNotes(query);
+        System.out.println("[DEBUG performSearch] found " + results.size() + " results for query='" + query + "'");
+
+        Platform.runLater(() -> {
+            searchResultsContainer.getChildren().clear();
+
+            if (results.isEmpty()) {
+                Label noResults = new Label("No results found for \"" + query + "\"");
+                noResults.getStyleClass().add("no-results");
+                searchResultsContainer.getChildren().add(noResults);
+                System.out.println("[DEBUG performSearch] Added 'no results' label to container");
+            } else {
+                Label countLabel = new Label(results.size() + " result(s) found");
+                countLabel.getStyleClass().add("search-count");
+                searchResultsContainer.getChildren().add(countLabel);
+                System.out.println("[DEBUG performSearch] Added count label to container");
+
+                for (LocalCacheService.NoteData result : results) {
+                    VBox card = createResultCard(result);
+                    searchResultsContainer.getChildren().add(card);
+                }
+                System.out.println("[DEBUG performSearch] Added " + results.size() + " result cards to container");
+            }
+            System.out.println("[DEBUG performSearch] Container now has " + searchResultsContainer.getChildren().size() + " children");
+        });
+    }
+
+    private void showSearchPane() {
+        System.out.println("[DEBUG showSearchPane] called");
+        notePane.setVisible(false);
+        reviewPane.setVisible(false);
+        searchPane.setVisible(true);
+        searchPane.toFront();
+    }
+
     public void showNotePane() {
+        System.out.println("[DEBUG showNotePane] called");
+        searchPane.setVisible(false);
         reviewPane.setVisible(false);
         notePane.setVisible(true);
         notePane.toFront();
@@ -171,6 +307,7 @@ public class MainViewV2 extends BorderPane {
     }
 
     public void showReviewPane() {
+        searchPane.setVisible(false);
         notePane.setVisible(false);
         reviewPane.setVisible(true);
         reviewPane.toFront();
@@ -403,15 +540,6 @@ public class MainViewV2 extends BorderPane {
     }
 
     /**
-     * 获取本地笔记统计信息
-     */
-    public String getLocalStats() {
-        int count = localCache.getLocalNoteCount();
-        String lastSync = localCache.getLastSyncTime();
-        return String.format("Local notes: %d\nLast sync: %s", count, lastSync != null ? lastSync : "Never");
-    }
-
-    /**
      * 切换到记录/笔记面板
      */
     public void showRecordTab() {
@@ -419,16 +547,11 @@ public class MainViewV2 extends BorderPane {
     }
 
     /**
-     * 检查是否在搜索面板 (for back navigation compatibility)
+     * 获取本地笔记统计信息
      */
-    public boolean isInSearchPane() {
-        return false;  // Search is now a separate view
-    }
-
-    /**
-     * 从搜索面板返回 (for back navigation compatibility)
-     */
-    public void goBackFromSearch() {
-        // No longer used - search is handled separately
+    public String getLocalStats() {
+        int count = localCache.getLocalNoteCount();
+        String lastSync = localCache.getLastSyncTime();
+        return String.format("Local notes: %d\nLast sync: %s", count, lastSync != null ? lastSync : "Never");
     }
 }
