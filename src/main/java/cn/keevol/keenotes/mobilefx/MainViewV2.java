@@ -200,17 +200,21 @@ public class MainViewV2 extends BorderPane {
     }
 
     private VBox createReviewPane() {
-        // Period selection buttons (7 days, 30 days, 90 days, All)
+        // Period selection dropdown
         HBox periodControls = new HBox(8);
         periodControls.setPadding(new Insets(8, 16, 8, 16));
 
-        String[] periods = {"7 days", "30 days", "90 days", "All"};
-        for (String period : periods) {
-            Button btn = new Button(period);
-            btn.getStyleClass().add("review-period-btn");
-            btn.setOnAction(e -> loadReviewNotes(period));
-            periodControls.getChildren().add(btn);
-        }
+        ComboBox<String> periodSelect = new ComboBox<>();
+        periodSelect.getItems().addAll("7 days", "30 days", "90 days", "All");
+        periodSelect.setValue("7 days");
+        periodSelect.getStyleClass().add("review-period-select");
+        periodSelect.setOnAction(e -> loadReviewNotes(periodSelect.getValue()));
+
+        // Add label for context
+        Label periodLabel = new Label("Review Period:");
+        periodLabel.getStyleClass().add("period-label");
+
+        periodControls.getChildren().addAll(periodLabel, periodSelect);
 
         // Results container
         reviewResultsContainer.setPadding(new Insets(8, 16, 16, 16));
