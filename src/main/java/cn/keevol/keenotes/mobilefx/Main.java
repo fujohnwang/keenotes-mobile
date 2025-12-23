@@ -38,7 +38,7 @@ public class Main extends Application {
         contentPane = new StackPane();
 
         // Create views
-        mainView = new MainViewV2(this::showSettingsView);
+        mainView = new MainViewV2(this::showSettingsView, this::onClearSearchToNoteView);
         debugView = new DebugView(this::backFromDebug);
 
         // Initialize WebSocket client
@@ -194,6 +194,17 @@ public class Main extends Application {
             mainView.showReviewPane();
         } else {
             mainView.showRecordTab();
+        }
+    }
+
+    /**
+     * Called when MainViewV2 clears search and returns to note view
+     * Updates tab button state to match
+     */
+    private void onClearSearchToNoteView() {
+        reviewTabBtn.getStyleClass().remove("active");
+        if (!recordTabBtn.getStyleClass().contains("active")) {
+            recordTabBtn.getStyleClass().add("active");
         }
     }
 

@@ -156,20 +156,16 @@ public class LocalCacheService {
     public List<NoteData> searchNotes(String query) {
         List<NoteData> results = new ArrayList<>();
         if (query == null || query.trim().isEmpty()) {
-            System.out.println("[DEBUG searchNotes] query is empty, returning empty list");
             return results;
         }
 
         String sql = "SELECT id, content, channel, created_at FROM notes_cache " +
                      "WHERE content LIKE ? ORDER BY created_at DESC LIMIT 100";
 
-        System.out.println("[DEBUG searchNotes] query='" + query + "', sql=" + sql);
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, "%" + query + "%");
-            System.out.println("[DEBUG searchNotes] executing query with param: %" + query + "%");
             ResultSet rs = pstmt.executeQuery();
 
-            int count = 0;
             while (rs.next()) {
                 results.add(new NoteData(
                     rs.getLong("id"),
@@ -178,15 +174,11 @@ public class LocalCacheService {
                     rs.getString("created_at"),
                     null  // 不需要返回加密内容
                 ));
-                count++;
             }
-            System.out.println("[DEBUG searchNotes] found " + count + " rows");
         } catch (SQLException e) {
             System.err.println("Search failed: " + e.getMessage());
-            e.printStackTrace();
         }
 
-        System.out.println("[DEBUG searchNotes] returning " + results.size() + " results");
         return results;
     }
 
