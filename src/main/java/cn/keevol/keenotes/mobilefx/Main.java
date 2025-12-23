@@ -20,10 +20,14 @@ public class Main extends Application {
     private StackPane contentPane;
     private BorderPane root;
     private MainViewV2 mainView;
+    private SearchView searchView;
+    private DebugView debugView;
     private Button recordTabBtn;
     private Button reviewTabBtn;
     private WebSocketClientService wsClient;
     private boolean inSettingsView = false;
+    private boolean inSearchView = false;
+    private boolean inDebugView = false;
 
     @Override
     public void start(Stage stage) {
@@ -36,8 +40,9 @@ public class Main extends Application {
         contentPane = new StackPane();
 
         // Create views
-        mainView = new MainViewV2(this::showSettingsView);
-        // reviewView is now integrated into MainViewV2
+        mainView = new MainViewV2(this::showSettingsView, this::showSearchView);
+        searchView = new SearchView(this::backFromSearch);
+        debugView = new DebugView(this::backFromDebug);
 
         // Initialize WebSocket client
         wsClient = new WebSocketClientService();
@@ -168,8 +173,34 @@ public class Main extends Application {
 
     private void showSettingsView() {
         inSettingsView = true;
-        SettingsView settingsView = new SettingsView(this::backFromSettings);
+        SettingsView settingsView = new SettingsView(this::backFromSettings, this::showDebugView);
         contentPane.getChildren().setAll(settingsView);
+    }
+
+    private void showSearchView() {
+        inSearchView = true;
+        inDebugView = false;
+        inSettingsView = false;
+        contentPane.getChildren().setAll(searchView);
+    }
+
+    private void showDebugView() {
+        inDebugView = true;
+        inSettingsView = false;
+        inSearchView = false;
+        contentPane.getChildren().setAll(debugView);
+    }
+
+    private void backFromSearch() {
+        inSearchView = false;
+        contentPane.getChildren().setAll(mainView);
+        mainView.showNotePane();
+    }
+
+    private void backFromDebug() {
+        inDebugView = false;
+        contentPane.getChildren().setAll(mainView);
+        mainView.showNotePane();
     }
 
     private void backFromSettings() {
@@ -188,12 +219,22 @@ public class Main extends Application {
      * @return true if navigation was handled, false if should exit app
      */
     private boolean handleBackNavigation() {
-        // Priority 1: Settings view
+        // Priority 1: Debug view
+        if (inDebugView) {
+            backFromDebug();
+            return true;
+        }
+        // Priority 2: Search view
+        if (inSearchView) {
+            backFromSearch();
+            return true;
+        }
+        // Priority 3: Settings view
         if (inSettingsView) {
             backFromSettings();
             return true;
         }
-        // Priority 2: Search results in MainView
+        // Priority 4: Search results in MainView
         if (mainView.isInSearchPane()) {
             mainView.goBackFromSearch();
             return true;

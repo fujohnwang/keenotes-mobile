@@ -21,38 +21,28 @@ import java.util.List;
  */
 public class MainViewV2 extends BorderPane {
 
-    private final TextField searchField;
     private final StackPane contentPane;
     private final VBox notePane;
-    private final VBox searchPane;
     private final VBox reviewPane;
     private final TextArea noteInput;
     private final Button submitBtn;
     private final Label statusLabel;
     private final VBox echoContainer;
-    private final VBox searchResultsContainer;
     private final VBox reviewResultsContainer;
 
     private final ApiServiceV2 apiService;
     private final LocalCacheService localCache;
     private final Runnable onOpenSettings;
+    private final Runnable onOpenSearch;
 
-    private final Button clearSearchBtn;
-    private final PauseTransition debounce;
-
-    // Header buttons
-    private ToggleButton searchTab;
-
-    public MainViewV2(Runnable onOpenSettings) {
+    public MainViewV2(Runnable onOpenSettings, Runnable onOpenSearch) {
         this.onOpenSettings = onOpenSettings;
+        this.onOpenSearch = onOpenSearch;
         this.apiService = new ApiServiceV2();
         this.localCache = LocalCacheService.getInstance();
         getStyleClass().add("main-view");
 
         // Initialize components
-        searchField = new TextField();
-        clearSearchBtn = new Button("✕");
-        searchResultsContainer = new VBox(12);
         reviewResultsContainer = new VBox(12);
         contentPane = new StackPane();
         noteInput = new TextArea();
@@ -60,20 +50,15 @@ public class MainViewV2 extends BorderPane {
         statusLabel = new Label();
         echoContainer = new VBox(8);
 
-        // Debounce timer for search
-        debounce = new PauseTransition(Duration.millis(500));
-        debounce.setOnFinished(e -> performSearch());
-
         // Header with tabs and settings
         setTop(createHeader());
 
         // Create panes
         notePane = createNotePane();
-        searchPane = createSearchPane();
         reviewPane = createReviewPane();
 
         // Stack all panes
-        contentPane.getChildren().addAll(searchPane, reviewPane, notePane);
+        contentPane.getChildren().addAll(reviewPane, notePane);
         setCenter(contentPane);
 
         // Show note pane by default
@@ -84,17 +69,10 @@ public class MainViewV2 extends BorderPane {
     }
 
     private HBox createHeader() {
-        // Search toggle button (left)
-        searchTab = new ToggleButton("Search");
-        searchTab.setToggleGroup(null);  // No toggle group needed
-        searchTab.getStyleClass().add("tab-button");
-        searchTab.setOnAction(e -> {
-            if (searchTab.isSelected()) {
-                showSearchPane();
-            } else {
-                showNotePane();
-            }
-        });
+        // Search button (left) - calls onOpenSearch
+        Button searchBtn = new Button("Search");
+        searchBtn.getStyleClass().add("tab-button");
+        searchBtn.setOnAction(e -> onOpenSearch.run());
 
         // Settings button (right)
         javafx.scene.shape.SVGPath gearIcon = new javafx.scene.shape.SVGPath();
@@ -111,44 +89,8 @@ public class MainViewV2 extends BorderPane {
         settingsBtn.setOnMouseEntered(e -> gearIcon.setFill(javafx.scene.paint.Color.web("#00D4FF")));
         settingsBtn.setOnMouseExited(e -> gearIcon.setFill(javafx.scene.paint.Color.web("#8B949E")));
 
-        // Search field and clear button
-        searchField.setPromptText("Search notes...");
-        searchField.getStyleClass().add("search-field");
-        searchField.managedProperty().bind(searchTab.selectedProperty());
-        searchField.visibleProperty().bind(searchTab.selectedProperty());
-        HBox.setHgrow(searchField, Priority.ALWAYS);
-
-        clearSearchBtn.getStyleClass().add("clear-search-btn");
-        clearSearchBtn.setVisible(false);
-        clearSearchBtn.setManaged(false);
-        clearSearchBtn.setOnAction(e -> searchField.clear());
-
-        searchField.textProperty().addListener((obs, oldVal, newVal) -> {
-            boolean hasText = newVal != null && !newVal.trim().isEmpty();
-            clearSearchBtn.setVisible(hasText);
-            clearSearchBtn.setManaged(hasText);
-
-            if (!hasText) {
-                cancelDebounce();
-                searchResultsContainer.getChildren().clear();
-            } else {
-                debounceSearch();
-            }
-        });
-
-        searchField.setOnAction(e -> {
-            cancelDebounce();
-            performSearch();
-        });
-
-        StackPane searchContainer = new StackPane(searchField, clearSearchBtn);
-        StackPane.setAlignment(clearSearchBtn, Pos.CENTER_RIGHT);
-        StackPane.setMargin(clearSearchBtn, new Insets(0, 8, 0, 0));
-        searchContainer.managedProperty().bind(searchTab.selectedProperty());
-        searchContainer.visibleProperty().bind(searchTab.selectedProperty());
-
         // Left side: Search button
-        HBox leftBox = new HBox(8, searchTab);
+        HBox leftBox = new HBox(8, searchBtn);
         leftBox.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(leftBox, Priority.ALWAYS);
 
@@ -194,32 +136,6 @@ public class MainViewV2 extends BorderPane {
         return pane;
     }
 
-    private VBox createSearchPane() {
-        Label titleLabel = new Label("Search Results");
-        titleLabel.getStyleClass().add("search-pane-title");
-
-        // Review button in search panel
-        Button reviewBtn = new Button("Review Notes");
-        reviewBtn.getStyleClass().add("review-in-search-btn");
-        reviewBtn.setOnAction(e -> showReviewPane());
-
-        HBox headerRow = new HBox(8, titleLabel, reviewBtn);
-        headerRow.setAlignment(Pos.CENTER_LEFT);
-        headerRow.setPadding(new Insets(8, 16, 0, 16));
-
-        searchResultsContainer.setPadding(new Insets(8, 16, 16, 16));
-        searchResultsContainer.getStyleClass().add("search-results");
-
-        ScrollPane scrollPane = new ScrollPane(searchResultsContainer);
-        scrollPane.setFitToWidth(true);
-        scrollPane.getStyleClass().add("content-scroll");
-
-        VBox pane = new VBox(8, headerRow, scrollPane);
-        VBox.setVgrow(scrollPane, Priority.ALWAYS);
-        pane.getStyleClass().add("search-pane");
-        return pane;
-    }
-
     private VBox createReviewPane() {
         Label titleLabel = new Label("Review Notes");
         titleLabel.getStyleClass().add("review-pane-title");
@@ -245,38 +161,6 @@ public class MainViewV2 extends BorderPane {
             controls.getChildren().add(btn);
         }
 
-        // Debug button to dump all notes
-        Button debugBtn = new Button("Debug: Dump All Notes");
-        debugBtn.getStyleClass().add("review-period-btn");
-        debugBtn.setOnAction(e -> {
-            System.out.println("=== DEBUG: DUMPING ALL NOTES ===");
-            localCache.getAllNotes();
-            System.out.println("=== DEBUG: DUMP COMPLETE ===");
-        });
-        controls.getChildren().add(debugBtn);
-
-        // Debug button to reset sync state
-        Button resetBtn = new Button("Debug: Reset Sync");
-        resetBtn.getStyleClass().add("review-period-btn");
-        resetBtn.setOnAction(e -> {
-            try {
-                localCache.resetSyncState();
-                System.out.println("=== SYNC STATE RESET - Restart app to re-sync ===");
-            } catch (SQLException ex) {
-                System.err.println("Failed to reset sync: " + ex.getMessage());
-            }
-        });
-        controls.getChildren().add(resetBtn);
-
-        // Debug button to check database count
-        Button countBtn = new Button("Debug: DB Count");
-        countBtn.getStyleClass().add("review-period-btn");
-        countBtn.setOnAction(e -> {
-            int count = localCache.getLocalNoteCount();
-            System.out.println("=== DEBUG: Database has " + count + " notes ===");
-        });
-        controls.getChildren().add(countBtn);
-
         reviewResultsContainer.setPadding(new Insets(8, 16, 16, 16));
         reviewResultsContainer.getStyleClass().add("review-results");
 
@@ -290,75 +174,19 @@ public class MainViewV2 extends BorderPane {
         return pane;
     }
 
-    private void showNotePane() {
-        searchPane.setVisible(false);
+    public void showNotePane() {
         reviewPane.setVisible(false);
         notePane.setVisible(true);
         notePane.toFront();
-        if (searchTab != null) {
-            searchTab.setSelected(false);
-        }
         Platform.runLater(() -> noteInput.requestFocus());
-    }
-
-    private void showSearchPane() {
-        notePane.setVisible(false);
-        reviewPane.setVisible(false);
-        searchPane.setVisible(true);
-        searchPane.toFront();
-        Platform.runLater(() -> searchField.requestFocus());
     }
 
     public void showReviewPane() {
         notePane.setVisible(false);
-        searchPane.setVisible(false);
         reviewPane.setVisible(true);
         reviewPane.toFront();
         // Load review notes when showing the pane
         loadReviewNotes();
-    }
-
-    private void debounceSearch() {
-        debounce.playFromStart();
-    }
-
-    private void cancelDebounce() {
-        debounce.stop();
-    }
-
-    private void performSearch() {
-        String query = searchField.getText().trim();
-        if (query.isEmpty()) {
-            searchResultsContainer.getChildren().clear();
-            return;
-        }
-
-        searchResultsContainer.getChildren().clear();
-        Label loadingLabel = new Label("Searching locally...");
-        loadingLabel.getStyleClass().add("search-loading");
-        searchResultsContainer.getChildren().add(loadingLabel);
-
-        // 使用本地搜索
-        List<LocalCacheService.NoteData> results = localCache.searchNotes(query);
-
-        Platform.runLater(() -> {
-            searchResultsContainer.getChildren().clear();
-
-            if (results.isEmpty()) {
-                Label noResults = new Label("No results found for \"" + query + "\"");
-                noResults.getStyleClass().add("no-results");
-                searchResultsContainer.getChildren().add(noResults);
-            } else {
-                Label countLabel = new Label(results.size() + " result(s) found");
-                countLabel.getStyleClass().add("search-count");
-                searchResultsContainer.getChildren().add(countLabel);
-
-                for (LocalCacheService.NoteData result : results) {
-                    VBox card = createResultCard(result);
-                    searchResultsContainer.getChildren().add(card);
-                }
-            }
-        });
     }
 
     private void loadReviewNotes() {
@@ -595,14 +423,6 @@ public class MainViewV2 extends BorderPane {
     }
 
     /**
-     * 切换到搜索面板
-     */
-    public void showSearchTab() {
-        searchTab.setSelected(true);
-        showSearchPane();
-    }
-
-    /**
      * 切换到记录/笔记面板
      */
     public void showRecordTab() {
@@ -610,18 +430,16 @@ public class MainViewV2 extends BorderPane {
     }
 
     /**
-     * 检查是否在搜索面板
+     * 检查是否在搜索面板 (for back navigation compatibility)
      */
     public boolean isInSearchPane() {
-        return searchPane != null && searchPane.isVisible();
+        return false;  // Search is now a separate view
     }
 
     /**
-     * 从搜索面板返回
+     * 从搜索面板返回 (for back navigation compatibility)
      */
     public void goBackFromSearch() {
-        if (isInSearchPane()) {
-            showNotePane();
-        }
+        // No longer used - search is handled separately
     }
 }
