@@ -48,6 +48,7 @@ public class SearchView extends VBox {
         searchField = new TextField();
         searchField.setPromptText("Search notes...");
         searchField.getStyleClass().add("search-input");
+        searchField.setPadding(new Insets(8, 12, 8, 12));
 
         // Debounce timer for search
         debounce = new PauseTransition(Duration.millis(500));
@@ -66,13 +67,8 @@ public class SearchView extends VBox {
             performSearch(searchField.getText().trim());
         });
 
-        // Search input area
-        VBox searchArea = createSearchArea();
-        // Add search field to search area
-        searchArea.getChildren().add(1, searchField);
-
-        // Header with back button, search area, and scroll pane
-        getChildren().addAll(createHeader(), searchArea, scrollPane);
+        // Header with back button, search field, and scroll pane
+        getChildren().addAll(createHeader(), searchField, scrollPane);
     }
 
     private HBox createHeader() {
@@ -88,16 +84,6 @@ public class SearchView extends VBox {
         header.setPadding(new Insets(12, 16, 8, 16));
         header.getStyleClass().add("header");
         return header;
-    }
-
-    private VBox createSearchArea() {
-        Label hint = new Label("Enter keyword to search:");
-        hint.getStyleClass().add("search-hint");
-
-        VBox searchArea = new VBox(8, hint);
-        searchArea.setPadding(new Insets(8, 16, 0, 16));
-        searchArea.getStyleClass().add("search-area");
-        return searchArea;
     }
 
     private void debounceSearch() {

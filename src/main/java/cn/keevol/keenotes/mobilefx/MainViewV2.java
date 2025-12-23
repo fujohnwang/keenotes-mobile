@@ -137,30 +137,19 @@ public class MainViewV2 extends BorderPane {
     }
 
     private VBox createReviewPane() {
-        Label titleLabel = new Label("Review Notes");
-        titleLabel.getStyleClass().add("review-pane-title");
-
-        // Back button to return to note pane
-        Button backBtn = new Button("Back");
-        backBtn.getStyleClass().add("back-btn");
-        backBtn.setOnAction(e -> showNotePane());
-
-        HBox headerRow = new HBox(8, titleLabel, backBtn);
-        headerRow.setAlignment(Pos.CENTER_LEFT);
-        headerRow.setPadding(new Insets(8, 16, 0, 16));
-
-        // Review controls
-        HBox controls = new HBox(8);
-        controls.setPadding(new Insets(8, 16, 0, 16));
+        // Period selection buttons (7 days, 30 days, 90 days, All)
+        HBox periodControls = new HBox(8);
+        periodControls.setPadding(new Insets(8, 16, 8, 16));
 
         String[] periods = {"7 days", "30 days", "90 days", "All"};
         for (String period : periods) {
             Button btn = new Button(period);
             btn.getStyleClass().add("review-period-btn");
             btn.setOnAction(e -> loadReviewNotes(period));
-            controls.getChildren().add(btn);
+            periodControls.getChildren().add(btn);
         }
 
+        // Results container
         reviewResultsContainer.setPadding(new Insets(8, 16, 16, 16));
         reviewResultsContainer.getStyleClass().add("review-results");
 
@@ -168,7 +157,7 @@ public class MainViewV2 extends BorderPane {
         scrollPane.setFitToWidth(true);
         scrollPane.getStyleClass().add("content-scroll");
 
-        VBox pane = new VBox(8, headerRow, controls, scrollPane);
+        VBox pane = new VBox(8, periodControls, scrollPane);
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
         pane.getStyleClass().add("review-pane");
         return pane;
