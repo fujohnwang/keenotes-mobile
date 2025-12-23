@@ -35,6 +35,7 @@ public class MainViewV2 extends BorderPane {
     private final ApiServiceV2 apiService;
     private final LocalCacheService localCache;
     private final Runnable onOpenSettings;
+    private final Runnable onClearSearchToNoteView;
 
     // Header components
     private HBox header;
@@ -43,8 +44,9 @@ public class MainViewV2 extends BorderPane {
     private Button settingsBtn;
     private PauseTransition searchDebounce;
 
-    public MainViewV2(Runnable onOpenSettings) {
+    public MainViewV2(Runnable onOpenSettings, Runnable onClearSearchToNoteView) {
         this.onOpenSettings = onOpenSettings;
+        this.onClearSearchToNoteView = onClearSearchToNoteView;
         this.apiService = new ApiServiceV2();
         this.localCache = LocalCacheService.getInstance();
         getStyleClass().add("main-view");
@@ -60,10 +62,7 @@ public class MainViewV2 extends BorderPane {
 
         // Initialize search debounce
         searchDebounce = new PauseTransition(Duration.millis(500));
-        searchDebounce.setOnFinished(e -> {
-            System.out.println("[DEBUG debounce finished] calling performSearch()");
-            performSearch();
-        });
+        searchDebounce.setOnFinished(e -> performSearch());
 
         // Header with search/settings
         createHeader();
@@ -83,9 +82,6 @@ public class MainViewV2 extends BorderPane {
 
         // Set initial focus
         Platform.runLater(() -> noteInput.requestFocus());
-
-        int noteCount = localCache.getLocalNoteCount();
-        System.out.println("[DEBUG constructor] MainViewV2 created, local note count=" + noteCount);
     }
 
     private void createHeader() {
@@ -122,32 +118,29 @@ public class MainViewV2 extends BorderPane {
 
         searchField.textProperty().addListener((obs, oldVal, newVal) -> {
             boolean hasText = newVal != null && !newVal.trim().isEmpty();
-            System.out.println("[DEBUG textProperty] oldVal='" + oldVal + "', newVal='" + newVal + "', hasText=" + hasText + ", searchDebounce=" + searchDebounce);
             clearSearchBtn.setVisible(hasText);
             clearSearchBtn.setManaged(hasText);
 
             if (!hasText) {
-                System.out.println("[DEBUG textProperty] clearing results and showing note pane");
                 if (searchDebounce != null) {
                     searchDebounce.stop();
                 }
                 searchResultsContainer.getChildren().clear();
                 showNotePane();
+                // Notify Main to update tab button state
+                if (onClearSearchToNoteView != null) {
+                    onClearSearchToNoteView.run();
+                }
             } else {
-                System.out.println("[DEBUG textProperty] showing search pane and starting debounce");
                 showSearchPane();
                 if (searchDebounce != null) {
                     searchDebounce.stop();  // Stop any existing
                     searchDebounce.playFromStart();  // Restart
-                    System.out.println("[DEBUG textProperty] debounce playFromStart() called");
-                } else {
-                    System.out.println("[DEBUG textProperty] ERROR: searchDebounce is null!");
                 }
             }
         });
 
         searchField.setOnAction(e -> {
-            System.out.println("[DEBUG onAction] Enter pressed in search field");
             searchDebounce.stop();
             performSearch();
         });
@@ -173,8 +166,6 @@ public class MainViewV2 extends BorderPane {
         searchBox.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(searchBox, Priority.ALWAYS);
         header.getChildren().addAll(searchBox, settingsBtn);
-
-        System.out.println("[DEBUG rebuildHeader] header rebuilt, searchField=" + searchField + ", visible=" + searchField.isVisible());
     }
 
 
@@ -251,7 +242,6 @@ public class MainViewV2 extends BorderPane {
 
     private void performSearch() {
         String query = searchField.getText().trim();
-        System.out.println("[DEBUG performSearch] query='" + query + "'");
         if (query.isEmpty()) {
             searchResultsContainer.getChildren().clear();
             return;
@@ -263,7 +253,6 @@ public class MainViewV2 extends BorderPane {
         searchResultsContainer.getChildren().add(loadingLabel);
 
         List<LocalCacheService.NoteData> results = localCache.searchNotes(query);
-        System.out.println("[DEBUG performSearch] found " + results.size() + " results for query='" + query + "'");
 
         Platform.runLater(() -> {
             searchResultsContainer.getChildren().clear();
@@ -272,25 +261,20 @@ public class MainViewV2 extends BorderPane {
                 Label noResults = new Label("No results found for \"" + query + "\"");
                 noResults.getStyleClass().add("no-results");
                 searchResultsContainer.getChildren().add(noResults);
-                System.out.println("[DEBUG performSearch] Added 'no results' label to container");
             } else {
                 Label countLabel = new Label(results.size() + " result(s) found");
                 countLabel.getStyleClass().add("search-count");
                 searchResultsContainer.getChildren().add(countLabel);
-                System.out.println("[DEBUG performSearch] Added count label to container");
 
                 for (LocalCacheService.NoteData result : results) {
                     VBox card = createResultCard(result);
                     searchResultsContainer.getChildren().add(card);
                 }
-                System.out.println("[DEBUG performSearch] Added " + results.size() + " result cards to container");
             }
-            System.out.println("[DEBUG performSearch] Container now has " + searchResultsContainer.getChildren().size() + " children");
         });
     }
 
     private void showSearchPane() {
-        System.out.println("[DEBUG showSearchPane] called");
         notePane.setVisible(false);
         reviewPane.setVisible(false);
         searchPane.setVisible(true);
@@ -298,7 +282,6 @@ public class MainViewV2 extends BorderPane {
     }
 
     public void showNotePane() {
-        System.out.println("[DEBUG showNotePane] called");
         searchPane.setVisible(false);
         reviewPane.setVisible(false);
         notePane.setVisible(true);
