@@ -44,11 +44,11 @@ public class MainViewV2 extends BorderPane {
     private Button settingsBtn;
     private PauseTransition searchDebounce;
 
-    public MainViewV2(Runnable onOpenSettings, Runnable onClearSearchToNoteView) {
+    public MainViewV2(Runnable onOpenSettings, Runnable onClearSearchToNoteView,LocalCacheService lcs) {
         this.onOpenSettings = onOpenSettings;
         this.onClearSearchToNoteView = onClearSearchToNoteView;
         this.apiService = new ApiServiceV2();
-        this.localCache = LocalCacheService.getInstance();
+        this.localCache = lcs;
         getStyleClass().add("main-view");
 
         // Initialize components
