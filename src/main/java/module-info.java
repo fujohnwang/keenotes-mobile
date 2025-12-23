@@ -4,6 +4,8 @@ module com.keenotes.mobile {
     requires javafx.graphics;
     requires javafx.base;
     requires java.net.http;
+    requires java.sql;
+    requires jakarta.websocket.client;
     requires com.gluonhq.attach.display;
     requires com.gluonhq.attach.lifecycle;
     requires com.gluonhq.attach.storage;
