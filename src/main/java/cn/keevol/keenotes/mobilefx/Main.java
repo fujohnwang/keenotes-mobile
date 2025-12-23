@@ -38,7 +38,7 @@ public class Main extends Application {
         contentPane = new StackPane();
 
         // Create views
-        mainView = new MainViewV2(this::showSettingsView, this::onClearSearchToNoteView);
+        mainView = new MainViewV2(this::showSettingsView, this::onClearSearchToNoteView, LocalCacheService.getInstance());
         debugView = new DebugView(this::backFromDebug);
 
         // Initialize WebSocket client
