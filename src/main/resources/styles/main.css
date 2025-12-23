@@ -528,3 +528,68 @@
     -fx-text-fill: -fx-text-secondary;
     -fx-font-style: italic;
 }
+
+/* Review Period Select (ComboBox) */
+.period-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-weight: bold;
+}
+
+.review-period-select {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-background-radius: 8px;
+    -fx-border-color: -fx-border;
+    -fx-border-radius: 8px;
+    -fx-padding: 8 12;
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-primary;
+    -fx-cursor: hand;
+}
+
+.review-period-select:hover {
+    -fx-border-color: -fx-primary;
+}
+
+.review-period-select:focused {
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, -fx-accent-glow, 12, 0, 0, 0);
+}
+
+/* ComboBox dropdown list */
+.review-period-select .list-view {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.review-period-select .list-cell {
+    -fx-background-color: -fx-surface;
+    -fx-text-fill: -fx-text-primary;
+    -fx-padding: 8 12;
+}
+
+.review-period-select .list-cell:hover {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-text-fill: -fx-primary;
+}
+
+.review-period-select .list-cell:selected {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: -fx-background;
+    -fx-font-weight: bold;
+}
+
+/* Arrow button styling */
+.review-period-select .arrow {
+    -fx-background-color: -fx-text-secondary;
+}
+
+.review-period-select:hover .arrow {
+    -fx-background-color: -fx-primary;
+}
+
+.review-period-select:showing .arrow {
+    -fx-background-color: -fx-primary;
+}

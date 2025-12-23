@@ -200,9 +200,10 @@ public class MainViewV2 extends BorderPane {
     }
 
     private VBox createReviewPane() {
-        // Period selection dropdown
+        // Period selection dropdown - vertically centered
         HBox periodControls = new HBox(8);
         periodControls.setPadding(new Insets(8, 16, 8, 16));
+        periodControls.setAlignment(Pos.CENTER_LEFT);
 
         ComboBox<String> periodSelect = new ComboBox<>();
         periodSelect.getItems().addAll("7 days", "30 days", "90 days", "All");
@@ -210,11 +211,15 @@ public class MainViewV2 extends BorderPane {
         periodSelect.getStyleClass().add("review-period-select");
         periodSelect.setOnAction(e -> loadReviewNotes(periodSelect.getValue()));
 
-        // Add label for context
+        // Add label for context - vertically centered
         Label periodLabel = new Label("Review Period:");
         periodLabel.getStyleClass().add("period-label");
 
-        periodControls.getChildren().addAll(periodLabel, periodSelect);
+        // Wrap in VBox for vertical centering
+        VBox labelBox = new VBox(periodLabel);
+        labelBox.setAlignment(Pos.CENTER);
+
+        periodControls.getChildren().addAll(labelBox, periodSelect);
 
         // Results container
         reviewResultsContainer.setPadding(new Insets(8, 16, 16, 16));
