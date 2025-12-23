@@ -20,13 +20,11 @@ public class Main extends Application {
     private StackPane contentPane;
     private BorderPane root;
     private MainViewV2 mainView;
-    private SearchView searchView;
     private DebugView debugView;
     private Button recordTabBtn;
     private Button reviewTabBtn;
     private WebSocketClientService wsClient;
     private boolean inSettingsView = false;
-    private boolean inSearchView = false;
     private boolean inDebugView = false;
 
     @Override
@@ -40,8 +38,7 @@ public class Main extends Application {
         contentPane = new StackPane();
 
         // Create views
-        mainView = new MainViewV2(this::showSettingsView, this::showSearchView);
-        searchView = new SearchView(this::backFromSearch);
+        mainView = new MainViewV2(this::showSettingsView);
         debugView = new DebugView(this::backFromDebug);
 
         // Initialize WebSocket client
@@ -177,24 +174,10 @@ public class Main extends Application {
         contentPane.getChildren().setAll(settingsView);
     }
 
-    private void showSearchView() {
-        inSearchView = true;
-        inDebugView = false;
-        inSettingsView = false;
-        contentPane.getChildren().setAll(searchView);
-    }
-
     private void showDebugView() {
         inDebugView = true;
         inSettingsView = false;
-        inSearchView = false;
         contentPane.getChildren().setAll(debugView);
-    }
-
-    private void backFromSearch() {
-        inSearchView = false;
-        contentPane.getChildren().setAll(mainView);
-        mainView.showNotePane();
     }
 
     private void backFromDebug() {
@@ -224,21 +207,16 @@ public class Main extends Application {
             backFromDebug();
             return true;
         }
-        // Priority 2: Search view
-        if (inSearchView) {
-            backFromSearch();
-            return true;
-        }
-        // Priority 3: Settings view
+        // Priority 2: Settings view
         if (inSettingsView) {
             backFromSettings();
             return true;
         }
-        // Priority 4: Search results in MainView
-        if (mainView.isInSearchPane()) {
-            mainView.goBackFromSearch();
-            return true;
-        }
+        // Priority 3: If search field has text, clear it
+        // Note: search field is always visible now, so we check if it has text
+        // This requires MainView to expose a method to check/clear search
+        // For now, skip this priority since search is always visible
+
         // Not handled - let system handle (exit app)
         return false;
     }
