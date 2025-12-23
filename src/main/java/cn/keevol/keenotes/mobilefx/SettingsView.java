@@ -17,9 +17,11 @@ public class SettingsView extends BorderPane {
     private final Label statusLabel;
     private final SettingsService settings;
     private final Runnable onBack;
+    private final Runnable onOpenDebug;
 
-    public SettingsView(Runnable onBack) {
+    public SettingsView(Runnable onBack, Runnable onOpenDebug) {
         this.onBack = onBack;
+        this.onOpenDebug = onOpenDebug;
         this.settings = SettingsService.getInstance();
         getStyleClass().add("main-view");
 
@@ -65,6 +67,18 @@ public class SettingsView extends BorderPane {
         Label encryptionHint = new Label("Leave both empty to disable E2E encryption");
         encryptionHint.getStyleClass().add("field-hint");
 
+        // Debug entry
+        Button debugBtn = new Button("Debug");
+        debugBtn.getStyleClass().add("debug-entry-btn");
+        debugBtn.setMaxWidth(Double.MAX_VALUE);
+        debugBtn.setOnAction(e -> onOpenDebug.run());
+
+        Label debugHint = new Label("Click to access debug tools (for development)");
+        debugHint.getStyleClass().add("field-hint");
+
+        VBox debugSection = new VBox(4, debugBtn, debugHint);
+        debugSection.setPadding(new Insets(8, 0, 0, 0));
+
         VBox form = new VBox(16,
                 createFieldGroup("Endpoint URL", endpointField),
                 createFieldGroup("Token", tokenField),
@@ -72,6 +86,7 @@ public class SettingsView extends BorderPane {
                 createFieldGroupWithHint("Confirm Password", encryptionPasswordConfirmField, encryptionHint),
                 saveButton,
                 statusLabel,
+                debugSection,
                 footer
         );
         form.setPadding(new Insets(24));
