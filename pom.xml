@@ -225,6 +225,7 @@
                             
                             <!-- 如果报错依旧，可能还需要把 SQLite 驱动也加进去 -->
                             <arg>--initialize-at-run-time=org.sqlite.JDBC</arg>
+                            <arg>--initialize-at-build-time=org.sqlite.util.ProcessRunner</arg>
                         </configuration>
                     </plugin>
                 </plugins>
