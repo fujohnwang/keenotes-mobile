@@ -59,7 +59,9 @@ public class ServiceManager {
             CompletableFuture.runAsync(() -> {
                 try {
                     localCacheService.initialize();
-                    localCacheInitialized = true;
+                    synchronized (ServiceManager.this) {
+                        localCacheInitialized = true;
+                    }
                     notifyStatusChanged("local_cache_ready", "本地缓存已就绪");
                 } catch (Exception e) {
                     notifyStatusChanged("local_cache_error", "本地缓存初始化失败: " + e.getMessage());

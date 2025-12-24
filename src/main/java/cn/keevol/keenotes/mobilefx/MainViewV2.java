@@ -267,37 +267,59 @@ public class MainViewV2 extends BorderPane {
         loadingLabel.getStyleClass().add("search-loading");
         searchResultsContainer.getChildren().add(loadingLabel);
 
-        LocalCacheService cache = getLocalCacheService();
-        if (cache == null || !cache.isInitialized()) {
+        // 在后台线程执行搜索
+        new Thread(() -> {
+            LocalCacheService cache = getLocalCacheService();
+            if (cache == null || !cache.isInitialized()) {
+                Platform.runLater(() -> {
+                    searchResultsContainer.getChildren().clear();
+                    // 检查是否有本地笔记，提供更有帮助的信息
+                    if (ServiceManager.getInstance().isLocalCacheInitialized()) {
+                        // 缓存已初始化但为空
+                        Label noResults = new Label("No notes found. Try saving some notes first!");
+                        noResults.getStyleClass().add("no-results");
+                        searchResultsContainer.getChildren().add(noResults);
+                    } else {
+                        // 缓存仍在初始化中
+                        Label notReadyLabel = new Label("Local cache is initializing. Please wait a moment...");
+                        notReadyLabel.getStyleClass().add("search-loading");
+                        searchResultsContainer.getChildren().add(notReadyLabel);
+
+                        // 1秒后重试搜索
+                        new Thread(() -> {
+                            try {
+                                Thread.sleep(1000);
+                                Platform.runLater(() -> performSearch());
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }).start();
+                    }
+                });
+                return;
+            }
+
+            List<LocalCacheService.NoteData> results = cache.searchNotes(query);
+
             Platform.runLater(() -> {
                 searchResultsContainer.getChildren().clear();
-                Label notReadyLabel = new Label("Local cache not ready yet. Please wait...");
-                notReadyLabel.getStyleClass().add("no-results");
-                searchResultsContainer.getChildren().add(notReadyLabel);
-            });
-            return;
-        }
 
-        List<LocalCacheService.NoteData> results = cache.searchNotes(query);
+                if (results.isEmpty()) {
+                    Label noResults = new Label("No results found for \"" + query + "\"");
+                    noResults.getStyleClass().add("no-results");
+                    searchResultsContainer.getChildren().add(noResults);
+                } else {
+                    Label countLabel = new Label(results.size() + " result(s) found");
+                    countLabel.getStyleClass().add("search-count");
+                    searchResultsContainer.getChildren().add(countLabel);
 
-        Platform.runLater(() -> {
-            searchResultsContainer.getChildren().clear();
-
-            if (results.isEmpty()) {
-                Label noResults = new Label("No results found for \"" + query + "\"");
-                noResults.getStyleClass().add("no-results");
-                searchResultsContainer.getChildren().add(noResults);
-            } else {
-                Label countLabel = new Label(results.size() + " result(s) found");
-                countLabel.getStyleClass().add("search-count");
-                searchResultsContainer.getChildren().add(countLabel);
-
-                for (LocalCacheService.NoteData result : results) {
-                    VBox card = createResultCard(result);
-                    searchResultsContainer.getChildren().add(card);
+                    for (LocalCacheService.NoteData result : results) {
+                        VBox card = createResultCard(result);
+                        searchResultsContainer.getChildren().add(card);
+                    }
                 }
-            }
-        });
+            });
+        }).start();
     }
 
     private void showSearchPane() {
@@ -343,40 +365,62 @@ public class MainViewV2 extends BorderPane {
 
         System.out.println("[DEBUG loadReviewNotes] period=" + period + ", days=" + days);
 
-        LocalCacheService cache = getLocalCacheService();
-        if (cache == null || !cache.isInitialized()) {
+        // 在后台线程执行回顾加载
+        new Thread(() -> {
+            LocalCacheService cache = getLocalCacheService();
+            if (cache == null || !cache.isInitialized()) {
+                Platform.runLater(() -> {
+                    reviewResultsContainer.getChildren().clear();
+                    // 检查是否有本地笔记，提供更有帮助的信息
+                    if (ServiceManager.getInstance().isLocalCacheInitialized()) {
+                        // 缓存已初始化但为空
+                        Label noResults = new Label("No notes found. Try saving some notes first!");
+                        noResults.getStyleClass().add("no-results");
+                        reviewResultsContainer.getChildren().add(noResults);
+                    } else {
+                        // 缓存仍在初始化中
+                        Label notReadyLabel = new Label("Local cache is initializing. Please wait a moment...");
+                        notReadyLabel.getStyleClass().add("search-loading");
+                        reviewResultsContainer.getChildren().add(notReadyLabel);
+
+                        // 1秒后重试加载
+                        new Thread(() -> {
+                            try {
+                                Thread.sleep(1000);
+                                Platform.runLater(() -> loadReviewNotes(period));
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }).start();
+                    }
+                });
+                return;
+            }
+
+            // 使用本地回顾
+            List<LocalCacheService.NoteData> results = cache.getNotesForReview(days);
+
             Platform.runLater(() -> {
                 reviewResultsContainer.getChildren().clear();
-                Label notReadyLabel = new Label("Local cache not ready yet. Please wait...");
-                notReadyLabel.getStyleClass().add("no-results");
-                reviewResultsContainer.getChildren().add(notReadyLabel);
-            });
-            return;
-        }
 
-        // 使用本地回顾
-        List<LocalCacheService.NoteData> results = cache.getNotesForReview(days);
+                System.out.println("[DEBUG loadReviewNotes] results.size=" + results.size());
 
-        Platform.runLater(() -> {
-            reviewResultsContainer.getChildren().clear();
+                if (results.isEmpty()) {
+                    Label noResults = new Label("No notes found for " + period);
+                    noResults.getStyleClass().add("no-results");
+                    reviewResultsContainer.getChildren().add(noResults);
+                } else {
+                    Label countLabel = new Label(results.size() + " note(s) in " + period);
+                    countLabel.getStyleClass().add("search-count");
+                    reviewResultsContainer.getChildren().add(countLabel);
 
-            System.out.println("[DEBUG loadReviewNotes] results.size=" + results.size());
-
-            if (results.isEmpty()) {
-                Label noResults = new Label("No notes found for " + period);
-                noResults.getStyleClass().add("no-results");
-                reviewResultsContainer.getChildren().add(noResults);
-            } else {
-                Label countLabel = new Label(results.size() + " note(s) in " + period);
-                countLabel.getStyleClass().add("search-count");
-                reviewResultsContainer.getChildren().add(countLabel);
-
-                for (LocalCacheService.NoteData result : results) {
-                    VBox card = createResultCard(result);
-                    reviewResultsContainer.getChildren().add(card);
+                    for (LocalCacheService.NoteData result : results) {
+                        VBox card = createResultCard(result);
+                        reviewResultsContainer.getChildren().add(card);
+                    }
                 }
-            }
-        });
+            });
+        }).start();
     }
 
     private VBox createResultCard(LocalCacheService.NoteData result) {
@@ -584,17 +628,16 @@ public class MainViewV2 extends BorderPane {
      * 在后台线程初始化，避免阻塞UI显示
      */
     private void initializeLocalCacheAsync() {
+        // 使用ServiceManager的机制，它会在后台线程初始化
+        // 我们只需获取实例，让它开始初始化过程
         new Thread(() -> {
             try {
                 // 稍微延迟，确保UI已经渲染完成
                 Thread.sleep(100);
                 localCache = ServiceManager.getInstance().getLocalCacheService();
-                if (localCache != null && !localCache.isInitialized()) {
-                    localCache.initialize();
-                }
-                System.out.println("[MainViewV2] LocalCacheService initialized");
+                System.out.println("[MainViewV2] LocalCacheService initialization triggered");
             } catch (Exception e) {
-                System.err.println("[MainViewV2] Failed to initialize LocalCacheService: " + e.getMessage());
+                System.err.println("[MainViewV2] Failed to trigger LocalCacheService initialization: " + e.getMessage());
             }
         }).start();
     }
@@ -607,10 +650,16 @@ public class MainViewV2 extends BorderPane {
         if (localCache == null) {
             localCache = ServiceManager.getInstance().getLocalCacheService();
         }
-        // 如果尚未初始化，等待一小段时间
+        // 如果尚未初始化，等待一段时间（最多2秒）
         if (localCache != null && !localCache.isInitialized()) {
             try {
-                Thread.sleep(100); // 短暂等待
+                // 增加等待时间，给数据库初始化更多时间
+                for (int i = 0; i < 20; i++) {
+                    Thread.sleep(100); // 每次等待100ms，总共2秒
+                    if (localCache.isInitialized()) {
+                        break;
+                    }
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
