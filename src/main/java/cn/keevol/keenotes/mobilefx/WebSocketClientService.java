@@ -73,22 +73,22 @@ public class WebSocketClientService {
         
         logger.info("Initializing Vert.x...");
         
-        // 使用更简单的配置，减少后台线程
         VertxOptions vertxOptions = new VertxOptions()
                 .setWorkerPoolSize(1)
-                .setEventLoopPoolSize(1)
-                .setBlockedThreadCheckInterval(1000)
-                .setMaxEventLoopExecuteTime(2000000000L);  // 2 秒
+                .setEventLoopPoolSize(1);
         
         this.vertx = Vertx.vertx(vertxOptions);
         
         HttpClientOptions options = new HttpClientOptions()
                 .setConnectTimeout(5000)
-                .setIdleTimeout(5)
-                .setReadIdleTimeout(5)
-                .setWriteIdleTimeout(5)
+                .setIdleTimeout(10)              // 空闲超时 10 秒
+                .setReadIdleTimeout(10)
+                .setWriteIdleTimeout(10)
+                .setSoLinger(0)                  // TCP linger=0，立即发送 RST 关闭连接
                 .setMaxPoolSize(1)
-                .setKeepAlive(false);
+                .setKeepAlive(false)
+                .setTcpNoDelay(true)
+                .setReuseAddress(true);
         
         if (ssl) {
             options.setSsl(true).setTrustAll(true);
@@ -219,7 +219,7 @@ public class WebSocketClientService {
 
         webSocket.exceptionHandler(e -> {
             if (isShuttingDown.get()) {
-                return;  // 关闭时忽略异常
+                return;
             }
             logger.warning("WebSocket error: " + e.getMessage());
             isConnected.set(false);
@@ -507,10 +507,11 @@ public class WebSocketClientService {
             reconnectTimerId = -1;
         }
         
-        // 主动关闭 WebSocket 连接（发送 close frame）
+        // 关闭 WebSocket
         if (webSocket != null) {
             try {
-                webSocket.close((short) 1000, "shutdown");
+                webSocket.close();
+                logger.info("WebSocket close initiated");
             } catch (Exception e) {
                 // ignore
             }
@@ -519,7 +520,7 @@ public class WebSocketClientService {
         
         isConnected.set(false);
         
-        // 先关闭 HttpClient
+        // 关闭 HttpClient
         if (httpClient != null) {
             try {
                 httpClient.close();
@@ -529,12 +530,11 @@ public class WebSocketClientService {
             httpClient = null;
         }
         
-        // 最后关闭 Vert.x
+        // 关闭 Vert.x
         if (vertx != null) {
-            Vertx v = vertx;
+            vertx.close();
             vertx = null;
-            v.close();
-            logger.info("Vert.x close initiated");
+            logger.info("Vert.x closed");
         }
         
         isInitialized.set(false);
