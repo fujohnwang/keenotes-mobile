@@ -23,58 +23,22 @@ public class Main extends Application {
     private DebugView debugView;
     private Button recordTabBtn;
     private Button reviewTabBtn;
-    private WebSocketClientService wsClient;
     private boolean inSettingsView = false;
     private boolean inDebugView = false;
 
     @Override
     public void start(Stage stage) {
         // Load Chinese font for Android/iOS native builds
+        // This is fast and doesn't block UI
         loadCustomFont();
-
-
 
         root = new BorderPane();
         contentPane = new StackPane();
 
-        // Create views
-        mainView = new MainViewV2(this::showSettingsView, this::onClearSearchToNoteView, LocalCacheService.getInstance());
+        // Create views - pass ServiceManager instead of directly accessing services
+        // This allows lazy initialization of services
+        mainView = new MainViewV2(this::showSettingsView, this::onClearSearchToNoteView);
         debugView = new DebugView(this::backFromDebug);
-
-        // Initialize WebSocket client
-        wsClient = new WebSocketClientService();
-        wsClient.addListener(new WebSocketClientService.SyncListener() {
-            @Override
-            public void onConnectionStatus(boolean connected) {
-                System.out.println("WebSocket connected: " + connected);
-            }
-
-            @Override
-            public void onSyncProgress(int current, int total) {
-                System.out.println("Sync progress: " + current + "/" + total);
-            }
-
-            @Override
-            public void onSyncComplete(int total, long lastSyncId) {
-                System.out.println("Sync complete: " + total + " notes, lastSyncId=" + lastSyncId);
-            }
-
-            @Override
-            public void onRealtimeUpdate(long id, String content) {
-                System.out.println("Realtime update: note " + id);
-            }
-
-            @Override
-            public void onError(String message) {
-                System.err.println("WebSocket error: " + message);
-            }
-        });
-
-        // Connect WebSocket after UI is ready
-        Platform.runLater(() -> {
-            System.out.println("Attempting to connect WebSocket...");
-            wsClient.connect();
-        });
 
         // Bottom tab bar
         root.setBottom(createBottomTabBar());
@@ -87,14 +51,11 @@ public class Main extends Application {
         scene.getStylesheets().add(getClass().getResource("/styles/main.css").toExternalForm());
 
         // Handle Android back button (mapped to ESCAPE in JavaFX)
-        // Note: Only ESCAPE is used for back navigation, not BACK_SPACE
-        // BACK_SPACE should work normally in text fields for deleting characters
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
                 if (handleBackNavigation()) {
                     event.consume();
                 }
-                // If not consumed, let the system handle it (exit app)
             }
         });
 
@@ -115,10 +76,60 @@ public class Main extends Application {
             }
         }
 
+        // 显示UI - 这是最重要的，用户应该立即看到界面
         stage.show();
+
+        // UI显示后，延迟初始化服务（在后台线程）
+        // 这样即使网络不通或配置未完成，UI也能正常显示
+        initializeServicesAfterUI();
 
         LifecycleService.create().ifPresent(service ->
                 System.out.println("LifecycleService initialized"));
+    }
+
+    /**
+     * 在UI显示后初始化服务
+     * 所有耗时操作（数据库初始化、网络连接）都在后台执行
+     */
+    private void initializeServicesAfterUI() {
+        // 使用Platform.runLater确保UI已经完全渲染
+        Platform.runLater(() -> {
+            System.out.println("Initializing services after UI is ready...");
+
+            // 1. 初始化LocalCacheService（数据库初始化）
+            // 这个操作可能稍慢，但在后台执行，不影响UI
+            ServiceManager.getInstance().getLocalCacheService();
+
+            // 2. 添加服务状态监听器
+            ServiceManager.getInstance().addListener((status, message) -> {
+                System.out.println("[Service Status] " + status + ": " + message);
+                // 可以在这里更新UI显示服务状态
+                updateServiceStatusUI(status, message);
+            });
+
+            // 3. 延迟连接WebSocket（在异步线程）
+            // 给用户几秒钟时间看到UI，然后再尝试连接
+            // 如果网络不通，用户仍然可以使用设置界面配置endpoint
+            new Thread(() -> {
+                try {
+                    // 稍微延迟，让用户先看到UI
+                    Thread.sleep(500);
+                    System.out.println("Attempting to connect WebSocket...");
+                    ServiceManager.getInstance().connectWebSocketIfNeeded();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }).start();
+        });
+    }
+
+    /**
+     * 更新服务状态UI（可选的，可以在状态栏显示）
+     */
+    private void updateServiceStatusUI(String status, String message) {
+        // 可以在这里添加状态栏显示
+        // 例如：在底部显示连接状态图标或文字
+        // 目前只打印日志，用户可以通过设置界面查看状态
     }
 
 
@@ -235,9 +246,8 @@ public class Main extends Application {
     @Override
     public void stop() {
         System.out.println("Application stopping...");
-        if (wsClient != null) {
-            wsClient.shutdown();
-        }
+        // 使用ServiceManager统一管理服务的关闭
+        ServiceManager.getInstance().shutdown();
         System.out.println("Application stopped.");
     }
 

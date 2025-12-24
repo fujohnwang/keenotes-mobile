@@ -33,7 +33,6 @@ public class MainViewV2 extends BorderPane {
     private final VBox searchResultsContainer;
 
     private final ApiServiceV2 apiService;
-    private final LocalCacheService localCache;
     private final Runnable onOpenSettings;
     private final Runnable onClearSearchToNoteView;
 
@@ -44,12 +43,19 @@ public class MainViewV2 extends BorderPane {
     private Button settingsBtn;
     private PauseTransition searchDebounce;
 
-    public MainViewV2(Runnable onOpenSettings, Runnable onClearSearchToNoteView,LocalCacheService lcs) {
+    // Lazy-loaded services
+    private LocalCacheService localCache;
+
+    public MainViewV2(Runnable onOpenSettings, Runnable onClearSearchToNoteView) {
         this.onOpenSettings = onOpenSettings;
         this.onClearSearchToNoteView = onClearSearchToNoteView;
-        this.apiService = new ApiServiceV2();
-        this.localCache = lcs;
+        // 使用ServiceManager获取ApiService，而不是直接创建
+        this.apiService = ServiceManager.getInstance().getApiService();
         getStyleClass().add("main-view");
+
+        // 延迟初始化LocalCacheService（在后台线程）
+        // 这样UI可以立即显示，即使数据库初始化需要时间
+        initializeLocalCacheAsync();
 
         // Initialize components
         reviewResultsContainer = new VBox(12);
@@ -261,7 +267,18 @@ public class MainViewV2 extends BorderPane {
         loadingLabel.getStyleClass().add("search-loading");
         searchResultsContainer.getChildren().add(loadingLabel);
 
-        List<LocalCacheService.NoteData> results = localCache.searchNotes(query);
+        LocalCacheService cache = getLocalCacheService();
+        if (cache == null || !cache.isInitialized()) {
+            Platform.runLater(() -> {
+                searchResultsContainer.getChildren().clear();
+                Label notReadyLabel = new Label("Local cache not ready yet. Please wait...");
+                notReadyLabel.getStyleClass().add("no-results");
+                searchResultsContainer.getChildren().add(notReadyLabel);
+            });
+            return;
+        }
+
+        List<LocalCacheService.NoteData> results = cache.searchNotes(query);
 
         Platform.runLater(() -> {
             searchResultsContainer.getChildren().clear();
@@ -326,8 +343,19 @@ public class MainViewV2 extends BorderPane {
 
         System.out.println("[DEBUG loadReviewNotes] period=" + period + ", days=" + days);
 
+        LocalCacheService cache = getLocalCacheService();
+        if (cache == null || !cache.isInitialized()) {
+            Platform.runLater(() -> {
+                reviewResultsContainer.getChildren().clear();
+                Label notReadyLabel = new Label("Local cache not ready yet. Please wait...");
+                notReadyLabel.getStyleClass().add("no-results");
+                reviewResultsContainer.getChildren().add(notReadyLabel);
+            });
+            return;
+        }
+
         // 使用本地回顾
-        List<LocalCacheService.NoteData> results = localCache.getNotesForReview(days);
+        List<LocalCacheService.NoteData> results = cache.getNotesForReview(days);
 
         Platform.runLater(() -> {
             reviewResultsContainer.getChildren().clear();
@@ -542,8 +570,51 @@ public class MainViewV2 extends BorderPane {
      * 获取本地笔记统计信息
      */
     public String getLocalStats() {
-        int count = localCache.getLocalNoteCount();
-        String lastSync = localCache.getLastSyncTime();
+        LocalCacheService cache = getLocalCacheService();
+        if (cache == null || !cache.isInitialized()) {
+            return "Local cache: initializing...";
+        }
+        int count = cache.getLocalNoteCount();
+        String lastSync = cache.getLastSyncTime();
         return String.format("Local notes: %d\nLast sync: %s", count, lastSync != null ? lastSync : "Never");
+    }
+
+    /**
+     * 延迟初始化LocalCacheService
+     * 在后台线程初始化，避免阻塞UI显示
+     */
+    private void initializeLocalCacheAsync() {
+        new Thread(() -> {
+            try {
+                // 稍微延迟，确保UI已经渲染完成
+                Thread.sleep(100);
+                localCache = ServiceManager.getInstance().getLocalCacheService();
+                if (localCache != null && !localCache.isInitialized()) {
+                    localCache.initialize();
+                }
+                System.out.println("[MainViewV2] LocalCacheService initialized");
+            } catch (Exception e) {
+                System.err.println("[MainViewV2] Failed to initialize LocalCacheService: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    /**
+     * 懒加载LocalCacheService
+     * 如果尚未初始化，会等待初始化完成
+     */
+    private LocalCacheService getLocalCacheService() {
+        if (localCache == null) {
+            localCache = ServiceManager.getInstance().getLocalCacheService();
+        }
+        // 如果尚未初始化，等待一小段时间
+        if (localCache != null && !localCache.isInitialized()) {
+            try {
+                Thread.sleep(100); // 短暂等待
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return localCache;
     }
 }
