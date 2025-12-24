@@ -24,18 +24,52 @@ public class LocalCacheService {
     private final Path dbPath;
     private Connection connection;
     private final CryptoService cryptoService;
+    private volatile boolean initialized = false;
 
     private LocalCacheService() {
         this.cryptoService = new CryptoService();
         this.dbPath = resolveDbPath();
     }
 
+    /**
+     * 获取单例实例
+     * 注意：此方法返回实例，但不一定已完成数据库初始化
+     * 建议使用ServiceManager来管理服务的生命周期
+     */
     public static synchronized LocalCacheService getInstance() {
         if (instance == null) {
             instance = new LocalCacheService();
-            instance.initDatabase();
+            // 不再在构造函数中立即初始化数据库
+            // 而是延迟到首次需要时或由ServiceManager触发
         }
         return instance;
+    }
+
+    /**
+     * 显式初始化数据库
+     * 由ServiceManager在后台线程调用
+     */
+    public synchronized void initialize() {
+        if (!initialized) {
+            initDatabase();
+            initialized = true;
+        }
+    }
+
+    /**
+     * 检查是否已初始化
+     */
+    public boolean isInitialized() {
+        return initialized;
+    }
+
+    /**
+     * 确保数据库已初始化（懒加载）
+     */
+    private void ensureInitialized() {
+        if (!initialized) {
+            initialize();
+        }
     }
 
     private Path resolveDbPath() {
@@ -51,6 +85,13 @@ public class LocalCacheService {
 
     private void initDatabase() {
         try {
+            // 确保SQLite驱动已加载
+            try {
+                Class.forName("org.sqlite.JDBC");
+            } catch (ClassNotFoundException e) {
+                // 驱动可能已通过其他方式加载，继续尝试
+            }
+
             // 确保目录存在
             if (dbPath.getParent() != null) {
                 Files.createDirectories(dbPath.getParent());
@@ -99,6 +140,7 @@ public class LocalCacheService {
      * @param notes 笔记列表
      */
     public void batchInsertNotes(List<NoteData> notes) throws SQLException {
+        ensureInitialized();
         if (notes.isEmpty()) {
             System.out.println("[DEBUG LocalCache] batchInsertNotes called with empty list");
             return;
@@ -136,6 +178,7 @@ public class LocalCacheService {
      * 插入单条笔记（用于实时同步）
      */
     public void insertNote(NoteData note) throws SQLException {
+        ensureInitialized();
         String sql = "INSERT OR REPLACE INTO notes_cache (id, content, channel, created_at, encrypted_content) VALUES (?, ?, ?, ?, ?)";
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -154,6 +197,7 @@ public class LocalCacheService {
      * @return 匹配的笔记列表
      */
     public List<NoteData> searchNotes(String query) {
+        ensureInitialized();
         List<NoteData> results = new ArrayList<>();
         if (query == null || query.trim().isEmpty()) {
             return results;
@@ -188,6 +232,7 @@ public class LocalCacheService {
      * @return 指定天数内的笔记
      */
     public List<NoteData> getNotesForReview(int days) {
+        ensureInitialized();
         List<NoteData> results = new ArrayList<>();
 
         String sql = "SELECT id, content, channel, created_at FROM notes_cache " +
@@ -225,6 +270,7 @@ public class LocalCacheService {
      * 获取所有笔记（用于调试或导出）
      */
     public List<NoteData> getAllNotes() {
+        ensureInitialized();
         List<NoteData> results = new ArrayList<>();
         String sql = "SELECT id, content, channel, created_at FROM notes_cache ORDER BY created_at DESC";
 
@@ -258,6 +304,7 @@ public class LocalCacheService {
      * 更新最后同步ID
      */
     public void updateLastSyncId(long lastSyncId) throws SQLException {
+        ensureInitialized();
         String sql = "UPDATE sync_state SET last_sync_id = ?, last_sync_time = datetime('now') WHERE id = 1";
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -271,6 +318,7 @@ public class LocalCacheService {
      * @return last_sync_id，如果从未同步返回-1
      */
     public long getLastSyncId() {
+        ensureInitialized();
         String sql = "SELECT last_sync_id FROM sync_state WHERE id = 1";
 
         try (Statement stmt = connection.createStatement();
@@ -290,6 +338,7 @@ public class LocalCacheService {
      * 获取最后同步时间
      */
     public String getLastSyncTime() {
+        ensureInitialized();
         String sql = "SELECT last_sync_time FROM sync_state WHERE id = 1";
 
         try (Statement stmt = connection.createStatement();
@@ -309,6 +358,7 @@ public class LocalCacheService {
      * 获取本地笔记总数
      */
     public int getLocalNoteCount() {
+        ensureInitialized();
         String sql = "SELECT COUNT(*) FROM notes_cache";
 
         try (Statement stmt = connection.createStatement();
@@ -341,6 +391,7 @@ public class LocalCacheService {
      * 重置同步状态（用于调试或强制重新同步）
      */
     public void resetSyncState() throws SQLException {
+        ensureInitialized();
         System.out.println("[DEBUG LocalCache] Resetting sync state...");
 
         // 清空笔记表

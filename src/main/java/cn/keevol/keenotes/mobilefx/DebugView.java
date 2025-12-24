@@ -16,10 +16,7 @@ import java.sql.SQLException;
  */
 public class DebugView extends VBox {
 
-    private final LocalCacheService localCache;
-
     public DebugView(Runnable onBack) {
-        this.localCache = LocalCacheService.getInstance();
         getStyleClass().add("debug-view");
 
         // Debug buttons container
@@ -66,12 +63,22 @@ public class DebugView extends VBox {
     }
 
     private void dumpAllNotes() {
+        LocalCacheService localCache = ServiceManager.getInstance().getLocalCacheService();
+        if (localCache == null || !localCache.isInitialized()) {
+            System.out.println("=== DEBUG: LocalCache not ready ===");
+            return;
+        }
         System.out.println("=== DEBUG: DUMPING ALL NOTES ===");
         localCache.getAllNotes();
         System.out.println("=== DEBUG: DUMP COMPLETE ===");
     }
 
     private void resetSyncState() {
+        LocalCacheService localCache = ServiceManager.getInstance().getLocalCacheService();
+        if (localCache == null || !localCache.isInitialized()) {
+            System.out.println("=== DEBUG: LocalCache not ready ===");
+            return;
+        }
         try {
             localCache.resetSyncState();
             System.out.println("=== SYNC STATE RESET - Restart app to re-sync ===");
@@ -81,6 +88,11 @@ public class DebugView extends VBox {
     }
 
     private void checkDbCount() {
+        LocalCacheService localCache = ServiceManager.getInstance().getLocalCacheService();
+        if (localCache == null || !localCache.isInitialized()) {
+            System.out.println("=== DEBUG: LocalCache not ready ===");
+            return;
+        }
         int count = localCache.getLocalNoteCount();
         String lastSync = localCache.getLastSyncTime();
         System.out.println("=== DEBUG: Database has " + count + " notes ===");
@@ -88,6 +100,11 @@ public class DebugView extends VBox {
     }
 
     private void clearAllNotes() {
+        LocalCacheService localCache = ServiceManager.getInstance().getLocalCacheService();
+        if (localCache == null || !localCache.isInitialized()) {
+            System.out.println("=== DEBUG: LocalCache not ready ===");
+            return;
+        }
         try {
             localCache.resetSyncState();
             System.out.println("=== ALL NOTES CLEARED ===");

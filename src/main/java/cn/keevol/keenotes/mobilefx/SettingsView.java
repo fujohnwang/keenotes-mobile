@@ -143,7 +143,7 @@ public class SettingsView extends BorderPane {
     private void saveSettings() {
         String password = encryptionPasswordField.getText();
         String confirmPassword = encryptionPasswordConfirmField.getText();
-        
+
         // Validate password match
         if (!password.equals(confirmPassword)) {
             encryptionPasswordField.clear();
@@ -154,17 +154,29 @@ public class SettingsView extends BorderPane {
             statusLabel.getStyleClass().add("error");
             return;
         }
-        
+
         settings.setEndpointUrl(endpointField.getText().trim());
         settings.setToken(tokenField.getText());
         settings.setEncryptionPassword(password);
         settings.save();
-        
-        String msg = settings.isEncryptionEnabled() 
+
+        String msg = settings.isEncryptionEnabled()
             ? "Settings saved ✓ (E2E encryption enabled)"
             : "Settings saved ✓";
         statusLabel.setText(msg);
         statusLabel.getStyleClass().removeAll("error", "success");
         statusLabel.getStyleClass().add("success");
+
+        // 尝试重新连接WebSocket（如果配置已完成）
+        if (settings.isConfigured()) {
+            new Thread(() -> {
+                try {
+                    Thread.sleep(500); // 稍微延迟
+                    ServiceManager.getInstance().connectWebSocketIfNeeded();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }).start();
+        }
     }
 }
