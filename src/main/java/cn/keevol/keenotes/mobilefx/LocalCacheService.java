@@ -65,10 +65,17 @@ public class LocalCacheService {
 
     /**
      * 确保数据库已初始化（懒加载）
+     * 这个方法会阻塞直到初始化完成
      */
     private void ensureInitialized() {
         if (!initialized) {
-            initialize();
+            // 如果尚未初始化，尝试初始化
+            // 但需要考虑可能有其他线程正在初始化的情况
+            synchronized (this) {
+                if (!initialized) {
+                    initialize();
+                }
+            }
         }
     }
 
