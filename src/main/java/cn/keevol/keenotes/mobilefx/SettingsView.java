@@ -155,6 +155,9 @@ public class SettingsView extends BorderPane {
             return;
         }
 
+        // Check if this is a new configuration (from empty to configured)
+        boolean wasConfiguredBefore = settings.isConfigured();
+
         settings.setEndpointUrl(endpointField.getText().trim());
         settings.setToken(tokenField.getText());
         settings.setEncryptionPassword(password);
@@ -166,6 +169,20 @@ public class SettingsView extends BorderPane {
         statusLabel.setText(msg);
         statusLabel.getStyleClass().removeAll("error", "success");
         statusLabel.getStyleClass().add("success");
+
+        // 如果之前未配置，现在配置了，触发缓存初始化
+        if (!wasConfiguredBefore && settings.isConfigured()) {
+            System.out.println("[SettingsView] New configuration detected, triggering cache initialization");
+            // 触发ServiceManager初始化缓存
+            new Thread(() -> {
+                try {
+                    Thread.sleep(100);
+                    ServiceManager.getInstance().getLocalCacheService();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }).start();
+        }
 
         // 尝试重新连接WebSocket（如果配置已完成）
         if (settings.isConfigured()) {

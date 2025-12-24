@@ -53,10 +53,6 @@ public class MainViewV2 extends BorderPane {
         this.apiService = ServiceManager.getInstance().getApiService();
         getStyleClass().add("main-view");
 
-        // 延迟初始化LocalCacheService（在后台线程）
-        // 这样UI可以立即显示，即使数据库初始化需要时间
-        initializeLocalCacheAsync();
-
         // Initialize components
         reviewResultsContainer = new VBox(12);
         searchResultsContainer = new VBox(12);
@@ -88,6 +84,10 @@ public class MainViewV2 extends BorderPane {
 
         // Set initial focus
         Platform.runLater(() -> noteInput.requestFocus());
+
+        // 延迟检查是否需要初始化缓存（在UI显示后）
+        // 只有当配置存在时才初始化，避免不必要的数据库操作
+        checkAndInitializeCacheAsync();
     }
 
     private void createHeader() {
@@ -269,36 +269,34 @@ public class MainViewV2 extends BorderPane {
 
         // 在后台线程执行搜索
         new Thread(() -> {
-            LocalCacheService cache = getLocalCacheService();
-            if (cache == null || !cache.isInitialized()) {
+            // 检查缓存是否就绪
+            if (!isLocalCacheReady()) {
                 Platform.runLater(() -> {
                     searchResultsContainer.getChildren().clear();
-                    // 检查是否有本地笔记，提供更有帮助的信息
-                    if (ServiceManager.getInstance().isLocalCacheInitialized()) {
-                        // 缓存已初始化但为空
+                    // 检查是否已配置
+                    SettingsService settings = SettingsService.getInstance();
+                    if (!settings.isConfigured()) {
+                        // 未配置
+                        Label notConfigured = new Label("Please configure server settings first in Settings.");
+                        notConfigured.getStyleClass().add("no-results");
+                        searchResultsContainer.getChildren().add(notConfigured);
+                    } else if (ServiceManager.getInstance().isLocalCacheInitialized()) {
+                        // 已配置且缓存已初始化，但为空
                         Label noResults = new Label("No notes found. Try saving some notes first!");
                         noResults.getStyleClass().add("no-results");
                         searchResultsContainer.getChildren().add(noResults);
                     } else {
-                        // 缓存仍在初始化中
-                        Label notReadyLabel = new Label("Local cache is initializing. Please wait a moment...");
-                        notReadyLabel.getStyleClass().add("search-loading");
-                        searchResultsContainer.getChildren().add(notReadyLabel);
-
-                        // 1秒后重试搜索
-                        new Thread(() -> {
-                            try {
-                                Thread.sleep(1000);
-                                Platform.runLater(() -> performSearch());
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                            }
-                        }).start();
+                        // 缓存正在初始化中
+                        Label initializing = new Label("Cache is initializing. Please wait a moment...");
+                        initializing.getStyleClass().add("search-loading");
+                        searchResultsContainer.getChildren().add(initializing);
                     }
                 });
                 return;
             }
 
+            // 缓存就绪，执行搜索
+            LocalCacheService cache = getLocalCacheService();
             List<LocalCacheService.NoteData> results = cache.searchNotes(query);
 
             Platform.runLater(() -> {
@@ -367,37 +365,34 @@ public class MainViewV2 extends BorderPane {
 
         // 在后台线程执行回顾加载
         new Thread(() -> {
-            LocalCacheService cache = getLocalCacheService();
-            if (cache == null || !cache.isInitialized()) {
+            // 检查缓存是否就绪
+            if (!isLocalCacheReady()) {
                 Platform.runLater(() -> {
                     reviewResultsContainer.getChildren().clear();
-                    // 检查是否有本地笔记，提供更有帮助的信息
-                    if (ServiceManager.getInstance().isLocalCacheInitialized()) {
-                        // 缓存已初始化但为空
+                    // 检查是否已配置
+                    SettingsService settings = SettingsService.getInstance();
+                    if (!settings.isConfigured()) {
+                        // 未配置
+                        Label notConfigured = new Label("Please configure server settings first in Settings.");
+                        notConfigured.getStyleClass().add("no-results");
+                        reviewResultsContainer.getChildren().add(notConfigured);
+                    } else if (ServiceManager.getInstance().isLocalCacheInitialized()) {
+                        // 已配置且缓存已初始化，但为空
                         Label noResults = new Label("No notes found. Try saving some notes first!");
                         noResults.getStyleClass().add("no-results");
                         reviewResultsContainer.getChildren().add(noResults);
                     } else {
-                        // 缓存仍在初始化中
-                        Label notReadyLabel = new Label("Local cache is initializing. Please wait a moment...");
-                        notReadyLabel.getStyleClass().add("search-loading");
-                        reviewResultsContainer.getChildren().add(notReadyLabel);
-
-                        // 1秒后重试加载
-                        new Thread(() -> {
-                            try {
-                                Thread.sleep(1000);
-                                Platform.runLater(() -> loadReviewNotes(period));
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                            }
-                        }).start();
+                        // 缓存正在初始化中
+                        Label initializing = new Label("Cache is initializing. Please wait a moment...");
+                        initializing.getStyleClass().add("search-loading");
+                        reviewResultsContainer.getChildren().add(initializing);
                     }
                 });
                 return;
             }
 
-            // 使用本地回顾
+            // 缓存就绪，执行回顾
+            LocalCacheService cache = getLocalCacheService();
             List<LocalCacheService.NoteData> results = cache.getNotesForReview(days);
 
             Platform.runLater(() -> {
@@ -624,46 +619,67 @@ public class MainViewV2 extends BorderPane {
     }
 
     /**
-     * 延迟初始化LocalCacheService
-     * 在后台线程初始化，避免阻塞UI显示
+     * 检查是否需要初始化缓存
+     * 只有当配置存在时才初始化，避免不必要的数据库操作
      */
-    private void initializeLocalCacheAsync() {
-        // 使用ServiceManager的机制，它会在后台线程初始化
-        // 我们只需获取实例，让它开始初始化过程
+    private void checkAndInitializeCacheAsync() {
         new Thread(() -> {
             try {
                 // 稍微延迟，确保UI已经渲染完成
                 Thread.sleep(100);
+
+                // 检查配置是否存在
+                SettingsService settings = SettingsService.getInstance();
+                if (!settings.isConfigured()) {
+                    System.out.println("[MainViewV2] No configuration found, skipping cache initialization");
+                    return;
+                }
+
+                // 配置存在，初始化缓存
                 localCache = ServiceManager.getInstance().getLocalCacheService();
-                System.out.println("[MainViewV2] LocalCacheService initialization triggered");
+                System.out.println("[MainViewV2] Configuration found, cache initialization triggered");
             } catch (Exception e) {
-                System.err.println("[MainViewV2] Failed to trigger LocalCacheService initialization: " + e.getMessage());
+                System.err.println("[MainViewV2] Failed to check/initialize cache: " + e.getMessage());
             }
         }).start();
     }
 
     /**
-     * 懒加载LocalCacheService
-     * 如果尚未初始化，会等待初始化完成
+     * 获取LocalCacheService实例
+     * 如果尚未初始化，会触发初始化但不等待
      */
     private LocalCacheService getLocalCacheService() {
         if (localCache == null) {
             localCache = ServiceManager.getInstance().getLocalCacheService();
         }
-        // 如果尚未初始化，等待一段时间（最多2秒）
-        if (localCache != null && !localCache.isInitialized()) {
-            try {
-                // 增加等待时间，给数据库初始化更多时间
-                for (int i = 0; i < 20; i++) {
-                    Thread.sleep(100); // 每次等待100ms，总共2秒
-                    if (localCache.isInitialized()) {
-                        break;
-                    }
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
         return localCache;
+    }
+
+    /**
+     * 检查本地缓存是否已就绪
+     */
+    private boolean isLocalCacheReady() {
+        LocalCacheService cache = getLocalCacheService();
+        return cache != null && cache.isInitialized();
+    }
+
+    /**
+     * 当设置保存后调用此方法
+     * 如果配置已完成但缓存未初始化，则触发初始化
+     */
+    public void onSettingsSaved() {
+        SettingsService settings = SettingsService.getInstance();
+        if (settings.isConfigured() && !isLocalCacheReady()) {
+            System.out.println("[MainViewV2] Settings saved, triggering cache initialization");
+            // 触发缓存初始化
+            new Thread(() -> {
+                try {
+                    Thread.sleep(100); // 短暂延迟
+                    localCache = ServiceManager.getInstance().getLocalCacheService();
+                } catch (Exception e) {
+                    System.err.println("[MainViewV2] Failed to initialize cache after settings saved: " + e.getMessage());
+                }
+            }).start();
+        }
     }
 }
