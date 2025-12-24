@@ -1,27 +1,35 @@
 package cn.keevol.keenotes.mobilefx;
 
-import jakarta.websocket.*;
-import java.io.IOException;
-import java.net.URI;
-import java.nio.ByteBuffer;
+import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
+import io.vertx.core.http.HttpClient;
+import io.vertx.core.http.HttpClientOptions;
+import io.vertx.core.http.WebSocket;
+import io.vertx.core.http.WebSocketConnectOptions;
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
+
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * WebSocket客户端服务，处理与服务器的实时同步
- * - 连接管理
- * - 数据同步
- * - 心跳和重连
+ * WebSocket客户端服务 - 基于Vert.x实现
+ * 处理与服务器的实时同步：连接管理、数据同步、心跳和重连
  */
-public class WebSocketClientService extends Endpoint {
+public class WebSocketClientService {
     private static final Logger logger = Logger.getLogger(WebSocketClientService.class.getName());
 
-    private Session session;
-    private Map<String, Object> sessionProperties;
+    private volatile Vertx vertx;
+    private volatile HttpClient httpClient;
+    private volatile WebSocket webSocket;
+    
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
     private final AtomicBoolean isConnecting = new AtomicBoolean(false);
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
+    private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
+    private final AtomicBoolean isInitialized = new AtomicBoolean(false);
 
     // 服务依赖
     private final LocalCacheService localCache;
@@ -35,10 +43,9 @@ public class WebSocketClientService extends Endpoint {
     private static final int MAX_RECONNECT_ATTEMPTS = 10;
     private static final int RECONNECT_BASE_DELAY_MS = 1000;
 
-    // 心跳和重连定时器
-    private ScheduledExecutorService scheduler;
-    private ScheduledFuture<?> heartbeatTask;
-    private ScheduledFuture<?> reconnectTask;
+    // 心跳定时器
+    private long heartbeatTimerId = -1;
+    private long reconnectTimerId = -1;
 
     // 回调监听器
     private final List<SyncListener> listeners = new CopyOnWriteArrayList<>();
@@ -53,78 +60,191 @@ public class WebSocketClientService extends Endpoint {
         this.cryptoService = new CryptoService();
         this.settings = SettingsService.getInstance();
         this.clientId = generateClientId();
-        this.scheduler = Executors.newScheduledThreadPool(2);
+        // 不在构造函数中初始化 Vert.x，延迟到第一次连接时
+    }
+
+    /**
+     * 延迟初始化 Vert.x - 只在第一次连接时调用
+     */
+    private synchronized void ensureInitialized(boolean ssl) {
+        if (isInitialized.get() || isShuttingDown.get()) {
+            return;
+        }
+        
+        logger.info("Initializing Vert.x...");
+        
+        // 使用更简单的配置，减少后台线程
+        VertxOptions vertxOptions = new VertxOptions()
+                .setWorkerPoolSize(1)
+                .setEventLoopPoolSize(1)
+                .setBlockedThreadCheckInterval(1000)
+                .setMaxEventLoopExecuteTime(2000000000L);  // 2 秒
+        
+        this.vertx = Vertx.vertx(vertxOptions);
+        
+        HttpClientOptions options = new HttpClientOptions()
+                .setConnectTimeout(5000)
+                .setIdleTimeout(5)
+                .setReadIdleTimeout(5)
+                .setWriteIdleTimeout(5)
+                .setMaxPoolSize(1)
+                .setKeepAlive(false);
+        
+        if (ssl) {
+            options.setSsl(true).setTrustAll(true);
+        }
+        
+        this.httpClient = vertx.createHttpClient(options);
+        isInitialized.set(true);
+        logger.info("Vert.x initialized");
     }
 
     /**
      * 连接到WebSocket服务器
      */
     public void connect() {
+        if (isShuttingDown.get()) {
+            return;
+        }
+        
         if (isConnected.get() || isConnecting.get()) {
             logger.info("Already connected or connecting");
             return;
         }
 
         if (!isConnecting.compareAndSet(false, true)) {
-            return; // Another thread is connecting
+            return;
         }
 
         String wsUrl = settings.getEndpointUrl();
         if (wsUrl == null || wsUrl.isEmpty()) {
             logger.warning("WebSocket URL not configured");
+            isConnecting.set(false);
             return;
         }
 
-        // 转换HTTP URL为WebSocket URL
-        String wsEndpointUrl = wsUrl.replace("http://", "ws://").replace("https://", "wss://");
-        if (!wsEndpointUrl.endsWith("/ws")) {
-            wsEndpointUrl = wsEndpointUrl + "/ws";
-        }
+        // 解析URL
+        String host;
+        int port;
+        boolean ssl;
+        String path = "/ws";
 
         try {
-            WebSocketContainer container = ContainerProvider.getWebSocketContainer();
-            String authToken = settings.getToken();
-
-            // 设置客户端ID和最后同步ID
-            lastSyncId = localCache.getLastSyncId();
-
-            // Store properties for use in onOpen
-            this.sessionProperties = new HashMap<>();
-            sessionProperties.put("auth_token", authToken);
-            sessionProperties.put("client_id", clientId);
-            sessionProperties.put("last_sync_id", lastSyncId);
-
-            // Configure endpoint with Authorization header
-            ClientEndpointConfig config = ClientEndpointConfig.Builder.create()
-                    .configurator(new ClientEndpointConfig.Configurator() {
-                        @Override
-                        public void beforeRequest(Map<String, List<String>> headers) {
-                            if (authToken != null && !authToken.isEmpty()) {
-                                headers.put("Authorization", List.of("Bearer " + authToken));
-                            }
-                        }
-                    })
-                    .build();
-            container.connectToServer(this, config, URI.create(wsEndpointUrl));
-            logger.info("WebSocket connecting to: " + wsEndpointUrl);
-
+            java.net.URI uri = new java.net.URI(wsUrl);
+            host = uri.getHost();
+            ssl = "https".equalsIgnoreCase(uri.getScheme()) || "wss".equalsIgnoreCase(uri.getScheme());
+            port = uri.getPort();
+            if (port == -1) {
+                port = ssl ? 443 : 80;
+            }
+            if (uri.getPath() != null && !uri.getPath().isEmpty() && !uri.getPath().equals("/")) {
+                path = uri.getPath();
+                if (!path.endsWith("/ws")) {
+                    path = path + "/ws";
+                }
+            }
         } catch (Exception e) {
-            logger.warning("Failed to connect WebSocket: " + e.getMessage());
+            logger.warning("Invalid URL: " + wsUrl);
             isConnecting.set(false);
-            scheduleReconnect();
+            return;
         }
+
+        // 延迟初始化 Vert.x
+        ensureInitialized(ssl);
+        
+        if (isShuttingDown.get()) {
+            isConnecting.set(false);
+            return;
+        }
+
+        lastSyncId = localCache.getLastSyncId();
+        String authToken = settings.getToken();
+
+        WebSocketConnectOptions connectOptions = new WebSocketConnectOptions()
+                .setHost(host)
+                .setPort(port)
+                .setSsl(ssl)
+                .setURI(path);
+
+        // 添加 Origin 头 - Cloudflare WebSocket 要求
+        String origin = (ssl ? "https" : "http") + "://" + host;
+        connectOptions.addHeader("Origin", origin);
+
+        // 添加 Authorization 头 - 复用 HTTP POST 的 token 认证方式
+        if (authToken != null && !authToken.isEmpty()) {
+            connectOptions.addHeader("Authorization", "Bearer " + authToken);
+            logger.info("Adding Authorization header: Bearer " + authToken.substring(0, Math.min(4, authToken.length())) + "...");
+        } else {
+            logger.warning("No auth token configured!");
+        }
+
+        logger.info("WebSocket connecting to: " + (ssl ? "wss" : "ws") + "://" + host + ":" + port + path);
+
+        httpClient.webSocket(connectOptions, ar -> {
+            if (ar.succeeded()) {
+                webSocket = ar.result();
+                isConnected.set(true);
+                isConnecting.set(false);
+                reconnectAttempts = 0;
+
+                setupWebSocketHandlers();
+                sendHandshake();
+                startHeartbeat();
+                notifyConnectionStatus(true);
+
+                logger.info("WebSocket connected successfully");
+            } else {
+                logger.warning("WebSocket connection failed: " + ar.cause().getMessage());
+                isConnecting.set(false);
+                scheduleReconnect();
+            }
+        });
+    }
+
+
+    private void setupWebSocketHandlers() {
+        webSocket.textMessageHandler(this::handleTextMessage);
+        
+        webSocket.closeHandler(v -> {
+            if (isShuttingDown.get()) {
+                logger.info("WebSocket closed (shutdown)");
+                return;
+            }
+            logger.info("WebSocket closed");
+            isConnected.set(false);
+            cleanup();
+            notifyConnectionStatus(false);
+            scheduleReconnect();
+        });
+
+        webSocket.exceptionHandler(e -> {
+            if (isShuttingDown.get()) {
+                return;  // 关闭时忽略异常
+            }
+            logger.warning("WebSocket error: " + e.getMessage());
+            isConnected.set(false);
+            notifyError(e.getMessage());
+            cleanup();
+            scheduleReconnect();
+        });
+    }
+
+    private void sendHandshake() {
+        JsonObject handshake = new JsonObject()
+                .put("type", "handshake")
+                .put("client_id", clientId)
+                .put("last_sync_id", lastSyncId);
+        
+        webSocket.writeTextMessage(handshake.encode());
+        logger.info("Sent handshake with lastSyncId=" + lastSyncId);
     }
 
     /**
      * 断开连接
      */
     public void disconnect() {
-        if (session != null && session.isOpen()) {
-            try {
-                session.close(new CloseReason(CloseReason.CloseCodes.NORMAL_CLOSURE, "Client disconnect"));
-            } catch (IOException e) {
-                logger.warning("Error closing session: " + e.getMessage());
-            }
+        if (webSocket != null) {
+            webSocket.close();
         }
         cleanup();
     }
@@ -141,128 +261,85 @@ public class WebSocketClientService extends Endpoint {
             throw new IllegalStateException("Encryption password not set");
         }
 
-        // 加密内容
         String encryptedContent = cryptoService.encrypt(content);
 
-        // 构建消息
-        String message = String.format(
-            "{\"type\":\"new_note\",\"content\":%s,\"channel\":\"mobile\",\"timestamp\":\"%s\"}",
-            escapeJson(encryptedContent),
-            java.time.LocalDateTime.now().toString()
-        );
+        JsonObject message = new JsonObject()
+                .put("type", "new_note")
+                .put("content", encryptedContent)
+                .put("channel", "mobile")
+                .put("timestamp", LocalDateTime.now().toString());
 
-        session.getBasicRemote().sendText(message);
+        webSocket.writeTextMessage(message.encode());
         logger.info("Sent new note to server");
     }
 
     /**
-     * WebSocket连接打开回调 - Endpoint override
-     */
-    @Override
-    public void onOpen(Session session, EndpointConfig config) {
-        this.session = session;
-        isConnected.set(true);
-        isConnecting.set(false);  // Reset connecting flag
-        reconnectAttempts = 0;  // 重置重连计数
-
-        // Add message handler for text messages
-        session.addMessageHandler(new MessageHandler.Whole<String>() {
-            @Override
-            public void onMessage(String message) {
-                handleTextMessage(message);
-            }
-        });
-
-        // 获取认证信息 (从sessionProperties)
-        String clientId = (String) sessionProperties.get("client_id");
-        Long lastSyncId = (Long) sessionProperties.get("last_sync_id");
-
-        // 发送握手消息（认证已在HTTP头中完成）
-        String handshake = String.format(
-            "{\"type\":\"handshake\",\"client_id\":\"%s\",\"last_sync_id\":%d}",
-            clientId, lastSyncId != null ? lastSyncId : -1
-        );
-
-        try {
-            session.getBasicRemote().sendText(handshake);
-            logger.info("WebSocket connected, sent handshake");
-        } catch (IOException e) {
-            logger.warning("Failed to send handshake: " + e.getMessage());
-        }
-
-        // 启动心跳
-        startHeartbeat();
-
-        // 通知监听器
-        notifyConnectionStatus(true);
-    }
-
-    /**
-     * Handle text messages from server
+     * 处理服务器消息
      */
     private void handleTextMessage(String message) {
         try {
-            // 简单JSON解析
-            if (message.contains("\"type\":\"sync_batch\"")) {
-                handleSyncBatch(message);
-            } else if (message.contains("\"type\":\"sync_complete\"")) {
-                handleSyncComplete(message);
-            } else if (message.contains("\"type\":\"realtime_update\"")) {
-                handleRealtimeUpdate(message);
-            } else if (message.contains("\"type\":\"pong\"")) {
-                // 收到pong，更新最后活动时间
-                logger.fine("Received pong");
-            } else if (message.contains("\"type\":\"error\"")) {
-                handleError(message);
-            } else if (message.contains("\"type\":\"new_note_ack\"")) {
-                handleNewNoteAck(message);
+            JsonObject json = new JsonObject(message);
+            String type = json.getString("type");
+
+            switch (type) {
+                case "sync_batch":
+                    handleSyncBatch(json);
+                    break;
+                case "sync_complete":
+                    handleSyncComplete(json);
+                    break;
+                case "realtime_update":
+                    handleRealtimeUpdate(json);
+                    break;
+                case "pong":
+                    logger.fine("Received pong");
+                    break;
+                case "ping":
+                    webSocket.writeTextMessage("{\"type\":\"pong\"}");
+                    break;
+                case "error":
+                    handleError(json);
+                    break;
+                case "new_note_ack":
+                    handleNewNoteAck(json);
+                    break;
+                default:
+                    logger.warning("Unknown message type: " + type);
             }
         } catch (Exception e) {
             logger.warning("Failed to handle message: " + e.getMessage());
         }
     }
 
-    /**
-     * 处理同步批次
-     */
-    private void handleSyncBatch(String message) throws Exception {
+    private void handleSyncBatch(JsonObject json) {
         isSyncing.set(true);
-        notifySyncProgress(0, 1);  // 开始同步
+        notifySyncProgress(0, 1);
 
-        logger.info("DEBUG: handleSyncBatch - raw message: " + message);
-
-        // 解析JSON（简化版）
-        int batchId = extractInt(message, "batch_id");
-        int totalBatches = extractInt(message, "total_batches");
-
-        logger.info("DEBUG: batchId=" + batchId + ", totalBatches=" + totalBatches + ", expectedBatches=" + expectedBatches);
+        int batchId = json.getInteger("batch_id", 0);
+        int totalBatches = json.getInteger("total_batches", 1);
 
         if (expectedBatches == 0) {
             expectedBatches = totalBatches;
             syncBatchBuffer.clear();
         }
 
-        // 解析notes数组
-        logger.info("DEBUG: Message contains 'notes': " + message.contains("\"notes\":["));
-        List<LocalCacheService.NoteData> batchNotes = parseNotesArray(message);
-        logger.info("DEBUG: Parsed " + batchNotes.size() + " notes from batch " + batchId);
+        JsonArray notes = json.getJsonArray("notes");
+        if (notes != null) {
+            for (int i = 0; i < notes.size(); i++) {
+                JsonObject note = notes.getJsonObject(i);
+                try {
+                    long id = note.getLong("id");
+                    String encryptedContent = note.getString("content");
+                    String channel = note.getString("channel");
+                    String createdAt = note.getString("created_at");
 
-        // Additional debug: check if message has the right structure
-        if (message.contains("\"notes\":") && batchNotes.isEmpty()) {
-            logger.warning("DEBUG: Message has notes field but parseNotesArray returned empty! Message: " + message);
-        }
-
-        // 解密并添加到buffer
-        for (LocalCacheService.NoteData note : batchNotes) {
-            try {
-                logger.info("DEBUG: Processing note id=" + note.id + ", content=" + note.content.substring(0, Math.min(30, note.content.length())));
-                String decryptedContent = cryptoService.decrypt(note.content);
-                syncBatchBuffer.add(new LocalCacheService.NoteData(
-                    note.id, decryptedContent, note.channel, note.createdAt, note.content
-                ));
-                logger.info("DEBUG: Added to buffer - id=" + note.id);
-            } catch (Exception e) {
-                logger.warning("Failed to decrypt note " + note.id + ": " + e.getMessage());
+                    String decryptedContent = cryptoService.decrypt(encryptedContent);
+                    syncBatchBuffer.add(new LocalCacheService.NoteData(
+                            id, decryptedContent, channel, createdAt, encryptedContent
+                    ));
+                } catch (Exception e) {
+                    logger.warning("Failed to decrypt note: " + e.getMessage());
+                }
             }
         }
 
@@ -271,203 +348,135 @@ public class WebSocketClientService extends Endpoint {
         logger.info("Received batch " + batchId + "/" + totalBatches + ", buffer size=" + syncBatchBuffer.size());
     }
 
-    /**
-     * 处理同步完成
-     */
-    private void handleSyncComplete(String message) throws Exception {
-        int totalSynced = extractInt(message, "total_synced");
-        long lastSyncId = extractLong(message, "last_sync_id");
+    private void handleSyncComplete(JsonObject json) {
+        int totalSynced = json.getInteger("total_synced", 0);
+        long newLastSyncId = json.getLong("last_sync_id", -1L);
 
-        logger.info("DEBUG: Raw message: " + message);
-        logger.info("DEBUG: totalSynced=" + totalSynced + ", lastSyncId=" + lastSyncId);
-
-        if (!syncBatchBuffer.isEmpty()) {
-            // 批量插入到本地缓存
-            logger.info("DEBUG: About to batch insert " + syncBatchBuffer.size() + " notes");
-            for (LocalCacheService.NoteData note : syncBatchBuffer) {
-                logger.info("DEBUG: Buffer contains - id=" + note.id + ", content=" + note.content.substring(0, Math.min(30, note.content.length())));
+        try {
+            if (!syncBatchBuffer.isEmpty()) {
+                localCache.batchInsertNotes(syncBatchBuffer);
+                logger.info("Batch inserted " + syncBatchBuffer.size() + " notes");
             }
-            localCache.batchInsertNotes(syncBatchBuffer);
-            logger.info("Batch inserted " + syncBatchBuffer.size() + " notes");
-        } else {
-            logger.warning("DEBUG: syncBatchBuffer is EMPTY! No notes to insert");
+
+            if (totalSynced > 0 && newLastSyncId > 0) {
+                localCache.updateLastSyncId(newLastSyncId);
+                this.lastSyncId = newLastSyncId;
+                logger.info("Updated lastSyncId to: " + newLastSyncId);
+            }
+        } catch (Exception e) {
+            logger.warning("Failed to save synced notes: " + e.getMessage());
         }
 
-        // 更新最后同步ID - 只在有笔记被同步时才更新
-        if (totalSynced > 0 && lastSyncId > 0) {
-            localCache.updateLastSyncId(lastSyncId);
-            this.lastSyncId = lastSyncId;
-            logger.info("Updated lastSyncId to: " + lastSyncId);
-        } else if (totalSynced == 0) {
-            logger.info("No notes synced (totalSynced=0), keeping lastSyncId=" + this.lastSyncId);
-        } else {
-            logger.warning("Invalid lastSyncId: " + lastSyncId + ", skipping update");
-        }
-
-        // 清理buffer
         syncBatchBuffer.clear();
         expectedBatches = 0;
         receivedBatches = 0;
         isSyncing.set(false);
 
-        notifySyncComplete(totalSynced, lastSyncId);
-        logger.info("Sync complete: " + totalSynced + " notes, lastSyncId=" + lastSyncId);
+        notifySyncComplete(totalSynced, newLastSyncId);
+        logger.info("Sync complete: " + totalSynced + " notes");
     }
 
-    /**
-     * 处理实时更新
-     */
-    private void handleRealtimeUpdate(String message) throws Exception {
-        logger.info("DEBUG: Received realtime_update message: " + message);
-
-        // 解析单个note
-        int noteStart = message.indexOf("\"note\":{");
-        if (noteStart == -1) {
-            logger.warning("DEBUG: Could not find note in message");
-            return;
-        }
-
-        int noteEnd = findMatchingBrace(message, noteStart + 7);
-        if (noteEnd == -1) {
-            logger.warning("DEBUG: Could not find note end");
-            return;
-        }
-
-        String noteStr = message.substring(noteStart + 7, noteEnd + 1);
-        long id = extractLong(noteStr, "id");
-        String encryptedContent = extractString(noteStr, "content");
-        String channel = extractString(noteStr, "channel");
-        String createdAt = extractString(noteStr, "created_at");
-
-        logger.info("DEBUG: Parsed note - id=" + id + ", channel=" + channel + ", createdAt=" + createdAt);
+    private void handleRealtimeUpdate(JsonObject json) {
+        JsonObject noteJson = json.getJsonObject("note");
+        if (noteJson == null) return;
 
         try {
-            // 解密
+            long id = noteJson.getLong("id");
+            String encryptedContent = noteJson.getString("content");
+            String channel = noteJson.getString("channel");
+            String createdAt = noteJson.getString("created_at");
+
             String decryptedContent = cryptoService.decrypt(encryptedContent);
 
-            // 插入到本地缓存
             LocalCacheService.NoteData note = new LocalCacheService.NoteData(
-                id, decryptedContent, channel, createdAt, encryptedContent
+                    id, decryptedContent, channel, createdAt, encryptedContent
             );
             localCache.insertNote(note);
 
             notifyRealtimeUpdate(id, decryptedContent);
-            logger.info("Realtime update received for note " + id + ", content: " + decryptedContent.substring(0, Math.min(50, decryptedContent.length())));
-
+            logger.info("Realtime update for note " + id);
         } catch (Exception e) {
             logger.warning("Failed to process realtime update: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
-    /**
-     * 处理新笔记确认
-     */
-    private void handleNewNoteAck(String message) {
-        long id = extractLong(message, "id");
-        boolean success = message.contains("\"success\":true");
+    private void handleNewNoteAck(JsonObject json) {
+        long id = json.getLong("id", -1L);
+        boolean success = json.getBoolean("success", false);
         if (success) {
             logger.info("Server acknowledged new note with id=" + id);
         }
     }
 
-    /**
-     * 处理错误
-     */
-    private void handleError(String message) {
-        String errorMsg = extractString(message, "message");
+    private void handleError(JsonObject json) {
+        String errorMsg = json.getString("message", "Unknown error");
         logger.warning("Server error: " + errorMsg);
         notifyError(errorMsg);
     }
 
-    /**
-     * WebSocket关闭回调 - Endpoint override
-     */
-    @Override
-    public void onClose(Session session, CloseReason closeReason) {
-        logger.info("WebSocket closed: " + closeReason.getReasonPhrase() + " (code: " + closeReason.getCloseCode() + ")");
-        isConnected.set(false);
-        isConnecting.set(false);
-        cleanup();
-        notifyConnectionStatus(false);
-
-        // 尝试重连（除非是正常关闭）
-        if (closeReason.getCloseCode() != CloseReason.CloseCodes.NORMAL_CLOSURE) {
-            scheduleReconnect();
-        }
-    }
-
-    /**
-     * WebSocket错误回调 - Endpoint override
-     */
-    @Override
-    public void onError(Session session, Throwable throwable) {
-        logger.warning("WebSocket error: " + throwable.getMessage());
-        isConnected.set(false);
-        isConnecting.set(false);
-        notifyError(throwable.getMessage());
-        cleanup();
-        scheduleReconnect();
-    }
 
     /**
      * 启动心跳
      */
     private void startHeartbeat() {
-        if (heartbeatTask != null && !heartbeatTask.isDone()) {
-            heartbeatTask.cancel(false);
-        }
-
-        heartbeatTask = scheduler.scheduleAtFixedRate(() -> {
-            if (isConnected.get() && session != null && session.isOpen()) {
-                try {
-                    session.getBasicRemote().sendText("{\"type\":\"ping\"}");
-                } catch (IOException e) {
-                    logger.warning("Heartbeat failed: " + e.getMessage());
-                    // 连接可能已断开
-                    isConnected.set(false);
-                    scheduleReconnect();
-                }
+        stopHeartbeat();
+        heartbeatTimerId = vertx.setPeriodic(30000, id -> {
+            if (isConnected.get() && webSocket != null) {
+                webSocket.writeTextMessage("{\"type\":\"ping\"}");
             }
-        }, 30, 30, TimeUnit.SECONDS);
+        });
+    }
+
+    private void stopHeartbeat() {
+        if (heartbeatTimerId != -1 && vertx != null) {
+            vertx.cancelTimer(heartbeatTimerId);
+            heartbeatTimerId = -1;
+        }
     }
 
     /**
      * 安排重连
      */
     private void scheduleReconnect() {
+        // 如果正在关闭或未初始化，不要重连
+        if (isShuttingDown.get() || !isInitialized.get() || vertx == null) {
+            return;
+        }
+        
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            logger.warning("Max reconnect attempts reached, giving up");
+            logger.warning("Max reconnect attempts reached");
             notifyError("Max reconnect attempts reached");
             return;
         }
 
-        if (reconnectTask != null && !reconnectTask.isDone()) {
-            reconnectTask.cancel(false);
+        if (reconnectTimerId != -1) {
+            vertx.cancelTimer(reconnectTimerId);
         }
 
-        int delay = RECONNECT_BASE_DELAY_MS * (int)Math.pow(2, reconnectAttempts);
+        int delay = RECONNECT_BASE_DELAY_MS * (int) Math.pow(2, reconnectAttempts);
         reconnectAttempts++;
 
         logger.info("Scheduling reconnect in " + delay + "ms (attempt " + reconnectAttempts + "/" + MAX_RECONNECT_ATTEMPTS + ")");
 
-        reconnectTask = scheduler.schedule(() -> {
-            logger.info("Attempting reconnect...");
-            connect();
-        }, delay, TimeUnit.MILLISECONDS);
+        reconnectTimerId = vertx.setTimer(delay, id -> {
+            reconnectTimerId = -1;
+            if (!isShuttingDown.get()) {
+                logger.info("Attempting reconnect...");
+                connect();
+            }
+        });
     }
 
     /**
      * 清理资源
      */
     private void cleanup() {
-        if (heartbeatTask != null) {
-            heartbeatTask.cancel(false);
-            heartbeatTask = null;
-        }
-        if (reconnectTask != null) {
-            reconnectTask.cancel(false);
-            reconnectTask = null;
+        if (vertx != null && isInitialized.get()) {
+            stopHeartbeat();
+            if (reconnectTimerId != -1) {
+                vertx.cancelTimer(reconnectTimerId);
+                reconnectTimerId = -1;
+            }
         }
         syncBatchBuffer.clear();
         expectedBatches = 0;
@@ -476,33 +485,67 @@ public class WebSocketClientService extends Endpoint {
     }
 
     /**
-     * 完全关闭服务，释放所有资源
+     * 完全关闭服务
      */
     public void shutdown() {
-        disconnect();
-        if (scheduler != null) {
-            scheduler.shutdown();
-            try {
-                if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                    scheduler.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                scheduler.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
+        logger.info("Shutting down WebSocket service...");
+        isShuttingDown.set(true);
+        
+        // 如果从未初始化，直接返回
+        if (!isInitialized.get()) {
+            logger.info("Vert.x was never initialized, nothing to close");
+            return;
         }
+        
+        // 取消定时器
+        if (heartbeatTimerId != -1 && vertx != null) {
+            vertx.cancelTimer(heartbeatTimerId);
+            heartbeatTimerId = -1;
+        }
+        if (reconnectTimerId != -1 && vertx != null) {
+            vertx.cancelTimer(reconnectTimerId);
+            reconnectTimerId = -1;
+        }
+        
+        // 主动关闭 WebSocket 连接（发送 close frame）
+        if (webSocket != null) {
+            try {
+                webSocket.close((short) 1000, "shutdown");
+            } catch (Exception e) {
+                // ignore
+            }
+            webSocket = null;
+        }
+        
+        isConnected.set(false);
+        
+        // 先关闭 HttpClient
+        if (httpClient != null) {
+            try {
+                httpClient.close();
+            } catch (Exception e) {
+                // ignore
+            }
+            httpClient = null;
+        }
+        
+        // 最后关闭 Vert.x
+        if (vertx != null) {
+            Vertx v = vertx;
+            vertx = null;
+            v.close();
+            logger.info("Vert.x close initiated");
+        }
+        
+        isInitialized.set(false);
+        logger.info("WebSocket service shutdown complete");
     }
 
-    /**
-     * 生成客户端ID
-     */
     private String generateClientId() {
         return UUID.randomUUID().toString();
     }
 
-    /**
-     * 监听器相关
-     */
+    // 监听器管理
     public void addListener(SyncListener listener) {
         listeners.add(listener);
     }
@@ -531,189 +574,12 @@ public class WebSocketClientService extends Endpoint {
         listeners.forEach(l -> l.onError(message));
     }
 
-    /**
-     * 工具方法：JSON解析
-     */
-    private String extractString(String json, String key) {
-        String searchKey = "\"" + key + "\"";
-        int keyPos = json.indexOf(searchKey);
-        if (keyPos == -1) {
-            logger.fine("DEBUG extractString(" + key + "): key not found in " + json);
-            return null;
-        }
-
-        int colonPos = json.indexOf(":", keyPos);
-        if (colonPos == -1) return null;
-
-        // Skip whitespace after colon
-        int valueStart = colonPos + 1;
-        while (valueStart < json.length() && Character.isWhitespace(json.charAt(valueStart))) {
-            valueStart++;
-        }
-
-        // Check if value starts with quote
-        if (valueStart >= json.length() || json.charAt(valueStart) != '"') {
-            logger.fine("DEBUG extractString(" + key + "): value is not a quoted string");
-            return null;
-        }
-
-        int valueEnd = findStringEnd(json, valueStart + 1);
-        if (valueEnd == -1) return null;
-
-        String result = json.substring(valueStart + 1, valueEnd)
-            .replace("\\n", "\n")
-            .replace("\\r", "\r")
-            .replace("\\t", "\t")
-            .replace("\\\"", "\"")
-            .replace("\\\\", "\\");
-        logger.fine("DEBUG extractString(" + key + "): result='" + result + "'");
-        return result;
+    public boolean isConnected() {
+        return isConnected.get();
     }
 
-    private long extractLong(String json, String key) {
-        String value = extractString(json, key);
-        if (value != null) {
-            try {
-                long result = Long.parseLong(value);
-                logger.fine("DEBUG extractLong(" + key + "): found quoted value '" + value + "' -> " + result);
-                return result;
-            } catch (NumberFormatException e) {
-                logger.warning("DEBUG extractLong(" + key + "): quoted value '" + value + "' is not a number");
-            }
-        }
-
-        // 尝试不带引号的数字
-        String searchKey = "\"" + key + "\"";
-        int keyPos = json.indexOf(searchKey);
-        if (keyPos == -1) {
-            logger.warning("DEBUG extractLong(" + key + "): key not found in " + json);
-            return -1;
-        }
-        int colonPos = json.indexOf(":", keyPos);
-        if (colonPos == -1) return -1;
-        int valueStart = colonPos + 1;
-        while (valueStart < json.length() && Character.isWhitespace(json.charAt(valueStart))) {
-            valueStart++;
-        }
-        int valueEnd = valueStart;
-        while (valueEnd < json.length() && (Character.isDigit(json.charAt(valueEnd)) || json.charAt(valueEnd) == '-')) {
-            valueEnd++;
-        }
-        try {
-            long result = Long.parseLong(json.substring(valueStart, valueEnd));
-            logger.fine("DEBUG extractLong(" + key + "): found unquoted value '" + json.substring(valueStart, valueEnd) + "' -> " + result);
-            return result;
-        } catch (NumberFormatException e2) {
-            logger.warning("DEBUG extractLong(" + key + "): unquoted value is not a number");
-            return -1;
-        }
-    }
-
-    private int extractInt(String json, String key) {
-        return (int) extractLong(json, key);
-    }
-
-    private int findStringEnd(String json, int start) {
-        for (int i = start; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (c == '\\' && i + 1 < json.length()) {
-                i++;
-            } else if (c == '\"') {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private int findMatchingBrace(String json, int start) {
-        if (start >= json.length() || json.charAt(start) != '{') return -1;
-        int depth = 1;
-        for (int i = start + 1; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (c == '\"') {
-                i = findStringEnd(json, i + 1);
-                if (i == -1) return -1;
-            } else if (c == '{') {
-                depth++;
-            } else if (c == '}') {
-                depth--;
-                if (depth == 0) return i;
-            }
-        }
-        return -1;
-    }
-
-    private List<LocalCacheService.NoteData> parseNotesArray(String message) {
-        List<LocalCacheService.NoteData> notes = new ArrayList<>();
-        int arrayStart = message.indexOf("\"notes\":[");
-        if (arrayStart == -1) {
-            logger.warning("DEBUG parseNotesArray: Could not find \"notes\":[ in message");
-            return notes;
-        }
-
-        // "notes":[" is 9 characters, so arrayStart + 8 points to the '['
-        int bracketStart = arrayStart + 8;
-        int arrayEnd = findMatchingBracket(message, bracketStart);
-        if (arrayEnd == -1) {
-            logger.warning("DEBUG parseNotesArray: Could not find matching bracket, start=" + bracketStart + ", char=" + message.charAt(bracketStart));
-            return notes;
-        }
-
-        String arrayContent = message.substring(bracketStart + 1, arrayEnd);
-        logger.info("DEBUG parseNotesArray: arrayContent=" + arrayContent);
-
-        int pos = 0;
-        while (pos < arrayContent.length()) {
-            int objStart = arrayContent.indexOf("{", pos);
-            if (objStart == -1) break;
-
-            int objEnd = findMatchingBrace(arrayContent, objStart);
-            if (objEnd == -1) break;
-
-            String objStr = arrayContent.substring(objStart, objEnd + 1);
-            logger.info("DEBUG parseNotesArray: objStr=" + objStr);
-
-            long id = extractLong(objStr, "id");
-            String content = extractString(objStr, "content");
-            String channel = extractString(objStr, "channel");
-            String createdAt = extractString(objStr, "created_at");
-
-            logger.info("DEBUG parseNotesArray: parsed - id=" + id + ", content=" + content + ", channel=" + channel + ", createdAt=" + createdAt);
-
-            notes.add(new LocalCacheService.NoteData(id, content, channel, createdAt, content));
-            pos = objEnd + 1;
-        }
-
-        logger.info("DEBUG parseNotesArray: returning " + notes.size() + " notes");
-        return notes;
-    }
-
-    private int findMatchingBracket(String json, int start) {
-        if (start >= json.length() || json.charAt(start) != '[') return -1;
-        int depth = 1;
-        for (int i = start + 1; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (c == '\"') {
-                i = findStringEnd(json, i + 1);
-                if (i == -1) return -1;
-            } else if (c == '[') {
-                depth++;
-            } else if (c == ']') {
-                depth--;
-                if (depth == 0) return i;
-            }
-        }
-        return -1;
-    }
-
-    private String escapeJson(String text) {
-        return "\"" + text
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t")
-                + "\"";
+    public boolean isSyncing() {
+        return isSyncing.get();
     }
 
     /**
@@ -738,6 +604,6 @@ public class WebSocketClientService extends Endpoint {
         public void info(String msg) { System.out.println("[INFO] " + msg); }
         public void warning(String msg) { System.err.println("[WARN] " + msg); }
         public void severe(String msg) { System.err.println("[ERROR] " + msg); }
-        public void fine(String msg) { System.out.println("[DEBUG] " + msg); }
+        public void fine(String msg) { /* debug level, skip */ }
     }
 }
