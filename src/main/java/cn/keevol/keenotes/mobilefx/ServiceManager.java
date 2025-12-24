@@ -1,9 +1,7 @@
 package cn.keevol.keenotes.mobilefx;
 
 import javafx.application.Platform;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Consumer;
 
 /**
  * 服务管理器 - 负责延迟初始化和管理所有服务
@@ -56,8 +54,10 @@ public class ServiceManager {
         if (localCacheService == null) {
             localCacheService = LocalCacheService.getInstance();
             // 在后台线程初始化数据库，避免阻塞UI
-            CompletableFuture.runAsync(() -> {
+            // 使用普通 Thread 而不是 CompletableFuture，因为后者在 Native Image 中可能有问题
+            Thread initThread = new Thread(() -> {
                 try {
+                    System.out.println("[ServiceManager] Starting local cache initialization...");
                     localCacheService.initialize();
                     synchronized (ServiceManager.this) {
                         localCacheInitialized = true;
@@ -67,8 +67,11 @@ public class ServiceManager {
                 } catch (Exception e) {
                     notifyStatusChanged("local_cache_error", "本地缓存初始化失败: " + e.getMessage());
                     System.err.println("[ServiceManager] Local cache initialization failed: " + e.getMessage());
+                    e.printStackTrace();
                 }
-            });
+            }, "LocalCacheInit");
+            initThread.setDaemon(true);
+            initThread.start();
         }
         return localCacheService;
     }
@@ -130,20 +133,26 @@ public class ServiceManager {
      * 延迟连接WebSocket（在UI启动后调用）
      */
     public void connectWebSocketIfNeeded() {
-        // 确保在JavaFX线程之外执行网络操作
-        CompletableFuture.runAsync(() -> {
+        // 使用普通 Thread 而不是 CompletableFuture
+        Thread connectThread = new Thread(() -> {
             try {
+                System.out.println("[ServiceManager] Checking WebSocket connection...");
                 SettingsService settings = getSettingsService();
                 if (settings.isConfigured()) {
+                    System.out.println("[ServiceManager] Settings configured, connecting WebSocket...");
                     WebSocketClientService ws = getWebSocketService();
                     ws.connect();
                 } else {
+                    System.out.println("[ServiceManager] Settings not configured");
                     notifyStatusChanged("not_configured", "未配置服务器地址，请在设置中配置");
                 }
             } catch (Exception e) {
+                System.err.println("[ServiceManager] Connect error: " + e.getMessage());
                 notifyStatusChanged("connect_error", "连接失败: " + e.getMessage());
             }
-        });
+        }, "WebSocketConnect");
+        connectThread.setDaemon(true);
+        connectThread.start();
     }
 
     /**
