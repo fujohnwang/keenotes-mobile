@@ -73,7 +73,19 @@
             <version>3.44.1.0</version>
         </dependency>
 
-        <!-- Vert.x WebSocket Client -->
+        <!-- OkHttp WebSocket Client -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+        <!-- Okio for ByteString support -->
+        <dependency>
+            <groupId>com.squareup.okio</groupId>
+            <artifactId>okio</artifactId>
+            <version>3.6.0</version>
+        </dependency>
+        <!-- Vert.x Core for JSON handling -->
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-core</artifactId>
@@ -220,8 +232,8 @@
                                 <arg>--initialize-at-build-time=org.sqlite.util.ProcessRunner</arg>
                                 <arg>--initialize-at-build-time=org.sqlite.util.OSInfo</arg>
                                 <arg>--initialize-at-build-time=org.sqlite.SQLiteJDBCLoader</arg>
-                                <!-- Vert.x / Netty 相关 -->
-                                <arg>--initialize-at-run-time=io.netty</arg>
+                                <!-- OkHttp / Vert.x 相关 -->
+                                <arg>--initialize-at-run-time=okhttp3</arg>
                                 <arg>--initialize-at-run-time=io.vertx</arg>
                             </nativeImageArgs>
                         </configuration>

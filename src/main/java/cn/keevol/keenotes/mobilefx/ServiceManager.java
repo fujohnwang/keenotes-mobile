@@ -192,12 +192,27 @@ public class ServiceManager {
      * 关闭所有服务
      */
     public void shutdown() {
+        System.out.println("[ServiceManager] Starting shutdown...");
+
+        // 先关闭WebSocket服务，停止网络连接
         if (webSocketService != null) {
+            System.out.println("[ServiceManager] Shutting down WebSocket service...");
             webSocketService.shutdown();
         }
+
+        // 关闭本地缓存服务
         if (localCacheService != null) {
+            System.out.println("[ServiceManager] Closing local cache service...");
             localCacheService.close();
         }
+
+        // 关闭API服务（如果需要）
+        if (apiService != null) {
+            // ApiServiceV2 如果有需要关闭的资源，在这里处理
+            System.out.println("[ServiceManager] API service shutdown complete");
+        }
+
+        System.out.println("[ServiceManager] All services shutdown complete");
     }
 
     /**

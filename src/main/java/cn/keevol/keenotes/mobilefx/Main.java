@@ -246,8 +246,15 @@ public class Main extends Application {
     @Override
     public void stop() {
         System.out.println("Application stopping...");
-        // 使用ServiceManager统一管理服务的关闭
-        ServiceManager.getInstance().shutdown();
+        try {
+            // 使用ServiceManager统一管理服务的关闭
+            ServiceManager.getInstance().shutdown();
+            // 给一些时间让线程优雅关闭
+            Thread.sleep(1000);
+        } catch (Exception e) {
+            System.err.println("Error during shutdown: " + e.getMessage());
+            e.printStackTrace();
+        }
         System.out.println("Application stopped.");
     }
 

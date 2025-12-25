@@ -5,8 +5,8 @@ module com.keenotes.mobile {
     requires javafx.base;
     requires java.net.http;
     requires java.sql;
+    requires okhttp3;
     requires io.vertx.core;
-    requires io.netty.codec.http;
     requires com.gluonhq.attach.display;
     requires com.gluonhq.attach.lifecycle;
     requires com.gluonhq.attach.storage;
