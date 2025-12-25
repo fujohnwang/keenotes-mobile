@@ -110,7 +110,7 @@ public class Main extends Application {
             // 3. 延迟连接WebSocket（在异步线程）
             // 给用户几秒钟时间看到UI，然后再尝试连接
             // 如果网络不通，用户仍然可以使用设置界面配置endpoint
-            new Thread(() -> {
+            Thread connectThread = new Thread(() -> {
                 try {
                     // 稍微延迟，让用户先看到UI
                     Thread.sleep(500);
@@ -119,7 +119,9 @@ public class Main extends Application {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-            }).start();
+            });
+            connectThread.setDaemon(true);  // 设置为daemon线程
+            connectThread.start();
         });
     }
 
@@ -249,8 +251,7 @@ public class Main extends Application {
         try {
             // 使用ServiceManager统一管理服务的关闭
             ServiceManager.getInstance().shutdown();
-            // 给一些时间让线程优雅关闭
-            Thread.sleep(1000);
+            // 不需要等待，shutdown方法会立即释放所有资源
         } catch (Exception e) {
             System.err.println("Error during shutdown: " + e.getMessage());
             e.printStackTrace();

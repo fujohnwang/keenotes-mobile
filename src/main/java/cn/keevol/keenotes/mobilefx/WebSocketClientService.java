@@ -38,9 +38,7 @@ public class WebSocketClientService {
     private static final int MAX_RECONNECT_ATTEMPTS = 10;
     private static final int RECONNECT_BASE_DELAY_MS = 1000;
 
-    // 心跳定时器
-    private ScheduledExecutorService heartbeatScheduler;
-    private ScheduledFuture<?> heartbeatTask;
+    // 重连定时器
     private ScheduledExecutorService reconnectScheduler;
     private ScheduledFuture<?> reconnectTask;
 
@@ -71,11 +69,13 @@ public class WebSocketClientService {
         logger.info("Initializing OkHttp...");
 
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .writeTimeout(10, TimeUnit.SECONDS)
-                .pingInterval(30, TimeUnit.SECONDS) // 自动ping/pong支持
-                .retryOnConnectionFailure(false);   // 我们自己处理重连逻辑
+                .connectTimeout(3, TimeUnit.SECONDS)      // 连接超时3秒
+                .readTimeout(5, TimeUnit.SECONDS)         // 读取超时5秒
+                .writeTimeout(5, TimeUnit.SECONDS)        // 写入超时5秒
+                // 禁用协议层ping/pong，使用服务器的应用层心跳
+                // .pingInterval(30, TimeUnit.SECONDS)     // 禁用：Armeria服务器不支持自动回复
+                .retryOnConnectionFailure(false)          // 我们自己处理重连逻辑
+                .connectionPool(new ConnectionPool(0, 5, TimeUnit.SECONDS)); // 无空闲连接，5秒清理
 
         if (ssl) {
             // 信任所有证书（仅用于开发/测试环境）
@@ -186,10 +186,11 @@ public class WebSocketClientService {
                 reconnectAttempts = 0;
 
                 sendHandshake();
-                startHeartbeat();
+                // 保留应用层ping/pong响应能力，但不主动发送ping
+                // 服务器会主动发送ping，我们只需要响应pong
                 notifyConnectionStatus(true);
 
-                logger.info("WebSocket connected successfully");
+                logger.info("WebSocket connected successfully (application-level ping/pong)");
             }
 
             @Override
@@ -200,7 +201,7 @@ public class WebSocketClientService {
             @Override
             public void onClosed(WebSocket webSocket, int code, String reason) {
                 if (isShuttingDown.get()) {
-                    logger.info("WebSocket closed (shutdown)");
+                    logger.info("WebSocket closed (shutdown): " + code + " " + reason);
                     return;
                 }
                 logger.info("WebSocket closed: " + code + " " + reason);
@@ -213,6 +214,7 @@ public class WebSocketClientService {
             @Override
             public void onFailure(WebSocket webSocket, Throwable t, Response response) {
                 if (isShuttingDown.get()) {
+                    logger.info("WebSocket failure during shutdown: " + t.getMessage());
                     return;
                 }
                 logger.warning("WebSocket failure: " + t.getMessage());
@@ -295,6 +297,12 @@ public class WebSocketClientService {
      * 处理服务器消息
      */
     private void handleTextMessage(String message) {
+        // 如果正在关闭，忽略所有消息
+        if (isShuttingDown.get()) {
+            logger.fine("Ignoring message during shutdown: " + message);
+            return;
+        }
+
         try {
             logger.info("Received message: " + message);
 
@@ -318,13 +326,17 @@ public class WebSocketClientService {
                 case "realtime_update":
                     handleRealtimeUpdate(json);
                     break;
-                case "pong":
-                    logger.fine("Received pong");
-                    break;
                 case "ping":
+                    // 服务器发送的应用层ping，我们回复pong
+                    // 这样可以兼容服务器的心跳机制
                     if (webSocket != null) {
                         webSocket.send("{\"type\":\"pong\"}");
+                        logger.fine("Responded to server ping with pong");
                     }
+                    break;
+                case "pong":
+                    // 服务器对我们ping的响应（实际不会发生，因为服务器不主动ping）
+                    logger.fine("Received pong from server");
                     break;
                 case "error":
                     handleError(json);
@@ -433,6 +445,13 @@ public class WebSocketClientService {
             );
             localCache.insertNote(note);
 
+            // 关键修复：实时同步后更新lastSyncId，避免下次重复同步
+            if (id > lastSyncId) {
+                lastSyncId = id;
+                localCache.updateLastSyncId(lastSyncId);
+                logger.info("Updated lastSyncId to " + lastSyncId + " after realtime update");
+            }
+
             notifyRealtimeUpdate(id, decryptedContent);
             logger.info("Realtime update for note " + id + " completed successfully");
         } catch (Exception e) {
@@ -453,47 +472,6 @@ public class WebSocketClientService {
         String errorMsg = json.getString("message", "Unknown error");
         logger.warning("Server error: " + errorMsg);
         notifyError(errorMsg);
-    }
-
-    /**
-     * 启动心跳 - 使用ScheduledExecutorService
-     */
-    private void startHeartbeat() {
-        stopHeartbeat();
-
-        heartbeatScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "WebSocket-Heartbeat");
-            t.setDaemon(true);
-            return t;
-        });
-
-        heartbeatTask = heartbeatScheduler.scheduleAtFixedRate(() -> {
-            if (isConnected.get() && webSocket != null) {
-                try {
-                    webSocket.send("{\"type\":\"ping\"}");
-                } catch (Exception e) {
-                    logger.warning("Failed to send ping: " + e.getMessage());
-                }
-            }
-        }, 30, 30, TimeUnit.SECONDS);
-    }
-
-    private void stopHeartbeat() {
-        if (heartbeatTask != null) {
-            heartbeatTask.cancel(true);
-            heartbeatTask = null;
-        }
-        if (heartbeatScheduler != null) {
-            heartbeatScheduler.shutdownNow();
-            try {
-                if (!heartbeatScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                    logger.warning("Heartbeat scheduler did not terminate in time");
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            heartbeatScheduler = null;
-        }
     }
 
     /**
@@ -543,8 +521,6 @@ public class WebSocketClientService {
      * 清理资源
      */
     private void cleanup() {
-        stopHeartbeat();
-
         if (reconnectTask != null) {
             reconnectTask.cancel(true);
             reconnectTask = null;
@@ -557,17 +533,17 @@ public class WebSocketClientService {
     }
 
     /**
-     * 完全关闭服务
+     * 完全关闭服务 - 立即返回，后台清理
      */
     public void shutdown() {
-        logger.info("Shutting down WebSocket service...");
+        logger.info("Starting immediate shutdown...");
+
+        // 1. 立即设置关闭标志（阻止新操作）
         isShuttingDown.set(true);
 
-        // 取消所有定时任务
-        stopHeartbeat();
-
+        // 2. 立即取消定时任务（不等待）
         if (reconnectTask != null) {
-            reconnectTask.cancel(true);
+            reconnectTask.cancel(true);  // 中断正在执行的任务
             reconnectTask = null;
         }
 
@@ -576,41 +552,47 @@ public class WebSocketClientService {
             reconnectScheduler = null;
         }
 
-        // 关闭 WebSocket
+        // 3. WebSocket：后台关闭，主线程不等待
         if (webSocket != null) {
-            try {
-                webSocket.close(1000, "Shutdown");
-                logger.info("WebSocket close initiated");
-            } catch (Exception e) {
-                // ignore
-            }
-            webSocket = null;
+            final WebSocket ws = webSocket;
+            webSocket = null;  // 立即清空引用
+
+            // 在后台线程关闭WebSocket，避免阻塞
+            Thread closeThread = new Thread(() -> {
+                try {
+                    ws.close(1000, "Client shutdown");
+                    logger.info("WebSocket close sent (background)");
+                } catch (Exception e) {
+                    logger.warning("WebSocket close error: " + e.getMessage());
+                }
+            }, "WebSocketClose");
+            closeThread.setDaemon(true);  // 设置为daemon线程
+            closeThread.start();
         }
 
         isConnected.set(false);
 
-        // 关闭 OkHttp - 关键：需要关闭 dispatcher 的线程池
+        // 4. OkHttp：立即释放所有资源
         if (httpClient != null) {
             try {
-                // 关闭连接池
-                httpClient.connectionPool().evictAll();
-
-                // 关闭 dispatcher 的线程池
+                // 立即停止所有网络操作
                 httpClient.dispatcher().executorService().shutdownNow();
 
-                // 关闭缓存（如果有）
+                // 立即驱逐所有连接
+                httpClient.connectionPool().evictAll();
+
+                // 关闭缓存
                 if (httpClient.cache() != null) {
                     httpClient.cache().close();
                 }
             } catch (Exception e) {
-                // ignore
+                logger.warning("OkHttp cleanup error: " + e.getMessage());
             }
             httpClient = null;
-            logger.info("OkHttp closed");
         }
 
         isInitialized.set(false);
-        logger.info("WebSocket service shutdown complete");
+        logger.info("Shutdown initiated (async cleanup in background)");
     }
 
     private String generateClientId() {
