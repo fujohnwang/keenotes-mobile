@@ -1,13 +1,8 @@
 package cn.keevol.keenotes.mobilefx;
 
-import io.vertx.core.Vertx;
-import io.vertx.core.VertxOptions;
-import io.vertx.core.http.HttpClient;
-import io.vertx.core.http.HttpClientOptions;
-import io.vertx.core.http.WebSocket;
-import io.vertx.core.http.WebSocketConnectOptions;
-import io.vertx.core.json.JsonArray;
+import okhttp3.*;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.json.JsonArray;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -15,16 +10,16 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * WebSocket客户端服务 - 基于Vert.x实现
+ * WebSocket客户端服务 - 基于OkHttp实现
  * 处理与服务器的实时同步：连接管理、数据同步、心跳和重连
  */
 public class WebSocketClientService {
     private static final Logger logger = Logger.getLogger(WebSocketClientService.class.getName());
 
-    private volatile Vertx vertx;
-    private volatile HttpClient httpClient;
+    private volatile OkHttpClient httpClient;
     private volatile WebSocket webSocket;
-    
+    private volatile Call healthCheckCall; // 用于心跳的HTTP健康检查调用
+
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
     private final AtomicBoolean isConnecting = new AtomicBoolean(false);
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
@@ -44,8 +39,10 @@ public class WebSocketClientService {
     private static final int RECONNECT_BASE_DELAY_MS = 1000;
 
     // 心跳定时器
-    private long heartbeatTimerId = -1;
-    private long reconnectTimerId = -1;
+    private ScheduledExecutorService heartbeatScheduler;
+    private ScheduledFuture<?> heartbeatTask;
+    private ScheduledExecutorService reconnectScheduler;
+    private ScheduledFuture<?> reconnectTask;
 
     // 回调监听器
     private final List<SyncListener> listeners = new CopyOnWriteArrayList<>();
@@ -60,43 +57,35 @@ public class WebSocketClientService {
         this.cryptoService = new CryptoService();
         this.settings = SettingsService.getInstance();
         this.clientId = generateClientId();
-        // 不在构造函数中初始化 Vert.x，延迟到第一次连接时
+        // 不在构造函数中初始化OkHttp，延迟到第一次连接时
     }
 
     /**
-     * 延迟初始化 Vert.x - 只在第一次连接时调用
+     * 延迟初始化OkHttp - 只在第一次连接时调用
      */
     private synchronized void ensureInitialized(boolean ssl) {
         if (isInitialized.get() || isShuttingDown.get()) {
             return;
         }
-        
-        logger.info("Initializing Vert.x...");
-        
-        VertxOptions vertxOptions = new VertxOptions()
-                .setWorkerPoolSize(1)
-                .setEventLoopPoolSize(1);
-        
-        this.vertx = Vertx.vertx(vertxOptions);
-        
-        HttpClientOptions options = new HttpClientOptions()
-                .setConnectTimeout(5000)
-                .setIdleTimeout(10)              // 空闲超时 10 秒
-                .setReadIdleTimeout(10)
-                .setWriteIdleTimeout(10)
-                .setSoLinger(0)                  // TCP linger=0，立即发送 RST 关闭连接
-                .setMaxPoolSize(1)
-                .setKeepAlive(false)
-                .setTcpNoDelay(true)
-                .setReuseAddress(true);
-        
+
+        logger.info("Initializing OkHttp...");
+
+        OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .writeTimeout(10, TimeUnit.SECONDS)
+                .pingInterval(30, TimeUnit.SECONDS) // 自动ping/pong支持
+                .retryOnConnectionFailure(false);   // 我们自己处理重连逻辑
+
         if (ssl) {
-            options.setSsl(true).setTrustAll(true);
+            // 信任所有证书（仅用于开发/测试环境）
+            // 生产环境应该使用正确的证书验证
+            builder.hostnameVerifier((hostname, session) -> true);
         }
-        
-        this.httpClient = vertx.createHttpClient(options);
+
+        this.httpClient = builder.build();
         isInitialized.set(true);
-        logger.info("Vert.x initialized");
+        logger.info("OkHttp initialized");
     }
 
     /**
@@ -106,7 +95,7 @@ public class WebSocketClientService {
         if (isShuttingDown.get()) {
             return;
         }
-        
+
         if (isConnected.get() || isConnecting.get()) {
             logger.info("Already connected or connecting");
             return;
@@ -149,9 +138,9 @@ public class WebSocketClientService {
             return;
         }
 
-        // 延迟初始化 Vert.x
+        // 延迟初始化OkHttp
         ensureInitialized(ssl);
-        
+
         if (isShuttingDown.get()) {
             isConnecting.set(false);
             return;
@@ -160,83 +149,108 @@ public class WebSocketClientService {
         lastSyncId = localCache.getLastSyncId();
         String authToken = settings.getToken();
 
-        WebSocketConnectOptions connectOptions = new WebSocketConnectOptions()
-                .setHost(host)
-                .setPort(port)
-                .setSsl(ssl)
-                .setURI(path);
+        // 构建WebSocket URL
+        String protocol = ssl ? "wss" : "ws";
+        String wsRequestUrl = protocol + "://" + host + ":" + port + path;
+
+        // 构建请求
+        Request.Builder requestBuilder = new Request.Builder()
+                .url(wsRequestUrl);
 
         // 添加 Origin 头 - Cloudflare WebSocket 要求
         String origin = (ssl ? "https" : "http") + "://" + host;
-        connectOptions.addHeader("Origin", origin);
+        requestBuilder.addHeader("Origin", origin);
 
         // 添加 Authorization 头 - 复用 HTTP POST 的 token 认证方式
         if (authToken != null && !authToken.isEmpty()) {
-            connectOptions.addHeader("Authorization", "Bearer " + authToken);
+            requestBuilder.addHeader("Authorization", "Bearer " + authToken);
             logger.info("Adding Authorization header: Bearer " + authToken.substring(0, Math.min(4, authToken.length())) + "...");
         } else {
             logger.warning("No auth token configured!");
         }
 
-        logger.info("WebSocket connecting to: " + (ssl ? "wss" : "ws") + "://" + host + ":" + port + path);
+        logger.info("WebSocket connecting to: " + wsRequestUrl);
 
-        httpClient.webSocket(connectOptions, ar -> {
-            if (ar.succeeded()) {
-                webSocket = ar.result();
+        // 创建WebSocket监听器
+        WebSocketListener listener = new WebSocketListener() {
+            @Override
+            public void onOpen(WebSocket webSocket, Response response) {
+                if (isShuttingDown.get()) {
+                    webSocket.close(1000, "Shutdown");
+                    return;
+                }
+
+                WebSocketClientService.this.webSocket = webSocket;
                 isConnected.set(true);
                 isConnecting.set(false);
                 reconnectAttempts = 0;
 
-                setupWebSocketHandlers();
                 sendHandshake();
                 startHeartbeat();
                 notifyConnectionStatus(true);
 
                 logger.info("WebSocket connected successfully");
-            } else {
-                logger.warning("WebSocket connection failed: " + ar.cause().getMessage());
-                isConnecting.set(false);
+            }
+
+            @Override
+            public void onMessage(WebSocket webSocket, String text) {
+                handleTextMessage(text);
+            }
+
+            @Override
+            public void onClosed(WebSocket webSocket, int code, String reason) {
+                if (isShuttingDown.get()) {
+                    logger.info("WebSocket closed (shutdown)");
+                    return;
+                }
+                logger.info("WebSocket closed: " + code + " " + reason);
+                isConnected.set(false);
+                cleanup();
+                notifyConnectionStatus(false);
                 scheduleReconnect();
             }
-        });
-    }
 
-
-    private void setupWebSocketHandlers() {
-        webSocket.textMessageHandler(this::handleTextMessage);
-        
-        webSocket.closeHandler(v -> {
-            if (isShuttingDown.get()) {
-                logger.info("WebSocket closed (shutdown)");
-                return;
+            @Override
+            public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+                if (isShuttingDown.get()) {
+                    return;
+                }
+                logger.warning("WebSocket failure: " + t.getMessage());
+                isConnected.set(false);
+                notifyError(t.getMessage());
+                cleanup();
+                scheduleReconnect();
             }
-            logger.info("WebSocket closed");
-            isConnected.set(false);
-            cleanup();
-            notifyConnectionStatus(false);
-            scheduleReconnect();
-        });
+        };
 
-        webSocket.exceptionHandler(e -> {
-            if (isShuttingDown.get()) {
-                return;
-            }
-            logger.warning("WebSocket error: " + e.getMessage());
-            isConnected.set(false);
-            notifyError(e.getMessage());
-            cleanup();
+        // 发起WebSocket连接
+        try {
+            httpClient.newWebSocket(requestBuilder.build(), listener);
+        } catch (Exception e) {
+            logger.warning("WebSocket connection exception: " + e.getMessage());
+            isConnecting.set(false);
             scheduleReconnect();
-        });
+        }
     }
 
     private void sendHandshake() {
+        if (webSocket == null) return;
+
         JsonObject handshake = new JsonObject()
                 .put("type", "handshake")
                 .put("client_id", clientId)
                 .put("last_sync_id", lastSyncId);
-        
-        webSocket.writeTextMessage(handshake.encode());
-        logger.info("Sent handshake with lastSyncId=" + lastSyncId);
+
+        try {
+            boolean sent = webSocket.send(handshake.encode());
+            if (sent) {
+                logger.info("Sent handshake with lastSyncId=" + lastSyncId);
+            } else {
+                logger.warning("Failed to send handshake");
+            }
+        } catch (Exception e) {
+            logger.warning("Exception sending handshake: " + e.getMessage());
+        }
     }
 
     /**
@@ -244,7 +258,7 @@ public class WebSocketClientService {
      */
     public void disconnect() {
         if (webSocket != null) {
-            webSocket.close();
+            webSocket.close(1000, "Client disconnect");
         }
         cleanup();
     }
@@ -269,8 +283,12 @@ public class WebSocketClientService {
                 .put("channel", "mobile")
                 .put("timestamp", LocalDateTime.now().toString());
 
-        webSocket.writeTextMessage(message.encode());
-        logger.info("Sent new note to server");
+        boolean sent = webSocket.send(message.encode());
+        if (sent) {
+            logger.info("Sent new note to server");
+        } else {
+            throw new IllegalStateException("Failed to send message");
+        }
     }
 
     /**
@@ -278,8 +296,17 @@ public class WebSocketClientService {
      */
     private void handleTextMessage(String message) {
         try {
+            logger.info("Received message: " + message);
+
             JsonObject json = new JsonObject(message);
             String type = json.getString("type");
+
+            if (type == null) {
+                logger.warning("Message without type: " + message);
+                return;
+            }
+
+            logger.info("Processing message type: " + type);
 
             switch (type) {
                 case "sync_batch":
@@ -295,7 +322,9 @@ public class WebSocketClientService {
                     logger.fine("Received pong");
                     break;
                 case "ping":
-                    webSocket.writeTextMessage("{\"type\":\"pong\"}");
+                    if (webSocket != null) {
+                        webSocket.send("{\"type\":\"pong\"}");
+                    }
                     break;
                 case "error":
                     handleError(json);
@@ -308,6 +337,7 @@ public class WebSocketClientService {
             }
         } catch (Exception e) {
             logger.warning("Failed to handle message: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -377,8 +407,15 @@ public class WebSocketClientService {
     }
 
     private void handleRealtimeUpdate(JsonObject json) {
+        logger.info("handleRealtimeUpdate called with json: " + json);
+
         JsonObject noteJson = json.getJsonObject("note");
-        if (noteJson == null) return;
+        logger.info("note object: " + noteJson);
+
+        if (noteJson == null) {
+            logger.warning("note object is null");
+            return;
+        }
 
         try {
             long id = noteJson.getLong("id");
@@ -386,7 +423,10 @@ public class WebSocketClientService {
             String channel = noteJson.getString("channel");
             String createdAt = noteJson.getString("created_at");
 
+            logger.info("Parsed note - id: " + id + ", channel: " + channel + ", createdAt: " + createdAt);
+
             String decryptedContent = cryptoService.decrypt(encryptedContent);
+            logger.info("Decrypted content: " + decryptedContent);
 
             LocalCacheService.NoteData note = new LocalCacheService.NoteData(
                     id, decryptedContent, channel, createdAt, encryptedContent
@@ -394,9 +434,10 @@ public class WebSocketClientService {
             localCache.insertNote(note);
 
             notifyRealtimeUpdate(id, decryptedContent);
-            logger.info("Realtime update for note " + id);
+            logger.info("Realtime update for note " + id + " completed successfully");
         } catch (Exception e) {
             logger.warning("Failed to process realtime update: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -414,43 +455,66 @@ public class WebSocketClientService {
         notifyError(errorMsg);
     }
 
-
     /**
-     * 启动心跳
+     * 启动心跳 - 使用ScheduledExecutorService
      */
     private void startHeartbeat() {
         stopHeartbeat();
-        heartbeatTimerId = vertx.setPeriodic(30000, id -> {
-            if (isConnected.get() && webSocket != null) {
-                webSocket.writeTextMessage("{\"type\":\"ping\"}");
-            }
+
+        heartbeatScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "WebSocket-Heartbeat");
+            t.setDaemon(true);
+            return t;
         });
+
+        heartbeatTask = heartbeatScheduler.scheduleAtFixedRate(() -> {
+            if (isConnected.get() && webSocket != null) {
+                try {
+                    webSocket.send("{\"type\":\"ping\"}");
+                } catch (Exception e) {
+                    logger.warning("Failed to send ping: " + e.getMessage());
+                }
+            }
+        }, 30, 30, TimeUnit.SECONDS);
     }
 
     private void stopHeartbeat() {
-        if (heartbeatTimerId != -1 && vertx != null) {
-            vertx.cancelTimer(heartbeatTimerId);
-            heartbeatTimerId = -1;
+        if (heartbeatTask != null) {
+            heartbeatTask.cancel(true);
+            heartbeatTask = null;
+        }
+        if (heartbeatScheduler != null) {
+            heartbeatScheduler.shutdownNow();
+            try {
+                if (!heartbeatScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                    logger.warning("Heartbeat scheduler did not terminate in time");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            heartbeatScheduler = null;
         }
     }
 
     /**
-     * 安排重连
+     * 安排重连 - 使用ScheduledExecutorService
      */
     private void scheduleReconnect() {
         // 如果正在关闭或未初始化，不要重连
-        if (isShuttingDown.get() || !isInitialized.get() || vertx == null) {
+        if (isShuttingDown.get() || !isInitialized.get()) {
             return;
         }
-        
+
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             logger.warning("Max reconnect attempts reached");
             notifyError("Max reconnect attempts reached");
             return;
         }
 
-        if (reconnectTimerId != -1) {
-            vertx.cancelTimer(reconnectTimerId);
+        // 取消之前的重连任务
+        if (reconnectTask != null) {
+            reconnectTask.cancel(true);
+            reconnectTask = null;
         }
 
         int delay = RECONNECT_BASE_DELAY_MS * (int) Math.pow(2, reconnectAttempts);
@@ -458,26 +522,34 @@ public class WebSocketClientService {
 
         logger.info("Scheduling reconnect in " + delay + "ms (attempt " + reconnectAttempts + "/" + MAX_RECONNECT_ATTEMPTS + ")");
 
-        reconnectTimerId = vertx.setTimer(delay, id -> {
-            reconnectTimerId = -1;
+        if (reconnectScheduler == null) {
+            reconnectScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "WebSocket-Reconnect");
+                t.setDaemon(true);
+                return t;
+            });
+        }
+
+        reconnectTask = reconnectScheduler.schedule(() -> {
+            reconnectTask = null;
             if (!isShuttingDown.get()) {
                 logger.info("Attempting reconnect...");
                 connect();
             }
-        });
+        }, delay, TimeUnit.MILLISECONDS);
     }
 
     /**
      * 清理资源
      */
     private void cleanup() {
-        if (vertx != null && isInitialized.get()) {
-            stopHeartbeat();
-            if (reconnectTimerId != -1) {
-                vertx.cancelTimer(reconnectTimerId);
-                reconnectTimerId = -1;
-            }
+        stopHeartbeat();
+
+        if (reconnectTask != null) {
+            reconnectTask.cancel(true);
+            reconnectTask = null;
         }
+
         syncBatchBuffer.clear();
         expectedBatches = 0;
         receivedBatches = 0;
@@ -490,53 +562,53 @@ public class WebSocketClientService {
     public void shutdown() {
         logger.info("Shutting down WebSocket service...");
         isShuttingDown.set(true);
-        
-        // 如果从未初始化，直接返回
-        if (!isInitialized.get()) {
-            logger.info("Vert.x was never initialized, nothing to close");
-            return;
+
+        // 取消所有定时任务
+        stopHeartbeat();
+
+        if (reconnectTask != null) {
+            reconnectTask.cancel(true);
+            reconnectTask = null;
         }
-        
-        // 取消定时器
-        if (heartbeatTimerId != -1 && vertx != null) {
-            vertx.cancelTimer(heartbeatTimerId);
-            heartbeatTimerId = -1;
+
+        if (reconnectScheduler != null) {
+            reconnectScheduler.shutdownNow();
+            reconnectScheduler = null;
         }
-        if (reconnectTimerId != -1 && vertx != null) {
-            vertx.cancelTimer(reconnectTimerId);
-            reconnectTimerId = -1;
-        }
-        
+
         // 关闭 WebSocket
         if (webSocket != null) {
             try {
-                webSocket.close();
+                webSocket.close(1000, "Shutdown");
                 logger.info("WebSocket close initiated");
             } catch (Exception e) {
                 // ignore
             }
             webSocket = null;
         }
-        
+
         isConnected.set(false);
-        
-        // 关闭 HttpClient
+
+        // 关闭 OkHttp - 关键：需要关闭 dispatcher 的线程池
         if (httpClient != null) {
             try {
-                httpClient.close();
+                // 关闭连接池
+                httpClient.connectionPool().evictAll();
+
+                // 关闭 dispatcher 的线程池
+                httpClient.dispatcher().executorService().shutdownNow();
+
+                // 关闭缓存（如果有）
+                if (httpClient.cache() != null) {
+                    httpClient.cache().close();
+                }
             } catch (Exception e) {
                 // ignore
             }
             httpClient = null;
+            logger.info("OkHttp closed");
         }
-        
-        // 关闭 Vert.x
-        if (vertx != null) {
-            vertx.close();
-            vertx = null;
-            logger.info("Vert.x closed");
-        }
-        
+
         isInitialized.set(false);
         logger.info("WebSocket service shutdown complete");
     }
