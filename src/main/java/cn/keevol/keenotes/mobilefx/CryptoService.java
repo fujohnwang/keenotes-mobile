@@ -1,30 +1,49 @@
 package cn.keevol.keenotes.mobilefx;
 
+import org.bouncycastle.crypto.generators.Argon2BytesGenerator;
+import org.bouncycastle.crypto.generators.HKDFBytesGenerator;
+import org.bouncycastle.crypto.params.Argon2Parameters;
+import org.bouncycastle.crypto.params.HKDFParameters;
+import org.bouncycastle.crypto.digests.SHA256Digest;
+
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.security.spec.KeySpec;
 import java.util.Base64;
 
 /**
- * AES-GCM encryption service for E2E encryption.
- * Password is stored locally and never sent to server.
- * Enhanced with timestamp-based AEAD for additional integrity verification.
+ * 增强的加密服务 - 使用Argon2 + HKDF派生加密密钥
+ * 
+ * 密钥派生流程：
+ * 1. 用户密码通过Argon2id生成中间密钥材料（32字节）
+ * 2. 使用HKDF-SHA256从Argon2输出派生最终AES密钥
+ * 3. 使用AES-256-GCM进行加密
+ * 
+ * 安全参数：
+ * - Argon2id: 64MB内存, 3次迭代, 并行度1
+ * - HKDF: SHA-256
+ * - AES-256-GCM: 128位认证标签, 12字节IV
  */
 public class CryptoService {
 
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_TAG_LENGTH = 128; // bits
-    private static final int GCM_IV_LENGTH = 12;   // bytes
-    private static final int SALT_LENGTH = 16;     // bytes
-    private static final int KEY_LENGTH = 256;     // bits
-    private static final int ITERATIONS = 65536;
+    private static final int GCM_IV_LENGTH = 12; // bytes
+    private static final int SALT_LENGTH = 16; // bytes
+    private static final int KEY_LENGTH = 32; // bytes (256 bits)
     private static final int TIMESTAMP_LENGTH = 8; // bytes (long)
+
+    // Argon2参数
+    private static final int ARGON2_ITERATIONS = 3;
+    private static final int ARGON2_MEMORY_KB = 65536; // 64MB
+    private static final int ARGON2_PARALLELISM = 1;
+
+    // HKDF info参数（用于派生特定用途的密钥）
+    private static final byte[] HKDF_INFO = "KeeNotes-E2E-Encryption-v2".getBytes(StandardCharsets.UTF_8);
 
     private final SettingsService settings;
 
@@ -33,7 +52,7 @@ public class CryptoService {
     }
 
     /**
-     * Check if encryption is enabled (password is set).
+     * 检查加密是否已启用
      */
     public boolean isEncryptionEnabled() {
         String password = settings.getEncryptionPassword();
@@ -41,12 +60,9 @@ public class CryptoService {
     }
 
     /**
-     * Encrypt plaintext using AES-GCM with timestamp as AAD.
-     * Format: Base64(salt + iv + timestamp + ciphertext + tag)
-     *
-     * @param plaintext The text to encrypt
-     * @return Base64 encoded encrypted data
-     * @throws Exception if encryption fails
+     * 使用Argon2+HKDF+AES-GCM加密
+     * Format: Base64(version + salt + iv + timestamp + ciphertext + tag)
+     * version: 1字节，标识加密方案版本（0x02表示Argon2+HKDF）
      */
     public String encrypt(String plaintext) throws Exception {
         String password = settings.getEncryptionPassword();
@@ -54,44 +70,45 @@ public class CryptoService {
             throw new IllegalStateException("Encryption password not set");
         }
 
-        // Generate random salt and IV
+        // 生成随机盐和IV
         SecureRandom random = new SecureRandom();
         byte[] salt = new byte[SALT_LENGTH];
         byte[] iv = new byte[GCM_IV_LENGTH];
         random.nextBytes(salt);
         random.nextBytes(iv);
 
-        // Get current timestamp as additional authenticated data
+        // 获取当前时间戳作为AAD
         long timestamp = System.currentTimeMillis();
         byte[] timestampBytes = ByteBuffer.allocate(TIMESTAMP_LENGTH).putLong(timestamp).array();
 
-        // Derive key from password
-        SecretKey key = deriveKey(password, salt);
+        // 派生加密密钥
+        SecretKey key = deriveKeyArgon2HKDF(password, salt);
 
-        // Encrypt with timestamp as AAD
+        // AES-GCM加密
         Cipher cipher = Cipher.getInstance(ALGORITHM);
         GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
         cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec);
-        cipher.updateAAD(timestampBytes);  // Add timestamp as authenticated data
-        byte[] ciphertext = cipher.doFinal(plaintext.getBytes("UTF-8"));
+        cipher.updateAAD(timestampBytes);
+        byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
 
-        // Combine salt + iv + timestamp + ciphertext
-        byte[] combined = new byte[salt.length + iv.length + TIMESTAMP_LENGTH + ciphertext.length];
-        System.arraycopy(salt, 0, combined, 0, salt.length);
-        System.arraycopy(iv, 0, combined, salt.length, iv.length);
-        System.arraycopy(timestampBytes, 0, combined, salt.length + iv.length, TIMESTAMP_LENGTH);
-        System.arraycopy(ciphertext, 0, combined, salt.length + iv.length + TIMESTAMP_LENGTH, ciphertext.length);
+        // 组合：version(1) + salt(16) + iv(12) + timestamp(8) + ciphertext
+        byte[] combined = new byte[1 + salt.length + iv.length + TIMESTAMP_LENGTH + ciphertext.length];
+        int pos = 0;
+        combined[pos++] = 0x02; // 版本标识：Argon2+HKDF
+        System.arraycopy(salt, 0, combined, pos, salt.length);
+        pos += salt.length;
+        System.arraycopy(iv, 0, combined, pos, iv.length);
+        pos += iv.length;
+        System.arraycopy(timestampBytes, 0, combined, pos, TIMESTAMP_LENGTH);
+        pos += TIMESTAMP_LENGTH;
+        System.arraycopy(ciphertext, 0, combined, pos, ciphertext.length);
 
         return Base64.getEncoder().encodeToString(combined);
     }
 
     /**
-     * Decrypt ciphertext using AES-GCM with timestamp verification.
-     * Also returns the timestamp for potential validation.
-     *
-     * @param encryptedBase64 Base64 encoded encrypted data
-     * @return Decrypted plaintext
-     * @throws Exception if decryption fails or timestamp is invalid
+     * 使用Argon2+HKDF+AES-GCM解密
+     * 支持检测旧格式（PBKDF2），但抛出异常提示需要重新加密
      */
     public String decrypt(String encryptedBase64) throws Exception {
         String password = settings.getEncryptionPassword();
@@ -101,46 +118,96 @@ public class CryptoService {
 
         byte[] combined = Base64.getDecoder().decode(encryptedBase64);
 
-        // Extract components
-        if (combined.length < SALT_LENGTH + GCM_IV_LENGTH + TIMESTAMP_LENGTH) {
+        // 检查最小长度
+        if (combined.length < 1 + SALT_LENGTH + GCM_IV_LENGTH + TIMESTAMP_LENGTH) {
             throw new IllegalArgumentException("Invalid encrypted data format");
         }
+
+        // 检查版本标识
+        byte version = combined[0];
+
+        if (version == 0x02) {
+            // 新格式：Argon2+HKDF
+            return decryptV2(combined, password);
+        } else {
+            // 旧格式（PBKDF2）或无版本标识
+            // 尝试旧格式解密
+            throw new UnsupportedOperationException(
+                    "This note was encrypted with the old method (PBKDF2). " +
+                            "Please re-encrypt your notes with the new Argon2+HKDF method for enhanced security.");
+        }
+    }
+
+    /**
+     * 解密V2格式（Argon2+HKDF）
+     */
+    private String decryptV2(byte[] combined, String password) throws Exception {
+        int pos = 1; // 跳过版本字节
 
         byte[] salt = new byte[SALT_LENGTH];
         byte[] iv = new byte[GCM_IV_LENGTH];
         byte[] timestampBytes = new byte[TIMESTAMP_LENGTH];
-        byte[] ciphertext = new byte[combined.length - SALT_LENGTH - GCM_IV_LENGTH - TIMESTAMP_LENGTH];
+        byte[] ciphertext = new byte[combined.length - 1 - SALT_LENGTH - GCM_IV_LENGTH - TIMESTAMP_LENGTH];
 
-        System.arraycopy(combined, 0, salt, 0, SALT_LENGTH);
-        System.arraycopy(combined, SALT_LENGTH, iv, 0, GCM_IV_LENGTH);
-        System.arraycopy(combined, SALT_LENGTH + GCM_IV_LENGTH, timestampBytes, 0, TIMESTAMP_LENGTH);
-        System.arraycopy(combined, SALT_LENGTH + GCM_IV_LENGTH + TIMESTAMP_LENGTH, ciphertext, 0, ciphertext.length);
+        System.arraycopy(combined, pos, salt, 0, SALT_LENGTH);
+        pos += SALT_LENGTH;
+        System.arraycopy(combined, pos, iv, 0, GCM_IV_LENGTH);
+        pos += GCM_IV_LENGTH;
+        System.arraycopy(combined, pos, timestampBytes, 0, TIMESTAMP_LENGTH);
+        pos += TIMESTAMP_LENGTH;
+        System.arraycopy(combined, pos, ciphertext, 0, ciphertext.length);
 
-        // Extract timestamp for potential validation
+        // 验证时间戳（防止过旧数据）
         long timestamp = ByteBuffer.wrap(timestampBytes).getLong();
         long age = System.currentTimeMillis() - timestamp;
-
-        // Optional: Validate timestamp (reject data older than 10 years)
         if (age > 10L * 365 * 24 * 60 * 60 * 1000) {
-            throw new SecurityException("Encrypted data is too old, possible replay attack");
+            throw new SecurityException("Encrypted data is too old (>10 years), possible replay attack");
         }
 
-        // Derive key from password
-        SecretKey key = deriveKey(password, salt);
+        // 派生加密密钥
+        SecretKey key = deriveKeyArgon2HKDF(password, salt);
 
-        // Decrypt with timestamp verification
+        // AES-GCM解密
         Cipher cipher = Cipher.getInstance(ALGORITHM);
         GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
         cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec);
-        cipher.updateAAD(timestampBytes);  // Verify timestamp as authenticated data
+        cipher.updateAAD(timestampBytes);
         byte[] plaintext = cipher.doFinal(ciphertext);
 
-        return new String(plaintext, "UTF-8");
+        return new String(plaintext, StandardCharsets.UTF_8);
     }
 
     /**
-     * Decrypt and return timestamp information.
-     * Useful for debugging and validation.
+     * 使用Argon2id + HKDF派生AES密钥
+     */
+    private SecretKey deriveKeyArgon2HKDF(String password, byte[] salt) {
+        // Step 1: Argon2id
+        Argon2Parameters.Builder builder = new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
+                .withVersion(Argon2Parameters.ARGON2_VERSION_13)
+                .withIterations(ARGON2_ITERATIONS)
+                .withMemoryAsKB(ARGON2_MEMORY_KB)
+                .withParallelism(ARGON2_PARALLELISM)
+                .withSalt(salt);
+
+        Argon2BytesGenerator argon2 = new Argon2BytesGenerator();
+        argon2.init(builder.build());
+
+        byte[] argon2Output = new byte[KEY_LENGTH];
+        argon2.generateBytes(password.toCharArray(), argon2Output);
+
+        // Step 2: HKDF-SHA256
+        HKDFBytesGenerator hkdf = new HKDFBytesGenerator(new SHA256Digest());
+        HKDFParameters hkdfParams = new HKDFParameters(argon2Output, salt, HKDF_INFO);
+        hkdf.init(hkdfParams);
+
+        byte[] derivedKey = new byte[KEY_LENGTH];
+        hkdf.generateBytes(derivedKey, 0, KEY_LENGTH);
+
+        return new SecretKeySpec(derivedKey, "AES");
+    }
+
+    /**
+     * 解密并返回元数据
      */
     public DecryptionResult decryptWithMetadata(String encryptedBase64) throws Exception {
         String password = settings.getEncryptionPassword();
@@ -150,44 +217,43 @@ public class CryptoService {
 
         byte[] combined = Base64.getDecoder().decode(encryptedBase64);
 
-        if (combined.length < SALT_LENGTH + GCM_IV_LENGTH + TIMESTAMP_LENGTH) {
+        if (combined.length < 1 + SALT_LENGTH + GCM_IV_LENGTH + TIMESTAMP_LENGTH) {
             throw new IllegalArgumentException("Invalid encrypted data format");
         }
 
+        byte version = combined[0];
+        if (version != 0x02) {
+            throw new UnsupportedOperationException("Unsupported encryption version");
+        }
+
+        int pos = 1;
         byte[] salt = new byte[SALT_LENGTH];
         byte[] iv = new byte[GCM_IV_LENGTH];
         byte[] timestampBytes = new byte[TIMESTAMP_LENGTH];
-        byte[] ciphertext = new byte[combined.length - SALT_LENGTH - GCM_IV_LENGTH - TIMESTAMP_LENGTH];
+        byte[] ciphertext = new byte[combined.length - 1 - SALT_LENGTH - GCM_IV_LENGTH - TIMESTAMP_LENGTH];
 
-        System.arraycopy(combined, 0, salt, 0, SALT_LENGTH);
-        System.arraycopy(combined, SALT_LENGTH, iv, 0, GCM_IV_LENGTH);
-        System.arraycopy(combined, SALT_LENGTH + GCM_IV_LENGTH, timestampBytes, 0, TIMESTAMP_LENGTH);
-        System.arraycopy(combined, SALT_LENGTH + GCM_IV_LENGTH + TIMESTAMP_LENGTH, ciphertext, 0, ciphertext.length);
+        System.arraycopy(combined, pos, salt, 0, SALT_LENGTH);
+        pos += SALT_LENGTH;
+        System.arraycopy(combined, pos, iv, 0, GCM_IV_LENGTH);
+        pos += GCM_IV_LENGTH;
+        System.arraycopy(combined, pos, timestampBytes, 0, TIMESTAMP_LENGTH);
+        pos += TIMESTAMP_LENGTH;
+        System.arraycopy(combined, pos, ciphertext, 0, ciphertext.length);
 
         long timestamp = ByteBuffer.wrap(timestampBytes).getLong();
 
-        SecretKey key = deriveKey(password, salt);
+        SecretKey key = deriveKeyArgon2HKDF(password, salt);
         Cipher cipher = Cipher.getInstance(ALGORITHM);
         GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
         cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec);
         cipher.updateAAD(timestampBytes);
         byte[] plaintext = cipher.doFinal(ciphertext);
 
-        return new DecryptionResult(new String(plaintext, "UTF-8"), timestamp);
+        return new DecryptionResult(new String(plaintext, StandardCharsets.UTF_8), timestamp);
     }
 
     /**
-     * Derive AES key from password using PBKDF2.
-     */
-    private SecretKey deriveKey(String password, byte[] salt) throws Exception {
-        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_LENGTH);
-        SecretKey tmp = factory.generateSecret(spec);
-        return new SecretKeySpec(tmp.getEncoded(), "AES");
-    }
-
-    /**
-     * Result of decryption with metadata.
+     * 解密结果包含元数据
      */
     public static class DecryptionResult {
         public final String plaintext;
