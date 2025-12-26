@@ -18,7 +18,6 @@ public class WebSocketClientService {
 
     private volatile OkHttpClient httpClient;
     private volatile WebSocket webSocket;
-    private volatile Call healthCheckCall; // 用于心跳的HTTP健康检查调用
 
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
     private final AtomicBoolean isConnecting = new AtomicBoolean(false);
@@ -69,12 +68,12 @@ public class WebSocketClientService {
         logger.info("Initializing OkHttp...");
 
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
-                .connectTimeout(3, TimeUnit.SECONDS)      // 连接超时3秒
-                .readTimeout(5, TimeUnit.SECONDS)         // 读取超时5秒
-                .writeTimeout(5, TimeUnit.SECONDS)        // 写入超时5秒
+                .connectTimeout(3, TimeUnit.SECONDS) // 连接超时3秒
+                .readTimeout(5, TimeUnit.SECONDS) // 读取超时5秒
+                .writeTimeout(5, TimeUnit.SECONDS) // 写入超时5秒
                 // 禁用协议层ping/pong，使用服务器的应用层心跳
-                // .pingInterval(30, TimeUnit.SECONDS)     // 禁用：Armeria服务器不支持自动回复
-                .retryOnConnectionFailure(false)          // 我们自己处理重连逻辑
+                // .pingInterval(30, TimeUnit.SECONDS) // 禁用：Armeria服务器不支持自动回复
+                .retryOnConnectionFailure(false) // 我们自己处理重连逻辑
                 .connectionPool(new ConnectionPool(0, 5, TimeUnit.SECONDS)); // 无空闲连接，5秒清理
 
         if (ssl) {
@@ -164,7 +163,8 @@ public class WebSocketClientService {
         // 添加 Authorization 头 - 复用 HTTP POST 的 token 认证方式
         if (authToken != null && !authToken.isEmpty()) {
             requestBuilder.addHeader("Authorization", "Bearer " + authToken);
-            logger.info("Adding Authorization header: Bearer " + authToken.substring(0, Math.min(4, authToken.length())) + "...");
+            logger.info("Adding Authorization header: Bearer " + authToken.substring(0, Math.min(4, authToken.length()))
+                    + "...");
         } else {
             logger.warning("No auth token configured!");
         }
@@ -236,7 +236,8 @@ public class WebSocketClientService {
     }
 
     private void sendHandshake() {
-        if (webSocket == null) return;
+        if (webSocket == null)
+            return;
 
         JsonObject handshake = new JsonObject()
                 .put("type", "handshake")
@@ -377,8 +378,7 @@ public class WebSocketClientService {
 
                     String decryptedContent = cryptoService.decrypt(encryptedContent);
                     syncBatchBuffer.add(new LocalCacheService.NoteData(
-                            id, decryptedContent, channel, createdAt, encryptedContent
-                    ));
+                            id, decryptedContent, channel, createdAt, encryptedContent));
                 } catch (Exception e) {
                     logger.warning("Failed to decrypt note: " + e.getMessage());
                 }
@@ -441,8 +441,7 @@ public class WebSocketClientService {
             logger.info("Decrypted content: " + decryptedContent);
 
             LocalCacheService.NoteData note = new LocalCacheService.NoteData(
-                    id, decryptedContent, channel, createdAt, encryptedContent
-            );
+                    id, decryptedContent, channel, createdAt, encryptedContent);
             localCache.insertNote(note);
 
             // 关键修复：实时同步后更新lastSyncId，避免下次重复同步
@@ -498,7 +497,8 @@ public class WebSocketClientService {
         int delay = RECONNECT_BASE_DELAY_MS * (int) Math.pow(2, reconnectAttempts);
         reconnectAttempts++;
 
-        logger.info("Scheduling reconnect in " + delay + "ms (attempt " + reconnectAttempts + "/" + MAX_RECONNECT_ATTEMPTS + ")");
+        logger.info("Scheduling reconnect in " + delay + "ms (attempt " + reconnectAttempts + "/"
+                + MAX_RECONNECT_ATTEMPTS + ")");
 
         if (reconnectScheduler == null) {
             reconnectScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -533,17 +533,19 @@ public class WebSocketClientService {
     }
 
     /**
-     * 完全关闭服务 - 立即返回，后台清理
+     * 完全关闭服务 - 立即返回，强制断开连接
+     * 优化策略：先关闭底层OkHttp资源，使用cancel()而非close()避免等待
      */
     public void shutdown() {
         logger.info("Starting immediate shutdown...");
 
         // 1. 立即设置关闭标志（阻止新操作）
         isShuttingDown.set(true);
+        isConnected.set(false);
 
         // 2. 立即取消定时任务（不等待）
         if (reconnectTask != null) {
-            reconnectTask.cancel(true);  // 中断正在执行的任务
+            reconnectTask.cancel(true); // 中断正在执行的任务
             reconnectTask = null;
         }
 
@@ -552,47 +554,41 @@ public class WebSocketClientService {
             reconnectScheduler = null;
         }
 
-        // 3. WebSocket：后台关闭，主线程不等待
-        if (webSocket != null) {
-            final WebSocket ws = webSocket;
-            webSocket = null;  // 立即清空引用
-
-            // 在后台线程关闭WebSocket，避免阻塞
-            Thread closeThread = new Thread(() -> {
-                try {
-                    ws.close(1000, "Client shutdown");
-                    logger.info("WebSocket close sent (background)");
-                } catch (Exception e) {
-                    logger.warning("WebSocket close error: " + e.getMessage());
-                }
-            }, "WebSocketClose");
-            closeThread.setDaemon(true);  // 设置为daemon线程
-            closeThread.start();
-        }
-
-        isConnected.set(false);
-
-        // 4. OkHttp：立即释放所有资源
+        // 3. 立即强制关闭OkHttp底层资源（这会强制断开所有连接）
         if (httpClient != null) {
             try {
-                // 立即停止所有网络操作
+                // 先shutdownNow调度器，立即中断所有网络操作
                 httpClient.dispatcher().executorService().shutdownNow();
 
-                // 立即驱逐所有连接
+                // 立即驱逐所有连接（强制关闭底层Socket）
                 httpClient.connectionPool().evictAll();
 
                 // 关闭缓存
                 if (httpClient.cache() != null) {
                     httpClient.cache().close();
                 }
+
+                logger.info("OkHttp resources closed");
             } catch (Exception e) {
                 logger.warning("OkHttp cleanup error: " + e.getMessage());
             }
             httpClient = null;
         }
 
+        // 4. 清空WebSocket引用，使用cancel()立即断开，不等待close frame
+        if (webSocket != null) {
+            try {
+                // 使用cancel()代替close()，立即断开连接不等待
+                webSocket.cancel();
+                logger.info("WebSocket cancelled immediately");
+            } catch (Exception e) {
+                // 忽略异常，底层连接可能已被OkHttp关闭
+            }
+            webSocket = null;
+        }
+
         isInitialized.set(false);
-        logger.info("Shutdown initiated (async cleanup in background)");
+        logger.info("Shutdown completed");
     }
 
     private String generateClientId() {
@@ -641,9 +637,13 @@ public class WebSocketClientService {
      */
     public interface SyncListener {
         void onConnectionStatus(boolean connected);
+
         void onSyncProgress(int current, int total);
+
         void onSyncComplete(int total, long lastSyncId);
+
         void onRealtimeUpdate(long id, String content);
+
         void onError(String message);
     }
 
@@ -655,9 +655,19 @@ public class WebSocketClientService {
             return new Logger();
         }
 
-        public void info(String msg) { System.out.println("[INFO] " + msg); }
-        public void warning(String msg) { System.err.println("[WARN] " + msg); }
-        public void severe(String msg) { System.err.println("[ERROR] " + msg); }
-        public void fine(String msg) { /* debug level, skip */ }
+        public void info(String msg) {
+            System.out.println("[INFO] " + msg);
+        }
+
+        public void warning(String msg) {
+            System.err.println("[WARN] " + msg);
+        }
+
+        public void severe(String msg) {
+            System.err.println("[ERROR] " + msg);
+        }
+
+        public void fine(String msg) {
+            /* debug level, skip */ }
     }
 }
