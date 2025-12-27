@@ -11,22 +11,18 @@ case "$OS_NAME" in
         if [ "$OS_ARCH" = "arm64" ]; then
             PLATFORM="mac-aarch64"
         else
-            PLATFORM="mac-x64"
+            PLATFORM="mac"
         fi
         ;;
     Linux)
         if [ "$OS_ARCH" = "aarch64" ]; then
             PLATFORM="linux-aarch64"
         else
-            PLATFORM="linux-amd64"
+            PLATFORM="linux"
         fi
         ;;
     MINGW*|MSYS*|CYGWIN*)
-        if [ "$OS_ARCH" = "x86_64" ]; then
-            PLATFORM="win-x64"
-        else
-            PLATFORM="win-x86"
-        fi
+        PLATFORM="win"
         ;;
 esac
 
