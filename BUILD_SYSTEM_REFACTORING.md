@@ -129,7 +129,8 @@ jobs:
           java-version: '21'
       
       - name: Build JAR
-        run: mvn clean package -Pdesktop -DskipTests -Djavafx.platform=win-x64
+        shell: bash
+        run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=win"
       
       - name: Create Windows EXE
         shell: pwsh
@@ -168,9 +169,9 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      # 类似配置，使用 linux-amd64
+      # 类似配置，使用 linux
       - name: Build JAR
-        run: mvn clean package -Pdesktop -DskipTests -Djavafx.platform=linux-amd64
+        run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=linux"
       
       - name: Create DEB/RPM
         run: |
@@ -193,14 +194,14 @@ case "$OS_NAME" in
         if [ "$OS_ARCH" = "arm64" ]; then
             PLATFORM="mac-aarch64"
         else
-            PLATFORM="mac-x64"
+            PLATFORM="mac"
         fi
         ;;
     Linux)
         if [ "$OS_ARCH" = "aarch64" ]; then
             PLATFORM="linux-aarch64"
         else
-            PLATFORM="linux-amd64"
+            PLATFORM="linux"
         fi
         ;;
 esac
@@ -243,10 +244,10 @@ java --module-path "<javafx-jars>" \
 | Platform | OS | Arch | Classifier |
 |----------|----|----|-----------|
 | macOS ARM64 | macOS | arm64 | `mac-aarch64` |
-| macOS Intel | macOS | x64 | `mac-x64` |
-| Linux x64 | Linux | x86_64 | `linux-amd64` |
+| macOS Intel | macOS | x64 | `mac` |
+| Linux x64 | Linux | x86_64 | `linux` |
 | Linux ARM64 | Linux | aarch64 | `linux-aarch64` |
-| Windows x64 | Windows | x64 | `win-x64` |
+| Windows x64 | Windows | x64 | `win` |
 
 ### 打包格式
 

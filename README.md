@@ -16,10 +16,10 @@ mvn javafx:run -Djavafx.platform=<platform>
 
 Available platforms:
 - `mac-aarch64` - macOS ARM64 (Apple Silicon)
-- `mac-x64` - macOS Intel
-- `linux-amd64` - Linux x86_64
+- `mac` - macOS Intel (x64)
+- `linux` - Linux x86_64
 - `linux-aarch64` - Linux ARM64
-- `win-x64` - Windows x64
+- `win` - Windows x64
 
 Or use the provided run script:
 

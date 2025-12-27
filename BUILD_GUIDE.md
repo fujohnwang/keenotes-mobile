@@ -78,10 +78,10 @@ This script:
 | Platform | Classifier |
 |----------|-----------|
 | macOS ARM64 (Apple Silicon) | `mac-aarch64` |
-| macOS Intel | `mac-x64` |
-| Linux x64 | `linux-amd64` |
+| macOS Intel (x64) | `mac` |
+| Linux x64 | `linux` |
 | Linux ARM64 | `linux-aarch64` |
-| Windows x64 | `win-x64` |
+| Windows x64 | `win` |
 
 ## Mobile Applications
 
