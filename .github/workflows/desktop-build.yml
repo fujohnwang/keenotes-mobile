@@ -9,128 +9,129 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-      
-      - name: Build JAR
-        run: mvn clean package -Pdesktop -DskipTests
-      
-      - name: List target directory
-        run: ls -la target/
-        shell: bash
-      
-      - name: Create Windows EXE Installer
-        run: |
-          jpackage `
-            --input target `
-            --name KeeNotes `
-            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar `
-            --main-class cn.keevol.keenotes.mobilefx.Main `
-            --type exe `
-            --app-version 1.0.0 `
-            --vendor "Keevol" `
-            --dest dist
-      
-      - name: Create Windows MSI Installer
-        run: |
-          jpackage `
-            --input target `
-            --name KeeNotes `
-            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar `
-            --main-class cn.keevol.keenotes.mobilefx.Main `
-            --type msi `
-            --app-version 1.0.0 `
-            --vendor "Keevol" `
-            --dest dist
-      
-      - name: Upload Windows Installers
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installers
-          path: dist/*
+     runs-on: windows-latest
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v4
+
+       - name: Setup Java 21
+         uses: actions/setup-java@v4
+         with:
+           distribution: 'temurin'
+           java-version: '21'
+
+       - name: Build JAR
+         run: mvn clean package -Pdesktop -DskipTests -Djavafx.platform=win-amd64
+
+       - name: List target directory
+         run: ls -la target/
+         shell: bash
+
+       - name: Create Windows EXE Installer
+         shell: pwsh
+         run: |
+           jpackage `
+             --input target `
+             --name KeeNotes `
+             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar `
+             --main-class cn.keevol.keenotes.mobilefx.Main `
+             --type exe `
+             --app-version 1.0.0 `
+             --vendor "Keevol" `
+             --icon "src/main/resources/icons/icon-512.png" `
+             --dest dist
+
+       - name: Upload Windows Installers
+         uses: actions/upload-artifact@v4
+         with:
+           name: windows-installers
+           path: dist/*
 
   build-macos:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-      
-      - name: Build JAR
-        run: mvn clean package -P desktop -DskipTests
-      
-      - name: List target directory
-        run: ls -la target/
-      
-      - name: Create macOS DMG
-        run: |
-          jpackage \
-            --input target \
-            --name KeeNotes \
-            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class cn.keevol.keenotes.mobilefx.Main \
-            --type dmg \
-            --app-version 1.0.0 \
-            --vendor "Keevol" \
-            --dest dist
-      
-      - name: Upload macOS DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-dmg
-          path: dist/*.dmg
+     runs-on: macos-latest
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v4
+
+       - name: Setup Java 21
+         uses: actions/setup-java@v4
+         with:
+           distribution: 'temurin'
+           java-version: '21'
+
+       - name: Build JAR
+         run: mvn clean package -Pdesktop -DskipTests -Djavafx.platform=mac-aarch64
+
+       - name: List target directory
+         run: ls -la target/
+
+       - name: Create macOS DMG
+         run: |
+           jpackage \
+             --input target \
+             --name KeeNotes \
+             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
+             --main-class cn.keevol.keenotes.mobilefx.Main \
+             --type dmg \
+             --app-version 1.0.0 \
+             --vendor "Keevol" \
+             --icon "src/main/resources/icons/keenotes.icns" \
+             --dest dist
+
+       - name: Upload macOS DMG
+         uses: actions/upload-artifact@v4
+         with:
+           name: macos-dmg
+           path: dist/*.dmg
 
   build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-      
-      - name: Build JAR
-        run: mvn clean package -Pdesktop -DskipTests
-      
-      - name: List target directory
-        run: ls -la target/
-      
-      - name: Create DEB Package
-        run: |
-          jpackage \
-            --input target \
-            --name keenotes \
-            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class cn.keevol.keenotes.mobilefx.Main \
-            --type deb \
-            --app-version 1.0.0 \
-            --vendor "Keevol" \
-            --linux-shortcut \
-            --dest dist
-      
-      - name: Copy Standalone JAR as Fallback
-        run: |
-          mkdir -p dist
-          cp target/keenotes-mobile-1.0.0-SNAPSHOT.jar dist/keenotes-linux-standalone.jar
-      
-      - name: Upload Linux Packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-packages
-          path: dist/*
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v4
+
+       - name: Setup Java 21
+         uses: actions/setup-java@v4
+         with:
+           distribution: 'temurin'
+           java-version: '21'
+
+       - name: Build JAR
+         run: mvn clean package -Pdesktop -DskipTests -Djavafx.platform=linux-amd64
+
+       - name: List target directory
+         run: ls -la target/
+
+       - name: Create DEB Package
+         run: |
+           jpackage \
+             --input target \
+             --name keenotes \
+             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
+             --main-class cn.keevol.keenotes.mobilefx.Main \
+             --type deb \
+             --app-version 1.0.0 \
+             --vendor "Keevol" \
+             --icon "src/main/resources/icons/icon-512.png" \
+             --linux-shortcut \
+             --dest dist
+
+       - name: Create RPM Package
+         run: |
+           jpackage \
+             --input target \
+             --name keenotes \
+             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
+             --main-class cn.keevol.keenotes.mobilefx.Main \
+             --type rpm \
+             --app-version 1.0.0 \
+             --vendor "Keevol" \
+             --icon "src/main/resources/icons/icon-512.png" \
+             --linux-shortcut \
+             --dest dist
+
+       - name: Upload Linux Packages
+         uses: actions/upload-artifact@v4
+         with:
+           name: linux-packages
+           path: dist/*

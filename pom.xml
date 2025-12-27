@@ -181,47 +181,68 @@
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
+            <dependencies>
+                <!-- JavaFX with platform-specific native libraries -->
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-base</artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>${javafx.platform}</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-graphics</artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>${javafx.platform}</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-controls</artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>${javafx.platform}</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-fxml</artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>${javafx.platform}</classifier>
+                </dependency>
+            </dependencies>
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-maven-plugin</artifactId>
-                        <configuration>
-                            <mainClass>${main.class}</mainClass>
-                        </configuration>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <version>3.5.1</version>
                         <executions>
                             <execution>
+                                <phase>package</phase>
                                 <goals>
-                                    <goal>repackage</goal>
+                                    <goal>shade</goal>
                                 </goals>
+                                <configuration>
+                                    <transformers>
+                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                            <mainClass>${main.class}</mainClass>
+                                        </transformer>
+                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                    </transformers>
+                                    <filters>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>META-INF/*.SF</exclude>
+                                                <exclude>META-INF/*.DSA</exclude>
+                                                <exclude>META-INF/*.RSA</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
                 </plugins>
             </build>
-<!--            <dependencies>-->
-<!--                <dependency>-->
-<!--                    <groupId>com.gluonhq.attach</groupId>-->
-<!--                    <artifactId>display</artifactId>-->
-<!--                    <version>${attach.version}</version>-->
-<!--                    <classifier>desktop</classifier>-->
-<!--                    <scope>runtime</scope>-->
-<!--                </dependency>-->
-<!--                <dependency>-->
-<!--                    <groupId>com.gluonhq.attach</groupId>-->
-<!--                    <artifactId>lifecycle</artifactId>-->
-<!--                    <version>${attach.version}</version>-->
-<!--                    <classifier>desktop</classifier>-->
-<!--                    <scope>runtime</scope>-->
-<!--                </dependency>-->
-<!--                <dependency>-->
-<!--                    <groupId>com.gluonhq.attach</groupId>-->
-<!--                    <artifactId>storage</artifactId>-->
-<!--                    <version>${attach.version}</version>-->
-<!--                    <classifier>desktop</classifier>-->
-<!--                    <scope>runtime</scope>-->
-<!--                </dependency>-->
-<!--            </dependencies>-->
         </profile>
 
         <!-- Android profile -->
