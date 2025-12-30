@@ -159,6 +159,64 @@ public class ServiceManager {
     }
 
     /**
+     * 重新初始化所有服务（用于配置变更）
+     */
+    public synchronized void reinitializeServices() {
+        System.out.println("[ServiceManager] Reinitializing services due to configuration change...");
+        
+        try {
+            // 1. 断开旧的 WebSocket 连接
+            if (webSocketService != null) {
+                System.out.println("[ServiceManager] Disconnecting old WebSocket connection...");
+                webSocketService.disconnect();
+                
+                // 等待断开完成
+                Thread.sleep(200);
+            }
+            
+            // 2. 重置本地缓存同步状态（保留数据，只重置同步状态）
+            if (localCacheService != null && localCacheService.isInitialized()) {
+                System.out.println("[ServiceManager] Resetting local cache sync state...");
+                localCacheService.resetSyncState();
+            }
+            
+            // 3. 重置服务状态标志
+            webSocketConnected = false;
+            servicesReady = false;
+            
+            // 4. 通知状态变更
+            notifyStatusChanged("reinitializing", "正在重新连接到新服务器...");
+            
+            // 5. 重新连接到新 endpoint
+            System.out.println("[ServiceManager] Reconnecting to new endpoint...");
+            connectWebSocketIfNeeded();
+            
+            System.out.println("[ServiceManager] Service reinitialization completed");
+            
+        } catch (Exception e) {
+            System.err.println("[ServiceManager] Service reinitialization failed: " + e.getMessage());
+            e.printStackTrace();
+            notifyStatusChanged("reinit_error", "重新初始化失败: " + e.getMessage());
+            throw new RuntimeException("Service reinitialization failed", e);
+        }
+    }
+
+    /**
+     * 初始化服务（用于首次配置）
+     */
+    public synchronized void initializeServices() {
+        System.out.println("[ServiceManager] Initializing services for first-time configuration...");
+        
+        // 1. 触发缓存初始化
+        getLocalCacheService();
+        
+        // 2. 连接 WebSocket
+        connectWebSocketIfNeeded();
+        
+        System.out.println("[ServiceManager] Service initialization completed");
+    }
+
+    /**
      * 检查服务是否就绪
      */
     public boolean isServicesReady() {

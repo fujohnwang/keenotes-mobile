@@ -155,45 +155,83 @@ public class SettingsView extends BorderPane {
             return;
         }
 
-        // Check if this is a new configuration (from empty to configured)
+        // 保存变更前的状态
+        String oldEndpoint = settings.getEndpointUrl();
+        String oldToken = settings.getToken();
+        String oldPassword = settings.getEncryptionPassword();
         boolean wasConfiguredBefore = settings.isConfigured();
 
-        settings.setEndpointUrl(endpointField.getText().trim());
-        settings.setToken(tokenField.getText());
-        settings.setEncryptionPassword(password);
+        // 获取新的配置值
+        String newEndpoint = endpointField.getText().trim();
+        String newToken = tokenField.getText();
+        String newPassword = password;
+
+        // 检查关键配置是否变更
+        boolean endpointChanged = !java.util.Objects.equals(oldEndpoint, newEndpoint);
+        boolean tokenChanged = !java.util.Objects.equals(oldToken, newToken);
+        boolean passwordChanged = !java.util.Objects.equals(oldPassword, newPassword);
+        boolean configurationChanged = endpointChanged || tokenChanged || passwordChanged;
+
+        // 保存新设置
+        settings.setEndpointUrl(newEndpoint);
+        settings.setToken(newToken);
+        settings.setEncryptionPassword(newPassword);
         settings.save();
 
         String msg = settings.isEncryptionEnabled()
             ? "Settings saved ✓ (E2E encryption enabled)"
             : "Settings saved ✓";
-        statusLabel.setText(msg);
-        statusLabel.getStyleClass().removeAll("error", "success");
-        statusLabel.getStyleClass().add("success");
 
-        // 如果之前未配置，现在配置了，触发缓存初始化
-        if (!wasConfiguredBefore && settings.isConfigured()) {
-            System.out.println("[SettingsView] New configuration detected, triggering cache initialization");
-            // 触发ServiceManager初始化缓存
+        if (configurationChanged && wasConfiguredBefore) {
+            // 配置变更：需要清理旧状态并重新初始化
+            System.out.println("[SettingsView] Configuration changed, reinitializing services...");
+            System.out.println("[SettingsView] - Endpoint changed: " + endpointChanged);
+            System.out.println("[SettingsView] - Token changed: " + tokenChanged);
+            System.out.println("[SettingsView] - Password changed: " + passwordChanged);
+            
+            statusLabel.setText("Configuration changed, reconnecting...");
+            statusLabel.getStyleClass().removeAll("error", "success");
+            statusLabel.getStyleClass().add("success");
+
+            new Thread(() -> {
+                try {
+                    ServiceManager.getInstance().reinitializeServices();
+                    // 更新UI状态
+                    javafx.application.Platform.runLater(() -> {
+                        statusLabel.setText(msg + " (Reconnected)");
+                    });
+                } catch (Exception e) {
+                    System.err.println("[SettingsView] Reinitialization failed: " + e.getMessage());
+                    javafx.application.Platform.runLater(() -> {
+                        statusLabel.setText("Settings saved, but reconnection failed");
+                        statusLabel.getStyleClass().removeAll("error", "success");
+                        statusLabel.getStyleClass().add("error");
+                    });
+                }
+            }, "SettingsReinit").start();
+
+        } else if (!wasConfiguredBefore && settings.isConfigured()) {
+            // 首次配置：正常初始化
+            System.out.println("[SettingsView] New configuration detected, initializing services...");
+            
+            statusLabel.setText(msg);
+            statusLabel.getStyleClass().removeAll("error", "success");
+            statusLabel.getStyleClass().add("success");
+
             new Thread(() -> {
                 try {
                     Thread.sleep(100);
-                    ServiceManager.getInstance().getLocalCacheService();
+                    ServiceManager.getInstance().initializeServices();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-            }).start();
-        }
+            }, "SettingsInit").start();
 
-        // 尝试重新连接WebSocket（如果配置已完成）
-        if (settings.isConfigured()) {
-            new Thread(() -> {
-                try {
-                    Thread.sleep(500); // 稍微延迟
-                    ServiceManager.getInstance().connectWebSocketIfNeeded();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }).start();
+        } else {
+            // 无关键配置变更或配置为空
+            statusLabel.setText(msg);
+            statusLabel.getStyleClass().removeAll("error", "success");
+            statusLabel.getStyleClass().add("success");
         }
     }
 }

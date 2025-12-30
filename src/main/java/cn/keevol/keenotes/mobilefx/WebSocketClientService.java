@@ -260,10 +260,40 @@ public class WebSocketClientService {
      * 断开连接
      */
     public void disconnect() {
+        System.out.println("[WebSocket] Disconnecting...");
         if (webSocket != null) {
             webSocket.close(1000, "Client disconnect");
         }
         cleanup();
+    }
+
+    /**
+     * 强制重新连接（断开旧连接并建立新连接）
+     */
+    public void reconnect() {
+        System.out.println("[WebSocket] Force reconnecting...");
+        
+        // 断开旧连接
+        if (isConnected.get()) {
+            disconnect();
+            
+            // 等待断开完成
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        
+        // 建立新连接
+        connect();
+    }
+
+    /**
+     * 检查是否已连接
+     */
+    public boolean isConnected() {
+        return isConnected.get();
     }
 
     /**
