@@ -410,25 +410,60 @@ public class LocalCacheService {
     }
 
     /**
-     * 重置同步状态（用于调试或强制重新同步）
+     * 重置同步状态（保留数据，只重置同步状态）
      */
-    public void resetSyncState() throws SQLException {
+    public void resetSyncState() {
         ensureInitialized();
-        System.out.println("[DEBUG LocalCache] Resetting sync state...");
+        System.out.println("[LocalCache] Resetting sync state (keeping data)...");
 
-        // 清空笔记表
-        String clearNotes = "DELETE FROM notes_cache";
-        try (Statement stmt = connection.createStatement()) {
-            stmt.executeUpdate(clearNotes);
+        try {
+            // 只重置 sync_state，保留笔记数据
+            String resetSync = "UPDATE sync_state SET last_sync_id = -1, last_sync_time = NULL WHERE id = 1";
+            try (Statement stmt = connection.createStatement()) {
+                stmt.executeUpdate(resetSync);
+            }
+            System.out.println("[LocalCache] Sync state reset complete (data preserved)");
+        } catch (SQLException e) {
+            System.err.println("[LocalCache] Failed to reset sync state: " + e.getMessage());
+            throw new RuntimeException("Failed to reset sync state", e);
         }
+    }
 
-        // 重置 sync_state
-        String resetSync = "UPDATE sync_state SET last_sync_id = -1, last_sync_time = NULL WHERE id = 1";
-        try (Statement stmt = connection.createStatement()) {
-            stmt.executeUpdate(resetSync);
+    /**
+     * 完全清理所有缓存数据
+     */
+    public void clearAllData() {
+        ensureInitialized();
+        System.out.println("[LocalCache] Clearing all cache data...");
+
+        try {
+            // 清空笔记表
+            String clearNotes = "DELETE FROM notes_cache";
+            try (Statement stmt = connection.createStatement()) {
+                int deleted = stmt.executeUpdate(clearNotes);
+                System.out.println("[LocalCache] Cleared " + deleted + " cached notes");
+            }
+
+            // 重置 sync_state
+            String resetSync = "UPDATE sync_state SET last_sync_id = -1, last_sync_time = NULL WHERE id = 1";
+            try (Statement stmt = connection.createStatement()) {
+                stmt.executeUpdate(resetSync);
+            }
+
+            System.out.println("[LocalCache] All cache data cleared");
+        } catch (SQLException e) {
+            System.err.println("[LocalCache] Failed to clear cache data: " + e.getMessage());
+            throw new RuntimeException("Failed to clear cache data", e);
         }
+    }
 
-        System.out.println("[DEBUG LocalCache] Sync state reset complete");
+    /**
+     * 重置同步状态（用于调试或强制重新同步）
+     * @deprecated 使用 clearAllData() 代替
+     */
+    @Deprecated
+    public void resetSyncState_Legacy() throws SQLException {
+        clearAllData();
     }
 
     /**
