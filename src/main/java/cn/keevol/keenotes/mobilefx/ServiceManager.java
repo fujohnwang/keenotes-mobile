@@ -65,9 +65,12 @@ public class ServiceManager {
                     notifyStatusChanged("local_cache_ready", "本地缓存已就绪");
                     System.out.println("[ServiceManager] Local cache initialized successfully");
                 } catch (Exception e) {
-                    notifyStatusChanged("local_cache_error", "本地缓存初始化失败: " + e.getMessage());
-                    System.err.println("[ServiceManager] Local cache initialization failed: " + e.getMessage());
+                    System.err.println("[ServiceManager] Local cache initialization failed!");
+                    System.err.println("[ServiceManager] Error: " + e.getMessage());
+                    System.err.println("[ServiceManager] This error will not prevent the UI from working");
                     e.printStackTrace();
+                    notifyStatusChanged("local_cache_error", "本地缓存初始化失败: " + e.getMessage());
+                    // 不要重新抛出异常，让应用继续运行
                 }
             }, "LocalCacheInit");
             initThread.setDaemon(true);
