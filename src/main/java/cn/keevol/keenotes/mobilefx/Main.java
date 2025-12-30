@@ -28,6 +28,13 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
+        // 添加启动日志
+        System.out.println("[Main] Application starting...");
+        System.out.println("[Main] Java version: " + System.getProperty("java.version"));
+        System.out.println("[Main] OS: " + System.getProperty("os.name") + " " + System.getProperty("os.version"));
+        System.out.println("[Main] User home: " + System.getProperty("user.home"));
+        System.out.println("[Main] JavaFX version: " + System.getProperty("javafx.version", "unknown"));
+        
         // Load Chinese font for Android/iOS native builds
         // This is fast and doesn't block UI
         loadCustomFont();

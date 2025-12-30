@@ -92,18 +92,29 @@ public class LocalCacheService {
 
     private void initDatabase() {
         try {
+            System.out.println("[LocalCache] Starting database initialization...");
+            
             // 确保SQLite驱动已加载
             try {
                 Class.forName("org.sqlite.JDBC");
+                System.out.println("[LocalCache] SQLite JDBC driver loaded successfully");
             } catch (ClassNotFoundException e) {
-                // 驱动可能已通过其他方式加载，继续尝试
+                System.err.println("[LocalCache] SQLite JDBC driver not found: " + e.getMessage());
+                throw new RuntimeException("SQLite JDBC driver not available", e);
             }
 
-            // 确保目录存在
+            // 确保目录存在并可写
             if (dbPath.getParent() != null) {
                 Files.createDirectories(dbPath.getParent());
+                System.out.println("[LocalCache] Database directory created: " + dbPath.getParent());
+                
+                // 验证目录可写
+                if (!Files.isWritable(dbPath.getParent())) {
+                    throw new RuntimeException("Database directory is not writable: " + dbPath.getParent());
+                }
             }
 
+            System.out.println("[LocalCache] Connecting to database: " + dbPath);
             connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
 
             // 创建本地缓存表
@@ -135,9 +146,13 @@ public class LocalCacheService {
                 "INSERT OR IGNORE INTO sync_state (id, last_sync_id) VALUES (1, -1)");
 
             stmt.close();
+            System.out.println("[LocalCache] Database initialization completed successfully");
 
         } catch (SQLException | java.io.IOException e) {
-            System.err.println("Failed to initialize local cache database: " + e.getMessage());
+            System.err.println("[LocalCache] Database initialization failed!");
+            System.err.println("[LocalCache] Error: " + e.getMessage());
+            System.err.println("[LocalCache] Database path: " + dbPath);
+            e.printStackTrace();
             throw new RuntimeException("Database initialization failed", e);
         }
     }

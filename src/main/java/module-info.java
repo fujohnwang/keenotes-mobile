@@ -22,5 +22,11 @@ module com.keenotes.mobile {
 
     exports cn.keevol.keenotes.mobilefx;
 
-    opens cn.keevol.keenotes.mobilefx to javafx.fxml, javafx.graphics, javafx.base;
+    // 为JavaFX和第三方库开放反射访问
+    opens cn.keevol.keenotes.mobilefx to 
+        javafx.fxml, 
+        javafx.graphics, 
+        javafx.base,
+        okhttp3,
+        io.vertx.core;
 }

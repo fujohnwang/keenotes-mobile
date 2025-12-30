@@ -39,7 +39,21 @@ jobs:
             --type exe `
             --app-version 1.0.0 `
             --vendor "Keevol" `
-            --icon "src/main/resources/icons/icon-512.png" `
+            --icon "src/main/resources/icons/app-icon.ico" `
+            --dest dist
+
+      - name: Create Windows MSI Installer
+        shell: pwsh
+        run: |
+          jpackage `
+            --input target `
+            --name KeeNotes `
+            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar `
+            --main-class cn.keevol.keenotes.mobilefx.Main `
+            --type msi `
+            --app-version 1.0.0 `
+            --vendor "Keevol" `
+            --icon "src/main/resources/icons/app-icon.ico" `
             --dest dist
 
       - name: Upload Windows Installers
@@ -76,14 +90,27 @@ jobs:
             --type dmg \
             --app-version 1.0.0 \
             --vendor "Keevol" \
-            --icon "src/main/resources/icons/keenotes.icns" \
+            --icon "src/main/resources/icons/app-icon.png" \
             --dest dist
 
-      - name: Upload macOS DMG
+      - name: Create macOS PKG
+        run: |
+          jpackage \
+            --input target \
+            --name KeeNotes \
+            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
+            --main-class cn.keevol.keenotes.mobilefx.Main \
+            --type pkg \
+            --app-version 1.0.0 \
+            --vendor "Keevol" \
+            --icon "src/main/resources/icons/app-icon.png" \
+            --dest dist
+
+      - name: Upload macOS Packages
         uses: actions/upload-artifact@v4
         with:
-          name: macos-dmg
-          path: dist/*.dmg
+          name: macos-packages
+          path: dist/*
 
   build-linux:
     runs-on: ubuntu-latest
@@ -127,9 +154,28 @@ jobs:
             --type rpm \
             --app-version 1.0.0 \
             --vendor "Keevol" \
-            --icon "src/main/resources/icons/icon-512.png" \
+            --icon "src/main/resources/icons/app-icon.png" \
             --linux-shortcut \
             --dest dist
+
+      - name: Create Standalone JAR
+        run: |
+          mkdir -p dist
+          cp target/keenotes-mobile-1.0.0-SNAPSHOT.jar dist/keenotes-linux-standalone.jar
+
+      - name: Create AppImage (if available)
+        run: |
+          # Try to create AppImage if jpackage supports it
+          jpackage \
+            --input target \
+            --name keenotes \
+            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
+            --main-class cn.keevol.keenotes.mobilefx.Main \
+            --type app-image \
+            --app-version 1.0.0 \
+            --vendor "Keevol" \
+            --icon "src/main/resources/icons/app-icon.png" \
+            --dest dist || echo "AppImage creation not supported on this platform"
 
       - name: Upload Linux Packages
         uses: actions/upload-artifact@v4
