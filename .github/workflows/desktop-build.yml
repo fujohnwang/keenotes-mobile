@@ -76,10 +76,10 @@ jobs:
         include:
           - arch: mac
             name-suffix: Intel
-            runner: macos-13  # Intel macOS runner
+            runner: macos-15-intel  # Intel macOS runner - updated from macos-13
           - arch: mac-aarch64  
             name-suffix: AppleSilicon
-            runner: macos-latest  # Apple Silicon macOS runner
+            runner: macos-latest  # Apple Silicon macOS runner - updated from macos-latest
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
