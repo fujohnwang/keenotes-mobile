@@ -56,14 +56,30 @@ jobs:
             --icon "src/main/resources/icons/app-icon.ico" `
             --dest dist
 
+      - name: List Windows build artifacts
+        shell: bash
+        run: |
+          echo "Windows build artifacts:"
+          ls -la dist/ || echo "No dist directory found"
+          find dist -name "*.exe" -o -name "*.msi" 2>/dev/null || echo "No installers found"
+
       - name: Upload Windows Installers
         uses: actions/upload-artifact@v4
         with:
           name: windows-installers
           path: dist/*
+          if-no-files-found: error
 
   build-macos:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [mac, mac-aarch64]
+        include:
+          - arch: mac
+            name-suffix: Intel
+          - arch: mac-aarch64
+            name-suffix: AppleSilicon
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,17 +90,17 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Build JAR
-        run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=mac-aarch64"
+      - name: Build JAR for ${{ matrix.arch }}
+        run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=${{ matrix.arch }}"
 
       - name: List target directory
         run: ls -la target/
 
-      - name: Create macOS DMG
+      - name: Create macOS DMG for ${{ matrix.name-suffix }}
         run: |
           jpackage \
             --input target \
-            --name KeeNotes \
+            --name "KeeNotes-${{ matrix.name-suffix }}" \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
             --main-class cn.keevol.keenotes.mobilefx.Main \
             --type dmg \
@@ -93,11 +109,11 @@ jobs:
             --icon "src/main/resources/icons/app-icon.png" \
             --dest dist
 
-      - name: Create macOS PKG
+      - name: Create macOS PKG for ${{ matrix.name-suffix }}
         run: |
           jpackage \
             --input target \
-            --name KeeNotes \
+            --name "KeeNotes-${{ matrix.name-suffix }}" \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
             --main-class cn.keevol.keenotes.mobilefx.Main \
             --type pkg \
@@ -106,11 +122,18 @@ jobs:
             --icon "src/main/resources/icons/app-icon.png" \
             --dest dist
 
-      - name: Upload macOS Packages
+      - name: List macOS build artifacts for ${{ matrix.name-suffix }}
+        run: |
+          echo "macOS build artifacts for ${{ matrix.name-suffix }}:"
+          ls -la dist/ || echo "No dist directory found"
+          find dist -name "*.dmg" -o -name "*.pkg" 2>/dev/null || echo "No packages found"
+
+      - name: Upload macOS Packages (${{ matrix.name-suffix }})
         uses: actions/upload-artifact@v4
         with:
-          name: macos-packages
+          name: macos-packages-${{ matrix.arch }}
           path: dist/*
+          if-no-files-found: error
 
   build-linux:
     runs-on: ubuntu-latest
@@ -177,8 +200,15 @@ jobs:
             --icon "src/main/resources/icons/app-icon.png" \
             --dest dist || echo "AppImage creation not supported on this platform"
 
+      - name: List Linux build artifacts
+        run: |
+          echo "Linux build artifacts:"
+          ls -la dist/ || echo "No dist directory found"
+          find dist -name "*.deb" -o -name "*.rpm" -o -name "*.jar" 2>/dev/null || echo "No packages found"
+
       - name: Upload Linux Packages
         uses: actions/upload-artifact@v4
         with:
           name: linux-packages
           path: dist/*
+          if-no-files-found: error

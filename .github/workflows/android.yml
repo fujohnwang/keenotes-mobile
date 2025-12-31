@@ -37,6 +37,7 @@ jobs:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         run: |
           echo "Using Android SDK at: $ANDROID_SDK_ROOT"
+          echo "Building with enhanced Android debugging..."
           
           # 关键技巧：
           # 虽然我们用 Java 21 运行 Maven，但我们强制 Gradle 使用 Java 17 (如果系统里有的话) 
@@ -45,6 +46,8 @@ jobs:
           
           mvn -Pandroid clean gluonfx:build gluonfx:package \
             -Dgluonfx.target.android.sdk=$ANDROID_SDK_ROOT \
+            -Dgluonfx.verbose=true \
+            -X \
             -e
 
       # 4. 容错打印日志
@@ -60,9 +63,23 @@ jobs:
             echo "Please check the 'Build APK' step logs directly."
           fi
 
-      # 5. 上传
+      # 5. 列出构建产物
+      - name: List build artifacts
+        run: |
+          echo "Listing target directory structure..."
+          find target -name "*.apk" -o -name "*.aab" 2>/dev/null || echo "No APK/AAB files found"
+          echo "Full target/gluonfx structure:"
+          ls -la target/gluonfx/ 2>/dev/null || echo "target/gluonfx not found"
+          if [ -d "target/gluonfx" ]; then
+            find target/gluonfx -type f -name "*.apk" -o -name "*.aab"
+          fi
+
+      # 6. 上传APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: keenotes-android-apk
-          path: target/gluonfx/aarch64-android/**/*.apk
+          path: |
+            target/gluonfx/**/*.apk
+            target/gluonfx/**/*.aab
+          if-no-files-found: warn
