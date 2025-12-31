@@ -64,6 +64,28 @@ public class LocalCacheService {
     }
 
     /**
+     * 构建JDBC URL，支持Android特定配置
+     */
+    private String buildJdbcUrl() {
+        // 基础URL
+        String baseUrl = "jdbc:sqlite:" + dbPath;
+        
+        // 检查是否是Android/移动平台
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        boolean isMobile = osName.contains("android") || osName.contains("linux");
+        
+        if (isMobile) {
+            // Android特定配置：禁用WAL模式，使用更保守的设置
+            System.out.println("[LocalCache] Using Android-specific SQLite configuration");
+            return baseUrl + "?journal_mode=DELETE&synchronous=FULL&cache_size=2000&timeout=30000";
+        } else {
+            // 桌面环境：使用更激进的配置以提高性能
+            System.out.println("[LocalCache] Using desktop SQLite configuration");
+            return baseUrl + "?journal_mode=WAL&synchronous=NORMAL&cache_size=10000&timeout=30000";
+        }
+    }
+
+    /**
      * 确保数据库已初始化（懒加载）
      * 这个方法会阻塞直到初始化完成
      */
@@ -80,34 +102,111 @@ public class LocalCacheService {
     }
 
     private Path resolveDbPath() {
+        System.out.println("[LocalCache] Resolving database path...");
+        System.out.println("[LocalCache] OS: " + System.getProperty("os.name"));
+        System.out.println("[LocalCache] Java version: " + System.getProperty("java.version"));
+        System.out.println("[LocalCache] User home: " + System.getProperty("user.home"));
+        System.out.println("[LocalCache] Temp dir: " + System.getProperty("java.io.tmpdir"));
+        
+        // 尝试多个路径候选
+        List<Path> candidatePaths = new ArrayList<>();
+        
+        // 1. 尝试Gluon Attach StorageService (Android/iOS)
         try {
-            System.out.println("[LocalCache] Resolving database path...");
-            
-            // 尝试使用Gluon Attach StorageService (Android/iOS)
             Optional<File> privateStorage = StorageService.create()
                     .flatMap(StorageService::getPrivateStorage);
             
             if (privateStorage.isPresent()) {
-                Path dbPath = privateStorage.get().toPath().resolve(DB_NAME);
-                System.out.println("[LocalCache] Using Gluon private storage: " + dbPath);
-                return dbPath;
-            } else {
-                System.out.println("[LocalCache] Gluon private storage not available, using fallback");
+                Path path = privateStorage.get().toPath().resolve(DB_NAME);
+                System.out.println("[LocalCache] Candidate 1 (Gluon private): " + path);
+                candidatePaths.add(path);
             }
         } catch (Exception e) {
-            System.err.println("[LocalCache] Error accessing Gluon storage: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("[LocalCache] Gluon storage error: " + e.getMessage());
         }
         
-        // 桌面环境或Gluon存储不可用时的回退方案
-        File userHomeDir = new File(System.getProperty("user.home"), ".keenotes");
-        if (!userHomeDir.exists()) {
-            boolean created = userHomeDir.mkdirs();
-            System.out.println("[LocalCache] Created fallback directory: " + created + " at " + userHomeDir);
+        // 2. 尝试临时目录 (Android应用缓存目录)
+        try {
+            String tempDir = System.getProperty("java.io.tmpdir");
+            if (tempDir != null && !tempDir.isEmpty()) {
+                Path path = Path.of(tempDir).resolve(DB_NAME);
+                System.out.println("[LocalCache] Candidate 2 (temp dir): " + path);
+                candidatePaths.add(path);
+            }
+        } catch (Exception e) {
+            System.err.println("[LocalCache] Temp dir error: " + e.getMessage());
         }
-        Path fallbackPath = userHomeDir.toPath().resolve(DB_NAME);
-        System.out.println("[LocalCache] Using fallback storage: " + fallbackPath);
-        return fallbackPath;
+        
+        // 3. 尝试用户主目录
+        try {
+            String userHome = System.getProperty("user.home");
+            if (userHome != null && !userHome.isEmpty()) {
+                Path path = Path.of(userHome, ".keenotes", DB_NAME);
+                System.out.println("[LocalCache] Candidate 3 (user home): " + path);
+                candidatePaths.add(path);
+            }
+        } catch (Exception e) {
+            System.err.println("[LocalCache] User home error: " + e.getMessage());
+        }
+        
+        // 4. 尝试当前工作目录
+        try {
+            String currentDir = System.getProperty("user.dir");
+            if (currentDir != null && !currentDir.isEmpty()) {
+                Path path = Path.of(currentDir, ".keenotes", DB_NAME);
+                System.out.println("[LocalCache] Candidate 4 (current dir): " + path);
+                candidatePaths.add(path);
+            }
+        } catch (Exception e) {
+            System.err.println("[LocalCache] Current dir error: " + e.getMessage());
+        }
+        
+        // 选择第一个可用的路径
+        for (Path path : candidatePaths) {
+            try {
+                // 尝试创建目录
+                if (path.getParent() != null) {
+                    Files.createDirectories(path.getParent());
+                    System.out.println("[LocalCache] Created directory: " + path.getParent());
+                }
+                
+                // 验证目录可写
+                if (path.getParent() != null && Files.isWritable(path.getParent())) {
+                    System.out.println("[LocalCache] Using database path: " + path);
+                    return path;
+                } else {
+                    System.out.println("[LocalCache] Path not writable: " + path);
+                }
+            } catch (Exception e) {
+                System.out.println("[LocalCache] Failed to use path " + path + ": " + e.getMessage());
+            }
+        }
+        
+        // 如果所有路径都失败，使用最后一个候选路径作为回退
+        if (!candidatePaths.isEmpty()) {
+            Path fallbackPath = candidatePaths.get(candidatePaths.size() - 1);
+            System.out.println("[LocalCache] Using fallback path: " + fallbackPath);
+            try {
+                if (fallbackPath.getParent() != null) {
+                    Files.createDirectories(fallbackPath.getParent());
+                }
+            } catch (Exception e) {
+                System.err.println("[LocalCache] Failed to create fallback directory: " + e.getMessage());
+            }
+            return fallbackPath;
+        }
+        
+        // 最后的回退方案
+        Path lastResort = Path.of(System.getProperty("user.home", "/tmp"), ".keenotes", DB_NAME);
+        System.out.println("[LocalCache] Using last resort path: " + lastResort);
+        try {
+            if (lastResort.getParent() != null) {
+                Files.createDirectories(lastResort.getParent());
+            }
+        } catch (Exception e) {
+            System.err.println("[LocalCache] Failed to create last resort directory: " + e.getMessage());
+        }
+        return lastResort;
     }
 
     private void initDatabase() {
@@ -147,8 +246,8 @@ public class LocalCacheService {
 
             System.out.println("[LocalCache] Connecting to database: " + dbPath);
             
-            // Android特定：添加连接参数以提高兼容性
-            String jdbcUrl = "jdbc:sqlite:" + dbPath + "?journal_mode=WAL&synchronous=NORMAL&cache_size=10000";
+            // 构建JDBC URL，支持Android特定配置
+            String jdbcUrl = buildJdbcUrl();
             System.out.println("[LocalCache] JDBC URL: " + jdbcUrl);
             
             connection = DriverManager.getConnection(jdbcUrl);
