@@ -48,6 +48,9 @@
             <list>fonts/MiSans-Regular.ttf</list>
             <list>fonts/.*\\.ttf</list>
             <list>icons/app-icon.png</list>
+            <list>icons/app-icon.ico</list>
+            <list>icons/app-icon-192.png</list>
+            <list>icons/app-icon-apple.png</list>
             <list>META-INF/.*</list>
           </resourcesList>
           <reflectionList>
@@ -182,8 +185,11 @@
   </pluginRepositories>
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
+    <javafx.platform>mac</javafx.platform>
     <attach.version>4.0.21</attach.version>
+    <maven.compiler.target>21</maven.compiler.target>
     <main.class>cn.keevol.keenotes.mobilefx.Main</main.class>
+    <maven.compiler.source>21</maven.compiler.source>
     <gluonfx.plugin.version>1.0.25</gluonfx.plugin.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javafx.version>23.0.1</javafx.version>

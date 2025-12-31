@@ -20,6 +20,9 @@
         <gluonfx.plugin.version>1.0.25</gluonfx.plugin.version>
         <attach.version>4.0.21</attach.version>
         <main.class>cn.keevol.keenotes.mobilefx.Main</main.class>
+        <!-- 支持更高版本的 Java -->
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
     </properties>
 
     <dependencies>
