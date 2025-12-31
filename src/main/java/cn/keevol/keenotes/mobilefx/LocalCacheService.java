@@ -80,19 +80,43 @@ public class LocalCacheService {
     }
 
     private Path resolveDbPath() {
-        return StorageService.create()
-                .flatMap(StorageService::getPrivateStorage)
-                .map(file -> file.toPath().resolve(DB_NAME))
-                .orElseGet(() -> {
-                    File userHomeDir = new File(System.getProperty("user.home"), ".keenotes");
-                    userHomeDir.mkdirs();
-                    return userHomeDir.toPath().resolve(DB_NAME);
-                });
+        try {
+            System.out.println("[LocalCache] Resolving database path...");
+            
+            // 尝试使用Gluon Attach StorageService (Android/iOS)
+            Optional<File> privateStorage = StorageService.create()
+                    .flatMap(StorageService::getPrivateStorage);
+            
+            if (privateStorage.isPresent()) {
+                Path dbPath = privateStorage.get().toPath().resolve(DB_NAME);
+                System.out.println("[LocalCache] Using Gluon private storage: " + dbPath);
+                return dbPath;
+            } else {
+                System.out.println("[LocalCache] Gluon private storage not available, using fallback");
+            }
+        } catch (Exception e) {
+            System.err.println("[LocalCache] Error accessing Gluon storage: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        // 桌面环境或Gluon存储不可用时的回退方案
+        File userHomeDir = new File(System.getProperty("user.home"), ".keenotes");
+        if (!userHomeDir.exists()) {
+            boolean created = userHomeDir.mkdirs();
+            System.out.println("[LocalCache] Created fallback directory: " + created + " at " + userHomeDir);
+        }
+        Path fallbackPath = userHomeDir.toPath().resolve(DB_NAME);
+        System.out.println("[LocalCache] Using fallback storage: " + fallbackPath);
+        return fallbackPath;
     }
 
     private void initDatabase() {
         try {
             System.out.println("[LocalCache] Starting database initialization...");
+            System.out.println("[LocalCache] Database path: " + dbPath);
+            System.out.println("[LocalCache] Java version: " + System.getProperty("java.version"));
+            System.out.println("[LocalCache] OS name: " + System.getProperty("os.name"));
+            System.out.println("[LocalCache] User home: " + System.getProperty("user.home"));
             
             // 确保SQLite驱动已加载
             try {
@@ -105,20 +129,44 @@ public class LocalCacheService {
 
             // 确保目录存在并可写
             if (dbPath.getParent() != null) {
-                Files.createDirectories(dbPath.getParent());
-                System.out.println("[LocalCache] Database directory created: " + dbPath.getParent());
-                
-                // 验证目录可写
-                if (!Files.isWritable(dbPath.getParent())) {
-                    throw new RuntimeException("Database directory is not writable: " + dbPath.getParent());
+                try {
+                    Files.createDirectories(dbPath.getParent());
+                    System.out.println("[LocalCache] Database directory created: " + dbPath.getParent());
+                    
+                    // 验证目录可写
+                    if (!Files.isWritable(dbPath.getParent())) {
+                        System.err.println("[LocalCache] Database directory is not writable: " + dbPath.getParent());
+                        throw new RuntimeException("Database directory is not writable: " + dbPath.getParent());
+                    }
+                    System.out.println("[LocalCache] Database directory is writable");
+                } catch (Exception e) {
+                    System.err.println("[LocalCache] Failed to create database directory: " + e.getMessage());
+                    throw new RuntimeException("Failed to create database directory", e);
                 }
             }
 
             System.out.println("[LocalCache] Connecting to database: " + dbPath);
-            connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+            
+            // Android特定：添加连接参数以提高兼容性
+            String jdbcUrl = "jdbc:sqlite:" + dbPath + "?journal_mode=WAL&synchronous=NORMAL&cache_size=10000";
+            System.out.println("[LocalCache] JDBC URL: " + jdbcUrl);
+            
+            connection = DriverManager.getConnection(jdbcUrl);
+            
+            // 验证连接
+            if (connection == null || connection.isClosed()) {
+                throw new SQLException("Failed to establish database connection");
+            }
+            System.out.println("[LocalCache] Database connection established successfully");
 
             // 创建本地缓存表
             Statement stmt = connection.createStatement();
+            
+            // Android特定：设置更宽松的超时
+            stmt.setQueryTimeout(30);
+            
+            System.out.println("[LocalCache] Creating tables...");
+            
             stmt.executeUpdate(
                 "CREATE TABLE IF NOT EXISTS notes_cache (" +
                 "  id INTEGER PRIMARY KEY, " +
@@ -128,10 +176,12 @@ public class LocalCacheService {
                 "  encrypted_content TEXT, " +  // 加密的原始内容（可选）
                 "  is_dirty INTEGER DEFAULT 0" +
                 ")");
+            System.out.println("[LocalCache] notes_cache table created");
 
             // 创建索引
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cache_created_at ON notes_cache(created_at)");
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cache_content ON notes_cache(content)");
+            System.out.println("[LocalCache] Indexes created");
 
             // 创建同步状态表
             stmt.executeUpdate(
@@ -140,20 +190,26 @@ public class LocalCacheService {
                 "  last_sync_id INTEGER DEFAULT -1, " +
                 "  last_sync_time DATETIME" +
                 ")");
+            System.out.println("[LocalCache] sync_state table created");
 
             // 初始化同步状态（如果不存在）
             stmt.executeUpdate(
                 "INSERT OR IGNORE INTO sync_state (id, last_sync_id) VALUES (1, -1)");
+            System.out.println("[LocalCache] sync_state initialized");
 
             stmt.close();
             System.out.println("[LocalCache] Database initialization completed successfully");
 
-        } catch (SQLException | java.io.IOException e) {
+        } catch (SQLException e) {
             System.err.println("[LocalCache] Database initialization failed!");
             System.err.println("[LocalCache] Error: " + e.getMessage());
             System.err.println("[LocalCache] Database path: " + dbPath);
             e.printStackTrace();
             throw new RuntimeException("Database initialization failed", e);
+        } catch (Exception e) {
+            System.err.println("[LocalCache] Unexpected error during database initialization: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Unexpected database initialization error", e);
         }
     }
 
