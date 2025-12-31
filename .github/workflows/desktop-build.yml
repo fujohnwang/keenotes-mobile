@@ -106,7 +106,7 @@ jobs:
             --type dmg \
             --app-version 1.0.0 \
             --vendor "Keevol" \
-            --icon "src/main/resources/icons/app-icon.png" \
+            --icon "src/main/resources/icons/keenotes.icns" \
             --dest dist
 
       - name: Create macOS PKG for ${{ matrix.name-suffix }}
@@ -119,7 +119,7 @@ jobs:
             --type pkg \
             --app-version 1.0.0 \
             --vendor "Keevol" \
-            --icon "src/main/resources/icons/app-icon.png" \
+            --icon "src/main/resources/icons/keenotes.icns" \
             --dest dist
 
       - name: List macOS build artifacts for ${{ matrix.name-suffix }}
@@ -177,7 +177,7 @@ jobs:
             --type rpm \
             --app-version 1.0.0 \
             --vendor "Keevol" \
-            --icon "src/main/resources/icons/app-icon.png" \
+            --icon "src/main/resources/icons/icon-512.png" \
             --linux-shortcut \
             --dest dist
 
@@ -197,7 +197,7 @@ jobs:
             --type app-image \
             --app-version 1.0.0 \
             --vendor "Keevol" \
-            --icon "src/main/resources/icons/app-icon.png" \
+            --icon "src/main/resources/icons/icon-512.png" \
             --dest dist || echo "AppImage creation not supported on this platform"
 
       - name: List Linux build artifacts
