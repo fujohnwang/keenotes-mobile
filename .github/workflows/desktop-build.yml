@@ -31,6 +31,20 @@ jobs:
       - name: Create Windows EXE Installer
         shell: pwsh
         run: |
+          # Create module path from Maven dependencies
+          $MODULE_PATH = ""
+          $JAVAFX_VERSION = "23.0.1"
+          $JAVAFX_PLATFORM = "win"
+          
+          $modules = @("javafx-base", "javafx-graphics", "javafx-controls", "javafx-fxml")
+          foreach ($module in $modules) {
+            $JAR_PATH = "$env:USERPROFILE\.m2\repository\org\openjfx\$module\$JAVAFX_VERSION\$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+            if (Test-Path $JAR_PATH) {
+              if ($MODULE_PATH -ne "") { $MODULE_PATH += ";" }
+              $MODULE_PATH += $JAR_PATH
+            }
+          }
+          
           jpackage `
             --input target `
             --name KeeNotes `
@@ -40,11 +54,29 @@ jobs:
             --app-version 1.0.0 `
             --vendor "Keevol" `
             --icon "src/main/resources/icons/app-icon.ico" `
+            --module-path "$MODULE_PATH" `
+            --add-modules "javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql" `
+            --java-options "--enable-native-access=ALL-UNNAMED" `
+            --java-options "-Xmx512m" `
             --dest dist
 
       - name: Create Windows MSI Installer
         shell: pwsh
         run: |
+          # Create module path from Maven dependencies
+          $MODULE_PATH = ""
+          $JAVAFX_VERSION = "23.0.1"
+          $JAVAFX_PLATFORM = "win"
+          
+          $modules = @("javafx-base", "javafx-graphics", "javafx-controls", "javafx-fxml")
+          foreach ($module in $modules) {
+            $JAR_PATH = "$env:USERPROFILE\.m2\repository\org\openjfx\$module\$JAVAFX_VERSION\$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+            if (Test-Path $JAR_PATH) {
+              if ($MODULE_PATH -ne "") { $MODULE_PATH += ";" }
+              $MODULE_PATH += $JAR_PATH
+            }
+          }
+          
           jpackage `
             --input target `
             --name KeeNotes `
@@ -54,6 +86,10 @@ jobs:
             --app-version 1.0.0 `
             --vendor "Keevol" `
             --icon "src/main/resources/icons/app-icon.ico" `
+            --module-path "$MODULE_PATH" `
+            --add-modules "javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql" `
+            --java-options "--enable-native-access=ALL-UNNAMED" `
+            --java-options "-Xmx512m" `
             --dest dist
 
       - name: List Windows build artifacts
@@ -110,6 +146,27 @@ jobs:
 
       - name: Create macOS DMG for ${{ matrix.name-suffix }}
         run: |
+          # Extract JavaFX modules for jpackage
+          mkdir -p javafx-jmods
+          
+          # Download JavaFX jmods for the current architecture
+          JAVAFX_VERSION=23.0.1
+          if [ "${{ matrix.arch }}" = "mac-aarch64" ]; then
+            JAVAFX_PLATFORM="mac-aarch64"
+          else
+            JAVAFX_PLATFORM="mac"
+          fi
+          
+          # Create module path from Maven dependencies
+          MODULE_PATH=""
+          for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
+            JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+            if [ -f "$JAR_PATH" ]; then
+              MODULE_PATH="$MODULE_PATH:$JAR_PATH"
+            fi
+          done
+          MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
+          
           jpackage \
             --input target \
             --name "KeeNotes-${{ matrix.name-suffix }}" \
@@ -121,13 +178,32 @@ jobs:
             --icon "src/main/resources/icons/keenotes.icns" \
             --mac-package-identifier "cn.keevol.keenotes" \
             --mac-package-name "KeeNotes" \
-            --java-options "--enable-native-access=javafx.graphics,ALL-UNNAMED" \
+            --module-path "$MODULE_PATH" \
+            --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
+            --java-options "--enable-native-access=ALL-UNNAMED" \
             --java-options "-Xmx512m" \
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
 
       - name: Create macOS PKG for ${{ matrix.name-suffix }}
         run: |
+          # Create module path from Maven dependencies
+          MODULE_PATH=""
+          JAVAFX_VERSION=23.0.1
+          if [ "${{ matrix.arch }}" = "mac-aarch64" ]; then
+            JAVAFX_PLATFORM="mac-aarch64"
+          else
+            JAVAFX_PLATFORM="mac"
+          fi
+          
+          for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
+            JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+            if [ -f "$JAR_PATH" ]; then
+              MODULE_PATH="$MODULE_PATH:$JAR_PATH"
+            fi
+          done
+          MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
+          
           jpackage \
             --input target \
             --name "KeeNotes-${{ matrix.name-suffix }}" \
@@ -139,7 +215,9 @@ jobs:
             --icon "src/main/resources/icons/keenotes.icns" \
             --mac-package-identifier "cn.keevol.keenotes" \
             --mac-package-name "KeeNotes" \
-            --java-options "--enable-native-access=javafx.graphics,ALL-UNNAMED" \
+            --module-path "$MODULE_PATH" \
+            --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
+            --java-options "--enable-native-access=ALL-UNNAMED" \
             --java-options "-Xmx512m" \
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
@@ -185,6 +263,19 @@ jobs:
 
       - name: Create DEB Package
         run: |
+          # Create module path from Maven dependencies
+          MODULE_PATH=""
+          JAVAFX_VERSION=23.0.1
+          JAVAFX_PLATFORM="linux"
+          
+          for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
+            JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+            if [ -f "$JAR_PATH" ]; then
+              MODULE_PATH="$MODULE_PATH:$JAR_PATH"
+            fi
+          done
+          MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
+          
           jpackage \
             --input target \
             --name keenotes \
@@ -194,11 +285,28 @@ jobs:
             --app-version 1.0.0 \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/icon-512.png" \
+            --module-path "$MODULE_PATH" \
+            --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
+            --java-options "--enable-native-access=ALL-UNNAMED" \
+            --java-options "-Xmx512m" \
             --linux-shortcut \
             --dest dist
 
       - name: Create RPM Package
         run: |
+          # Create module path from Maven dependencies
+          MODULE_PATH=""
+          JAVAFX_VERSION=23.0.1
+          JAVAFX_PLATFORM="linux"
+          
+          for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
+            JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+            if [ -f "$JAR_PATH" ]; then
+              MODULE_PATH="$MODULE_PATH:$JAR_PATH"
+            fi
+          done
+          MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
+          
           jpackage \
             --input target \
             --name keenotes \
@@ -208,6 +316,10 @@ jobs:
             --app-version 1.0.0 \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/icon-512.png" \
+            --module-path "$MODULE_PATH" \
+            --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
+            --java-options "--enable-native-access=ALL-UNNAMED" \
+            --java-options "-Xmx512m" \
             --linux-shortcut \
             --dest dist
 
@@ -218,6 +330,19 @@ jobs:
 
       - name: Create AppImage (if available)
         run: |
+          # Create module path from Maven dependencies
+          MODULE_PATH=""
+          JAVAFX_VERSION=23.0.1
+          JAVAFX_PLATFORM="linux"
+          
+          for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
+            JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+            if [ -f "$JAR_PATH" ]; then
+              MODULE_PATH="$MODULE_PATH:$JAR_PATH"
+            fi
+          done
+          MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
+          
           # Try to create AppImage if jpackage supports it
           jpackage \
             --input target \
@@ -228,6 +353,10 @@ jobs:
             --app-version 1.0.0 \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/icon-512.png" \
+            --module-path "$MODULE_PATH" \
+            --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
+            --java-options "--enable-native-access=ALL-UNNAMED" \
+            --java-options "-Xmx512m" \
             --dest dist || echo "AppImage creation not supported on this platform"
 
       - name: List Linux build artifacts

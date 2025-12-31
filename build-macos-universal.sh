@@ -21,6 +21,25 @@ jar tf target/keenotes-mobile-1.0.0-SNAPSHOT.jar | grep -E '\.(dylib|jnilib)$' |
 
 # Create Intel package
 mkdir -p dist/intel
+
+# Create module path from Maven dependencies
+MODULE_PATH=""
+JAVAFX_VERSION=23.0.1
+JAVAFX_PLATFORM="mac"
+
+for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
+    JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+    if [ -f "$JAR_PATH" ]; then
+        MODULE_PATH="$MODULE_PATH:$JAR_PATH"
+        echo "Found JavaFX module: $module"
+    else
+        echo "Missing JavaFX module: $module at $JAR_PATH"
+    fi
+done
+MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
+
+echo "JavaFX Module Path: $MODULE_PATH"
+
 jpackage \
     --input target \
     --name "KeeNotes-Intel" \
@@ -32,7 +51,9 @@ jpackage \
     --icon "src/main/resources/icons/keenotes.icns" \
     --mac-package-identifier "cn.keevol.keenotes" \
     --mac-package-name "KeeNotes" \
-    --java-options "--enable-native-access=javafx.graphics,ALL-UNNAMED" \
+    --module-path "$MODULE_PATH" \
+    --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
+    --java-options "--enable-native-access=ALL-UNNAMED" \
     --java-options "-Xmx512m" \
     --java-options "-Xdock:name=KeeNotes" \
     --dest dist/intel
@@ -50,6 +71,25 @@ jar tf target/keenotes-mobile-1.0.0-SNAPSHOT.jar | grep -E '\.(dylib|jnilib)$' |
 
 # Create Apple Silicon package
 mkdir -p dist/apple-silicon
+
+# Create module path from Maven dependencies
+MODULE_PATH=""
+JAVAFX_VERSION=23.0.1
+JAVAFX_PLATFORM="mac-aarch64"
+
+for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
+    JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
+    if [ -f "$JAR_PATH" ]; then
+        MODULE_PATH="$MODULE_PATH:$JAR_PATH"
+        echo "Found JavaFX module: $module"
+    else
+        echo "Missing JavaFX module: $module at $JAR_PATH"
+    fi
+done
+MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
+
+echo "JavaFX Module Path: $MODULE_PATH"
+
 jpackage \
     --input target \
     --name "KeeNotes-AppleSilicon" \
@@ -61,7 +101,9 @@ jpackage \
     --icon "src/main/resources/icons/keenotes.icns" \
     --mac-package-identifier "cn.keevol.keenotes" \
     --mac-package-name "KeeNotes" \
-    --java-options "--enable-native-access=javafx.graphics,ALL-UNNAMED" \
+    --module-path "$MODULE_PATH" \
+    --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
+    --java-options "--enable-native-access=ALL-UNNAMED" \
     --java-options "-Xmx512m" \
     --java-options "-Xdock:name=KeeNotes" \
     --dest dist/apple-silicon
