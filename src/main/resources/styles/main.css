@@ -593,3 +593,15 @@
 .review-period-select:showing .arrow {
     -fx-background-color: -fx-primary;
 }
+/* Error display styles for initialization failures */
+.error-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-error;
+}
+
+.error-detail {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-wrap-text: true;
+}
