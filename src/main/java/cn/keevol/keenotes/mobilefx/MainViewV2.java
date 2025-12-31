@@ -269,54 +269,92 @@ public class MainViewV2 extends BorderPane {
 
         // 在后台线程执行搜索
         new Thread(() -> {
-            // 检查缓存是否就绪
-            if (!isLocalCacheReady()) {
+            try {
+                // 增加调试信息
+                ServiceManager serviceManager = ServiceManager.getInstance();
+                SettingsService settings = SettingsService.getInstance();
+                
+                System.out.println("[DEBUG search] Query: " + query);
+                System.out.println("[DEBUG search] ServiceManager: " + (serviceManager != null ? "OK" : "NULL"));
+                System.out.println("[DEBUG search] Settings configured: " + settings.isConfigured());
+                System.out.println("[DEBUG search] LocalCache initialized: " + serviceManager.isLocalCacheInitialized());
+                
+                LocalCacheService cache = getLocalCacheService();
+                System.out.println("[DEBUG search] LocalCacheService: " + (cache != null ? "OK" : "NULL"));
+                if (cache != null) {
+                    System.out.println("[DEBUG search] Cache isInitialized: " + cache.isInitialized());
+                }
+                
+                // 检查缓存是否就绪
+                if (!isLocalCacheReady()) {
+                    Platform.runLater(() -> {
+                        searchResultsContainer.getChildren().clear();
+                        // 检查是否已配置
+                        if (!settings.isConfigured()) {
+                            // 未配置
+                            Label notConfigured = new Label("Please configure server settings first in Settings.");
+                            notConfigured.getStyleClass().add("no-results");
+                            searchResultsContainer.getChildren().add(notConfigured);
+                        } else if (serviceManager.isLocalCacheInitialized()) {
+                            // 已配置且缓存已初始化，但为空
+                            Label noResults = new Label("No notes found. Try saving some notes first!");
+                            noResults.getStyleClass().add("no-results");
+                            searchResultsContainer.getChildren().add(noResults);
+                        } else {
+                            // 缓存正在初始化中 - 在Android上可能需要更长时间
+                            Label initializing = new Label("Cache is initializing. Please wait a moment...");
+                            initializing.getStyleClass().add("search-loading");
+                            searchResultsContainer.getChildren().add(initializing);
+                            
+                            // Android特定：延迟重试
+                            Platform.runLater(() -> {
+                                new Thread(() -> {
+                                    try {
+                                        Thread.sleep(2000); // 等待2秒
+                                        Platform.runLater(() -> performSearch()); // 重试
+                                    } catch (InterruptedException e) {
+                                        Thread.currentThread().interrupt();
+                                    }
+                                }).start();
+                            });
+                        }
+                    });
+                    return;
+                }
+
+                // 缓存就绪，执行搜索
+                List<LocalCacheService.NoteData> results = cache.searchNotes(query);
+
                 Platform.runLater(() -> {
                     searchResultsContainer.getChildren().clear();
-                    // 检查是否已配置
-                    SettingsService settings = SettingsService.getInstance();
-                    if (!settings.isConfigured()) {
-                        // 未配置
-                        Label notConfigured = new Label("Please configure server settings first in Settings.");
-                        notConfigured.getStyleClass().add("no-results");
-                        searchResultsContainer.getChildren().add(notConfigured);
-                    } else if (ServiceManager.getInstance().isLocalCacheInitialized()) {
-                        // 已配置且缓存已初始化，但为空
-                        Label noResults = new Label("No notes found. Try saving some notes first!");
+
+                    System.out.println("[DEBUG search] results.size=" + results.size());
+
+                    if (results.isEmpty()) {
+                        Label noResults = new Label("No results found for \"" + query + "\"");
                         noResults.getStyleClass().add("no-results");
                         searchResultsContainer.getChildren().add(noResults);
                     } else {
-                        // 缓存正在初始化中
-                        Label initializing = new Label("Cache is initializing. Please wait a moment...");
-                        initializing.getStyleClass().add("search-loading");
-                        searchResultsContainer.getChildren().add(initializing);
+                        Label countLabel = new Label(results.size() + " result(s) found");
+                        countLabel.getStyleClass().add("search-count");
+                        searchResultsContainer.getChildren().add(countLabel);
+
+                        for (LocalCacheService.NoteData result : results) {
+                            VBox card = createResultCard(result);
+                            searchResultsContainer.getChildren().add(card);
+                        }
                     }
                 });
-                return;
+            } catch (Exception e) {
+                System.err.println("[ERROR search] Exception: " + e.getMessage());
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    searchResultsContainer.getChildren().clear();
+                    Label errorLabel = new Label("Error searching notes: " + e.getMessage());
+                    errorLabel.getStyleClass().add("no-results");
+                    searchResultsContainer.getChildren().add(errorLabel);
+                });
             }
-
-            // 缓存就绪，执行搜索
-            LocalCacheService cache = getLocalCacheService();
-            List<LocalCacheService.NoteData> results = cache.searchNotes(query);
-
-            Platform.runLater(() -> {
-                searchResultsContainer.getChildren().clear();
-
-                if (results.isEmpty()) {
-                    Label noResults = new Label("No results found for \"" + query + "\"");
-                    noResults.getStyleClass().add("no-results");
-                    searchResultsContainer.getChildren().add(noResults);
-                } else {
-                    Label countLabel = new Label(results.size() + " result(s) found");
-                    countLabel.getStyleClass().add("search-count");
-                    searchResultsContainer.getChildren().add(countLabel);
-
-                    for (LocalCacheService.NoteData result : results) {
-                        VBox card = createResultCard(result);
-                        searchResultsContainer.getChildren().add(card);
-                    }
-                }
-            });
         }).start();
     }
 
@@ -365,56 +403,91 @@ public class MainViewV2 extends BorderPane {
 
         // 在后台线程执行回顾加载
         new Thread(() -> {
-            // 检查缓存是否就绪
-            if (!isLocalCacheReady()) {
+            try {
+                // 增加调试信息
+                ServiceManager serviceManager = ServiceManager.getInstance();
+                SettingsService settings = SettingsService.getInstance();
+                
+                System.out.println("[DEBUG] ServiceManager: " + (serviceManager != null ? "OK" : "NULL"));
+                System.out.println("[DEBUG] Settings configured: " + settings.isConfigured());
+                System.out.println("[DEBUG] LocalCache initialized: " + serviceManager.isLocalCacheInitialized());
+                
+                LocalCacheService cache = getLocalCacheService();
+                System.out.println("[DEBUG] LocalCacheService: " + (cache != null ? "OK" : "NULL"));
+                if (cache != null) {
+                    System.out.println("[DEBUG] Cache isInitialized: " + cache.isInitialized());
+                }
+                
+                // 检查缓存是否就绪
+                if (!isLocalCacheReady()) {
+                    Platform.runLater(() -> {
+                        reviewResultsContainer.getChildren().clear();
+                        // 检查是否已配置
+                        if (!settings.isConfigured()) {
+                            // 未配置
+                            Label notConfigured = new Label("Please configure server settings first in Settings.");
+                            notConfigured.getStyleClass().add("no-results");
+                            reviewResultsContainer.getChildren().add(notConfigured);
+                        } else if (serviceManager.isLocalCacheInitialized()) {
+                            // 已配置且缓存已初始化，但为空
+                            Label noResults = new Label("No notes found. Try saving some notes first!");
+                            noResults.getStyleClass().add("no-results");
+                            reviewResultsContainer.getChildren().add(noResults);
+                        } else {
+                            // 缓存正在初始化中 - 在Android上可能需要更长时间
+                            Label initializing = new Label("Cache is initializing. Please wait a moment...");
+                            initializing.getStyleClass().add("search-loading");
+                            reviewResultsContainer.getChildren().add(initializing);
+                            
+                            // Android特定：延迟重试
+                            Platform.runLater(() -> {
+                                new Thread(() -> {
+                                    try {
+                                        Thread.sleep(2000); // 等待2秒
+                                        Platform.runLater(() -> loadReviewNotes(period)); // 重试
+                                    } catch (InterruptedException e) {
+                                        Thread.currentThread().interrupt();
+                                    }
+                                }).start();
+                            });
+                        }
+                    });
+                    return;
+                }
+
+                // 缓存就绪，执行回顾
+                List<LocalCacheService.NoteData> results = cache.getNotesForReview(days);
+
                 Platform.runLater(() -> {
                     reviewResultsContainer.getChildren().clear();
-                    // 检查是否已配置
-                    SettingsService settings = SettingsService.getInstance();
-                    if (!settings.isConfigured()) {
-                        // 未配置
-                        Label notConfigured = new Label("Please configure server settings first in Settings.");
-                        notConfigured.getStyleClass().add("no-results");
-                        reviewResultsContainer.getChildren().add(notConfigured);
-                    } else if (ServiceManager.getInstance().isLocalCacheInitialized()) {
-                        // 已配置且缓存已初始化，但为空
-                        Label noResults = new Label("No notes found. Try saving some notes first!");
+
+                    System.out.println("[DEBUG loadReviewNotes] results.size=" + results.size());
+
+                    if (results.isEmpty()) {
+                        Label noResults = new Label("No notes found for " + period);
                         noResults.getStyleClass().add("no-results");
                         reviewResultsContainer.getChildren().add(noResults);
                     } else {
-                        // 缓存正在初始化中
-                        Label initializing = new Label("Cache is initializing. Please wait a moment...");
-                        initializing.getStyleClass().add("search-loading");
-                        reviewResultsContainer.getChildren().add(initializing);
+                        Label countLabel = new Label(results.size() + " note(s) in " + period);
+                        countLabel.getStyleClass().add("search-count");
+                        reviewResultsContainer.getChildren().add(countLabel);
+
+                        for (LocalCacheService.NoteData result : results) {
+                            VBox card = createResultCard(result);
+                            reviewResultsContainer.getChildren().add(card);
+                        }
                     }
                 });
-                return;
+            } catch (Exception e) {
+                System.err.println("[ERROR loadReviewNotes] Exception: " + e.getMessage());
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    reviewResultsContainer.getChildren().clear();
+                    Label errorLabel = new Label("Error loading notes: " + e.getMessage());
+                    errorLabel.getStyleClass().add("no-results");
+                    reviewResultsContainer.getChildren().add(errorLabel);
+                });
             }
-
-            // 缓存就绪，执行回顾
-            LocalCacheService cache = getLocalCacheService();
-            List<LocalCacheService.NoteData> results = cache.getNotesForReview(days);
-
-            Platform.runLater(() -> {
-                reviewResultsContainer.getChildren().clear();
-
-                System.out.println("[DEBUG loadReviewNotes] results.size=" + results.size());
-
-                if (results.isEmpty()) {
-                    Label noResults = new Label("No notes found for " + period);
-                    noResults.getStyleClass().add("no-results");
-                    reviewResultsContainer.getChildren().add(noResults);
-                } else {
-                    Label countLabel = new Label(results.size() + " note(s) in " + period);
-                    countLabel.getStyleClass().add("search-count");
-                    reviewResultsContainer.getChildren().add(countLabel);
-
-                    for (LocalCacheService.NoteData result : results) {
-                        VBox card = createResultCard(result);
-                        reviewResultsContainer.getChildren().add(card);
-                    }
-                }
-            });
         }).start();
     }
 
