@@ -79,12 +79,8 @@ public class DebugView extends VBox {
             System.out.println("=== DEBUG: LocalCache not ready ===");
             return;
         }
-        try {
-            localCache.resetSyncState();
-            System.out.println("=== SYNC STATE RESET - Restart app to re-sync ===");
-        } catch (SQLException ex) {
-            System.err.println("Failed to reset sync: " + ex.getMessage());
-        }
+        localCache.resetSyncState();
+        System.out.println("=== SYNC STATE RESET - Restart app to re-sync ===");
     }
 
     private void checkDbCount() {
@@ -105,11 +101,7 @@ public class DebugView extends VBox {
             System.out.println("=== DEBUG: LocalCache not ready ===");
             return;
         }
-        try {
-            localCache.resetSyncState();
-            System.out.println("=== ALL NOTES CLEARED ===");
-        } catch (SQLException ex) {
-            System.err.println("Failed to clear notes: " + ex.getMessage());
-        }
+        localCache.resetSyncState();
+        System.out.println("=== ALL NOTES CLEARED ===");
     }
 }

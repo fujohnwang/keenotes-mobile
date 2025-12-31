@@ -654,10 +654,6 @@ public class WebSocketClientService {
         listeners.forEach(l -> l.onError(message));
     }
 
-    public boolean isConnected() {
-        return isConnected.get();
-    }
-
     public boolean isSyncing() {
         return isSyncing.get();
     }
