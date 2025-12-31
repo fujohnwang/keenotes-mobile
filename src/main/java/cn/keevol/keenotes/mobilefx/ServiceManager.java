@@ -74,6 +74,10 @@ public class ServiceManager {
     public synchronized LocalCacheService getLocalCacheService() {
         if (localCacheService == null) {
             localCacheService = LocalCacheService.getInstance();
+        }
+        
+        // 检查是否需要初始化
+        if (localCacheState == InitializationState.NOT_STARTED && !localCacheService.isInitialized()) {
             localCacheState = InitializationState.INITIALIZING;
             
             // 在后台线程初始化数据库，避免阻塞UI
@@ -145,7 +149,14 @@ public class ServiceManager {
             }, "LocalCacheInit");
             initThread.setDaemon(true);
             initThread.start();
+        } else if (localCacheService.isInitialized() && localCacheState != InitializationState.READY) {
+            // 如果服务已经初始化但状态不对，同步状态
+            synchronized (this) {
+                localCacheState = InitializationState.READY;
+                localCacheErrorMessage = null;
+            }
         }
+        
         return localCacheService;
     }
 
@@ -349,6 +360,8 @@ public class ServiceManager {
             }, "LocalCacheRetry");
             retryThread.setDaemon(true);
             retryThread.start();
+        } else {
+            System.out.println("[ServiceManager] Retry called but state is not ERROR: " + localCacheState);
         }
     }
 

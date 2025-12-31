@@ -363,11 +363,30 @@ public class MainViewV2 extends BorderPane {
                         initializingLabel.getStyleClass().add("search-loading");
                         searchResultsContainer.getChildren().add(initializingLabel);
                         
-                        // 延迟重试
+                        // 延迟重试，但限制重试次数
                         new Thread(() -> {
                             try {
-                                Thread.sleep(2000);
-                                Platform.runLater(() -> performSearch());
+                                Thread.sleep(3000); // 增加等待时间到3秒
+                                // 检查状态是否仍然是初始化中，避免无限循环
+                                ServiceManager.InitializationState currentState = serviceManager.getLocalCacheState();
+                                if (currentState == ServiceManager.InitializationState.INITIALIZING) {
+                                    // 如果仍在初始化，再等待一次
+                                    Thread.sleep(2000);
+                                    currentState = serviceManager.getLocalCacheState();
+                                }
+                                
+                                // 只有在状态改变时才重试
+                                if (currentState != ServiceManager.InitializationState.INITIALIZING) {
+                                    Platform.runLater(() -> performSearch());
+                                } else {
+                                    // 初始化超时，显示错误
+                                    Platform.runLater(() -> {
+                                        searchResultsContainer.getChildren().clear();
+                                        Label errorLabel = new Label("Cache initialization timeout. Please try again.");
+                                        errorLabel.getStyleClass().add("error-message");
+                                        searchResultsContainer.getChildren().add(errorLabel);
+                                    });
+                                }
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                             }
@@ -548,11 +567,30 @@ public class MainViewV2 extends BorderPane {
                         initializingLabel.getStyleClass().add("search-loading");
                         reviewResultsContainer.getChildren().add(initializingLabel);
                         
-                        // 延迟重试
+                        // 延迟重试，但限制重试次数
                         new Thread(() -> {
                             try {
-                                Thread.sleep(2000);
-                                Platform.runLater(() -> loadReviewNotes(period));
+                                Thread.sleep(3000); // 增加等待时间到3秒
+                                // 检查状态是否仍然是初始化中，避免无限循环
+                                ServiceManager.InitializationState currentState = serviceManager.getLocalCacheState();
+                                if (currentState == ServiceManager.InitializationState.INITIALIZING) {
+                                    // 如果仍在初始化，再等待一次
+                                    Thread.sleep(2000);
+                                    currentState = serviceManager.getLocalCacheState();
+                                }
+                                
+                                // 只有在状态改变时才重试
+                                if (currentState != ServiceManager.InitializationState.INITIALIZING) {
+                                    Platform.runLater(() -> loadReviewNotes(period));
+                                } else {
+                                    // 初始化超时，显示错误
+                                    Platform.runLater(() -> {
+                                        reviewResultsContainer.getChildren().clear();
+                                        Label errorLabel = new Label("Cache initialization timeout. Please try again.");
+                                        errorLabel.getStyleClass().add("error-message");
+                                        reviewResultsContainer.getChildren().add(errorLabel);
+                                    });
+                                }
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                             }
