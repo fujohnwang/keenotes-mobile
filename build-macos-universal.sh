@@ -32,6 +32,9 @@ jpackage \
     --icon "src/main/resources/icons/keenotes.icns" \
     --mac-package-identifier "cn.keevol.keenotes" \
     --mac-package-name "KeeNotes" \
+    --java-options "--enable-native-access=javafx.graphics,ALL-UNNAMED" \
+    --java-options "-Xmx512m" \
+    --java-options "-Xdock:name=KeeNotes" \
     --dest dist/intel
 
 # Clean and build for Apple Silicon (aarch64)
@@ -58,6 +61,9 @@ jpackage \
     --icon "src/main/resources/icons/keenotes.icns" \
     --mac-package-identifier "cn.keevol.keenotes" \
     --mac-package-name "KeeNotes" \
+    --java-options "--enable-native-access=javafx.graphics,ALL-UNNAMED" \
+    --java-options "-Xmx512m" \
+    --java-options "-Xdock:name=KeeNotes" \
     --dest dist/apple-silicon
 
 echo "Universal macOS build completed!"
