@@ -41,20 +41,36 @@ public class LocalCacheService {
     
     /**
      * 检测是否在Android平台上运行
-     * 使用编译时标志 -Dkeenotes.platform=android（在 pom.xml android profile 中设置）
+     * 使用多种方式检测，确保在 GraalVM Native Image 中也能正确识别
      */
     private boolean detectAndroid() {
-        // 方法1: 编译时标志（最可靠）
-        String platform = System.getProperty("keenotes.platform", "");
-        if ("android".equalsIgnoreCase(platform)) {
+        try {
+            // 方法1: 使用 Gluon Attach 的 Platform 检测（最可靠）
+            String platform = com.gluonhq.attach.util.Platform.getCurrent().name();
+            if ("ANDROID".equalsIgnoreCase(platform)) {
+                return true;
+            }
+        } catch (Exception e) {
+            // Gluon Attach 不可用，继续尝试其他方法
+        }
+        
+        // 方法2: 检查系统属性（可能由 Gluon 设置）
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        if (osName.contains("android")) {
             return true;
         }
         
-        // 方法2: 回退检测 - 检查 Android 特定路径
-        boolean hasAndroidPath = new File("/system/app").exists() || 
-                                 new File("/data/data").exists();
+        // 方法3: 检查 os.arch 和 os.name 组合（Android 通常是 Linux + ARM）
+        String osArch = System.getProperty("os.arch", "").toLowerCase();
+        if (osName.contains("linux") && (osArch.contains("aarch64") || osArch.contains("arm"))) {
+            // 进一步检查是否有 Android 特定的环境变量
+            String androidData = System.getenv("ANDROID_DATA");
+            if (androidData != null) {
+                return true;
+            }
+        }
         
-        return hasAndroidPath;
+        return false;
     }
 
     /**
@@ -156,7 +172,8 @@ public class LocalCacheService {
         StringBuilder initLog = new StringBuilder();
         try {
             initLog.append("Platform: ").append(isAndroid ? "Android" : "Desktop").append("\n");
-            initLog.append("keenotes.platform: ").append(System.getProperty("keenotes.platform", "not set")).append("\n");
+            initLog.append("os.name: ").append(System.getProperty("os.name", "unknown")).append("\n");
+            initLog.append("os.arch: ").append(System.getProperty("os.arch", "unknown")).append("\n");
             initLog.append("DB Path: ").append(dbPathString).append("\n");
             
             // 加载对应平台的JDBC驱动
