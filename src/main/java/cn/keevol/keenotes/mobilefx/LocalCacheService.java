@@ -119,20 +119,28 @@ public class LocalCacheService {
             initLog.append("Platform: ").append(isAndroid ? "Android" : "Desktop").append("\n");
             initLog.append("DB Path: ").append(dbPathString).append("\n");
             
-            // 加载 SQLite JDBC 驱动
-            initStep = "loading SQLite JDBC";
-            initLog.append("Loading SQLite JDBC driver...\n");
-            Class.forName("org.sqlite.JDBC");
-            initLog.append("SQLite JDBC driver loaded OK\n");
+            // 加载 JDBC 驱动
+            initStep = "loading JDBC driver";
+            if (isAndroid) {
+                // Android: 使用 SQLDroid
+                initLog.append("Loading SQLDroid driver...\n");
+                Class.forName("org.sqldroid.SQLDroidDriver");
+                initLog.append("SQLDroid driver loaded OK\n");
+            } else {
+                // Desktop: 使用 SQLite JDBC
+                initLog.append("Loading SQLite JDBC driver...\n");
+                Class.forName("org.sqlite.JDBC");
+                initLog.append("SQLite JDBC driver loaded OK\n");
+            }
 
             // 构建 JDBC URL
             initStep = "building JDBC URL";
             String jdbcUrl;
             if (isAndroid) {
-                // Android: 使用简单配置，避免 WAL 模式问题
-                jdbcUrl = "jdbc:sqlite:" + dbPathString;
+                // SQLDroid URL 格式
+                jdbcUrl = "jdbc:sqldroid:" + dbPathString;
             } else {
-                // Desktop: 使用优化配置
+                // SQLite JDBC URL 格式，带优化参数
                 jdbcUrl = "jdbc:sqlite:" + dbPathString + "?journal_mode=WAL&synchronous=NORMAL&cache_size=10000&timeout=30000";
             }
             initLog.append("JDBC URL: ").append(jdbcUrl).append("\n");
