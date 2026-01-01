@@ -3,10 +3,9 @@ module com.keenotes.mobile {
     requires javafx.fxml;
     requires javafx.graphics;
     requires javafx.base;
-    requires java.net.http;
     requires java.sql;
 
-    // OkHttp WebSocket客户端
+    // OkHttp WebSocket客户端 + HTTP请求
     requires okhttp3;
 
     // Vert.x用于JSON处理
