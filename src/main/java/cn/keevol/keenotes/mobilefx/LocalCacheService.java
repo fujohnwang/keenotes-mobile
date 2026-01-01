@@ -158,11 +158,17 @@ public class LocalCacheService {
         initStep = "opening Android SQLite";
         initLog.append("Using Android native SQLite...\n");
         
-        // 使用反射调用 Android SQLite API
-        Class<?> sqliteDbClass = Class.forName("android.database.sqlite.SQLiteDatabase");
+        // 使用运行时动态类名，避免 GraalVM 编译时常量分析
+        // GraalVM 会在编译时分析 Class.forName("常量字符串")，导致 ClassNotFoundException
+        // 通过运行时构建类名可以绕过这个限制
+        String dbClassName = new StringBuilder("android.database.sqlite.")
+            .append("SQLiteDatabase").toString();
+        String cursorFactoryName = dbClassName + "$CursorFactory";
+        
+        Class<?> sqliteDbClass = Class.forName(dbClassName);
         java.lang.reflect.Method openOrCreate = sqliteDbClass.getMethod(
             "openOrCreateDatabase", String.class, int.class, 
-            Class.forName("android.database.sqlite.SQLiteDatabase$CursorFactory"));
+            Class.forName(cursorFactoryName));
         
         Object androidDb = openOrCreate.invoke(null, dbPathString, 0, null);
         
@@ -506,7 +512,11 @@ public class LocalCacheService {
             String sql = "SELECT last_sync_id FROM sync_state WHERE id = 1";
             Object cursor = rawQuery.invoke(androidDatabase, sql, null);
             
-            Class<?> cursorClass = Class.forName("android.database.Cursor");
+            // 运行时动态构建类名
+            String cursorClassName = new StringBuilder("android.database.")
+                .append("Cursor").toString();
+            Class<?> cursorClass = Class.forName(cursorClassName);
+            
             java.lang.reflect.Method moveToFirst = cursorClass.getMethod("moveToFirst");
             java.lang.reflect.Method getLong = cursorClass.getMethod("getLong", int.class);
             java.lang.reflect.Method close = cursorClass.getMethod("close");
@@ -554,7 +564,11 @@ public class LocalCacheService {
             String sql = "SELECT last_sync_time FROM sync_state WHERE id = 1";
             Object cursor = rawQuery.invoke(androidDatabase, sql, null);
             
-            Class<?> cursorClass = Class.forName("android.database.Cursor");
+            // 运行时动态构建类名
+            String cursorClassName = new StringBuilder("android.database.")
+                .append("Cursor").toString();
+            Class<?> cursorClass = Class.forName(cursorClassName);
+            
             java.lang.reflect.Method moveToFirst = cursorClass.getMethod("moveToFirst");
             java.lang.reflect.Method getString = cursorClass.getMethod("getString", int.class);
             java.lang.reflect.Method close = cursorClass.getMethod("close");
@@ -602,7 +616,11 @@ public class LocalCacheService {
             String sql = "SELECT COUNT(*) FROM notes_cache";
             Object cursor = rawQuery.invoke(androidDatabase, sql, null);
             
-            Class<?> cursorClass = Class.forName("android.database.Cursor");
+            // 运行时动态构建类名
+            String cursorClassName = new StringBuilder("android.database.")
+                .append("Cursor").toString();
+            Class<?> cursorClass = Class.forName(cursorClassName);
+            
             java.lang.reflect.Method moveToFirst = cursorClass.getMethod("moveToFirst");
             java.lang.reflect.Method getInt = cursorClass.getMethod("getInt", int.class);
             java.lang.reflect.Method close = cursorClass.getMethod("close");
@@ -693,7 +711,11 @@ public class LocalCacheService {
     private List<NoteData> cursorToNoteList(Object cursor) throws Exception {
         List<NoteData> results = new ArrayList<>();
         
-        Class<?> cursorClass = Class.forName("android.database.Cursor");
+        // 运行时动态构建类名，避免 GraalVM 编译时常量分析
+        String cursorClassName = new StringBuilder("android.database.")
+            .append("Cursor").toString();
+        Class<?> cursorClass = Class.forName(cursorClassName);
+        
         java.lang.reflect.Method moveToNext = cursorClass.getMethod("moveToNext");
         java.lang.reflect.Method getLong = cursorClass.getMethod("getLong", int.class);
         java.lang.reflect.Method getString = cursorClass.getMethod("getString", int.class);
