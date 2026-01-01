@@ -73,36 +73,31 @@ public class ServiceManager {
      */
     public synchronized LocalCacheService getLocalCacheService() {
         if (localCacheService == null) {
-            localCacheService = LocalCacheService.getInstance();
+            // 更新状态：正在创建实例
+            localCacheErrorMessage = "Step 1: Creating LocalCacheService instance...";
+            try {
+                localCacheService = LocalCacheService.getInstance();
+                localCacheErrorMessage = "Step 1: Instance created OK";
+            } catch (Exception e) {
+                localCacheState = InitializationState.ERROR;
+                localCacheErrorMessage = "Step 1 FAILED: " + e.getClass().getSimpleName() + ": " + e.getMessage();
+                return null;
+            }
         }
         
         // 检查是否需要初始化 - 只有在未初始化且状态为NOT_STARTED时才启动新的初始化
         if (!localCacheService.isInitialized() && localCacheState == InitializationState.NOT_STARTED) {
             localCacheState = InitializationState.INITIALIZING;
+            localCacheErrorMessage = "Step 2: Starting init thread...";
             
             // 在后台线程初始化数据库，避免阻塞UI
-            // 使用普通 Thread 而不是 CompletableFuture，因为后者在 Native Image 中可能有问题
             Thread initThread = new Thread(() -> {
-                long startTime = System.currentTimeMillis();
                 try {
-                    System.out.println("[ServiceManager] Starting local cache initialization...");
-                    System.out.println("[ServiceManager] Platform: " + System.getProperty("os.name"));
-                    System.out.println("[ServiceManager] Java version: " + System.getProperty("java.version"));
-                    
-                    // Android特定：增加初始化延迟，确保应用完全启动
-                    String osName = System.getProperty("os.name", "").toLowerCase();
-                    boolean isMobile = osName.contains("android") || 
-                                       (osName.contains("linux") && System.getProperty("java.vm.name", "").toLowerCase().contains("substrate"));
-                    
-                    if (isMobile) {
-                        System.out.println("[ServiceManager] Detected mobile platform, adding initialization delay...");
-                        Thread.sleep(2000); // 等待2秒确保应用完全启动
+                    synchronized (ServiceManager.this) {
+                        localCacheErrorMessage = "Step 3: Init thread running...";
                     }
                     
                     localCacheService.initialize();
-                    
-                    long elapsed = System.currentTimeMillis() - startTime;
-                    System.out.println("[ServiceManager] Local cache initialized successfully in " + elapsed + "ms");
                     
                     synchronized (ServiceManager.this) {
                         localCacheState = InitializationState.READY;
@@ -110,60 +105,12 @@ public class ServiceManager {
                     }
                     notifyStatusChanged("local_cache_ready", "本地缓存已就绪");
                     
-                } catch (InterruptedException e) {
-                    System.err.println("[ServiceManager] Local cache initialization interrupted");
-                    Thread.currentThread().interrupt();
-                    synchronized (ServiceManager.this) {
-                        localCacheState = InitializationState.ERROR;
-                        localCacheErrorMessage = "初始化被中断";
-                    }
-                    notifyStatusChanged("local_cache_error", "本地缓存初始化被中断");
                 } catch (Exception e) {
-                    long elapsed = System.currentTimeMillis() - startTime;
-                    System.err.println("[ServiceManager] Local cache initialization failed after " + elapsed + "ms!");
-                    System.err.println("[ServiceManager] Error type: " + e.getClass().getName());
-                    System.err.println("[ServiceManager] Error message: " + e.getMessage());
-                    e.printStackTrace();
-                    
                     synchronized (ServiceManager.this) {
                         localCacheState = InitializationState.ERROR;
-                        localCacheErrorMessage = e.getClass().getSimpleName() + ": " + e.getMessage();
+                        localCacheErrorMessage = "Init FAILED: " + e.getClass().getSimpleName() + ": " + e.getMessage();
                     }
                     notifyStatusChanged("local_cache_error", "本地缓存初始化失败: " + e.getMessage());
-                    
-                    // 移动平台：尝试重试一次
-                    String osName = System.getProperty("os.name", "").toLowerCase();
-                    boolean isMobile = osName.contains("android") || 
-                                       (osName.contains("linux") && System.getProperty("java.vm.name", "").toLowerCase().contains("substrate"));
-                    
-                    if (isMobile) {
-                        System.out.println("[ServiceManager] Mobile platform detected, attempting retry in 5 seconds...");
-                        try {
-                            Thread.sleep(5000);
-                            System.out.println("[ServiceManager] Retrying local cache initialization...");
-                            
-                            synchronized (ServiceManager.this) {
-                                localCacheState = InitializationState.INITIALIZING;
-                            }
-                            
-                            localCacheService.initialize();
-                            
-                            synchronized (ServiceManager.this) {
-                                localCacheState = InitializationState.READY;
-                                localCacheErrorMessage = null;
-                            }
-                            notifyStatusChanged("local_cache_ready", "本地缓存已就绪（重试成功）");
-                            System.out.println("[ServiceManager] Local cache initialized successfully on retry");
-                        } catch (Exception retryException) {
-                            System.err.println("[ServiceManager] Retry also failed: " + retryException.getMessage());
-                            retryException.printStackTrace();
-                            synchronized (ServiceManager.this) {
-                                localCacheState = InitializationState.ERROR;
-                                localCacheErrorMessage = "重试失败: " + retryException.getClass().getSimpleName() + ": " + retryException.getMessage();
-                            }
-                            notifyStatusChanged("local_cache_error", "本地缓存初始化重试失败");
-                        }
-                    }
                 }
             }, "LocalCacheInit");
             initThread.setDaemon(true);

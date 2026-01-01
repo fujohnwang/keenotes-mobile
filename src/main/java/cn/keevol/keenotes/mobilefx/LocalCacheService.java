@@ -81,10 +81,15 @@ public class LocalCacheService {
     public static synchronized LocalCacheService getInstance() {
         if (instance == null) {
             instance = new LocalCacheService();
-            // 不再在构造函数中立即初始化数据库
-            // 而是延迟到首次需要时或由ServiceManager触发
         }
         return instance;
+    }
+    
+    // 用于追踪初始化步骤
+    private volatile String initStep = "not started";
+    
+    public String getInitStep() {
+        return initStep;
     }
 
     /**
@@ -171,6 +176,7 @@ public class LocalCacheService {
     private void initDatabase() {
         StringBuilder initLog = new StringBuilder();
         try {
+            initStep = "checking platform";
             initLog.append("Platform: ").append(isAndroid ? "Android" : "Desktop").append("\n");
             initLog.append("os.name: ").append(System.getProperty("os.name", "unknown")).append("\n");
             initLog.append("os.arch: ").append(System.getProperty("os.arch", "unknown")).append("\n");
@@ -180,10 +186,12 @@ public class LocalCacheService {
             if (isAndroid) {
                 // Android: 使用 SQLDroid
                 try {
+                    initStep = "loading SQLDroid";
                     initLog.append("Loading SQLDroid driver...\n");
                     DriverManager.registerDriver((Driver) Class.forName("org.sqldroid.SQLDroidDriver").newInstance());
                     initLog.append("SQLDroid driver registered OK\n");
                 } catch (Exception e) {
+                    initStep = "SQLDroid FAILED: " + e.getMessage();
                     initLog.append("SQLDroid FAILED: ").append(e.getClass().getSimpleName())
                            .append(" - ").append(e.getMessage()).append("\n");
                     throw new RuntimeException("SQLDroid driver not available: " + e.getMessage(), e);
@@ -191,20 +199,24 @@ public class LocalCacheService {
             } else {
                 // Desktop: 使用 SQLite JDBC
                 try {
+                    initStep = "loading SQLite JDBC";
                     initLog.append("Loading SQLite JDBC driver...\n");
                     Class.forName("org.sqlite.JDBC");
                     initLog.append("SQLite JDBC driver loaded OK\n");
                 } catch (ClassNotFoundException e) {
+                    initStep = "SQLite JDBC FAILED: " + e.getMessage();
                     initLog.append("SQLite JDBC FAILED: ").append(e.getMessage()).append("\n");
                     throw new RuntimeException("SQLite JDBC driver not available: " + e.getMessage(), e);
                 }
             }
 
             // 构建JDBC URL
+            initStep = "building JDBC URL";
             String jdbcUrl = buildJdbcUrl();
             initLog.append("JDBC URL: ").append(jdbcUrl).append("\n");
             
             // 建立连接
+            initStep = "connecting to DB";
             initLog.append("Connecting...\n");
             connection = DriverManager.getConnection(jdbcUrl);
             
@@ -212,9 +224,11 @@ public class LocalCacheService {
             if (connection == null || connection.isClosed()) {
                 throw new SQLException("Failed to establish database connection");
             }
+            initStep = "connected OK";
             initLog.append("Connected OK\n");
 
             // 创建表
+            initStep = "creating tables";
             Statement stmt = connection.createStatement();
             stmt.setQueryTimeout(30);
             
@@ -231,10 +245,12 @@ public class LocalCacheService {
                 ")");
 
             // 创建索引
+            initStep = "creating indexes";
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cache_created_at ON notes_cache(created_at)");
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cache_content ON notes_cache(content)");
 
             // 创建同步状态表
+            initStep = "creating sync_state";
             stmt.executeUpdate(
                 "CREATE TABLE IF NOT EXISTS sync_state (" +
                 "  id INTEGER PRIMARY KEY, " +
@@ -245,6 +261,8 @@ public class LocalCacheService {
             // 初始化同步状态（如果不存在）
             stmt.executeUpdate(
                 "INSERT OR IGNORE INTO sync_state (id, last_sync_id) VALUES (1, -1)");
+            
+            initStep = "completed";
 
             stmt.close();
             initLog.append("Database init completed OK");
