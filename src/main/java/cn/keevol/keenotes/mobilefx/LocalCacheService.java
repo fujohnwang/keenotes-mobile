@@ -37,34 +37,24 @@ public class LocalCacheService {
         this.cryptoService = new CryptoService();
         this.isAndroid = detectAndroid();
         this.dbPathString = resolveDbPath();
-        
-        System.out.println("[LocalCache] Platform: " + (isAndroid ? "Android (SQLDroid)" : "Desktop (SQLite JDBC)"));
-        System.out.println("[LocalCache] Database path: " + dbPathString);
     }
     
     /**
      * 检测是否在Android平台上运行
+     * 使用编译时标志 -Dkeenotes.platform=android（在 pom.xml android profile 中设置）
      */
     private boolean detectAndroid() {
-        String vmName = System.getProperty("java.vm.name", "").toLowerCase();
-        String vmVendor = System.getProperty("java.vm.vendor", "").toLowerCase();
-        
-        // GraalVM Native Image / Substrate VM 用于 Android
-        boolean isSubstrate = vmName.contains("substrate") || vmVendor.contains("gluon");
-        
-        // 检查是否有Android特定的类
-        boolean hasAndroidClasses = false;
-        try {
-            Class.forName("android.database.sqlite.SQLiteDatabase");
-            hasAndroidClasses = true;
-        } catch (ClassNotFoundException e) {
-            // 不是Android
+        // 方法1: 编译时标志（最可靠）
+        String platform = System.getProperty("keenotes.platform", "");
+        if ("android".equalsIgnoreCase(platform)) {
+            return true;
         }
         
-        System.out.println("[LocalCache] VM: " + vmName + ", Vendor: " + vmVendor);
-        System.out.println("[LocalCache] isSubstrate: " + isSubstrate + ", hasAndroidClasses: " + hasAndroidClasses);
+        // 方法2: 回退检测 - 检查 Android 特定路径
+        boolean hasAndroidPath = new File("/system/app").exists() || 
+                                 new File("/data/data").exists();
         
-        return isSubstrate || hasAndroidClasses;
+        return hasAndroidPath;
     }
 
     /**
@@ -131,10 +121,6 @@ public class LocalCacheService {
     }
 
     private String resolveDbPath() {
-        System.out.println("[LocalCache] Resolving database path...");
-        System.out.println("[LocalCache] OS: " + System.getProperty("os.name"));
-        System.out.println("[LocalCache] Java version: " + System.getProperty("java.version"));
-        
         // 1. 优先使用 Gluon Attach StorageService (Android/iOS)
         try {
             Optional<File> privateStorage = StorageService.create()
@@ -143,11 +129,10 @@ public class LocalCacheService {
             if (privateStorage.isPresent()) {
                 File storageDir = privateStorage.get();
                 File dbFile = new File(storageDir, DB_NAME);
-                System.out.println("[LocalCache] Using Gluon private storage: " + dbFile.getAbsolutePath());
                 return dbFile.getAbsolutePath();
             }
         } catch (Exception e) {
-            System.out.println("[LocalCache] Gluon storage not available: " + e.getMessage());
+            // Gluon storage not available
         }
         
         // 2. 桌面环境：使用用户主目录
@@ -156,65 +141,67 @@ public class LocalCacheService {
             if (userHome != null && !userHome.isEmpty()) {
                 Path path = Path.of(userHome, ".keenotes", DB_NAME);
                 Files.createDirectories(path.getParent());
-                System.out.println("[LocalCache] Using user home: " + path);
                 return path.toString();
             }
         } catch (Exception e) {
-            System.out.println("[LocalCache] User home not available: " + e.getMessage());
+            // User home not available
         }
         
         // 3. 回退到临时目录
         String tempDir = System.getProperty("java.io.tmpdir", "/tmp");
-        String fallback = tempDir + File.separator + DB_NAME;
-        System.out.println("[LocalCache] Using fallback path: " + fallback);
-        return fallback;
+        return tempDir + File.separator + DB_NAME;
     }
 
     private void initDatabase() {
+        StringBuilder initLog = new StringBuilder();
         try {
-            System.out.println("[LocalCache] Starting database initialization...");
-            System.out.println("[LocalCache] Database path: " + dbPathString);
-            System.out.println("[LocalCache] Platform: " + (isAndroid ? "Android" : "Desktop"));
+            initLog.append("Platform: ").append(isAndroid ? "Android" : "Desktop").append("\n");
+            initLog.append("keenotes.platform: ").append(System.getProperty("keenotes.platform", "not set")).append("\n");
+            initLog.append("DB Path: ").append(dbPathString).append("\n");
             
             // 加载对应平台的JDBC驱动
             if (isAndroid) {
                 // Android: 使用 SQLDroid
                 try {
+                    initLog.append("Loading SQLDroid driver...\n");
                     DriverManager.registerDriver((Driver) Class.forName("org.sqldroid.SQLDroidDriver").newInstance());
-                    System.out.println("[LocalCache] SQLDroid driver registered successfully");
+                    initLog.append("SQLDroid driver registered OK\n");
                 } catch (Exception e) {
-                    System.err.println("[LocalCache] SQLDroid driver not found: " + e.getMessage());
-                    throw new RuntimeException("SQLDroid driver not available", e);
+                    initLog.append("SQLDroid FAILED: ").append(e.getClass().getSimpleName())
+                           .append(" - ").append(e.getMessage()).append("\n");
+                    throw new RuntimeException("SQLDroid driver not available: " + e.getMessage(), e);
                 }
             } else {
                 // Desktop: 使用 SQLite JDBC
                 try {
+                    initLog.append("Loading SQLite JDBC driver...\n");
                     Class.forName("org.sqlite.JDBC");
-                    System.out.println("[LocalCache] SQLite JDBC driver loaded successfully");
+                    initLog.append("SQLite JDBC driver loaded OK\n");
                 } catch (ClassNotFoundException e) {
-                    System.err.println("[LocalCache] SQLite JDBC driver not found: " + e.getMessage());
-                    throw new RuntimeException("SQLite JDBC driver not available", e);
+                    initLog.append("SQLite JDBC FAILED: ").append(e.getMessage()).append("\n");
+                    throw new RuntimeException("SQLite JDBC driver not available: " + e.getMessage(), e);
                 }
             }
 
             // 构建JDBC URL
             String jdbcUrl = buildJdbcUrl();
-            System.out.println("[LocalCache] JDBC URL: " + jdbcUrl);
+            initLog.append("JDBC URL: ").append(jdbcUrl).append("\n");
             
             // 建立连接
+            initLog.append("Connecting...\n");
             connection = DriverManager.getConnection(jdbcUrl);
             
             // 验证连接
             if (connection == null || connection.isClosed()) {
                 throw new SQLException("Failed to establish database connection");
             }
-            System.out.println("[LocalCache] Database connection established successfully");
+            initLog.append("Connected OK\n");
 
             // 创建表
             Statement stmt = connection.createStatement();
             stmt.setQueryTimeout(30);
             
-            System.out.println("[LocalCache] Creating tables...");
+            initLog.append("Creating tables...\n");
             
             stmt.executeUpdate(
                 "CREATE TABLE IF NOT EXISTS notes_cache (" +
@@ -225,12 +212,10 @@ public class LocalCacheService {
                 "  encrypted_content TEXT, " +
                 "  is_dirty INTEGER DEFAULT 0" +
                 ")");
-            System.out.println("[LocalCache] notes_cache table created");
 
             // 创建索引
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cache_created_at ON notes_cache(created_at)");
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cache_content ON notes_cache(content)");
-            System.out.println("[LocalCache] Indexes created");
 
             // 创建同步状态表
             stmt.executeUpdate(
@@ -239,26 +224,26 @@ public class LocalCacheService {
                 "  last_sync_id INTEGER DEFAULT -1, " +
                 "  last_sync_time DATETIME" +
                 ")");
-            System.out.println("[LocalCache] sync_state table created");
 
             // 初始化同步状态（如果不存在）
             stmt.executeUpdate(
                 "INSERT OR IGNORE INTO sync_state (id, last_sync_id) VALUES (1, -1)");
-            System.out.println("[LocalCache] sync_state initialized");
 
             stmt.close();
-            System.out.println("[LocalCache] Database initialization completed successfully");
+            initLog.append("Database init completed OK");
+            System.out.println("[LocalCache] " + initLog.toString().replace("\n", " | "));
 
         } catch (SQLException e) {
-            System.err.println("[LocalCache] Database initialization failed!");
-            System.err.println("[LocalCache] Error: " + e.getMessage());
-            System.err.println("[LocalCache] Database path: " + dbPathString);
+            initLog.append("SQL ERROR: ").append(e.getMessage());
+            System.err.println("[LocalCache] Init failed: " + initLog);
             e.printStackTrace();
-            throw new RuntimeException("Database initialization failed", e);
+            throw new RuntimeException(initLog.toString(), e);
         } catch (Exception e) {
-            System.err.println("[LocalCache] Unexpected error during database initialization: " + e.getMessage());
+            initLog.append("ERROR: ").append(e.getClass().getSimpleName())
+                   .append(" - ").append(e.getMessage());
+            System.err.println("[LocalCache] Init failed: " + initLog);
             e.printStackTrace();
-            throw new RuntimeException("Unexpected database initialization error", e);
+            throw new RuntimeException(initLog.toString(), e);
         }
     }
 
