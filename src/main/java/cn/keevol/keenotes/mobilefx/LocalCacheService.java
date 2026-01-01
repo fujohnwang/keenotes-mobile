@@ -148,8 +148,23 @@ public class LocalCacheService {
                 java.sql.Driver driver = (java.sql.Driver) driverClass.getDeclaredConstructor().newInstance();
                 initLog.append("Driver instantiated OK\n");
                 
+                // 检查 driver 是否接受这个 URL
+                initStep = "checking URL acceptance";
+                boolean acceptsUrl = driver.acceptsURL(jdbcUrl);
+                initLog.append("Driver accepts URL '").append(jdbcUrl).append("': ").append(acceptsUrl).append("\n");
+                
+                if (!acceptsUrl) {
+                    // 尝试不同的 URL 格式
+                    String altUrl = "jdbc:sqlite:" + dbPathString;
+                    acceptsUrl = driver.acceptsURL(altUrl);
+                    initLog.append("Driver accepts alt URL '").append(altUrl).append("': ").append(acceptsUrl).append("\n");
+                    if (acceptsUrl) {
+                        jdbcUrl = altUrl;
+                    }
+                }
+                
                 initStep = "calling driver.connect()";
-                initLog.append("Calling driver.connect()...\n");
+                initLog.append("Calling driver.connect() with URL: ").append(jdbcUrl).append("\n");
                 
                 // 使用带超时的连接尝试
                 final java.sql.Driver finalDriver = driver;
@@ -178,7 +193,27 @@ public class LocalCacheService {
                 }
                 
                 connection = connHolder[0];
-                initLog.append("driver.connect() returned\n");
+                initLog.append("driver.connect() returned: ").append(connection == null ? "NULL" : connection.getClass().getName()).append("\n");
+                
+                // 如果 SQLDroid 返回 null，尝试直接使用 SQLDroidConnection
+                if (connection == null) {
+                    initStep = "trying direct SQLDroidConnection";
+                    initLog.append("Trying direct SQLDroidConnection instantiation...\n");
+                    
+                    try {
+                        // 尝试直接创建 SQLDroidConnection
+                        Class<?> connClass = Class.forName("org.sqldroid.SQLDroidConnection");
+                        initLog.append("SQLDroidConnection class loaded\n");
+                        
+                        // SQLDroidConnection(String url, Properties info)
+                        java.lang.reflect.Constructor<?> ctor = connClass.getConstructor(String.class, java.util.Properties.class);
+                        connection = (Connection) ctor.newInstance(dbPathString, new java.util.Properties());
+                        initLog.append("Direct SQLDroidConnection created: ").append(connection != null ? "OK" : "NULL").append("\n");
+                    } catch (Exception directEx) {
+                        initLog.append("Direct instantiation failed: ").append(directEx.getClass().getSimpleName())
+                               .append(" - ").append(directEx.getMessage()).append("\n");
+                    }
+                }
             } else {
                 // Desktop: 使用标准 DriverManager
                 Class.forName("org.sqlite.JDBC");
