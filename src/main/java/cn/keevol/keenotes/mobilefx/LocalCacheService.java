@@ -209,6 +209,20 @@ public class LocalCacheService {
                         java.lang.reflect.Constructor<?> ctor = connClass.getConstructor(String.class, java.util.Properties.class);
                         connection = (Connection) ctor.newInstance(dbPathString, new java.util.Properties());
                         initLog.append("Direct SQLDroidConnection created: ").append(connection != null ? "OK" : "NULL").append("\n");
+                    } catch (java.lang.reflect.InvocationTargetException ite) {
+                        // 获取真正的异常原因
+                        Throwable cause = ite.getCause();
+                        if (cause != null) {
+                            initLog.append("Direct instantiation failed (cause): ").append(cause.getClass().getName())
+                                   .append(" - ").append(cause.getMessage()).append("\n");
+                            // 如果有更深层的原因
+                            if (cause.getCause() != null) {
+                                initLog.append("Root cause: ").append(cause.getCause().getClass().getName())
+                                       .append(" - ").append(cause.getCause().getMessage()).append("\n");
+                            }
+                        } else {
+                            initLog.append("Direct instantiation failed: InvocationTargetException with no cause\n");
+                        }
                     } catch (Exception directEx) {
                         initLog.append("Direct instantiation failed: ").append(directEx.getClass().getSimpleName())
                                .append(" - ").append(directEx.getMessage()).append("\n");
