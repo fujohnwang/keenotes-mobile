@@ -76,8 +76,8 @@ public class ServiceManager {
             localCacheService = LocalCacheService.getInstance();
         }
         
-        // 检查是否需要初始化
-        if (localCacheState == InitializationState.NOT_STARTED && !localCacheService.isInitialized()) {
+        // 检查是否需要初始化 - 只有在未初始化且状态为NOT_STARTED时才启动新的初始化
+        if (!localCacheService.isInitialized() && localCacheState == InitializationState.NOT_STARTED) {
             localCacheState = InitializationState.INITIALIZING;
             
             // 在后台线程初始化数据库，避免阻塞UI
@@ -246,10 +246,11 @@ public class ServiceManager {
         System.out.println("[ServiceManager] Reinitializing services due to configuration change...");
         
         try {
-            // 1. 断开旧的 WebSocket 连接
+            // 1. 断开并重置 WebSocket 连接
             if (webSocketService != null) {
-                System.out.println("[ServiceManager] Disconnecting old WebSocket connection...");
-                webSocketService.disconnect();
+                System.out.println("[ServiceManager] Shutting down old WebSocket service...");
+                webSocketService.shutdown();
+                webSocketService = null; // 重置引用，强制重新创建
                 
                 // 等待断开完成
                 Thread.sleep(200);
@@ -268,7 +269,7 @@ public class ServiceManager {
             // 4. 通知状态变更
             notifyStatusChanged("reinitializing", "正在重新连接到新服务器...");
             
-            // 5. 重新连接到新 endpoint
+            // 5. 重新连接到新 endpoint（这会创建新的 WebSocket 服务实例）
             System.out.println("[ServiceManager] Reconnecting to new endpoint...");
             connectWebSocketIfNeeded();
             
