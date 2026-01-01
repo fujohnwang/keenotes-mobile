@@ -238,6 +238,15 @@
         <!-- Android profile -->
         <profile>
             <id>android</id>
+            <dependencies>
+                <!-- 尝试使用 xerial sqlite-jdbc，看看是否能在 Android 上工作 -->
+                <!-- 如果不行，需要考虑其他方案 -->
+                <dependency>
+                    <groupId>org.xerial</groupId>
+                    <artifactId>sqlite-jdbc</artifactId>
+                    <version>3.44.1.0</version>
+                </dependency>
+            </dependencies>
             <build>
                 <plugins>
                     <!-- Android版需要module-info.java -->
@@ -274,13 +283,15 @@
                                 <providedKeyStorePath></providedKeyStorePath>
                             </releaseConfiguration>
                             <nativeImageArgs>
-                                <!-- SQLDroid 使用 Android 原生 SQLite，不需要 JNI 配置 -->
                                 <!-- OkHttp / Vert.x 相关 - 运行时初始化 -->
                                 <arg>--initialize-at-run-time=okhttp3</arg>
                                 <arg>--initialize-at-run-time=okio</arg>
                                 <arg>--initialize-at-run-time=io.vertx</arg>
                                 <!-- SSL 相关 -->
                                 <arg>--initialize-at-run-time=javax.net.ssl</arg>
+                                <!-- SQLite JDBC 相关 -->
+                                <arg>--initialize-at-run-time=org.sqlite.core.NativeDB</arg>
+                                <arg>--initialize-at-run-time=org.sqlite.SQLiteJDBCLoader</arg>
                             </nativeImageArgs>
                         </configuration>
                     </plugin>
