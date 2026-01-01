@@ -273,6 +273,7 @@
                         <artifactId>gluonfx-maven-plugin</artifactId>
                         <configuration>
                             <target>android</target>
+                            <appIdentifier>cn.keevol.keenotes</appIdentifier>
                             <releaseConfiguration>
                                 <bundleName>KeeNotes</bundleName>
                                 <bundleVersion>1.0.0</bundleVersion>

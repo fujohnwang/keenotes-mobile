@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:versionCode="1"
     android:versionName="1.0.0">
 
@@ -11,14 +10,5 @@
     <!-- 存储权限（用于SQLite数据库） -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    
-    <!-- 只添加额外属性，不覆盖 GluonFX 生成的 activity -->
-    <application
-        android:icon="@mipmap/ic_launcher"
-        android:label="KeeNotes"
-        android:usesCleartextTraffic="true"
-        android:networkSecurityConfig="@xml/network_security_config"
-        tools:replace="android:icon,android:label">
-    </application>
 
 </manifest>
