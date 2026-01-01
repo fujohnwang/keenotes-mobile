@@ -273,6 +273,13 @@
                         <artifactId>gluonfx-maven-plugin</artifactId>
                         <configuration>
                             <target>android</target>
+                            <releaseConfiguration>
+                                <bundleName>KeeNotes</bundleName>
+                                <bundleVersion>1.0.0</bundleVersion>
+                                <bundleShortVersion>1.0</bundleShortVersion>
+                                <versionCode>1</versionCode>
+                                <providedKeyStorePath></providedKeyStorePath>
+                            </releaseConfiguration>
                             <nativeImageArgs>
                                 <!-- SQLDroid 使用 Android 原生 SQLite，不需要 JNI 配置 -->
                                 <!-- OkHttp / Vert.x 相关 - 运行时初始化 -->
