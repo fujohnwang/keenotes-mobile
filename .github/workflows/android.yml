@@ -30,21 +30,16 @@ jobs:
           tar -xzf gluon-graalvm.tar.gz -C gluon-gvm --strip-components=1
           echo "GRAALVM_HOME=$PWD/gluon-gvm" >> $GITHUB_ENV
 
-      # 3. 构建 APK (跳过AAB构建)
+      # 3. 构建 APK
       - name: Build APK
         env:
-          # 直接引用 GitHub Action 环境自带的 Android SDK 路径变量
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         run: |
-          echo "Using Android SDK at: $ANDROID_SDK_ROOT"
-          echo "Building Android APK..."
+          echo "Building Android APK and AAB..."
           
-          # 使用 gluonfx:build 和 gluonfx:package，但跳过 AAB 构建
           mvn -Pandroid clean gluonfx:build gluonfx:package \
             -Dgluonfx.target.android.sdk=$ANDROID_SDK_ROOT \
-            -Dgluonfx.skipAAB=true \
             -Dgluonfx.verbose=true \
-            -X \
             -e
 
       # 4. 容错打印日志
@@ -63,13 +58,8 @@ jobs:
       # 5. 列出构建产物
       - name: List build artifacts
         run: |
-          echo "Listing target directory structure..."
-          find target -name "*.apk" 2>/dev/null || echo "No APK files found"
-          echo "Full target/gluonfx structure:"
-          ls -la target/gluonfx/ 2>/dev/null || echo "target/gluonfx not found"
-          if [ -d "target/gluonfx" ]; then
-            find target/gluonfx -type f -name "*.apk"
-          fi
+          echo "Listing APK/AAB files..."
+          find target -name "*.apk" -o -name "*.aab" 2>/dev/null || echo "No files found"
 
       # 6. 上传APK
       - name: Upload APK
@@ -78,4 +68,5 @@ jobs:
           name: keenotes-android-apk
           path: |
             target/gluonfx/**/*.apk
+            target/gluonfx/**/*.aab
           if-no-files-found: warn
