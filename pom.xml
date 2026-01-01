@@ -282,6 +282,8 @@
                                 <providedKeyStorePath></providedKeyStorePath>
                             </releaseConfiguration>
                             <nativeImageArgs>
+                                <!-- 编译时平台标志，用于运行时检测 -->
+                                <arg>-Dkeenotes.platform=android</arg>
                                 <!-- SQLDroid 使用 Android 原生 SQLite，不需要 JNI 配置 -->
                                 <!-- OkHttp / Vert.x 相关 - 运行时初始化 -->
                                 <arg>--initialize-at-run-time=okhttp3</arg>
