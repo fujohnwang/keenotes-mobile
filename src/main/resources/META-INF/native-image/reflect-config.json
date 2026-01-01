@@ -46,27 +46,22 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "org.sqldroid.SQLDroidDriver",
+    "name": "android.database.sqlite.SQLiteDatabase",
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "org.sqldroid.SQLDroidConnection",
+    "name": "android.database.sqlite.SQLiteDatabase$CursorFactory",
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "org.sqldroid.SQLDroidStatement",
+    "name": "android.database.Cursor",
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "org.sqldroid.SQLDroidPreparedStatement",
-    "allDeclaredMethods": true,
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "org.sqldroid.SQLDroidResultSet",
+    "name": "android.database.sqlite.SQLiteCursor",
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },

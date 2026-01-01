@@ -238,14 +238,6 @@
         <!-- Android profile -->
         <profile>
             <id>android</id>
-            <dependencies>
-                <!-- SQLDroid - Android JDBC driver -->
-                <dependency>
-                    <groupId>org.sqldroid</groupId>
-                    <artifactId>sqldroid</artifactId>
-                    <version>1.0.3</version>
-                </dependency>
-            </dependencies>
             <build>
                 <plugins>
                     <!-- Android版需要module-info.java -->
