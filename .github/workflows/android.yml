@@ -30,25 +30,29 @@ jobs:
           tar -xzf gluon-graalvm.tar.gz -C gluon-gvm --strip-components=1
           echo "GRAALVM_HOME=$PWD/gluon-gvm" >> $GITHUB_ENV
 
-      # 3. 构建 APK
+      # 3. 构建 APK (只构建APK，不构建AAB)
       - name: Build APK
         env:
           # 直接引用 GitHub Action 环境自带的 Android SDK 路径变量
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         run: |
           echo "Using Android SDK at: $ANDROID_SDK_ROOT"
-          echo "Building with enhanced Android debugging..."
+          echo "Building Android APK..."
           
-          # 关键技巧：
-          # 虽然我们用 Java 21 运行 Maven，但我们强制 Gradle 使用 Java 17 (如果系统里有的话) 
-          # 或者我们直接尝试用 Java 21 跑。
-          # 如果之前是因为下载 SDK 失败，这次指定了 SDK 路径应该能跳过下载。
-          
-          mvn -Pandroid clean gluonfx:build gluonfx:package \
+          # 只用 gluonfx:build，不用 gluonfx:package（后者会尝试构建AAB）
+          # APK 会在 build 阶段生成
+          mvn -Pandroid clean gluonfx:build \
             -Dgluonfx.target.android.sdk=$ANDROID_SDK_ROOT \
             -Dgluonfx.verbose=true \
             -X \
             -e
+          
+          # 手动运行 assembleDebug 只生成 APK
+          if [ -d "target/gluonfx/aarch64-android/gvm/android_project" ]; then
+            cd target/gluonfx/aarch64-android/gvm/android_project
+            ./gradlew assembleDebug
+            cd -
+          fi
 
       # 4. 容错打印日志
       # 加了 if 判断，只有当目录存在时才打印，防止报错干扰判断
@@ -67,11 +71,11 @@ jobs:
       - name: List build artifacts
         run: |
           echo "Listing target directory structure..."
-          find target -name "*.apk" -o -name "*.aab" 2>/dev/null || echo "No APK/AAB files found"
+          find target -name "*.apk" 2>/dev/null || echo "No APK files found"
           echo "Full target/gluonfx structure:"
           ls -la target/gluonfx/ 2>/dev/null || echo "target/gluonfx not found"
           if [ -d "target/gluonfx" ]; then
-            find target/gluonfx -type f -name "*.apk" -o -name "*.aab"
+            find target/gluonfx -type f -name "*.apk"
           fi
 
       # 6. 上传APK
@@ -81,5 +85,4 @@ jobs:
           name: keenotes-android-apk
           path: |
             target/gluonfx/**/*.apk
-            target/gluonfx/**/*.aab
           if-no-files-found: warn
