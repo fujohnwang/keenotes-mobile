@@ -24,80 +24,35 @@ jobs:
         shell: bash
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=win"
 
-      - name: List target directory
-        run: ls -la target/
-        shell: bash
-
       - name: Create Windows EXE Installer
         shell: pwsh
         run: |
-          # Create module path from Maven dependencies
-          $MODULE_PATH = ""
-          $JAVAFX_VERSION = "23.0.1"
-          $JAVAFX_PLATFORM = "win"
-          
-          $modules = @("javafx-base", "javafx-graphics", "javafx-controls", "javafx-fxml")
-          foreach ($module in $modules) {
-            $JAR_PATH = "$env:USERPROFILE\.m2\repository\org\openjfx\$module\$JAVAFX_VERSION\$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
-            if (Test-Path $JAR_PATH) {
-              if ($MODULE_PATH -ne "") { $MODULE_PATH += ";" }
-              $MODULE_PATH += $JAR_PATH
-            }
-          }
-          
           jpackage `
             --input target `
             --name KeeNotes `
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar `
-            --main-class cn.keevol.keenotes.mobilefx.Main `
+            --main-class org.springframework.boot.loader.launch.JarLauncher `
             --type exe `
             --app-version 1.0.0 `
             --vendor "Keevol" `
             --icon "src/main/resources/icons/app-icon.ico" `
-            --module-path "$MODULE_PATH" `
-            --add-modules "javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql" `
-            --java-options "--enable-native-access=ALL-UNNAMED" `
             --java-options "-Xmx512m" `
             --dest dist
 
       - name: Create Windows MSI Installer
         shell: pwsh
         run: |
-          # Create module path from Maven dependencies
-          $MODULE_PATH = ""
-          $JAVAFX_VERSION = "23.0.1"
-          $JAVAFX_PLATFORM = "win"
-          
-          $modules = @("javafx-base", "javafx-graphics", "javafx-controls", "javafx-fxml")
-          foreach ($module in $modules) {
-            $JAR_PATH = "$env:USERPROFILE\.m2\repository\org\openjfx\$module\$JAVAFX_VERSION\$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
-            if (Test-Path $JAR_PATH) {
-              if ($MODULE_PATH -ne "") { $MODULE_PATH += ";" }
-              $MODULE_PATH += $JAR_PATH
-            }
-          }
-          
           jpackage `
             --input target `
             --name KeeNotes `
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar `
-            --main-class cn.keevol.keenotes.mobilefx.Main `
+            --main-class org.springframework.boot.loader.launch.JarLauncher `
             --type msi `
             --app-version 1.0.0 `
             --vendor "Keevol" `
             --icon "src/main/resources/icons/app-icon.ico" `
-            --module-path "$MODULE_PATH" `
-            --add-modules "javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql" `
-            --java-options "--enable-native-access=ALL-UNNAMED" `
             --java-options "-Xmx512m" `
             --dest dist
-
-      - name: List Windows build artifacts
-        shell: bash
-        run: |
-          echo "Windows build artifacts:"
-          ls -la dist/ || echo "No dist directory found"
-          find dist -name "*.exe" -o -name "*.msi" 2>/dev/null || echo "No installers found"
 
       - name: Upload Windows Installers
         uses: actions/upload-artifact@v4
@@ -112,10 +67,10 @@ jobs:
         include:
           - arch: mac
             name-suffix: Intel
-            runner: macos-15-intel  # Intel macOS runner - updated from macos-13
+            runner: macos-13
           - arch: mac-aarch64  
             name-suffix: AppleSilicon
-            runner: macos-latest  # Apple Silicon macOS runner - updated from macos-latest
+            runner: macos-latest
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
@@ -127,114 +82,42 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Show system info
-        run: |
-          echo "System architecture: $(uname -m)"
-          echo "Java architecture: $(java -XshowSettings:properties -version 2>&1 | grep 'os.arch')"
-          echo "Building for: ${{ matrix.arch }}"
-
       - name: Build JAR for ${{ matrix.arch }}
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=${{ matrix.arch }}"
 
-      - name: List target directory
-        run: ls -la target/
-
-      - name: Verify JAR architecture
-        run: |
-          echo "Checking JAR contents for native libraries..."
-          jar tf target/keenotes-mobile-1.0.0-SNAPSHOT.jar | grep -E '\.(dylib|jnilib)$' || echo "No native libraries found in JAR"
-
       - name: Create macOS DMG for ${{ matrix.name-suffix }}
         run: |
-          # Extract JavaFX modules for jpackage
-          mkdir -p javafx-jmods
-          
-          # Download JavaFX jmods for the current architecture
-          JAVAFX_VERSION=23.0.1
-          if [ "${{ matrix.arch }}" = "mac-aarch64" ]; then
-            JAVAFX_PLATFORM="mac-aarch64"
-          else
-            JAVAFX_PLATFORM="mac"
-          fi
-          
-          # Create module path from Maven dependencies
-          MODULE_PATH=""
-          for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
-            JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
-            if [ -f "$JAR_PATH" ]; then
-              MODULE_PATH="$MODULE_PATH:$JAR_PATH"
-            fi
-          done
-          MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
-          
           jpackage \
             --input target \
             --name "KeeNotes-${{ matrix.name-suffix }}" \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class cn.keevol.keenotes.mobilefx.Main \
+            --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type dmg \
             --app-version 1.0.0 \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/keenotes.icns" \
             --mac-package-identifier "cn.keevol.keenotes" \
             --mac-package-name "KeeNotes" \
-            --module-path "$MODULE_PATH" \
-            --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
-            --java-options "--enable-native-access=ALL-UNNAMED" \
             --java-options "-Xmx512m" \
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
 
       - name: Create macOS PKG for ${{ matrix.name-suffix }}
         run: |
-          # Create module path from Maven dependencies
-          MODULE_PATH=""
-          JAVAFX_VERSION=23.0.1
-          if [ "${{ matrix.arch }}" = "mac-aarch64" ]; then
-            JAVAFX_PLATFORM="mac-aarch64"
-          else
-            JAVAFX_PLATFORM="mac"
-          fi
-          
-          for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
-            JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
-            if [ -f "$JAR_PATH" ]; then
-              MODULE_PATH="$MODULE_PATH:$JAR_PATH"
-            fi
-          done
-          MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
-          
           jpackage \
             --input target \
             --name "KeeNotes-${{ matrix.name-suffix }}" \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class cn.keevol.keenotes.mobilefx.Main \
+            --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type pkg \
             --app-version 1.0.0 \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/keenotes.icns" \
             --mac-package-identifier "cn.keevol.keenotes" \
             --mac-package-name "KeeNotes" \
-            --module-path "$MODULE_PATH" \
-            --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
-            --java-options "--enable-native-access=ALL-UNNAMED" \
             --java-options "-Xmx512m" \
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
-
-      - name: Verify app architecture
-        run: |
-          echo "Checking app architecture..."
-          if [ -d "dist/KeeNotes-${{ matrix.name-suffix }}.app" ]; then
-            file "dist/KeeNotes-${{ matrix.name-suffix }}.app/Contents/MacOS/"*
-            lipo -info "dist/KeeNotes-${{ matrix.name-suffix }}.app/Contents/MacOS/"* 2>/dev/null || echo "lipo info not available"
-          fi
-
-      - name: List macOS build artifacts for ${{ matrix.name-suffix }}
-        run: |
-          echo "macOS build artifacts for ${{ matrix.name-suffix }}:"
-          ls -la dist/ || echo "No dist directory found"
-          find dist -name "*.dmg" -o -name "*.pkg" 2>/dev/null || echo "No packages found"
 
       - name: Upload macOS Packages (${{ matrix.name-suffix }})
         uses: actions/upload-artifact@v4
@@ -258,67 +141,32 @@ jobs:
       - name: Build JAR
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=linux"
 
-      - name: List target directory
-        run: ls -la target/
-
       - name: Create DEB Package
         run: |
-          # Create module path from Maven dependencies
-          MODULE_PATH=""
-          JAVAFX_VERSION=23.0.1
-          JAVAFX_PLATFORM="linux"
-          
-          for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
-            JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
-            if [ -f "$JAR_PATH" ]; then
-              MODULE_PATH="$MODULE_PATH:$JAR_PATH"
-            fi
-          done
-          MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
-          
           jpackage \
             --input target \
             --name keenotes \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class cn.keevol.keenotes.mobilefx.Main \
+            --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type deb \
             --app-version 1.0.0 \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/icon-512.png" \
-            --module-path "$MODULE_PATH" \
-            --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
-            --java-options "--enable-native-access=ALL-UNNAMED" \
             --java-options "-Xmx512m" \
             --linux-shortcut \
             --dest dist
 
       - name: Create RPM Package
         run: |
-          # Create module path from Maven dependencies
-          MODULE_PATH=""
-          JAVAFX_VERSION=23.0.1
-          JAVAFX_PLATFORM="linux"
-          
-          for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
-            JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
-            if [ -f "$JAR_PATH" ]; then
-              MODULE_PATH="$MODULE_PATH:$JAR_PATH"
-            fi
-          done
-          MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
-          
           jpackage \
             --input target \
             --name keenotes \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class cn.keevol.keenotes.mobilefx.Main \
+            --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type rpm \
             --app-version 1.0.0 \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/icon-512.png" \
-            --module-path "$MODULE_PATH" \
-            --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
-            --java-options "--enable-native-access=ALL-UNNAMED" \
             --java-options "-Xmx512m" \
             --linux-shortcut \
             --dest dist
@@ -327,43 +175,6 @@ jobs:
         run: |
           mkdir -p dist
           cp target/keenotes-mobile-1.0.0-SNAPSHOT.jar dist/keenotes-linux-standalone.jar
-
-      - name: Create AppImage (if available)
-        run: |
-          # Create module path from Maven dependencies
-          MODULE_PATH=""
-          JAVAFX_VERSION=23.0.1
-          JAVAFX_PLATFORM="linux"
-          
-          for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
-            JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
-            if [ -f "$JAR_PATH" ]; then
-              MODULE_PATH="$MODULE_PATH:$JAR_PATH"
-            fi
-          done
-          MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
-          
-          # Try to create AppImage if jpackage supports it
-          jpackage \
-            --input target \
-            --name keenotes \
-            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class cn.keevol.keenotes.mobilefx.Main \
-            --type app-image \
-            --app-version 1.0.0 \
-            --vendor "Keevol" \
-            --icon "src/main/resources/icons/icon-512.png" \
-            --module-path "$MODULE_PATH" \
-            --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
-            --java-options "--enable-native-access=ALL-UNNAMED" \
-            --java-options "-Xmx512m" \
-            --dest dist || echo "AppImage creation not supported on this platform"
-
-      - name: List Linux build artifacts
-        run: |
-          echo "Linux build artifacts:"
-          ls -la dist/ || echo "No dist directory found"
-          find dist -name "*.deb" -o -name "*.rpm" -o -name "*.jar" 2>/dev/null || echo "No packages found"
 
       - name: Upload Linux Packages
         uses: actions/upload-artifact@v4

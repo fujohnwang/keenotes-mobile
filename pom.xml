@@ -182,7 +182,7 @@
     </build>
 
     <profiles>
-        <!-- Desktop profile (default) -->
+        <!-- Desktop profile (default) - 使用 spring-boot-maven-plugin 打 fat jar -->
         <profile>
             <id>desktop</id>
             <activation>
@@ -218,32 +218,16 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-shade-plugin</artifactId>
-                        <version>3.5.1</version>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <version>3.2.1</version>
                         <executions>
                             <execution>
-                                <phase>package</phase>
                                 <goals>
-                                    <goal>shade</goal>
+                                    <goal>repackage</goal>
                                 </goals>
                                 <configuration>
-                                    <transformers>
-                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                            <mainClass>${main.class}</mainClass>
-                                        </transformer>
-                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                                    </transformers>
-                                    <filters>
-                                        <filter>
-                                            <artifact>*:*</artifact>
-                                            <excludes>
-                                                <exclude>META-INF/*.SF</exclude>
-                                                <exclude>META-INF/*.DSA</exclude>
-                                                <exclude>META-INF/*.RSA</exclude>
-                                            </excludes>
-                                        </filter>
-                                    </filters>
+                                    <mainClass>${main.class}</mainClass>
                                 </configuration>
                             </execution>
                         </executions>

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Universal macOS build script - builds for both Intel and Apple Silicon
+# 使用 spring-boot-maven-plugin 打 fat jar
 
 echo "Building Universal macOS packages..."
 echo "Current system architecture: $(uname -m)"
@@ -16,44 +17,19 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "Verifying Intel JAR contents..."
-jar tf target/keenotes-mobile-1.0.0-SNAPSHOT.jar | grep -E '\.(dylib|jnilib)$' | head -5 || echo "No native libraries found"
-
-# Create Intel package
 mkdir -p dist/intel
-
-# Create module path from Maven dependencies
-MODULE_PATH=""
-JAVAFX_VERSION=23.0.1
-JAVAFX_PLATFORM="mac"
-
-for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
-    JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
-    if [ -f "$JAR_PATH" ]; then
-        MODULE_PATH="$MODULE_PATH:$JAR_PATH"
-        echo "Found JavaFX module: $module"
-    else
-        echo "Missing JavaFX module: $module at $JAR_PATH"
-    fi
-done
-MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
-
-echo "JavaFX Module Path: $MODULE_PATH"
 
 jpackage \
     --input target \
     --name "KeeNotes-Intel" \
     --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-    --main-class cn.keevol.keenotes.mobilefx.Main \
+    --main-class org.springframework.boot.loader.launch.JarLauncher \
     --type dmg \
     --app-version 1.0.0 \
     --vendor "Keevol" \
     --icon "src/main/resources/icons/keenotes.icns" \
     --mac-package-identifier "cn.keevol.keenotes" \
     --mac-package-name "KeeNotes" \
-    --module-path "$MODULE_PATH" \
-    --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
-    --java-options "--enable-native-access=ALL-UNNAMED" \
     --java-options "-Xmx512m" \
     --java-options "-Xdock:name=KeeNotes" \
     --dest dist/intel
@@ -66,44 +42,19 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "Verifying Apple Silicon JAR contents..."
-jar tf target/keenotes-mobile-1.0.0-SNAPSHOT.jar | grep -E '\.(dylib|jnilib)$' | head -5 || echo "No native libraries found"
-
-# Create Apple Silicon package
 mkdir -p dist/apple-silicon
-
-# Create module path from Maven dependencies
-MODULE_PATH=""
-JAVAFX_VERSION=23.0.1
-JAVAFX_PLATFORM="mac-aarch64"
-
-for module in javafx-base javafx-graphics javafx-controls javafx-fxml; do
-    JAR_PATH="$HOME/.m2/repository/org/openjfx/$module/$JAVAFX_VERSION/$module-$JAVAFX_VERSION-$JAVAFX_PLATFORM.jar"
-    if [ -f "$JAR_PATH" ]; then
-        MODULE_PATH="$MODULE_PATH:$JAR_PATH"
-        echo "Found JavaFX module: $module"
-    else
-        echo "Missing JavaFX module: $module at $JAR_PATH"
-    fi
-done
-MODULE_PATH="${MODULE_PATH:1}"  # Remove leading colon
-
-echo "JavaFX Module Path: $MODULE_PATH"
 
 jpackage \
     --input target \
     --name "KeeNotes-AppleSilicon" \
     --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-    --main-class cn.keevol.keenotes.mobilefx.Main \
+    --main-class org.springframework.boot.loader.launch.JarLauncher \
     --type dmg \
     --app-version 1.0.0 \
     --vendor "Keevol" \
     --icon "src/main/resources/icons/keenotes.icns" \
     --mac-package-identifier "cn.keevol.keenotes" \
     --mac-package-name "KeeNotes" \
-    --module-path "$MODULE_PATH" \
-    --add-modules javafx.controls,javafx.fxml,java.logging,java.desktop,java.net.http,java.sql \
-    --java-options "--enable-native-access=ALL-UNNAMED" \
     --java-options "-Xmx512m" \
     --java-options "-Xdock:name=KeeNotes" \
     --dest dist/apple-silicon
@@ -111,16 +62,3 @@ jpackage \
 echo "Universal macOS build completed!"
 echo "Intel version: dist/intel/KeeNotes-Intel-1.0.0.dmg"
 echo "Apple Silicon version: dist/apple-silicon/KeeNotes-AppleSilicon-1.0.0.dmg"
-
-# Verify architectures if possible
-echo ""
-echo "Verifying app architectures..."
-if [ -d "dist/intel/KeeNotes-Intel.app" ]; then
-    echo "Intel app:"
-    file "dist/intel/KeeNotes-Intel.app/Contents/MacOS/"* 2>/dev/null || echo "Intel app binary not found"
-fi
-
-if [ -d "dist/apple-silicon/KeeNotes-AppleSilicon.app" ]; then
-    echo "Apple Silicon app:"
-    file "dist/apple-silicon/KeeNotes-AppleSilicon.app/Contents/MacOS/"* 2>/dev/null || echo "Apple Silicon app binary not found"
-fi
