@@ -590,7 +590,18 @@ public class MainViewV2 extends BorderPane {
                                     } catch (Exception ex) {
                                         gluonPlatform = "error: " + ex.getMessage();
                                     }
+                                    
+                                    // 获取初始化步骤
+                                    String initStep = "unknown";
+                                    try {
+                                        LocalCacheService cache = LocalCacheService.getInstance();
+                                        initStep = cache.getInitStep();
+                                    } catch (Exception ex) {
+                                        initStep = "getInstance failed: " + ex.getMessage();
+                                    }
+                                    
                                     String diagInfo = "State: INITIALIZING (stuck)\n" +
+                                                     "Init Step: " + initStep + "\n" +
                                                      "Gluon Platform: " + gluonPlatform + "\n" +
                                                      "os.name: " + System.getProperty("os.name", "unknown") + "\n" +
                                                      "os.arch: " + System.getProperty("os.arch", "unknown");
