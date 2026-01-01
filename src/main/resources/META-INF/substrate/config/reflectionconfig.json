@@ -57,6 +57,31 @@
     "allDeclaredConstructors": true
   },
   {
+    "name": "org.sqldroid.SQLDroidDriver",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqldroid.SQLDroidConnection",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqldroid.SQLDroidStatement",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqldroid.SQLDroidPreparedStatement",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqldroid.SQLDroidResultSet",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
     "name": "okhttp3.OkHttpClient",
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true

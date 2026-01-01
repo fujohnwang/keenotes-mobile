@@ -17,18 +17,54 @@ import java.util.Optional;
  * 本地缓存服务，管理客户端的SQLite数据库
  * - 存储从服务器同步的笔记（已解密内容，用于搜索）
  * - 存储同步状态（last_sync_id）
+ * 
+ * 平台支持：
+ * - Desktop: 使用 SQLite JDBC (org.sqlite.JDBC)
+ * - Android: 使用 SQLDroid (org.sqldroid.SQLDroidDriver)
  */
 public class LocalCacheService {
     private static final String DB_NAME = "keenotes_cache.db";
     private static LocalCacheService instance;
-    private final Path dbPath;
+    private String dbPathString;  // 使用String而不是Path，因为Android上Path可能有问题
     private Connection connection;
     private final CryptoService cryptoService;
     private volatile boolean initialized = false;
+    
+    // 平台检测
+    private final boolean isAndroid;
 
     private LocalCacheService() {
         this.cryptoService = new CryptoService();
-        this.dbPath = resolveDbPath();
+        this.isAndroid = detectAndroid();
+        this.dbPathString = resolveDbPath();
+        
+        System.out.println("[LocalCache] Platform: " + (isAndroid ? "Android (SQLDroid)" : "Desktop (SQLite JDBC)"));
+        System.out.println("[LocalCache] Database path: " + dbPathString);
+    }
+    
+    /**
+     * 检测是否在Android平台上运行
+     */
+    private boolean detectAndroid() {
+        String vmName = System.getProperty("java.vm.name", "").toLowerCase();
+        String vmVendor = System.getProperty("java.vm.vendor", "").toLowerCase();
+        
+        // GraalVM Native Image / Substrate VM 用于 Android
+        boolean isSubstrate = vmName.contains("substrate") || vmVendor.contains("gluon");
+        
+        // 检查是否有Android特定的类
+        boolean hasAndroidClasses = false;
+        try {
+            Class.forName("android.database.sqlite.SQLiteDatabase");
+            hasAndroidClasses = true;
+        } catch (ClassNotFoundException e) {
+            // 不是Android
+        }
+        
+        System.out.println("[LocalCache] VM: " + vmName + ", Vendor: " + vmVendor);
+        System.out.println("[LocalCache] isSubstrate: " + isSubstrate + ", hasAndroidClasses: " + hasAndroidClasses);
+        
+        return isSubstrate || hasAndroidClasses;
     }
 
     /**
@@ -64,24 +100,17 @@ public class LocalCacheService {
     }
 
     /**
-     * 构建JDBC URL，支持Android特定配置
+     * 构建JDBC URL
+     * - Desktop: jdbc:sqlite:/path/to/db
+     * - Android: jdbc:sqldroid:/path/to/db
      */
     private String buildJdbcUrl() {
-        // 基础URL
-        String baseUrl = "jdbc:sqlite:" + dbPath;
-        
-        // 检查是否是Android/移动平台
-        String osName = System.getProperty("os.name", "").toLowerCase();
-        boolean isMobile = osName.contains("android") || osName.contains("linux");
-        
-        if (isMobile) {
-            // Android特定配置：禁用WAL模式，使用更保守的设置
-            System.out.println("[LocalCache] Using Android-specific SQLite configuration");
-            return baseUrl + "?journal_mode=DELETE&synchronous=FULL&cache_size=2000&timeout=30000";
+        if (isAndroid) {
+            // SQLDroid URL格式
+            return "jdbc:sqldroid:" + dbPathString;
         } else {
-            // 桌面环境：使用更激进的配置以提高性能
-            System.out.println("[LocalCache] Using desktop SQLite configuration");
-            return baseUrl + "?journal_mode=WAL&synchronous=NORMAL&cache_size=10000&timeout=30000";
+            // SQLite JDBC URL格式，带优化参数
+            return "jdbc:sqlite:" + dbPathString + "?journal_mode=WAL&synchronous=NORMAL&cache_size=10000&timeout=30000";
         }
     }
 
@@ -101,155 +130,78 @@ public class LocalCacheService {
         }
     }
 
-    private Path resolveDbPath() {
+    private String resolveDbPath() {
         System.out.println("[LocalCache] Resolving database path...");
         System.out.println("[LocalCache] OS: " + System.getProperty("os.name"));
         System.out.println("[LocalCache] Java version: " + System.getProperty("java.version"));
-        System.out.println("[LocalCache] User home: " + System.getProperty("user.home"));
-        System.out.println("[LocalCache] Temp dir: " + System.getProperty("java.io.tmpdir"));
         
-        // 尝试多个路径候选
-        List<Path> candidatePaths = new ArrayList<>();
-        
-        // 1. 尝试Gluon Attach StorageService (Android/iOS)
+        // 1. 优先使用 Gluon Attach StorageService (Android/iOS)
         try {
             Optional<File> privateStorage = StorageService.create()
                     .flatMap(StorageService::getPrivateStorage);
             
             if (privateStorage.isPresent()) {
-                Path path = privateStorage.get().toPath().resolve(DB_NAME);
-                System.out.println("[LocalCache] Candidate 1 (Gluon private): " + path);
-                candidatePaths.add(path);
+                File storageDir = privateStorage.get();
+                File dbFile = new File(storageDir, DB_NAME);
+                System.out.println("[LocalCache] Using Gluon private storage: " + dbFile.getAbsolutePath());
+                return dbFile.getAbsolutePath();
             }
         } catch (Exception e) {
-            System.err.println("[LocalCache] Gluon storage error: " + e.getMessage());
+            System.out.println("[LocalCache] Gluon storage not available: " + e.getMessage());
         }
         
-        // 2. 尝试临时目录 (Android应用缓存目录)
-        try {
-            String tempDir = System.getProperty("java.io.tmpdir");
-            if (tempDir != null && !tempDir.isEmpty()) {
-                Path path = Path.of(tempDir).resolve(DB_NAME);
-                System.out.println("[LocalCache] Candidate 2 (temp dir): " + path);
-                candidatePaths.add(path);
-            }
-        } catch (Exception e) {
-            System.err.println("[LocalCache] Temp dir error: " + e.getMessage());
-        }
-        
-        // 3. 尝试用户主目录
+        // 2. 桌面环境：使用用户主目录
         try {
             String userHome = System.getProperty("user.home");
             if (userHome != null && !userHome.isEmpty()) {
                 Path path = Path.of(userHome, ".keenotes", DB_NAME);
-                System.out.println("[LocalCache] Candidate 3 (user home): " + path);
-                candidatePaths.add(path);
+                Files.createDirectories(path.getParent());
+                System.out.println("[LocalCache] Using user home: " + path);
+                return path.toString();
             }
         } catch (Exception e) {
-            System.err.println("[LocalCache] User home error: " + e.getMessage());
+            System.out.println("[LocalCache] User home not available: " + e.getMessage());
         }
         
-        // 4. 尝试当前工作目录
-        try {
-            String currentDir = System.getProperty("user.dir");
-            if (currentDir != null && !currentDir.isEmpty()) {
-                Path path = Path.of(currentDir, ".keenotes", DB_NAME);
-                System.out.println("[LocalCache] Candidate 4 (current dir): " + path);
-                candidatePaths.add(path);
-            }
-        } catch (Exception e) {
-            System.err.println("[LocalCache] Current dir error: " + e.getMessage());
-        }
-        
-        // 选择第一个可用的路径
-        for (Path path : candidatePaths) {
-            try {
-                // 尝试创建目录
-                if (path.getParent() != null) {
-                    Files.createDirectories(path.getParent());
-                    System.out.println("[LocalCache] Created directory: " + path.getParent());
-                }
-                
-                // 验证目录可写
-                if (path.getParent() != null && Files.isWritable(path.getParent())) {
-                    System.out.println("[LocalCache] Using database path: " + path);
-                    return path;
-                } else {
-                    System.out.println("[LocalCache] Path not writable: " + path);
-                }
-            } catch (Exception e) {
-                System.out.println("[LocalCache] Failed to use path " + path + ": " + e.getMessage());
-            }
-        }
-        
-        // 如果所有路径都失败，使用最后一个候选路径作为回退
-        if (!candidatePaths.isEmpty()) {
-            Path fallbackPath = candidatePaths.get(candidatePaths.size() - 1);
-            System.out.println("[LocalCache] Using fallback path: " + fallbackPath);
-            try {
-                if (fallbackPath.getParent() != null) {
-                    Files.createDirectories(fallbackPath.getParent());
-                }
-            } catch (Exception e) {
-                System.err.println("[LocalCache] Failed to create fallback directory: " + e.getMessage());
-            }
-            return fallbackPath;
-        }
-        
-        // 最后的回退方案
-        Path lastResort = Path.of(System.getProperty("user.home", "/tmp"), ".keenotes", DB_NAME);
-        System.out.println("[LocalCache] Using last resort path: " + lastResort);
-        try {
-            if (lastResort.getParent() != null) {
-                Files.createDirectories(lastResort.getParent());
-            }
-        } catch (Exception e) {
-            System.err.println("[LocalCache] Failed to create last resort directory: " + e.getMessage());
-        }
-        return lastResort;
+        // 3. 回退到临时目录
+        String tempDir = System.getProperty("java.io.tmpdir", "/tmp");
+        String fallback = tempDir + File.separator + DB_NAME;
+        System.out.println("[LocalCache] Using fallback path: " + fallback);
+        return fallback;
     }
 
     private void initDatabase() {
         try {
             System.out.println("[LocalCache] Starting database initialization...");
-            System.out.println("[LocalCache] Database path: " + dbPath);
-            System.out.println("[LocalCache] Java version: " + System.getProperty("java.version"));
-            System.out.println("[LocalCache] OS name: " + System.getProperty("os.name"));
-            System.out.println("[LocalCache] User home: " + System.getProperty("user.home"));
+            System.out.println("[LocalCache] Database path: " + dbPathString);
+            System.out.println("[LocalCache] Platform: " + (isAndroid ? "Android" : "Desktop"));
             
-            // 确保SQLite驱动已加载
-            try {
-                Class.forName("org.sqlite.JDBC");
-                System.out.println("[LocalCache] SQLite JDBC driver loaded successfully");
-            } catch (ClassNotFoundException e) {
-                System.err.println("[LocalCache] SQLite JDBC driver not found: " + e.getMessage());
-                throw new RuntimeException("SQLite JDBC driver not available", e);
-            }
-
-            // 确保目录存在并可写
-            if (dbPath.getParent() != null) {
+            // 加载对应平台的JDBC驱动
+            if (isAndroid) {
+                // Android: 使用 SQLDroid
                 try {
-                    Files.createDirectories(dbPath.getParent());
-                    System.out.println("[LocalCache] Database directory created: " + dbPath.getParent());
-                    
-                    // 验证目录可写
-                    if (!Files.isWritable(dbPath.getParent())) {
-                        System.err.println("[LocalCache] Database directory is not writable: " + dbPath.getParent());
-                        throw new RuntimeException("Database directory is not writable: " + dbPath.getParent());
-                    }
-                    System.out.println("[LocalCache] Database directory is writable");
+                    DriverManager.registerDriver((Driver) Class.forName("org.sqldroid.SQLDroidDriver").newInstance());
+                    System.out.println("[LocalCache] SQLDroid driver registered successfully");
                 } catch (Exception e) {
-                    System.err.println("[LocalCache] Failed to create database directory: " + e.getMessage());
-                    throw new RuntimeException("Failed to create database directory", e);
+                    System.err.println("[LocalCache] SQLDroid driver not found: " + e.getMessage());
+                    throw new RuntimeException("SQLDroid driver not available", e);
+                }
+            } else {
+                // Desktop: 使用 SQLite JDBC
+                try {
+                    Class.forName("org.sqlite.JDBC");
+                    System.out.println("[LocalCache] SQLite JDBC driver loaded successfully");
+                } catch (ClassNotFoundException e) {
+                    System.err.println("[LocalCache] SQLite JDBC driver not found: " + e.getMessage());
+                    throw new RuntimeException("SQLite JDBC driver not available", e);
                 }
             }
 
-            System.out.println("[LocalCache] Connecting to database: " + dbPath);
-            
-            // 构建JDBC URL，支持Android特定配置
+            // 构建JDBC URL
             String jdbcUrl = buildJdbcUrl();
             System.out.println("[LocalCache] JDBC URL: " + jdbcUrl);
             
+            // 建立连接
             connection = DriverManager.getConnection(jdbcUrl);
             
             // 验证连接
@@ -258,10 +210,8 @@ public class LocalCacheService {
             }
             System.out.println("[LocalCache] Database connection established successfully");
 
-            // 创建本地缓存表
+            // 创建表
             Statement stmt = connection.createStatement();
-            
-            // Android特定：设置更宽松的超时
             stmt.setQueryTimeout(30);
             
             System.out.println("[LocalCache] Creating tables...");
@@ -269,10 +219,10 @@ public class LocalCacheService {
             stmt.executeUpdate(
                 "CREATE TABLE IF NOT EXISTS notes_cache (" +
                 "  id INTEGER PRIMARY KEY, " +
-                "  content TEXT NOT NULL, " +  // 解密后的内容，用于本地搜索
+                "  content TEXT NOT NULL, " +
                 "  channel TEXT DEFAULT 'mobile', " +
                 "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                "  encrypted_content TEXT, " +  // 加密的原始内容（可选）
+                "  encrypted_content TEXT, " +
                 "  is_dirty INTEGER DEFAULT 0" +
                 ")");
             System.out.println("[LocalCache] notes_cache table created");
@@ -285,7 +235,7 @@ public class LocalCacheService {
             // 创建同步状态表
             stmt.executeUpdate(
                 "CREATE TABLE IF NOT EXISTS sync_state (" +
-                "  id INTEGER PRIMARY KEY CHECK (id = 1), " +
+                "  id INTEGER PRIMARY KEY, " +
                 "  last_sync_id INTEGER DEFAULT -1, " +
                 "  last_sync_time DATETIME" +
                 ")");
@@ -302,7 +252,7 @@ public class LocalCacheService {
         } catch (SQLException e) {
             System.err.println("[LocalCache] Database initialization failed!");
             System.err.println("[LocalCache] Error: " + e.getMessage());
-            System.err.println("[LocalCache] Database path: " + dbPath);
+            System.err.println("[LocalCache] Database path: " + dbPathString);
             e.printStackTrace();
             throw new RuntimeException("Database initialization failed", e);
         } catch (Exception e) {

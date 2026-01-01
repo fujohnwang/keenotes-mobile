@@ -239,6 +239,14 @@
         <!-- Android profile -->
         <profile>
             <id>android</id>
+            <dependencies>
+                <!-- SQLDroid - Android JDBC driver -->
+                <dependency>
+                    <groupId>org.sqldroid</groupId>
+                    <artifactId>sqldroid</artifactId>
+                    <version>1.0.3</version>
+                </dependency>
+            </dependencies>
             <build>
                 <plugins>
                     <!-- Android版需要module-info.java -->
@@ -267,27 +275,14 @@
                         <configuration>
                             <target>android</target>
                             <nativeImageArgs>
-                                <!-- SQLite 相关类需要在构建时初始化 -->
-                                <arg>--initialize-at-build-time=org.sqlite.util.ProcessRunner</arg>
-                                <arg>--initialize-at-build-time=org.sqlite.util.OSInfo</arg>
-                                <arg>--initialize-at-build-time=org.sqlite.SQLiteJDBCLoader</arg>
-                                <arg>--initialize-at-build-time=org.sqlite.JDBC</arg>
+                                <!-- SQLDroid 使用 Android 原生 SQLite，不需要 JNI 配置 -->
                                 <!-- OkHttp / Vert.x 相关 - 运行时初始化 -->
                                 <arg>--initialize-at-run-time=okhttp3</arg>
                                 <arg>--initialize-at-run-time=okio</arg>
                                 <arg>--initialize-at-run-time=io.vertx</arg>
                                 <!-- SSL 相关 -->
                                 <arg>--initialize-at-run-time=javax.net.ssl</arg>
-                                <!-- 允许不完整的类路径 -->
-                                <arg>--allow-incomplete-classpath</arg>
-                                <!-- 报告未支持的元素 -->
-                                <arg>--report-unsupported-elements-at-runtime</arg>
-                                <!-- JNI 配置 -->
-                                <arg>-H:JNIConfigurationFiles=src/main/resources/META-INF/native-image/jni-config.json</arg>
                             </nativeImageArgs>
-                            <bundlesList>
-                                <list>org.sqlite.JDBC</list>
-                            </bundlesList>
                         </configuration>
                     </plugin>
                 </plugins>
