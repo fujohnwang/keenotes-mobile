@@ -119,20 +119,6 @@ public class LocalCacheService {
             initLog.append("Platform: ").append(isAndroid ? "Android" : "Desktop").append("\n");
             initLog.append("DB Path: ").append(dbPathString).append("\n");
             
-            // 加载 JDBC 驱动
-            initStep = "loading JDBC driver";
-            if (isAndroid) {
-                // Android: 使用 SQLDroid
-                initLog.append("Loading SQLDroid driver...\n");
-                Class.forName("org.sqldroid.SQLDroidDriver");
-                initLog.append("SQLDroid driver loaded OK\n");
-            } else {
-                // Desktop: 使用 SQLite JDBC
-                initLog.append("Loading SQLite JDBC driver...\n");
-                Class.forName("org.sqlite.JDBC");
-                initLog.append("SQLite JDBC driver loaded OK\n");
-            }
-
             // 构建 JDBC URL
             initStep = "building JDBC URL";
             String jdbcUrl;
@@ -148,10 +134,59 @@ public class LocalCacheService {
             // 建立连接
             initStep = "connecting to DB";
             initLog.append("Connecting...\n");
-            connection = DriverManager.getConnection(jdbcUrl);
+            
+            if (isAndroid) {
+                // Android: 直接实例化 SQLDroid Driver 并创建连接
+                // 避免 DriverManager 在 Native Image 中的问题
+                initStep = "creating SQLDroid driver";
+                initLog.append("Creating SQLDroid driver instance...\n");
+                
+                Class<?> driverClass = Class.forName("org.sqldroid.SQLDroidDriver");
+                initLog.append("Driver class loaded: ").append(driverClass.getName()).append("\n");
+                
+                initStep = "instantiating driver";
+                java.sql.Driver driver = (java.sql.Driver) driverClass.getDeclaredConstructor().newInstance();
+                initLog.append("Driver instantiated OK\n");
+                
+                initStep = "calling driver.connect()";
+                initLog.append("Calling driver.connect()...\n");
+                
+                // 使用带超时的连接尝试
+                final java.sql.Driver finalDriver = driver;
+                final String finalUrl = jdbcUrl;
+                final Connection[] connHolder = new Connection[1];
+                final Exception[] errHolder = new Exception[1];
+                
+                Thread connectThread = new Thread(() -> {
+                    try {
+                        connHolder[0] = finalDriver.connect(finalUrl, new java.util.Properties());
+                    } catch (Exception e) {
+                        errHolder[0] = e;
+                    }
+                }, "SQLDroidConnect");
+                connectThread.start();
+                connectThread.join(10000); // 10秒超时
+                
+                if (connectThread.isAlive()) {
+                    connectThread.interrupt();
+                    throw new SQLException("SQLDroid connection timeout (10s). " +
+                        "This usually means android.database.sqlite classes are not accessible in Native Image.");
+                }
+                
+                if (errHolder[0] != null) {
+                    throw errHolder[0];
+                }
+                
+                connection = connHolder[0];
+                initLog.append("driver.connect() returned\n");
+            } else {
+                // Desktop: 使用标准 DriverManager
+                Class.forName("org.sqlite.JDBC");
+                connection = DriverManager.getConnection(jdbcUrl);
+            }
             
             if (connection == null || connection.isClosed()) {
-                throw new SQLException("Failed to establish database connection");
+                throw new SQLException("Failed to establish database connection - connection is null or closed");
             }
             initStep = "connected OK";
             initLog.append("Connected OK\n");
