@@ -1,83 +1,33 @@
 package cn.keevol.keenotes.mobilefx;
 
 import java.net.URI;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 
 /**
  * API Service V2 - 只保留POST功能
  * 搜索和回顾功能已移到本地LocalCacheService
- * 
- * 使用 OkHttp 替代 java.net.http.HttpClient 以解决 SSL 握手问题
  */
 public class ApiServiceV2 {
 
-    private static final int TIMEOUT_SECONDS = 30;
+    private static final Duration TIMEOUT = Duration.ofSeconds(30);
     private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
-    private final OkHttpClient httpClient;
+    private final HttpClient httpClient;
     private final SettingsService settings;
     private final CryptoService cryptoService;
 
     public ApiServiceV2() {
-        this.httpClient = createHttpClient();
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(TIMEOUT)
+                .build();
         this.settings = SettingsService.getInstance();
         this.cryptoService = new CryptoService();
-    }
-
-    /**
-     * 创建配置好的 OkHttpClient，支持更宽松的 SSL/TLS 配置
-     */
-    private OkHttpClient createHttpClient() {
-        try {
-            // 创建信任所有证书的 TrustManager（开发/测试用）
-            // 生产环境应该使用正确的证书验证
-            TrustManager[] trustAllCerts = new TrustManager[]{
-                new X509TrustManager() {
-                    @Override
-                    public void checkClientTrusted(X509Certificate[] chain, String authType) {}
-                    @Override
-                    public void checkServerTrusted(X509Certificate[] chain, String authType) {}
-                    @Override
-                    public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-                }
-            };
-
-            // 创建 SSLContext，使用 TLS 1.2/1.3
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, trustAllCerts, new SecureRandom());
-
-            return new OkHttpClient.Builder()
-                    .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager) trustAllCerts[0])
-                    .hostnameVerifier((hostname, session) -> true)
-                    .build();
-        } catch (Exception e) {
-            System.err.println("[ApiServiceV2] Failed to create SSL-enabled client, using default: " + e.getMessage());
-            // 回退到默认配置
-            return new OkHttpClient.Builder()
-                    .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .build();
-        }
     }
 
     /**
@@ -126,28 +76,26 @@ public class ApiServiceV2 {
 
             String jsonPayload = buildJsonPayload(encryptedContent, timestamp);
 
-            Request request = new Request.Builder()
-                    .url(endpointUrl)
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(endpointUrl))
+                    .timeout(TIMEOUT)
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + token)
-                    .post(RequestBody.create(jsonPayload, JSON))
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();
 
             final String originalContent = content;
-            
-            return CompletableFuture.supplyAsync(() -> {
-                try (Response response = httpClient.newCall(request).execute()) {
-                    if (response.isSuccessful()) {
-                        String responseBody = response.body() != null ? response.body().string() : "";
-                        Long noteId = parseNoteId(responseBody);
-                        return ApiResult.success(originalContent, noteId);
-                    } else {
-                        return ApiResult.failure("Server error: " + response.code());
-                    }
-                } catch (Exception e) {
-                    return ApiResult.failure("Network error: " + e.getMessage());
-                }
-            });
+            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                            // 解析返回的id
+                            Long noteId = parseNoteId(response.body());
+                            return ApiResult.success(originalContent, noteId);
+                        } else {
+                            return ApiResult.failure("Server error: " + response.statusCode());
+                        }
+                    })
+                    .exceptionally(ex -> ApiResult.failure("Network error: " + ex.getMessage()));
         } catch (Exception e) {
             return CompletableFuture.completedFuture(
                     ApiResult.failure("Encryption failed: " + e.getMessage()));

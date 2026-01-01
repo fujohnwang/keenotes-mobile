@@ -77,35 +77,9 @@ public class WebSocketClientService {
                 .connectionPool(new ConnectionPool(0, 5, TimeUnit.SECONDS)); // 无空闲连接，5秒清理
 
         if (ssl) {
-            // 配置 SSL/TLS 以解决握手失败问题
-            try {
-                // 创建信任所有证书的 TrustManager（开发/测试用）
-                javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[]{
-                    new javax.net.ssl.X509TrustManager() {
-                        @Override
-                        public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-                        @Override
-                        public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-                        @Override
-                        public java.security.cert.X509Certificate[] getAcceptedIssuers() { 
-                            return new java.security.cert.X509Certificate[0]; 
-                        }
-                    }
-                };
-
-                // 创建 SSLContext，使用 TLS
-                javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS");
-                sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
-
-                builder.sslSocketFactory(sslContext.getSocketFactory(), 
-                        (javax.net.ssl.X509TrustManager) trustAllCerts[0]);
-                builder.hostnameVerifier((hostname, session) -> true);
-                
-                logger.info("SSL/TLS configured with trust-all certificates");
-            } catch (Exception e) {
-                logger.warning("Failed to configure SSL: " + e.getMessage() + ", using default");
-                builder.hostnameVerifier((hostname, session) -> true);
-            }
+            // 信任所有证书（仅用于开发/测试环境）
+            // 生产环境应该使用正确的证书验证
+            builder.hostnameVerifier((hostname, session) -> true);
         }
 
         this.httpClient = builder.build();
@@ -286,40 +260,10 @@ public class WebSocketClientService {
      * 断开连接
      */
     public void disconnect() {
-        System.out.println("[WebSocket] Disconnecting...");
         if (webSocket != null) {
             webSocket.close(1000, "Client disconnect");
         }
         cleanup();
-    }
-
-    /**
-     * 强制重新连接（断开旧连接并建立新连接）
-     */
-    public void reconnect() {
-        System.out.println("[WebSocket] Force reconnecting...");
-        
-        // 断开旧连接
-        if (isConnected.get()) {
-            disconnect();
-            
-            // 等待断开完成
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-        
-        // 建立新连接
-        connect();
-    }
-
-    /**
-     * 检查是否已连接
-     */
-    public boolean isConnected() {
-        return isConnected.get();
     }
 
     /**
@@ -678,6 +622,10 @@ public class WebSocketClientService {
 
     private void notifyError(String message) {
         listeners.forEach(l -> l.onError(message));
+    }
+
+    public boolean isConnected() {
+        return isConnected.get();
     }
 
     public boolean isSyncing() {
