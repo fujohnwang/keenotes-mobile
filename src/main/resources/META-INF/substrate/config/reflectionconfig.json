@@ -24,5 +24,61 @@
     "name": "com.sun.javafx.font.PrismFontFile",
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqlite.JDBC",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqlite.SQLiteConnection",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqlite.core.NativeDB",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.sqlite.core.DB",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqlite.SQLiteJDBCLoader",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqlite.util.OSInfo",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "okhttp3.OkHttpClient",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "okhttp3.internal.platform.Platform",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "javax.net.ssl.SSLContext",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "javax.net.ssl.TrustManager",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "javax.net.ssl.X509TrustManager",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
   }
 ]

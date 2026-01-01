@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="cn.keevol.keenotes">
+
+    <!-- 网络权限 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- 存储权限（用于SQLite数据库） -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    
+    <!-- 允许明文HTTP（如果需要） -->
+    <application
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config">
+    </application>
+
+</manifest>
