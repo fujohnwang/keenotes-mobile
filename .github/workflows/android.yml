@@ -30,7 +30,7 @@ jobs:
           tar -xzf gluon-graalvm.tar.gz -C gluon-gvm --strip-components=1
           echo "GRAALVM_HOME=$PWD/gluon-gvm" >> $GITHUB_ENV
 
-      # 3. 构建 APK (只构建APK，不构建AAB)
+      # 3. 构建 APK (跳过AAB构建)
       - name: Build APK
         env:
           # 直接引用 GitHub Action 环境自带的 Android SDK 路径变量
@@ -39,20 +39,13 @@ jobs:
           echo "Using Android SDK at: $ANDROID_SDK_ROOT"
           echo "Building Android APK..."
           
-          # 只用 gluonfx:build，不用 gluonfx:package（后者会尝试构建AAB）
-          # APK 会在 build 阶段生成
-          mvn -Pandroid clean gluonfx:build \
+          # 使用 gluonfx:build 和 gluonfx:package，但跳过 AAB 构建
+          mvn -Pandroid clean gluonfx:build gluonfx:package \
             -Dgluonfx.target.android.sdk=$ANDROID_SDK_ROOT \
+            -Dgluonfx.skipAAB=true \
             -Dgluonfx.verbose=true \
             -X \
             -e
-          
-          # 手动运行 assembleDebug 只生成 APK
-          if [ -d "target/gluonfx/aarch64-android/gvm/android_project" ]; then
-            cd target/gluonfx/aarch64-android/gvm/android_project
-            ./gradlew assembleDebug
-            cd -
-          fi
 
       # 4. 容错打印日志
       # 加了 if 判断，只有当目录存在时才打印，防止报错干扰判断
