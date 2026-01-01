@@ -71,6 +71,12 @@
     "allDeclaredConstructors": true
   },
   {
+    "name": "org.sqldroid.SQLiteDatabase",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true
+  },
+  {
     "name": "android.database.sqlite.SQLiteDatabase",
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true,

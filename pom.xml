@@ -288,8 +288,13 @@
                                 <arg>--initialize-at-run-time=io.vertx</arg>
                                 <!-- SSL 相关 -->
                                 <arg>--initialize-at-run-time=javax.net.ssl</arg>
-                                <!-- SQLDroid 运行时初始化 -->
-                                <arg>--initialize-at-run-time=org.sqldroid</arg>
+                                <!-- SQLDroid 所有类 - 运行时初始化 -->
+                                <arg>--initialize-at-run-time=org.sqldroid.SQLDroidDriver</arg>
+                                <arg>--initialize-at-run-time=org.sqldroid.SQLDroidConnection</arg>
+                                <arg>--initialize-at-run-time=org.sqldroid.SQLiteDatabase</arg>
+                                <arg>--initialize-at-run-time=org.sqldroid.SQLDroidStatement</arg>
+                                <arg>--initialize-at-run-time=org.sqldroid.SQLDroidPreparedStatement</arg>
+                                <arg>--initialize-at-run-time=org.sqldroid.SQLDroidResultSet</arg>
                                 <!-- Android SQLite 类 - 运行时初始化 -->
                                 <arg>--initialize-at-run-time=android.database.sqlite</arg>
                                 <arg>--initialize-at-run-time=android.database</arg>

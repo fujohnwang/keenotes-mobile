@@ -200,6 +200,30 @@ public class LocalCacheService {
                     initStep = "trying direct SQLDroidConnection";
                     initLog.append("Trying direct SQLDroidConnection instantiation...\n");
                     
+                    // 首先尝试加载 org.sqldroid.SQLiteDatabase 看看具体错误
+                    try {
+                        initLog.append("Trying to load org.sqldroid.SQLiteDatabase...\n");
+                        Class<?> sqliteDbClass = Class.forName("org.sqldroid.SQLiteDatabase");
+                        initLog.append("org.sqldroid.SQLiteDatabase loaded OK: ").append(sqliteDbClass.getName()).append("\n");
+                    } catch (ExceptionInInitializerError eiie) {
+                        Throwable cause = eiie.getCause();
+                        initLog.append("SQLiteDatabase init error: ").append(cause != null ? cause.getClass().getName() + " - " + cause.getMessage() : "unknown").append("\n");
+                        if (cause != null && cause.getCause() != null) {
+                            initLog.append("Root cause: ").append(cause.getCause().getClass().getName()).append(" - ").append(cause.getCause().getMessage()).append("\n");
+                        }
+                    } catch (NoClassDefFoundError ncdfe) {
+                        initLog.append("SQLiteDatabase NoClassDefFoundError: ").append(ncdfe.getMessage()).append("\n");
+                        // 尝试加载 Android SQLite 类
+                        try {
+                            Class<?> androidDb = Class.forName("android.database.sqlite.SQLiteDatabase");
+                            initLog.append("android.database.sqlite.SQLiteDatabase loaded: ").append(androidDb.getName()).append("\n");
+                        } catch (Throwable t) {
+                            initLog.append("Android SQLiteDatabase load failed: ").append(t.getClass().getName()).append(" - ").append(t.getMessage()).append("\n");
+                        }
+                    } catch (Throwable t) {
+                        initLog.append("SQLiteDatabase load error: ").append(t.getClass().getName()).append(" - ").append(t.getMessage()).append("\n");
+                    }
+                    
                     try {
                         // 尝试直接创建 SQLDroidConnection
                         Class<?> connClass = Class.forName("org.sqldroid.SQLDroidConnection");
