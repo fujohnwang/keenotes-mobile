@@ -583,12 +583,53 @@ public class MainViewV2 extends BorderPane {
                                 if (currentState != ServiceManager.InitializationState.INITIALIZING) {
                                     Platform.runLater(() -> loadReviewNotes(period));
                                 } else {
-                                    // 初始化超时，显示错误
+                                    // 初始化超时，显示诊断信息
+                                    String gluonPlatform = "unknown";
+                                    try {
+                                        gluonPlatform = com.gluonhq.attach.util.Platform.getCurrent().name();
+                                    } catch (Exception ex) {
+                                        gluonPlatform = "error: " + ex.getMessage();
+                                    }
+                                    String diagInfo = "State: INITIALIZING (stuck)\n" +
+                                                     "Gluon Platform: " + gluonPlatform + "\n" +
+                                                     "os.name: " + System.getProperty("os.name", "unknown") + "\n" +
+                                                     "os.arch: " + System.getProperty("os.arch", "unknown");
+                                    String errorMsg = serviceManager.getLocalCacheErrorMessage();
+                                    if (errorMsg != null) {
+                                        diagInfo += "\nError: " + errorMsg;
+                                    }
+                                    final String finalDiag = diagInfo;
+                                    
                                     Platform.runLater(() -> {
                                         reviewResultsContainer.getChildren().clear();
-                                        Label errorLabel = new Label("Cache initialization timeout. Please try again.");
-                                        errorLabel.getStyleClass().add("error-message");
-                                        reviewResultsContainer.getChildren().add(errorLabel);
+                                        
+                                        VBox errorBox = new VBox(12);
+                                        errorBox.setPadding(new Insets(16));
+                                        errorBox.setAlignment(Pos.CENTER);
+                                        
+                                        Label errorTitle = new Label("Cache Initialization Timeout");
+                                        errorTitle.getStyleClass().add("error-title");
+                                        
+                                        Label errorDetail = new Label(finalDiag);
+                                        errorDetail.getStyleClass().add("error-detail");
+                                        errorDetail.setWrapText(true);
+                                        
+                                        Button retryBtn = new Button("Retry");
+                                        retryBtn.getStyleClass().addAll("action-button", "primary");
+                                        retryBtn.setOnAction(e -> {
+                                            serviceManager.retryLocalCacheInitialization();
+                                            new Thread(() -> {
+                                                try {
+                                                    Thread.sleep(1000);
+                                                    Platform.runLater(() -> loadReviewNotes(period));
+                                                } catch (InterruptedException ex) {
+                                                    Thread.currentThread().interrupt();
+                                                }
+                                            }).start();
+                                        });
+                                        
+                                        errorBox.getChildren().addAll(errorTitle, errorDetail, retryBtn);
+                                        reviewResultsContainer.getChildren().add(errorBox);
                                     });
                                 }
                             } catch (InterruptedException e) {
