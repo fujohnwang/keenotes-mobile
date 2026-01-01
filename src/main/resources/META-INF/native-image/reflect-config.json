@@ -36,12 +36,68 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "org.sqlite.SQLiteJDBCLoader",
+    "name": "org.sqldroid.SQLDroidDriver",
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "org.sqlite.util.OSInfo",
+    "name": "org.sqldroid.SQLDroidConnection",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqldroid.SQLDroidStatement",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqldroid.SQLDroidPreparedStatement",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqldroid.SQLDroidResultSet",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqldroid.SQLDroidResultSetMetaData",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqldroid.SQLDroidDatabaseMetaData",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "android.database.sqlite.SQLiteDatabase",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "android.database.sqlite.SQLiteOpenHelper",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "android.database.sqlite.SQLiteStatement",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "android.database.Cursor",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "android.database.sqlite.SQLiteCursor",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "android.content.ContentValues",
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },

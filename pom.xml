@@ -239,12 +239,11 @@
         <profile>
             <id>android</id>
             <dependencies>
-                <!-- 尝试使用 xerial sqlite-jdbc，看看是否能在 Android 上工作 -->
-                <!-- 如果不行，需要考虑其他方案 -->
+                <!-- SQLDroid - Android JDBC driver，内部使用 Android 原生 SQLite -->
                 <dependency>
-                    <groupId>org.xerial</groupId>
-                    <artifactId>sqlite-jdbc</artifactId>
-                    <version>3.44.1.0</version>
+                    <groupId>org.sqldroid</groupId>
+                    <artifactId>sqldroid</artifactId>
+                    <version>1.0.3</version>
                 </dependency>
             </dependencies>
             <build>
@@ -289,9 +288,12 @@
                                 <arg>--initialize-at-run-time=io.vertx</arg>
                                 <!-- SSL 相关 -->
                                 <arg>--initialize-at-run-time=javax.net.ssl</arg>
-                                <!-- SQLite JDBC 相关 -->
-                                <arg>--initialize-at-run-time=org.sqlite.core.NativeDB</arg>
-                                <arg>--initialize-at-run-time=org.sqlite.SQLiteJDBCLoader</arg>
+                                <!-- SQLDroid 运行时初始化 -->
+                                <arg>--initialize-at-run-time=org.sqldroid</arg>
+                                <!-- Android SQLite 类 - 运行时初始化 -->
+                                <arg>--initialize-at-run-time=android.database.sqlite</arg>
+                                <arg>--initialize-at-run-time=android.database</arg>
+                                <arg>--initialize-at-run-time=android.content</arg>
                             </nativeImageArgs>
                         </configuration>
                     </plugin>
