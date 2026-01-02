@@ -18,6 +18,11 @@ public class SettingsView extends BorderPane {
     private final SettingsService settings;
     private final Runnable onBack;
     private final Runnable onOpenDebug;
+    
+    // Easter egg: tap copyright 7 times to show debug
+    private int copyrightTapCount = 0;
+    private long lastTapTime = 0;
+    private VBox debugSection;
 
     public SettingsView(Runnable onBack, Runnable onOpenDebug) {
         this.onBack = onBack;
@@ -53,9 +58,10 @@ public class SettingsView extends BorderPane {
         saveButton.setMaxWidth(Double.MAX_VALUE);
         saveButton.setOnAction(e -> saveSettings());
 
-        // Copyright footer
+        // Copyright footer with easter egg
         Label copyrightLabel = new Label("©2025 王福强(Fuqiang Wang)  All Rights Reserved");
         copyrightLabel.getStyleClass().add("copyright-label");
+        copyrightLabel.setOnMouseClicked(e -> onCopyrightTap());
 
         Label websiteLabel = new Label("https://afoo.me");
         websiteLabel.getStyleClass().add("copyright-link");
@@ -67,7 +73,7 @@ public class SettingsView extends BorderPane {
         Label encryptionHint = new Label("Leave both empty to disable E2E encryption");
         encryptionHint.getStyleClass().add("field-hint");
 
-        // Debug entry
+        // Debug entry (hidden by default)
         Button debugBtn = new Button("Debug");
         debugBtn.getStyleClass().add("debug-entry-btn");
         debugBtn.setMaxWidth(Double.MAX_VALUE);
@@ -76,8 +82,10 @@ public class SettingsView extends BorderPane {
         Label debugHint = new Label("Click to access debug tools (for development)");
         debugHint.getStyleClass().add("field-hint");
 
-        VBox debugSection = new VBox(4, debugBtn, debugHint);
+        debugSection = new VBox(4, debugBtn, debugHint);
         debugSection.setPadding(new Insets(8, 0, 0, 0));
+        debugSection.setVisible(false);
+        debugSection.setManaged(false);
 
         VBox form = new VBox(16,
                 createFieldGroup("Endpoint URL", endpointField),
@@ -107,11 +115,17 @@ public class SettingsView extends BorderPane {
 
         Label title = new Label("Settings");
         title.getStyleClass().add("header-title");
+        title.setMaxWidth(Double.MAX_VALUE);
+        title.setAlignment(Pos.CENTER);
 
-        HBox spacer = new HBox();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        // Use StackPane for true centering - title centered, back button overlaid on left
+        StackPane headerStack = new StackPane();
+        headerStack.getChildren().addAll(title, backBtn);
+        StackPane.setAlignment(backBtn, Pos.CENTER_LEFT);
+        StackPane.setAlignment(title, Pos.CENTER);
+        HBox.setHgrow(headerStack, Priority.ALWAYS);
 
-        HBox header = new HBox(8, backBtn, title, spacer);
+        HBox header = new HBox(headerStack);
         header.getStyleClass().add("header");
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(8, 12, 8, 12));
@@ -130,6 +144,32 @@ public class SettingsView extends BorderPane {
         label.getStyleClass().add("field-label");
         VBox group = new VBox(6, label, field, hint);
         return group;
+    }
+
+    /**
+     * Easter egg: tap copyright 7 times to reveal debug section
+     */
+    private void onCopyrightTap() {
+        long now = System.currentTimeMillis();
+        
+        // Reset count if more than 1 second since last tap
+        if (now - lastTapTime > 1000) {
+            copyrightTapCount = 0;
+        }
+        lastTapTime = now;
+        copyrightTapCount++;
+        
+        if (copyrightTapCount >= 7 && !debugSection.isVisible()) {
+            debugSection.setVisible(true);
+            debugSection.setManaged(true);
+            statusLabel.setText("Debug mode enabled!");
+            statusLabel.getStyleClass().removeAll("error", "success");
+            statusLabel.getStyleClass().add("success");
+        } else if (copyrightTapCount >= 4 && copyrightTapCount < 7) {
+            int remaining = 7 - copyrightTapCount;
+            statusLabel.setText(remaining + " more tap(s) to enable debug mode");
+            statusLabel.getStyleClass().removeAll("error", "success");
+        }
     }
 
     private void loadSettings() {
