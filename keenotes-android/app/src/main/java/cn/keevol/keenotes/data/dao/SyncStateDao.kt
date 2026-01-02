@@ -17,4 +17,7 @@ interface SyncStateDao {
     
     @Query("DELETE FROM sync_state")
     suspend fun reset()
+    
+    @Query("DELETE FROM sync_state")
+    suspend fun clearSyncState()
 }

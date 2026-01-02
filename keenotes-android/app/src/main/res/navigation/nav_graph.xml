@@ -40,6 +40,19 @@
     <fragment
         android:id="@+id/settingsFragment"
         android:name="cn.keevol.keenotes.ui.settings.SettingsFragment"
-        android:label="Settings" />
+        android:label="Settings">
+        <action
+            android:id="@+id/action_settings_to_debug"
+            app:destination="@id/debugFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/debugFragment"
+        android:name="cn.keevol.keenotes.ui.debug.DebugFragment"
+        android:label="Debug" />
 
 </navigation>

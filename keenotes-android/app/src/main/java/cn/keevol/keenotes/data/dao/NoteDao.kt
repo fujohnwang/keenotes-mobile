@@ -13,6 +13,12 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE createdAt >= :since ORDER BY id DESC")
     suspend fun getNotesForReview(since: String): List<Note>
     
+    /**
+     * Flow version - auto-updates when database changes
+     */
+    @Query("SELECT * FROM notes WHERE createdAt >= :since ORDER BY id DESC")
+    fun getNotesForReviewFlow(since: String): Flow<List<Note>>
+    
     @Query("SELECT * FROM notes ORDER BY id DESC LIMIT :limit")
     suspend fun getRecentNotes(limit: Int = 100): List<Note>
     
