@@ -9,7 +9,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 /**
  * API service for posting notes
@@ -18,11 +25,39 @@ class ApiService(
     private val settingsRepository: SettingsRepository,
     private val cryptoService: CryptoService
 ) {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .build()
+    companion object {
+        private val TS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    }
+    
+    private val client: OkHttpClient = createClient()
+    
+    private fun createClient(): OkHttpClient {
+        return try {
+            // Trust all certificates (for development)
+            val trustAll = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<X509Certificate>?, authType: String?) {}
+                override fun checkServerTrusted(chain: Array<X509Certificate>?, authType: String?) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            })
+            
+            val sslContext = SSLContext.getInstance("TLS")
+            sslContext.init(null, trustAll, SecureRandom())
+            
+            OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .sslSocketFactory(sslContext.socketFactory, trustAll[0] as X509TrustManager)
+                .hostnameVerifier { _, _ -> true }
+                .build()
+        } catch (e: Exception) {
+            OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .build()
+        }
+    }
     
     data class PostResult(
         val success: Boolean,
@@ -40,20 +75,23 @@ class ApiService(
                 return@withContext PostResult(false, "Please configure server settings first")
             }
             
-            // Encrypt if enabled
-            val (finalContent, isEncrypted) = if (cryptoService.isEncryptionEnabled()) {
-                cryptoService.encrypt(content) to true
-            } else {
-                content to false
+            if (!cryptoService.isEncryptionEnabled()) {
+                return@withContext PostResult(false, "PIN code not set")
             }
             
-            // Build JSON body
+            // Encrypt content
+            val encrypted = cryptoService.encrypt(content)
+            val ts = LocalDateTime.now().format(TS_FORMATTER)
+            
+            // Build JSON body - match JavaFX format exactly
             val json = JSONObject().apply {
-                put("content", finalContent)
-                put("encrypted", isEncrypted)
+                put("channel", "mobile")
+                put("text", encrypted)
+                put("ts", ts)
+                put("encrypted", true)
             }
             
-            val requestBody = json.toString().toRequestBody("application/json".toMediaType())
+            val requestBody = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
             
             val request = Request.Builder()
                 .url(endpoint)
@@ -66,8 +104,7 @@ class ApiService(
             val responseBody = response.body?.string()
             
             if (response.isSuccessful && responseBody != null) {
-                val responseJson = JSONObject(responseBody)
-                val noteId = responseJson.optLong("id", -1).takeIf { it > 0 }
+                val noteId = parseNoteId(responseBody)
                 PostResult(
                     success = true,
                     message = "Note saved successfully",
@@ -85,6 +122,15 @@ class ApiService(
                 success = false,
                 message = "Network error: ${e.message}"
             )
+        }
+    }
+    
+    private fun parseNoteId(body: String): Long? {
+        return try {
+            val json = JSONObject(body)
+            json.optLong("id", -1).takeIf { it > 0 }
+        } catch (e: Exception) {
+            null
         }
     }
 }
