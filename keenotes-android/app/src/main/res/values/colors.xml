@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark Theme Colors -->
+    <color name="primary">#00D4FF</color>
+    <color name="primary_dark">#00A8CC</color>
+    <color name="background">#0D1117</color>
+    <color name="surface">#161B22</color>
+    <color name="surface_elevated">#21262D</color>
+    <color name="text_primary">#E6EDF3</color>
+    <color name="text_secondary">#8B949E</color>
+    <color name="border">#30363D</color>
+    <color name="success">#3FB950</color>
+    <color name="error">#F85149</color>
+    <color name="warning">#FFC107</color>
+    <color name="accent_glow">#2600D4FF</color>
+</resources>
