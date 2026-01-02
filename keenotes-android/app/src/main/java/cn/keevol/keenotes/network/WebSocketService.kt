@@ -184,6 +184,21 @@ class WebSocketService(
         webSocket?.close(1000, "User disconnect")
         webSocket = null
         _connectionState.value = ConnectionState.DISCONNECTED
+        _syncState.value = SyncState.IDLE
+    }
+    
+    /**
+     * Reset internal state for reconnection with new configuration
+     */
+    fun resetState() {
+        lastSyncId = -1
+        cachedPassword = null
+        synchronized(syncBatchBuffer) {
+            syncBatchBuffer.clear()
+        }
+        expectedBatches = 0
+        receivedBatches = 0
+        _syncState.value = SyncState.IDLE
     }
     
     private fun createWebSocketListener() = object : WebSocketListener() {

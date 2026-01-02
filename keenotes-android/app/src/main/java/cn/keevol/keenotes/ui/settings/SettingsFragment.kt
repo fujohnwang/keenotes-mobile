@@ -110,6 +110,19 @@ class SettingsFragment : Fragment() {
         val app = requireActivity().application as KeeNotesApp
         
         lifecycleScope.launch {
+            // Get old settings to detect changes
+            val oldEndpoint = app.settingsRepository.endpointUrl.first()
+            val oldToken = app.settingsRepository.token.first()
+            val oldPassword = app.settingsRepository.encryptionPassword.first()
+            val wasConfigured = oldEndpoint.isNotBlank() && oldToken.isNotBlank()
+            
+            // Check if configuration changed
+            val endpointChanged = oldEndpoint != endpoint
+            val tokenChanged = oldToken != token
+            val passwordChanged = oldPassword != password
+            val configurationChanged = endpointChanged || tokenChanged || passwordChanged
+            
+            // Save new settings
             app.settingsRepository.saveSettings(endpoint, token, password)
             
             val msg = if (password.isNotEmpty()) {
@@ -118,13 +131,47 @@ class SettingsFragment : Fragment() {
                 "Settings saved ✓"
             }
             
-            binding.statusText.text = msg
-            binding.statusText.setTextColor(requireContext().getColor(R.color.success))
-            
-            // Reconnect WebSocket with new settings
-            app.webSocketService.disconnect()
-            if (endpoint.isNotBlank() && token.isNotBlank()) {
+            if (configurationChanged && wasConfigured) {
+                // Configuration changed: need to reset state and reconnect
+                binding.statusText.text = "Configuration changed, reconnecting..."
+                binding.statusText.setTextColor(requireContext().getColor(R.color.success))
+                
+                // 1. Disconnect old WebSocket and reset internal state
+                app.webSocketService.disconnect()
+                app.webSocketService.resetState()
+                
+                // 2. Reset sync state (set lastSyncId to -1 to trigger full re-sync)
+                app.database.syncStateDao().clearSyncState()
+                
+                // 3. Clear notes if endpoint changed (different server = different data)
+                if (endpointChanged) {
+                    app.database.noteDao().deleteAll()
+                }
+                
+                // 4. Reconnect with new settings
+                if (endpoint.isNotBlank() && token.isNotBlank()) {
+                    app.webSocketService.connect()
+                    binding.statusText.text = "$msg (Reconnected)"
+                } else {
+                    binding.statusText.text = msg
+                }
+                
+            } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
+                // First time configuration
+                binding.statusText.text = msg
+                binding.statusText.setTextColor(requireContext().getColor(R.color.success))
                 app.webSocketService.connect()
+                
+            } else {
+                // No critical configuration change
+                binding.statusText.text = msg
+                binding.statusText.setTextColor(requireContext().getColor(R.color.success))
+                
+                // Still reconnect if configured (in case connection was lost)
+                app.webSocketService.disconnect()
+                if (endpoint.isNotBlank() && token.isNotBlank()) {
+                    app.webSocketService.connect()
+                }
             }
         }
     }
