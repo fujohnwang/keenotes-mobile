@@ -50,6 +50,9 @@ class WebSocketService(
     private var webSocket: WebSocket? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val clientId = UUID.randomUUID().toString()
+    
+    // Use @Volatile to ensure visibility across threads (OkHttp callbacks run on different thread)
+    @Volatile
     private var lastSyncId: Long = -1  // Match JavaFX: -1 means sync all
     
     // Batch sync buffer
@@ -129,10 +132,13 @@ class WebSocketService(
                 Log.i(TAG, "WebSocket connecting to: $wsUrl")
                 _connectionState.value = ConnectionState.CONNECTING
                 
-                // Load last sync ID (default -1 if not set)
-                val savedSyncId = syncStateDao.getSyncState()?.lastSyncId
-                lastSyncId = savedSyncId ?: -1
-                Log.i(TAG, "Loaded lastSyncId: $lastSyncId")
+                // CRITICAL: Load last sync ID BEFORE creating WebSocket
+                // OkHttp's onOpen callback runs on a different thread, so we must
+                // ensure lastSyncId is set before newWebSocket() is called
+                // If no sync_state record exists, use -1 (means never synced)
+                val syncState = syncStateDao.getSyncState()
+                lastSyncId = syncState?.lastSyncId ?: -1
+                Log.i(TAG, "Loaded lastSyncId: $lastSyncId (syncState exists: ${syncState != null})")
                 
                 // Build request with headers (match JavaFX)
                 val origin = "${if (ssl) "https" else "http"}://$host"
@@ -144,6 +150,8 @@ class WebSocketService(
                 
                 Log.i(TAG, "Adding Authorization header: Bearer ${token.take(4)}...")
                 
+                // Create WebSocket - onOpen callback will use the lastSyncId we just set
+                // @Volatile ensures lastSyncId is visible to OkHttp's callback thread
                 webSocket = client.newWebSocket(request, createWebSocketListener())
                 
             } catch (e: Exception) {
@@ -163,34 +171,41 @@ class WebSocketService(
     
     private fun createWebSocketListener() = object : WebSocketListener() {
         
-        override fun onOpen(webSocket: WebSocket, response: Response) {
-            Log.i(TAG, "WebSocket connected successfully")
+        override fun onOpen(ws: WebSocket, response: Response) {
+            Log.i(TAG, "WebSocket onOpen called, response code: ${response.code}")
             isConnecting = false
+            webSocket = ws  // Store the WebSocket reference
             _connectionState.value = ConnectionState.CONNECTED
             
             // Send handshake (matching JavaFX)
+            Log.i(TAG, "About to send handshake...")
             sendHandshake()
+            Log.i(TAG, "Handshake sent, waiting for server response...")
         }
         
-        override fun onMessage(webSocket: WebSocket, text: String) {
-            scope.launch {
+        override fun onMessage(ws: WebSocket, text: String) {
+            Log.i(TAG, "onMessage received, length=${text.length}")
+            // CRITICAL: Process messages synchronously to maintain order
+            // JavaFX processes messages synchronously in handleTextMessage()
+            // Using scope.launch would cause race conditions between sync_batch and sync_complete
+            runBlocking {
                 handleMessage(text)
             }
         }
         
-        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+        override fun onClosing(ws: WebSocket, code: Int, reason: String) {
             Log.i(TAG, "WebSocket closing: $code $reason")
-            webSocket.close(1000, null)
+            ws.close(1000, null)
         }
         
-        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+        override fun onClosed(ws: WebSocket, code: Int, reason: String) {
             Log.i(TAG, "WebSocket closed: $code $reason")
             isConnecting = false
             _connectionState.value = ConnectionState.DISCONNECTED
             scheduleReconnect()
         }
         
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+        override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
             Log.e(TAG, "WebSocket failure: ${t.message}", t)
             isConnecting = false
             _connectionState.value = ConnectionState.DISCONNECTED
@@ -199,32 +214,59 @@ class WebSocketService(
     }
     
     private fun sendHandshake() {
+        val ws = webSocket
+        if (ws == null) {
+            Log.e(TAG, "sendHandshake: webSocket is null!")
+            return
+        }
+        
+        // Log the current lastSyncId value
+        Log.i(TAG, "sendHandshake: current lastSyncId = $lastSyncId (type: ${lastSyncId::class.simpleName})")
+        
         val handshake = JSONObject().apply {
             put("type", "handshake")
             put("client_id", clientId)
             put("last_sync_id", lastSyncId)
         }
         
-        val sent = webSocket?.send(handshake.toString()) ?: false
-        Log.i(TAG, "Sent handshake with lastSyncId=$lastSyncId, success=$sent")
+        val message = handshake.toString()
+        Log.i(TAG, "Sending handshake JSON: $message")
+        
+        val sent = ws.send(message)
+        if (sent) {
+            Log.i(TAG, "Handshake sent successfully")
+        } else {
+            Log.e(TAG, "Failed to send handshake!")
+        }
     }
     
     private suspend fun handleMessage(text: String) {
         try {
-            Log.d(TAG, "Received message: $text")
+            Log.i(TAG, "Received message: $text")
             val json = JSONObject(text)
             val type = json.optString("type")
             
+            Log.i(TAG, "Processing message type: $type")
+            
             when (type) {
-                "sync_batch" -> handleSyncBatch(json)
-                "sync_complete" -> handleSyncComplete(json)
-                "realtime_update" -> handleRealtimeUpdate(json)
+                "sync_batch" -> {
+                    Log.i(TAG, "Handling sync_batch")
+                    handleSyncBatch(json)
+                }
+                "sync_complete" -> {
+                    Log.i(TAG, "Handling sync_complete")
+                    handleSyncComplete(json)
+                }
+                "realtime_update" -> {
+                    Log.i(TAG, "Handling realtime_update")
+                    handleRealtimeUpdate(json)
+                }
                 "ping" -> {
                     // Respond to server ping
                     webSocket?.send("{\"type\":\"pong\"}")
-                    Log.d(TAG, "Responded to ping with pong")
+                    Log.i(TAG, "Responded to ping with pong")
                 }
-                "pong" -> Log.d(TAG, "Received pong")
+                "pong" -> Log.i(TAG, "Received pong")
                 "error" -> {
                     val errorMsg = json.optString("message", "Unknown error")
                     Log.e(TAG, "Server error: $errorMsg")
@@ -236,7 +278,7 @@ class WebSocketService(
                 else -> Log.w(TAG, "Unknown message type: $type")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error handling message", e)
+            Log.e(TAG, "Error handling message: ${e.message}", e)
         }
     }
     
@@ -244,33 +286,48 @@ class WebSocketService(
         val batchId = json.optInt("batch_id", 0)
         val totalBatches = json.optInt("total_batches", 1)
         
+        Log.i(TAG, "handleSyncBatch: batch $batchId of $totalBatches")
+        
         if (expectedBatches == 0) {
             expectedBatches = totalBatches
             syncBatchBuffer.clear()
+            Log.i(TAG, "Starting new sync, expecting $totalBatches batches")
         }
         
-        val notesArray = json.optJSONArray("notes") ?: return
+        val notesArray = json.optJSONArray("notes")
+        if (notesArray == null) {
+            Log.w(TAG, "No notes array in sync_batch")
+            return
+        }
+        
+        Log.i(TAG, "Processing ${notesArray.length()} notes in batch")
         
         for (i in 0 until notesArray.length()) {
             val noteJson = notesArray.getJSONObject(i)
             val note = parseNote(noteJson)
             if (note != null) {
                 syncBatchBuffer.add(note)
+            } else {
+                Log.w(TAG, "Failed to parse note at index $i")
             }
         }
         
         receivedBatches++
-        Log.i(TAG, "Received batch $batchId/$totalBatches, buffer size=${syncBatchBuffer.size}")
+        Log.i(TAG, "Received batch $batchId/$totalBatches, buffer size=${syncBatchBuffer.size}, receivedBatches=$receivedBatches")
     }
     
     private suspend fun handleSyncComplete(json: JSONObject) {
         val totalSynced = json.optInt("total_synced", 0)
         val newLastSyncId = json.optLong("last_sync_id", -1L)
         
+        Log.i(TAG, "handleSyncComplete: totalSynced=$totalSynced, newLastSyncId=$newLastSyncId, bufferSize=${syncBatchBuffer.size}")
+        
         try {
             if (syncBatchBuffer.isNotEmpty()) {
                 noteDao.insertAll(syncBatchBuffer)
-                Log.i(TAG, "Batch inserted ${syncBatchBuffer.size} notes")
+                Log.i(TAG, "Batch inserted ${syncBatchBuffer.size} notes to database")
+            } else {
+                Log.i(TAG, "No notes in buffer to insert")
             }
             
             // Match JavaFX: only update if totalSynced > 0 and newLastSyncId > 0
@@ -279,16 +336,18 @@ class WebSocketService(
                 syncStateDao.updateSyncState(SyncState(lastSyncId = newLastSyncId, lastSyncTime = now))
                 lastSyncId = newLastSyncId
                 Log.i(TAG, "Updated lastSyncId to: $newLastSyncId")
+            } else {
+                Log.i(TAG, "Not updating lastSyncId: totalSynced=$totalSynced, newLastSyncId=$newLastSyncId")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to save synced notes", e)
+            Log.e(TAG, "Failed to save synced notes: ${e.message}", e)
         }
         
         syncBatchBuffer.clear()
         expectedBatches = 0
         receivedBatches = 0
         
-        Log.i(TAG, "Sync complete: $totalSynced notes")
+        Log.i(TAG, "Sync complete: $totalSynced notes processed")
     }
     
     private suspend fun handleRealtimeUpdate(json: JSONObject) {
@@ -316,20 +375,25 @@ class WebSocketService(
             val encryptedContent = json.getString("content")
             val createdAt = json.optString("created_at", json.optString("createdAt", ""))
             
+            Log.i(TAG, "parseNote: id=$id, createdAt=$createdAt, encryptionEnabled=${cryptoService.isEncryptionEnabled()}")
+            
             val content = if (cryptoService.isEncryptionEnabled()) {
                 try {
-                    cryptoService.decrypt(encryptedContent)
+                    val decrypted = cryptoService.decrypt(encryptedContent)
+                    Log.i(TAG, "Decrypted note $id successfully")
+                    decrypted
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to decrypt note $id", e)
-                    "[Decryption failed]"
+                    Log.e(TAG, "Failed to decrypt note $id: ${e.message}", e)
+                    "[Decryption failed: ${e.message}]"
                 }
             } else {
+                Log.i(TAG, "Encryption not enabled, using raw content for note $id")
                 encryptedContent
             }
             
             Note(id = id, content = content, createdAt = createdAt)
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing note", e)
+            Log.e(TAG, "Error parsing note JSON: ${e.message}", e)
             null
         }
     }

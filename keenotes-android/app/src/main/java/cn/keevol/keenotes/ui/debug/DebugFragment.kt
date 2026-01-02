@@ -149,6 +149,15 @@ class DebugFragment : Fragment() {
         if (state.name == "DISCONNECTED") {
             app.webSocketService.connect()
             statusText.text = "Attempting to connect..."
+        } else if (state.name == "CONNECTED") {
+            // Force reconnect to trigger sync
+            app.webSocketService.disconnect()
+            statusText.text = "Disconnected, reconnecting in 1s..."
+            lifecycleScope.launch {
+                kotlinx.coroutines.delay(1000)
+                app.webSocketService.connect()
+                statusText.text = "Reconnecting..."
+            }
         }
     }
 }
