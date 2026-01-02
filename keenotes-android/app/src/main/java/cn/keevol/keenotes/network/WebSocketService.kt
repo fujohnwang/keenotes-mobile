@@ -42,8 +42,15 @@ class WebSocketService(
         DISCONNECTED, CONNECTING, CONNECTED
     }
     
+    enum class SyncState {
+        IDLE, SYNCING, COMPLETED
+    }
+    
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState
+    
+    private val _syncState = MutableStateFlow(SyncState.IDLE)
+    val syncState: StateFlow<SyncState> = _syncState
     
     private val client: OkHttpClient = createClient()
     
@@ -299,6 +306,9 @@ class WebSocketService(
         Log.i(TAG, "handleSyncBatch: batch $batchId of $totalBatches")
         Log.i(TAG, "handleSyncBatch: raw JSON keys = ${json.keys().asSequence().toList()}")
         
+        // Set syncing state
+        _syncState.value = SyncState.SYNCING
+        
         if (expectedBatches == 0) {
             expectedBatches = totalBatches
             synchronized(syncBatchBuffer) {
@@ -385,6 +395,9 @@ class WebSocketService(
         }
         expectedBatches = 0
         receivedBatches = 0
+        
+        // Set sync completed state
+        _syncState.value = SyncState.COMPLETED
         
         Log.i(TAG, "Sync complete: $totalSynced notes processed")
     }

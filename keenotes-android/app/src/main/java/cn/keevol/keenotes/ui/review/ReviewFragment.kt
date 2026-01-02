@@ -14,8 +14,10 @@ import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.FragmentReviewBinding
+import cn.keevol.keenotes.network.WebSocketService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -77,6 +79,7 @@ class ReviewFragment : Fragment() {
     
     /**
      * Observe notes from database using Flow - auto-updates when data changes
+     * Also observes sync state to show appropriate empty message
      */
     private fun observeNotes(period: String) {
         val app = requireActivity().application as KeeNotesApp
@@ -98,13 +101,25 @@ class ReviewFragment : Fragment() {
         val since = Instant.now().minus(days.toLong(), ChronoUnit.DAYS).toString()
         
         notesJob = lifecycleScope.launch {
-            app.database.noteDao().getNotesForReviewFlow(since).collectLatest { notes ->
+            // Combine notes flow with sync state flow
+            combine(
+                app.database.noteDao().getNotesForReviewFlow(since),
+                app.webSocketService.syncState
+            ) { notes, syncState ->
+                Pair(notes, syncState)
+            }.collectLatest { (notes, syncState) ->
                 binding.loadingText.visibility = View.GONE
                 
                 if (notes.isEmpty()) {
                     binding.emptyText.visibility = View.VISIBLE
                     binding.notesRecyclerView.visibility = View.GONE
-                    binding.emptyText.text = "No notes found for $period"
+                    
+                    // Show different message based on sync state
+                    binding.emptyText.text = when (syncState) {
+                        WebSocketService.SyncState.SYNCING -> "Notes syncing..."
+                        WebSocketService.SyncState.IDLE -> "Waiting for sync..."
+                        WebSocketService.SyncState.COMPLETED -> "No notes found for $period"
+                    }
                     binding.countText.text = "0 note(s)"
                 } else {
                     binding.emptyText.visibility = View.GONE
