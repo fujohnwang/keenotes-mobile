@@ -104,7 +104,7 @@
                 android:layout_height="48dp"
                 android:layout_marginTop="6dp"
                 android:background="@drawable/bg_input_field"
-                android:hint="E2E encryption password (optional)"
+                android:hint="E2E encryption password (required)"
                 android:textColorHint="@color/text_secondary"
                 android:textColor="@color/text_primary"
                 android:paddingHorizontal="16dp"
@@ -137,8 +137,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="Leave both empty to disable E2E encryption"
-                android:textColor="@color/text_secondary"
+                android:text="⚠️ Remember your password! Without it, notes cannot be decrypted."
+                android:textColor="@color/warning"
                 android:textSize="12sp" />
 
             <!-- Save Button -->
