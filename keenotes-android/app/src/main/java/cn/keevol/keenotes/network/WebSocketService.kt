@@ -55,8 +55,13 @@ class WebSocketService(
     @Volatile
     private var lastSyncId: Long = -1  // Match JavaFX: -1 means sync all
     
-    // Batch sync buffer
-    private val syncBatchBuffer = mutableListOf<Note>()
+    // Cached encryption password to avoid nested runBlocking calls
+    @Volatile
+    private var cachedPassword: String? = null
+    
+    // Batch sync buffer - use synchronized list for thread safety
+    private val syncBatchBuffer = java.util.Collections.synchronizedList(mutableListOf<Note>())
+    @Volatile
     private var expectedBatches = 0
     private var receivedBatches = 0
     
@@ -111,6 +116,11 @@ class WebSocketService(
                     isConnecting = false
                     return@launch
                 }
+                
+                // CRITICAL: Cache the encryption password BEFORE WebSocket connection
+                // This avoids nested runBlocking calls in onMessage callback
+                cachedPassword = settingsRepository.getEncryptionPassword().takeIf { it.isNotBlank() }
+                Log.i(TAG, "Cached encryption password: ${if (cachedPassword != null) "yes (${cachedPassword!!.length} chars)" else "no"}")
                 
                 // Parse URL and build WebSocket URL
                 val uri = URI(endpoint)
@@ -287,33 +297,49 @@ class WebSocketService(
         val totalBatches = json.optInt("total_batches", 1)
         
         Log.i(TAG, "handleSyncBatch: batch $batchId of $totalBatches")
+        Log.i(TAG, "handleSyncBatch: raw JSON keys = ${json.keys().asSequence().toList()}")
         
         if (expectedBatches == 0) {
             expectedBatches = totalBatches
-            syncBatchBuffer.clear()
+            synchronized(syncBatchBuffer) {
+                syncBatchBuffer.clear()
+            }
             Log.i(TAG, "Starting new sync, expecting $totalBatches batches")
         }
         
         val notesArray = json.optJSONArray("notes")
         if (notesArray == null) {
-            Log.w(TAG, "No notes array in sync_batch")
+            Log.e(TAG, "CRITICAL: No notes array in sync_batch! JSON: $json")
             return
         }
         
         Log.i(TAG, "Processing ${notesArray.length()} notes in batch")
         
+        var successCount = 0
+        var failCount = 0
         for (i in 0 until notesArray.length()) {
-            val noteJson = notesArray.getJSONObject(i)
-            val note = parseNote(noteJson)
-            if (note != null) {
-                syncBatchBuffer.add(note)
-            } else {
-                Log.w(TAG, "Failed to parse note at index $i")
+            try {
+                val noteJson = notesArray.getJSONObject(i)
+                Log.i(TAG, "Parsing note $i: id=${noteJson.optLong("id")}")
+                val note = parseNote(noteJson)
+                if (note != null) {
+                    synchronized(syncBatchBuffer) {
+                        syncBatchBuffer.add(note)
+                    }
+                    successCount++
+                    Log.i(TAG, "Note $i parsed successfully: id=${note.id}")
+                } else {
+                    failCount++
+                    Log.e(TAG, "Failed to parse note at index $i: ${noteJson}")
+                }
+            } catch (e: Exception) {
+                failCount++
+                Log.e(TAG, "Exception parsing note at index $i: ${e.message}", e)
             }
         }
         
         receivedBatches++
-        Log.i(TAG, "Received batch $batchId/$totalBatches, buffer size=${syncBatchBuffer.size}, receivedBatches=$receivedBatches")
+        Log.i(TAG, "Batch $batchId/$totalBatches complete: success=$successCount, fail=$failCount, buffer size=${syncBatchBuffer.size}")
     }
     
     private suspend fun handleSyncComplete(json: JSONObject) {
@@ -323,11 +349,21 @@ class WebSocketService(
         Log.i(TAG, "handleSyncComplete: totalSynced=$totalSynced, newLastSyncId=$newLastSyncId, bufferSize=${syncBatchBuffer.size}")
         
         try {
-            if (syncBatchBuffer.isNotEmpty()) {
-                noteDao.insertAll(syncBatchBuffer)
-                Log.i(TAG, "Batch inserted ${syncBatchBuffer.size} notes to database")
+            // Copy buffer to avoid concurrent modification
+            val notesToInsert = synchronized(syncBatchBuffer) {
+                syncBatchBuffer.toList()
+            }
+            
+            if (notesToInsert.isNotEmpty()) {
+                Log.i(TAG, "Inserting ${notesToInsert.size} notes to database...")
+                noteDao.insertAll(notesToInsert)
+                Log.i(TAG, "SUCCESS: Inserted ${notesToInsert.size} notes to database")
+                
+                // Verify insertion
+                val count = noteDao.getNoteCount()
+                Log.i(TAG, "Database now has $count notes total")
             } else {
-                Log.i(TAG, "No notes in buffer to insert")
+                Log.w(TAG, "WARNING: syncBatchBuffer is empty, nothing to insert!")
             }
             
             // Match JavaFX: only update if totalSynced > 0 and newLastSyncId > 0
@@ -340,10 +376,13 @@ class WebSocketService(
                 Log.i(TAG, "Not updating lastSyncId: totalSynced=$totalSynced, newLastSyncId=$newLastSyncId")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to save synced notes: ${e.message}", e)
+            Log.e(TAG, "CRITICAL: Failed to save synced notes: ${e.message}", e)
+            e.printStackTrace()
         }
         
-        syncBatchBuffer.clear()
+        synchronized(syncBatchBuffer) {
+            syncBatchBuffer.clear()
+        }
         expectedBatches = 0
         receivedBatches = 0
         
@@ -375,25 +414,29 @@ class WebSocketService(
             val encryptedContent = json.getString("content")
             val createdAt = json.optString("created_at", json.optString("createdAt", ""))
             
-            Log.i(TAG, "parseNote: id=$id, createdAt=$createdAt, encryptionEnabled=${cryptoService.isEncryptionEnabled()}")
+            val password = cachedPassword
+            Log.i(TAG, "parseNote: id=$id, createdAt=$createdAt, hasPassword=${password != null}")
             
-            val content = if (cryptoService.isEncryptionEnabled()) {
+            val content = if (password != null) {
                 try {
-                    val decrypted = cryptoService.decrypt(encryptedContent)
-                    Log.i(TAG, "Decrypted note $id successfully")
+                    // Use decryptWithPassword to avoid nested runBlocking
+                    val decrypted = cryptoService.decryptWithPassword(encryptedContent, password)
+                    Log.i(TAG, "Decrypted note $id successfully, length=${decrypted.length}")
                     decrypted
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to decrypt note $id: ${e.message}", e)
+                    e.printStackTrace()
                     "[Decryption failed: ${e.message}]"
                 }
             } else {
-                Log.i(TAG, "Encryption not enabled, using raw content for note $id")
+                Log.w(TAG, "No encryption password, using raw content for note $id")
                 encryptedContent
             }
             
             Note(id = id, content = content, createdAt = createdAt)
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing note JSON: ${e.message}", e)
+            e.printStackTrace()
             null
         }
     }

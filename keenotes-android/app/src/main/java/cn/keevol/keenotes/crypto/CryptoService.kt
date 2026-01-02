@@ -87,6 +87,14 @@ class CryptoService(private val getPassword: () -> String?) {
         val password = getPassword()
             ?: throw IllegalStateException("Encryption password not set")
         
+        return decryptWithPassword(encryptedBase64, password)
+    }
+    
+    /**
+     * Decrypt ciphertext with explicit password (avoids callback)
+     * Use this when you already have the password cached
+     */
+    fun decryptWithPassword(encryptedBase64: String, password: String): String {
         val combined = Base64.getDecoder().decode(encryptedBase64)
         
         if (combined.size < 1 + SALT_LENGTH + GCM_IV_LENGTH + TIMESTAMP_LENGTH) {

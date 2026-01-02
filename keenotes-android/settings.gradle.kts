@@ -3,9 +3,10 @@ pluginManagement {
         google()
         mavenCentral()
         gradlePluginPortal()
-        // Fallback mirrors
+        // Fallback mirrors for China
         maven { url = uri("https://maven.aliyun.com/repository/google") }
         maven { url = uri("https://maven.aliyun.com/repository/central") }
+        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
     }
 }
 
@@ -14,7 +15,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // Fallback mirrors
+        // Fallback mirrors for China
         maven { url = uri("https://maven.aliyun.com/repository/google") }
         maven { url = uri("https://maven.aliyun.com/repository/central") }
     }
