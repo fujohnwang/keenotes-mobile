@@ -32,9 +32,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Make gradlew executable
+      - name: Generate Gradle Wrapper
         working-directory: keenotes-android
-        run: chmod +x gradlew
+        run: gradle wrapper --gradle-version 8.4
 
       - name: Build Debug APK
         working-directory: keenotes-android
