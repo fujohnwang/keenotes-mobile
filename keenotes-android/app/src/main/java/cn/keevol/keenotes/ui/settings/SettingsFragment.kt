@@ -75,7 +75,7 @@ class SettingsFragment : Fragment() {
         }
         
         binding.btnDebug.setOnClickListener {
-            // TODO: Navigate to debug view
+            findNavController().navigate(R.id.action_settings_to_debug)
         }
     }
     
