@@ -207,9 +207,11 @@ public class ServiceManager {
 
     /**
      * 重新初始化所有服务（用于配置变更）
+     * @param clearNotes 是否清空本地笔记缓存（endpoint变更时应为true）
      */
-    public synchronized void reinitializeServices() {
+    public synchronized void reinitializeServices(boolean clearNotes) {
         System.out.println("[ServiceManager] Reinitializing services due to configuration change...");
+        System.out.println("[ServiceManager] - clearNotes: " + clearNotes);
         
         try {
             // 1. 断开并重置 WebSocket 连接
@@ -222,10 +224,17 @@ public class ServiceManager {
                 Thread.sleep(200);
             }
             
-            // 2. 重置本地缓存同步状态（保留数据，只重置同步状态）
+            // 2. 重置本地缓存
             if (localCacheService != null && localCacheService.isInitialized()) {
-                System.out.println("[ServiceManager] Resetting local cache sync state...");
-                localCacheService.resetSyncState();
+                if (clearNotes) {
+                    // Endpoint变更：清空所有数据（不同服务器，数据完全不同）
+                    System.out.println("[ServiceManager] Clearing all local data (endpoint changed)...");
+                    localCacheService.clearAllData();
+                } else {
+                    // Token/Password变更：只重置同步状态（同一服务器，数据相同）
+                    System.out.println("[ServiceManager] Resetting sync state only...");
+                    localCacheService.resetSyncState();
+                }
             }
             
             // 3. 重置服务状态标志
@@ -247,6 +256,15 @@ public class ServiceManager {
             notifyStatusChanged("reinit_error", "重新初始化失败: " + e.getMessage());
             throw new RuntimeException("Service reinitialization failed", e);
         }
+    }
+    
+    /**
+     * 重新初始化所有服务（用于配置变更）- 兼容旧调用
+     * @deprecated 使用 reinitializeServices(boolean clearNotes) 代替
+     */
+    @Deprecated
+    public synchronized void reinitializeServices() {
+        reinitializeServices(false);
     }
 
     /**

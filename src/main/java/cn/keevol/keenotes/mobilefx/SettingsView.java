@@ -233,9 +233,15 @@ public class SettingsView extends BorderPane {
             statusLabel.getStyleClass().removeAll("error", "success");
             statusLabel.getStyleClass().add("success");
 
+            // Capture endpointChanged for use in thread
+            final boolean clearNotes = endpointChanged;
+            
             new Thread(() -> {
                 try {
-                    ServiceManager.getInstance().reinitializeServices();
+                    // Pass endpointChanged to determine if notes should be cleared
+                    // Endpoint变更 → 清空notes（不同服务器，数据完全不同）
+                    // Token/Password变更 → 只重置sync_state（同一服务器，数据相同）
+                    ServiceManager.getInstance().reinitializeServices(clearNotes);
                     // 更新UI状态
                     javafx.application.Platform.runLater(() -> {
                         statusLabel.setText(msg + " (Reconnected)");
