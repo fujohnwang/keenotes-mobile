@@ -1,10 +1,14 @@
 package cn.keevol.keenotes.mobilefx;
 
 import com.gluonhq.attach.lifecycle.LifecycleService;
+import javafx.animation.FadeTransition;
+import javafx.animation.ParallelTransition;
+import javafx.animation.TranslateTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
@@ -14,6 +18,7 @@ import javafx.scene.input.SwipeEvent;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 public class Main extends Application {
 
@@ -21,8 +26,7 @@ public class Main extends Application {
     private BorderPane root;
     private MainViewV2 mainView;
     private DebugView debugView;
-    private Button recordTabBtn;
-    private Button reviewTabBtn;
+    private StatusFooter statusFooter;
     private boolean inSettingsView = false;
     private boolean inDebugView = false;
 
@@ -47,12 +51,16 @@ public class Main extends Application {
         mainView = new MainViewV2(this::showSettingsView, this::onClearSearchToNoteView);
         debugView = new DebugView(this::backFromDebug);
 
-        // Bottom tab bar
-        root.setBottom(createBottomTabBar());
+        // Create status footer for connection status
+        statusFooter = new StatusFooter();
+
+        // Bottom status footer (replaces tab bar)
+        root.setBottom(statusFooter);
         root.setCenter(contentPane);
 
-        // Show record tab by default
-        showRecordTab();
+        // Show note pane by default
+        contentPane.getChildren().setAll(mainView);
+        mainView.showNotePane();
 
         Scene scene = new Scene(root, 375, 667);
         scene.getStylesheets().add(getClass().getResource("/styles/main.css").toExternalForm());
@@ -133,99 +141,124 @@ public class Main extends Application {
     }
 
     /**
-     * 更新服务状态UI（可选的，可以在状态栏显示）
+     * 更新服务状态UI - 使用StatusFooter显示连接状态
      */
     private void updateServiceStatusUI(String status, String message) {
-        // 可以在这里添加状态栏显示
-        // 例如：在底部显示连接状态图标或文字
-        // 目前只打印日志，用户可以通过设置界面查看状态
+        Platform.runLater(() -> {
+            if (statusFooter != null) {
+                switch (status.toLowerCase()) {
+                    case "websocket_connected":
+                        statusFooter.setConnectionState(StatusFooter.ConnectionState.CONNECTED);
+                        break;
+                    case "websocket_disconnected":
+                    case "not_configured":
+                    case "connect_error":
+                    case "websocket_error":
+                        statusFooter.setConnectionState(StatusFooter.ConnectionState.DISCONNECTED);
+                        break;
+                    case "reinitializing":
+                        statusFooter.setConnectionState(StatusFooter.ConnectionState.CONNECTING);
+                        break;
+                    default:
+                        // For other status messages (sync_complete, local_cache_ready, etc.)
+                        // Keep current connection state but could show message if needed
+                        break;
+                }
+            }
+        });
     }
 
-
-    private HBox createBottomTabBar() {
-        recordTabBtn = new Button("记录/Take");
-        recordTabBtn.getStyleClass().addAll("tab-button", "active");
-        recordTabBtn.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(recordTabBtn, Priority.ALWAYS);
-        recordTabBtn.setOnAction(e -> showRecordTab());
-
-        reviewTabBtn = new Button("回顾/Review");
-        reviewTabBtn.getStyleClass().add("tab-button");
-        reviewTabBtn.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(reviewTabBtn, Priority.ALWAYS);
-        reviewTabBtn.setOnAction(e -> showReviewTab());
-
-        HBox tabBar = new HBox(recordTabBtn, reviewTabBtn);
-        tabBar.getStyleClass().add("bottom-tab-bar");
-        tabBar.setAlignment(Pos.CENTER);
-        tabBar.setPadding(new Insets(0));
-        return tabBar;
-    }
-
-    private void showRecordTab() {
-        // Ensure MainViewV2 is showing
-        if (!contentPane.getChildren().contains(mainView)) {
-            contentPane.getChildren().setAll(mainView);
-        }
-        // Tell MainViewV2 to show note pane
-        mainView.showRecordTab();
-        reviewTabBtn.getStyleClass().remove("active");
-        if (!recordTabBtn.getStyleClass().contains("active")) {
-            recordTabBtn.getStyleClass().add("active");
-        }
-    }
-
-    private void showReviewTab() {
-        // Ensure MainViewV2 is showing
-        if (!contentPane.getChildren().contains(mainView)) {
-            contentPane.getChildren().setAll(mainView);
-        }
-        // Tell MainViewV2 to show review pane
-        mainView.showReviewPane();
-        recordTabBtn.getStyleClass().remove("active");
-        if (!reviewTabBtn.getStyleClass().contains("active")) {
-            reviewTabBtn.getStyleClass().add("active");
-        }
-    }
 
     private void showSettingsView() {
         inSettingsView = true;
         SettingsView settingsView = new SettingsView(this::backFromSettings, this::showDebugView);
-        contentPane.getChildren().setAll(settingsView);
+        animateViewTransition(settingsView, true);
     }
 
     private void showDebugView() {
         inDebugView = true;
         inSettingsView = false;
-        contentPane.getChildren().setAll(debugView);
+        animateViewTransition(debugView, true);
     }
 
     private void backFromDebug() {
         inDebugView = false;
-        contentPane.getChildren().setAll(mainView);
+        animateViewTransition(mainView, false);
         mainView.showNotePane();
     }
 
     private void backFromSettings() {
         inSettingsView = false;
-        // Ensure MainViewV2 is showing
-        contentPane.getChildren().setAll(mainView);
-        if (reviewTabBtn.getStyleClass().contains("active")) {
-            mainView.showReviewPane();
-        } else {
-            mainView.showRecordTab();
+        animateViewTransition(mainView, false);
+        mainView.showNotePane();
+    }
+
+    /**
+     * Animate view transition with fade and slide effect
+     * @param newView the view to show
+     * @param slideFromRight true for forward navigation (slide from right), false for back (slide from left)
+     */
+    private void animateViewTransition(Node newView, boolean slideFromRight) {
+        Node oldView = contentPane.getChildren().isEmpty() ? null : contentPane.getChildren().get(0);
+        
+        // Add new view
+        if (!contentPane.getChildren().contains(newView)) {
+            contentPane.getChildren().add(newView);
         }
+        newView.toFront();
+        
+        // Setup initial state for new view
+        double startX = slideFromRight ? 100 : -100;
+        newView.setTranslateX(startX);
+        newView.setOpacity(0);
+        
+        // Animate new view in
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(250), newView);
+        fadeIn.setFromValue(0);
+        fadeIn.setToValue(1);
+        
+        TranslateTransition slideIn = new TranslateTransition(Duration.millis(250), newView);
+        slideIn.setFromX(startX);
+        slideIn.setToX(0);
+        
+        ParallelTransition inTransition = new ParallelTransition(fadeIn, slideIn);
+        
+        // Animate old view out (if exists)
+        if (oldView != null && oldView != newView) {
+            double endX = slideFromRight ? -50 : 50;
+            
+            FadeTransition fadeOut = new FadeTransition(Duration.millis(200), oldView);
+            fadeOut.setFromValue(1);
+            fadeOut.setToValue(0);
+            
+            TranslateTransition slideOut = new TranslateTransition(Duration.millis(200), oldView);
+            slideOut.setFromX(0);
+            slideOut.setToX(endX);
+            
+            ParallelTransition outTransition = new ParallelTransition(fadeOut, slideOut);
+            
+            // Remove old view after animation
+            Node finalOldView = oldView;
+            outTransition.setOnFinished(e -> {
+                contentPane.getChildren().remove(finalOldView);
+                // Reset old view state
+                finalOldView.setTranslateX(0);
+                finalOldView.setOpacity(1);
+            });
+            
+            outTransition.play();
+        }
+        
+        inTransition.play();
     }
 
     /**
      * Called when MainViewV2 clears search and returns to note view
-     * Updates tab button state to match
+     * No longer needs to update tab buttons since they're removed
      */
     private void onClearSearchToNoteView() {
-        reviewTabBtn.getStyleClass().remove("active");
-        if (!recordTabBtn.getStyleClass().contains("active")) {
-            recordTabBtn.getStyleClass().add("active");
-        }
+        // No-op now that tab bar is removed
+        // MainViewV2 handles its own state
     }
 
     /**
