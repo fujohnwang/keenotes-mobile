@@ -129,8 +129,8 @@ class CryptoService(private val getPassword: () -> String?) {
         
         val timestamp = ByteBuffer.wrap(timestampBytes).long
         val age = System.currentTimeMillis() - timestamp
-        if (age > 10L * 365 * 24 * 60 * 60 * 1000) {
-            throw SecurityException("Encrypted data is too old (>10 years)")
+        if (age > 100L * 365 * 24 * 60 * 60 * 1000) {
+            throw SecurityException("Encrypted data is too old (>100 years)")
         }
         
         val key = deriveKeyArgon2HKDF(password, salt)
