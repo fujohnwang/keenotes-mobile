@@ -95,7 +95,7 @@ jobs:
         run: |
           jpackage \
             --input target \
-            --name "KeeNotes-${{ matrix.name-suffix }}" \
+            --name "KeeNotes" \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
             --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type dmg \
@@ -107,6 +107,8 @@ jobs:
             --java-options "-Xmx512m" \
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
+          # Rename DMG to include platform suffix
+          mv dist/KeeNotes-1.0.0.dmg dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.dmg
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4

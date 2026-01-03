@@ -89,7 +89,7 @@ jobs:
         run: |
           jpackage \
             --input target \
-            --name "KeeNotes-${{ matrix.name-suffix }}" \
+            --name "KeeNotes" \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
             --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type dmg \
@@ -101,12 +101,13 @@ jobs:
             --java-options "-Xmx512m" \
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
+          mv dist/KeeNotes-1.0.0.dmg dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.dmg
 
       - name: Create macOS PKG for ${{ matrix.name-suffix }}
         run: |
           jpackage \
             --input target \
-            --name "KeeNotes-${{ matrix.name-suffix }}" \
+            --name "KeeNotes" \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
             --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type pkg \
@@ -118,6 +119,7 @@ jobs:
             --java-options "-Xmx512m" \
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
+          mv dist/KeeNotes-1.0.0.pkg dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.pkg
 
       - name: Upload macOS Packages (${{ matrix.name-suffix }})
         uses: actions/upload-artifact@v4
