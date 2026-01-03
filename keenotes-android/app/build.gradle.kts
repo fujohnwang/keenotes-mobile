@@ -12,8 +12,15 @@ android {
         applicationId = "cn.keevol.keenotes"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        
+        // Version from gradle properties or default
+        val versionNameProp = project.findProperty("versionName") as String? ?: "1.0.0"
+        val versionCodeProp = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
+        versionCode = versionCodeProp
+        versionName = versionNameProp
+        
+        // Set APK output name
+        setProperty("archivesBaseName", "keenotes-android-$versionName")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
