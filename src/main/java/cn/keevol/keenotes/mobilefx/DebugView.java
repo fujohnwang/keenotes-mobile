@@ -94,8 +94,23 @@ public class DebugView extends VBox {
             return;
         }
         localCache.resetSyncState();
-        updateStatus("Sync state reset to initial");
+        updateStatus("Sync state reset, reconnecting...");
         System.out.println("=== SYNC STATE RESET ===");
+        
+        // Trigger re-sync by reconnecting WebSocket
+        WebSocketClientService wsService = ServiceManager.getInstance().getWebSocketService();
+        if (wsService != null) {
+            wsService.disconnect();
+            new Thread(() -> {
+                try {
+                    Thread.sleep(500);
+                    wsService.connect();
+                    javafx.application.Platform.runLater(() -> updateStatus("Sync state reset, reconnected"));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }).start();
+        }
     }
 
     private void checkDbCount() {
@@ -119,8 +134,23 @@ public class DebugView extends VBox {
             return;
         }
         localCache.clearAllData();
-        updateStatus("All notes cleared");
+        updateStatus("All notes cleared, reconnecting...");
         System.out.println("=== ALL NOTES CLEARED ===");
+        
+        // Trigger re-sync by reconnecting WebSocket
+        WebSocketClientService wsService = ServiceManager.getInstance().getWebSocketService();
+        if (wsService != null) {
+            wsService.disconnect();
+            new Thread(() -> {
+                try {
+                    Thread.sleep(500);
+                    wsService.connect();
+                    javafx.application.Platform.runLater(() -> updateStatus("All notes cleared, reconnected"));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }).start();
+        }
     }
 
     private void testWebSocket() {
