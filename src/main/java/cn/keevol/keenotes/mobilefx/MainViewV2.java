@@ -50,6 +50,10 @@ public class MainViewV2 extends BorderPane {
     private Button settingsBtn;
     private PauseTransition searchDebounce;
     private boolean reviewPaneActive = false;
+    
+    // Review button components for style reset
+    private javafx.scene.shape.SVGPath reviewIcon;
+    private Label reviewLabel;
 
     // Lazy-loaded services
     private LocalCacheService localCache;
@@ -122,17 +126,21 @@ public class MainViewV2 extends BorderPane {
         reviewTitle.getStyleClass().add("header-title");
 
         // Review button - book/list icon for reviewing notes
-        javafx.scene.shape.SVGPath reviewIcon = new javafx.scene.shape.SVGPath();
+        reviewIcon = new javafx.scene.shape.SVGPath();
         // Book/list icon path
         reviewIcon.setContent("M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z");
         reviewIcon.setFill(javafx.scene.paint.Color.web("#8B949E"));
-        reviewIcon.setScaleX(1.0);
-        reviewIcon.setScaleY(1.0);
 
-        Label reviewLabel = new Label("Review");
+        // 将SVGPath包装在固定尺寸的容器中，确保与Settings图标大小一致
+        StackPane reviewIconContainer = new StackPane(reviewIcon);
+        reviewIconContainer.setMinSize(24, 24);
+        reviewIconContainer.setMaxSize(24, 24);
+        reviewIconContainer.setPrefSize(24, 24);
+
+        reviewLabel = new Label("Review");
         reviewLabel.getStyleClass().add("icon-button-label");
 
-        VBox reviewBtnContent = new VBox(2, reviewIcon, reviewLabel);
+        VBox reviewBtnContent = new VBox(2, reviewIconContainer, reviewLabel);
         reviewBtnContent.setAlignment(Pos.CENTER);
 
         reviewBtn = new Button();
@@ -148,8 +156,7 @@ public class MainViewV2 extends BorderPane {
         });
         reviewBtn.setOnMouseExited(e -> {
             if (!reviewPaneActive) {
-                reviewIcon.setFill(javafx.scene.paint.Color.web("#8B949E"));
-                reviewLabel.setStyle("-fx-text-fill: #8B949E;");
+                resetReviewButtonStyle();
             }
         });
 
@@ -157,13 +164,17 @@ public class MainViewV2 extends BorderPane {
         javafx.scene.shape.SVGPath gearIcon = new javafx.scene.shape.SVGPath();
         gearIcon.setContent("M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66z");
         gearIcon.setFill(javafx.scene.paint.Color.web("#8B949E"));
-        gearIcon.setScaleX(1.0);
-        gearIcon.setScaleY(1.0);
+
+        // 将SVGPath包装在固定尺寸的容器中，与Review图标保持一致
+        StackPane settingsIconContainer = new StackPane(gearIcon);
+        settingsIconContainer.setMinSize(24, 24);
+        settingsIconContainer.setMaxSize(24, 24);
+        settingsIconContainer.setPrefSize(24, 24);
 
         Label settingsLabel = new Label("Settings");
         settingsLabel.getStyleClass().add("icon-button-label");
 
-        VBox settingsBtnContent = new VBox(2, gearIcon, settingsLabel);
+        VBox settingsBtnContent = new VBox(2, settingsIconContainer, settingsLabel);
         settingsBtnContent.setAlignment(Pos.CENTER);
 
         settingsBtn = new Button();
@@ -259,6 +270,7 @@ public class MainViewV2 extends BorderPane {
             HBox searchBox = new HBox(4, searchField, clearSearchBtn);
             searchBox.setAlignment(Pos.CENTER_LEFT);
             HBox.setHgrow(searchBox, Priority.ALWAYS);
+            HBox.setHgrow(searchField, Priority.ALWAYS);
             header.getChildren().addAll(searchBox, reviewBtn, settingsBtn);
         }
     }
@@ -537,9 +549,22 @@ public class MainViewV2 extends BorderPane {
 
     public void showNotePane() {
         reviewPaneActive = false;
+        resetReviewButtonStyle();  // 重置Review按钮样式
         rebuildHeader();  // Switch to normal header with search
         animatePaneSwitch(notePane, searchPane, reviewPane, false);
         Platform.runLater(() -> noteInput.requestFocus());
+    }
+    
+    /**
+     * 重置Review按钮的样式为默认状态
+     */
+    private void resetReviewButtonStyle() {
+        if (reviewIcon != null) {
+            reviewIcon.setFill(javafx.scene.paint.Color.web("#8B949E"));
+        }
+        if (reviewLabel != null) {
+            reviewLabel.setStyle("-fx-text-fill: #8B949E;");
+        }
     }
 
     public void showReviewPane() {
