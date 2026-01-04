@@ -1,94 +1,46 @@
-# KeeNotes Mobile
+# [KeeNotes](https://afoo.me/knotes.html)
 
-A cross-platform mobile note-taking app built with JavaFX and GluonFX.
+A cross-platform short-note-taking app built with JavaFX and mobile-native technology.
 
-## Requirements
+[https://keenotes.afoo.me](https://keenotes.afoo.me)
 
-- **JDK 21** or later
-- **Maven 3.8+**
-- **GraalVM** (for native compilation)
 
-## Run on Desktop
 
-```bash
-mvn javafx:run -Djavafx.platform=<platform>
-```
+## Tech Stack 
 
-Available platforms:
-- `mac-aarch64` - macOS ARM64 (Apple Silicon)
-- `mac` - macOS Intel (x64)
-- `linux` - Linux x86_64
-- `linux-aarch64` - Linux ARM64
-- `win` - Windows x64
+- Desktop apps for win/linux/macos/ios are built with JavaFX
+- Anroid app is built with kotlin and android native tech stack
 
-Or use the provided run script:
-
-```bash
-./run.sh [args]
-```
-
-## Build Desktop Application
-
-```bash
-./build-desktop.sh
-```
-
-This will:
-1. Clean and package the application as a fat JAR
-2. Create platform-specific installation package (DMG/EXE/DEB/RPM)
-
-## Build for Android
-
-```bash
-# Requires ANDROID_HOME and GRAALVM_HOME environment variables
-mvn gluonfx:build -Pandroid
-mvn gluonfx:package -Pandroid
-```
-
-## Build for iOS
-
-```bash
-# Requires macOS, Xcode, and GRAALVM_HOME
-mvn gluonfx:build -Pios
-mvn gluonfx:package -Pios
-```
 
 ## Project Structure
 
-```
-src/main/java/
-├── module-info.java
-└── cn/keevol/keenotes/mobilefx/
-    ├── Main.java        # Application entry point
-    └── MainView.java    # Main UI view
+- The root dir is a maven project of JavaFX for desktop apps
+- The subfolder `keenotes-android` is a standalone android project with android native tech stack
 
-src/main/resources/
-├── icons/               # App icons
-└── styles/
-    └── main.css         # Main stylesheet
-```
 
-## Building for Different Platforms
+## Consistency
 
-The project uses Maven profiles for different platforms:
+Although the implementations are different for desktop and mobile apps, they share consistency:
 
-- **desktop** (default): Creates fat JAR with all dependencies and platform-specific JavaFX libraries
-- **android**: Uses GluonFX to build native Android APK
-- **ios**: Uses GluonFX to build native iOS app
+- UI is consistent 
+- Functions & logic are consistent
+- Communication prototols are consistent
 
-GitHub Actions workflows automatically build for all platforms using matrix strategy.
 
-### Manual Build
 
-```bash
-# Desktop (requires specifying platform)
-mvn clean package -Pdesktop -Djavafx.platform=mac-aarch64
 
-# Android
-mvn gluonfx:build -Pandroid
-mvn gluonfx:package -Pandroid
 
-# iOS (macOS only)
-mvn gluonfx:build -Pios
-mvn gluonfx:package -Pios
-```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
