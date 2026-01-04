@@ -39,6 +39,13 @@
     -fx-pref-height: 56px;
 }
 
+/* Header title for review/settings mode */
+.header-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-text-primary;
+}
+
 /* Search field */
 .search-field {
     -fx-background-color: -fx-surface-elevated;
@@ -266,6 +273,22 @@
 .icon-button:hover {
     -fx-text-fill: -fx-primary;
     -fx-effect: dropshadow(gaussian, -fx-primary, 8, 0.3, 0, 0);
+}
+
+/* Icon button with label (icon + text) */
+.icon-button-with-label {
+    -fx-background-color: transparent;
+    -fx-cursor: hand;
+    -fx-padding: 2 8;
+}
+
+.icon-button-with-label:hover {
+    -fx-effect: dropshadow(gaussian, -fx-primary, 8, 0.3, 0, 0);
+}
+
+.icon-button-label {
+    -fx-font-size: 10px;
+    -fx-text-fill: #8B949E;
 }
 
 /* Content area */
@@ -517,6 +540,152 @@
 
 .note-date {
     -fx-font-size: 12px;
+    -fx-text-fill: -fx-primary;
+    -fx-font-weight: bold;
+}
+
+
+/* Field hint */
+.field-hint {
+    -fx-font-size: 11px;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-style: italic;
+}
+
+/* Review Period Select (ComboBox) */
+.period-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-weight: bold;
+}
+
+.review-period-select {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-background-radius: 8px;
+    -fx-border-color: -fx-border;
+    -fx-border-radius: 8px;
+    -fx-padding: 8 12;
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-primary;
+    -fx-cursor: hand;
+}
+
+.review-period-select:hover {
+    -fx-border-color: -fx-primary;
+}
+
+.review-period-select:focused {
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, -fx-accent-glow, 12, 0, 0, 0);
+}
+
+/* ComboBox dropdown list */
+.review-period-select .list-view {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.review-period-select .list-cell {
+    -fx-background-color: -fx-surface;
+    -fx-text-fill: -fx-text-primary;
+    -fx-padding: 8 12;
+}
+
+.review-period-select .list-cell:hover {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-text-fill: -fx-primary;
+}
+
+.review-period-select .list-cell:selected {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: -fx-background;
+    -fx-font-weight: bold;
+}
+
+/* Arrow button styling */
+.review-period-select .arrow {
+    -fx-background-color: -fx-text-secondary;
+}
+
+.review-period-select:hover .arrow {
+    -fx-background-color: -fx-primary;
+}
+
+.review-period-select:showing .arrow {
+    -fx-background-color: -fx-primary;
+}
+/* Error display styles for initialization failures */
+.error-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-error;
+}
+
+.error-detail {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-wrap-text: true;
+}
+
+
+/* ==================== Status Footer ==================== */
+.status-footer {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-border-width: 1 0 0 0;
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+}
+
+.status-footer .status-indicator {
+    -fx-stroke: transparent;
+}
+
+.status-footer .status-indicator.connected {
+    -fx-fill: #4CAF50;
+}
+
+.status-footer .status-indicator.disconnected {
+    -fx-fill: #F44336;
+}
+
+.status-footer .status-indicator.connecting {
+    -fx-fill: #FFC107;
+}
+
+.status-footer .status-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.status-footer .status-label.connected {
+    -fx-text-fill: #4CAF50;
+}
+
+.status-footer .status-label.disconnected {
+    -fx-text-fill: #F44336;
+}
+
+.status-footer .status-label.connecting {
+    -fx-text-fill: #FFC107;
+}
+
+/* ==================== Review Button in Header ==================== */
+.review-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-size: 14px;
+    -fx-cursor: hand;
+    -fx-padding: 4 8;
+}
+
+.review-button:hover {
+    -fx-text-fill: -fx-primary;
+}
+
+.review-button.active {
     -fx-text-fill: -fx-primary;
     -fx-font-weight: bold;
 }

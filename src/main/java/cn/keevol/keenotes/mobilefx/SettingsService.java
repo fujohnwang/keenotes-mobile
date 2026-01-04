@@ -5,6 +5,7 @@ import com.gluonhq.attach.storage.StorageService;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.Properties;
 
 /**
@@ -17,6 +18,7 @@ public class SettingsService {
     private static final String KEY_ENDPOINT_URL = "endpoint.url";
     private static final String KEY_TOKEN = "token";
     private static final String KEY_REVIEW_DAYS = "review.days";
+    private static final String KEY_ENCRYPTION_PASSWORD = "encryption.password";
     private static final int DEFAULT_REVIEW_DAYS = 7;
 
     private static SettingsService instance;
@@ -37,10 +39,29 @@ public class SettingsService {
     }
 
     private Path resolveSettingsPath() {
-        return StorageService.create()
-                .flatMap(StorageService::getPrivateStorage)
-                .map(file -> file.toPath().resolve(SETTINGS_FILE))
-                .orElseGet(() -> Path.of(System.getProperty("user.home"), ".keenotes", SETTINGS_FILE));
+        try {
+            System.out.println("[Settings] Resolving settings path...");
+            
+            // 尝试使用Gluon Attach StorageService (Android/iOS)
+            Optional<File> privateStorage = StorageService.create()
+                    .flatMap(StorageService::getPrivateStorage);
+            
+            if (privateStorage.isPresent()) {
+                Path settingsPath = privateStorage.get().toPath().resolve(SETTINGS_FILE);
+                System.out.println("[Settings] Using Gluon private storage: " + settingsPath);
+                return settingsPath;
+            } else {
+                System.out.println("[Settings] Gluon private storage not available, using fallback");
+            }
+        } catch (Exception e) {
+            System.err.println("[Settings] Error accessing Gluon storage: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        // 桌面环境或Gluon存储不可用时的回退方案
+        Path fallbackPath = Path.of(System.getProperty("user.home"), ".keenotes", SETTINGS_FILE);
+        System.out.println("[Settings] Using fallback storage: " + fallbackPath);
+        return fallbackPath;
     }
 
     private void loadSettings() {
@@ -94,5 +115,22 @@ public class SettingsService {
 
     public void setReviewDays(int days) {
         properties.setProperty(KEY_REVIEW_DAYS, String.valueOf(days));
+    }
+
+    public String getEncryptionPassword() {
+        return properties.getProperty(KEY_ENCRYPTION_PASSWORD, "");
+    }
+
+    public void setEncryptionPassword(String password) {
+        if (password == null || password.isEmpty()) {
+            properties.remove(KEY_ENCRYPTION_PASSWORD);
+        } else {
+            properties.setProperty(KEY_ENCRYPTION_PASSWORD, password);
+        }
+    }
+
+    public boolean isEncryptionEnabled() {
+        String pwd = getEncryptionPassword();
+        return pwd != null && !pwd.isEmpty();
     }
 }
