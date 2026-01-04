@@ -234,13 +234,14 @@ public class SettingsView extends BorderPane {
             statusLabel.getStyleClass().add("success");
 
             // Capture endpointChanged for use in thread
-            final boolean clearNotes = endpointChanged;
+            // 根据issue #10要求：endpoint或token变化都需要清空本地数据
+            final boolean clearNotes = endpointChanged || tokenChanged;
             
             new Thread(() -> {
                 try {
-                    // Pass endpointChanged to determine if notes should be cleared
-                    // Endpoint变更 → 清空notes（不同服务器，数据完全不同）
-                    // Token/Password变更 → 只重置sync_state（同一服务器，数据相同）
+                    // Pass clearNotes to determine if notes should be cleared
+                    // Endpoint或Token变更 → 清空notes（不同服务器或不同账户，数据完全不同）
+                    // Password变更 → 只重置sync_state（同一服务器同一账户，数据相同）
                     ServiceManager.getInstance().reinitializeServices(clearNotes);
                     // 更新UI状态
                     javafx.application.Platform.runLater(() -> {

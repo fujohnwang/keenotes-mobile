@@ -143,8 +143,8 @@ class SettingsFragment : Fragment() {
                 // 2. Reset sync state (set lastSyncId to -1 to trigger full re-sync)
                 app.database.syncStateDao().clearSyncState()
                 
-                // 3. Clear notes if endpoint changed (different server = different data)
-                if (endpointChanged) {
+                // 3. Clear notes if endpoint or token changed (different server or account = different data)
+                if (endpointChanged || tokenChanged) {
                     app.database.noteDao().deleteAll()
                 }
                 
