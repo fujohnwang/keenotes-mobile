@@ -126,7 +126,13 @@ class DebugFragment : Fragment() {
         val app = requireActivity().application as KeeNotesApp
         lifecycleScope.launch {
             app.database.syncStateDao().clearSyncState()
-            statusText.text = "Sync state reset to initial"
+            statusText.text = "Sync state reset, reconnecting..."
+            
+            // Trigger re-sync by reconnecting WebSocket
+            app.webSocketService.disconnect()
+            kotlinx.coroutines.delay(500)
+            app.webSocketService.connect()
+            statusText.text = "Sync state reset, reconnected"
             Toast.makeText(requireContext(), "Sync state reset", Toast.LENGTH_SHORT).show()
         }
     }
@@ -136,7 +142,13 @@ class DebugFragment : Fragment() {
         lifecycleScope.launch {
             app.database.noteDao().deleteAll()
             app.database.syncStateDao().clearSyncState()
-            statusText.text = "All notes cleared"
+            statusText.text = "All notes cleared, reconnecting..."
+            
+            // Trigger re-sync by reconnecting WebSocket
+            app.webSocketService.disconnect()
+            kotlinx.coroutines.delay(500)
+            app.webSocketService.connect()
+            statusText.text = "All notes cleared, reconnected"
             Toast.makeText(requireContext(), "All notes cleared", Toast.LENGTH_SHORT).show()
         }
     }
