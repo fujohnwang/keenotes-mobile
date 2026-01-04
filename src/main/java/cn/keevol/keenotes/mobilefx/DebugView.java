@@ -8,28 +8,35 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.Priority;
 
-import java.sql.SQLException;
-
 /**
  * Debug view for development and troubleshooting.
  * Contains all debug-related functionality.
  */
 public class DebugView extends VBox {
 
+    private final Label statusLabel;
+
     public DebugView(Runnable onBack) {
         getStyleClass().add("debug-view");
+
+        // Status label for feedback
+        statusLabel = new Label();
+        statusLabel.getStyleClass().add("debug-status");
+        statusLabel.setWrapText(true);
 
         // Debug buttons container
         VBox debugContainer = new VBox(12);
         debugContainer.setPadding(new Insets(16));
         debugContainer.getStyleClass().add("debug-container");
 
-        // Add all debug buttons
+        // Add status label and all debug buttons (matching Android order)
         debugContainer.getChildren().addAll(
+            statusLabel,
+            createDebugButton("Check DB Count", this::checkDbCount),
             createDebugButton("Dump All Notes", this::dumpAllNotes),
             createDebugButton("Reset Sync State", this::resetSyncState),
-            createDebugButton("Check DB Count", this::checkDbCount),
-            createDebugButton("Clear All Notes", this::clearAllNotes)
+            createDebugButton("Clear All Notes", this::clearAllNotes),
+            createDebugButton("Test WebSocket", this::testWebSocket)
         );
 
         // Spacer to push content up
@@ -65,43 +72,87 @@ public class DebugView extends VBox {
     private void dumpAllNotes() {
         LocalCacheService localCache = ServiceManager.getInstance().getLocalCacheService();
         if (localCache == null || !localCache.isInitialized()) {
-            System.out.println("=== DEBUG: LocalCache not ready ===");
+            updateStatus("LocalCache not ready");
             return;
         }
-        System.out.println("=== DEBUG: DUMPING ALL NOTES ===");
-        localCache.getAllNotes();
-        System.out.println("=== DEBUG: DUMP COMPLETE ===");
+        var notes = localCache.getAllNotes();
+        StringBuilder sb = new StringBuilder("=== Recent Notes ===\n");
+        int count = 0;
+        for (var note : notes) {
+            if (count++ >= 20) break;
+            String preview = note.content != null ? note.content.substring(0, Math.min(50, note.content.length())) : "";
+            sb.append("ID: ").append(note.id).append(", Content: ").append(preview).append("...\n");
+        }
+        updateStatus(sb.toString());
+        System.out.println(sb);
     }
 
     private void resetSyncState() {
         LocalCacheService localCache = ServiceManager.getInstance().getLocalCacheService();
         if (localCache == null || !localCache.isInitialized()) {
-            System.out.println("=== DEBUG: LocalCache not ready ===");
+            updateStatus("LocalCache not ready");
             return;
         }
         localCache.resetSyncState();
-        System.out.println("=== SYNC STATE RESET - Restart app to re-sync ===");
+        updateStatus("Sync state reset to initial");
+        System.out.println("=== SYNC STATE RESET ===");
     }
 
     private void checkDbCount() {
         LocalCacheService localCache = ServiceManager.getInstance().getLocalCacheService();
         if (localCache == null || !localCache.isInitialized()) {
-            System.out.println("=== DEBUG: LocalCache not ready ===");
+            updateStatus("LocalCache not ready");
             return;
         }
         int count = localCache.getLocalNoteCount();
+        long lastSyncId = localCache.getLastSyncId();
         String lastSync = localCache.getLastSyncTime();
-        System.out.println("=== DEBUG: Database has " + count + " notes ===");
-        System.out.println("=== DEBUG: Last sync: " + (lastSync != null ? lastSync : "Never") + " ===");
+        String msg = "DB has " + count + " notes\nLast sync ID: " + lastSyncId + "\nLast sync time: " + (lastSync != null ? lastSync : "Never");
+        updateStatus(msg);
+        System.out.println("=== DEBUG: " + msg + " ===");
     }
 
     private void clearAllNotes() {
         LocalCacheService localCache = ServiceManager.getInstance().getLocalCacheService();
         if (localCache == null || !localCache.isInitialized()) {
-            System.out.println("=== DEBUG: LocalCache not ready ===");
+            updateStatus("LocalCache not ready");
             return;
         }
-        localCache.resetSyncState();
+        localCache.clearAllData();
+        updateStatus("All notes cleared");
         System.out.println("=== ALL NOTES CLEARED ===");
+    }
+
+    private void testWebSocket() {
+        WebSocketClientService wsService = ServiceManager.getInstance().getWebSocketService();
+        if (wsService == null) {
+            updateStatus("WebSocket service not available");
+            return;
+        }
+        
+        boolean connected = wsService.isConnected();
+        updateStatus("WebSocket state: " + (connected ? "CONNECTED" : "DISCONNECTED"));
+        
+        if (!connected) {
+            wsService.connect();
+            updateStatus("Attempting to connect...");
+        } else {
+            // Force reconnect to trigger sync
+            wsService.disconnect();
+            updateStatus("Disconnected, reconnecting in 1s...");
+            new Thread(() -> {
+                try {
+                    Thread.sleep(1000);
+                    wsService.connect();
+                    javafx.application.Platform.runLater(() -> updateStatus("Reconnecting..."));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }).start();
+        }
+    }
+
+    private void updateStatus(String message) {
+        javafx.application.Platform.runLater(() -> statusLabel.setText(message));
     }
 }
