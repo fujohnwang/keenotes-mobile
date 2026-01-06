@@ -45,6 +45,10 @@ jobs:
             --vendor "Keevol" `
             --icon "src/main/resources/icons/app-icon.ico" `
             --java-options "-Xmx512m" `
+            --win-shortcut `
+            --win-menu `
+            --win-menu-group "Keevol" `
+            --win-dir-chooser `
             --dest dist
 
       - name: Create Windows MSI Installer
@@ -60,6 +64,10 @@ jobs:
             --vendor "Keevol" `
             --icon "src/main/resources/icons/app-icon.ico" `
             --java-options "-Xmx512m" `
+            --win-shortcut `
+            --win-menu `
+            --win-menu-group "Keevol" `
+            --win-dir-chooser `
             --dest dist
 
       - name: Upload Windows Artifacts
