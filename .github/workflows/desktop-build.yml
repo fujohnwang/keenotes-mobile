@@ -34,9 +34,13 @@ jobs:
             --main-class org.springframework.boot.loader.launch.JarLauncher `
             --type exe `
             --app-version 1.0.0 `
-            --vendor "Keevol" `
+            --vendor "KEEVOL" `
             --icon "src/main/resources/icons/app-icon.ico" `
             --java-options "-Xmx512m" `
+            --win-shortcut `
+            --win-menu `
+            --win-menu-group "KEEVOL" `
+            --win-dir-chooser `
             --dest dist
 
       - name: Create Windows MSI Installer
@@ -49,9 +53,13 @@ jobs:
             --main-class org.springframework.boot.loader.launch.JarLauncher `
             --type msi `
             --app-version 1.0.0 `
-            --vendor "Keevol" `
+            --vendor "KEEVOL" `
             --icon "src/main/resources/icons/app-icon.ico" `
             --java-options "-Xmx512m" `
+            --win-shortcut `
+            --win-menu `
+            --win-menu-group "KEEVOL" `
+            --win-dir-chooser `
             --dest dist
 
       - name: Upload Windows Installers
@@ -94,7 +102,7 @@ jobs:
             --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type dmg \
             --app-version 1.0.0 \
-            --vendor "Keevol" \
+            --vendor "KEEVOL" \
             --icon "src/main/resources/icons/keenotes.icns" \
             --mac-package-identifier "cn.keevol.keenotes" \
             --mac-package-name "KeeNotes" \
@@ -112,7 +120,7 @@ jobs:
             --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type pkg \
             --app-version 1.0.0 \
-            --vendor "Keevol" \
+            --vendor "KEEVOL" \
             --icon "src/main/resources/icons/keenotes.icns" \
             --mac-package-identifier "cn.keevol.keenotes" \
             --mac-package-name "KeeNotes" \
@@ -152,7 +160,7 @@ jobs:
             --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type deb \
             --app-version 1.0.0 \
-            --vendor "Keevol" \
+            --vendor "KEEVOL" \
             --icon "src/main/resources/icons/icon-512.png" \
             --java-options "-Xmx512m" \
             --linux-shortcut \
@@ -167,7 +175,7 @@ jobs:
             --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type rpm \
             --app-version 1.0.0 \
-            --vendor "Keevol" \
+            --vendor "KEEVOL" \
             --icon "src/main/resources/icons/icon-512.png" \
             --java-options "-Xmx512m" \
             --linux-shortcut \
