@@ -22,6 +22,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+            VERSION="${VERSION#V}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
@@ -41,7 +53,7 @@ jobs:
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar `
             --main-class org.springframework.boot.loader.launch.JarLauncher `
             --type exe `
-            --app-version 1.0.0 `
+            --app-version ${{ steps.version.outputs.version }} `
             --vendor "Keevol" `
             --icon "src/main/resources/icons/app-icon.ico" `
             --java-options "-Xmx512m" `
@@ -60,7 +72,7 @@ jobs:
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar `
             --main-class org.springframework.boot.loader.launch.JarLauncher `
             --type msi `
-            --app-version 1.0.0 `
+            --app-version ${{ steps.version.outputs.version }} `
             --vendor "Keevol" `
             --icon "src/main/resources/icons/app-icon.ico" `
             --java-options "-Xmx512m" `
@@ -91,6 +103,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+            VERSION="${VERSION#V}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
@@ -108,7 +131,7 @@ jobs:
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
             --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type dmg \
-            --app-version 1.0.0 \
+            --app-version ${{ steps.version.outputs.version }} \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/keenotes.icns" \
             --mac-package-identifier "cn.keevol.keenotes" \
@@ -117,7 +140,7 @@ jobs:
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
           # Rename DMG to include platform suffix
-          mv dist/KeeNotes-1.0.0.dmg dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.dmg
+          mv dist/KeeNotes-${{ steps.version.outputs.version }}.dmg dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
@@ -130,6 +153,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+            VERSION="${VERSION#V}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Setup Java 21
         uses: actions/setup-java@v4
@@ -148,7 +182,7 @@ jobs:
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
             --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type deb \
-            --app-version 1.0.0 \
+            --app-version ${{ steps.version.outputs.version }} \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/icon-512.png" \
             --java-options "-Xmx512m" \
@@ -163,7 +197,7 @@ jobs:
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
             --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type rpm \
-            --app-version 1.0.0 \
+            --app-version ${{ steps.version.outputs.version }} \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/icon-512.png" \
             --java-options "-Xmx512m" \
@@ -189,6 +223,7 @@ jobs:
             VERSION="${{ github.event.inputs.version }}"
           else
             VERSION="${GITHUB_REF_NAME#v}"
+            VERSION="${VERSION#V}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           # Generate versionCode from version (e.g., 1.2.3 -> 10203)
