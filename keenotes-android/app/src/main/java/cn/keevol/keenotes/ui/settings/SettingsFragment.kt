@@ -88,6 +88,7 @@ class SettingsFragment : Fragment() {
             val password = app.settingsRepository.encryptionPassword.first()
             binding.passwordInput.setText(password)
             binding.passwordConfirmInput.setText(password)
+            binding.copyToClipboardSwitch.isChecked = app.settingsRepository.copyToClipboardOnPost.first()
         }
     }
     
@@ -96,6 +97,7 @@ class SettingsFragment : Fragment() {
         val token = binding.tokenInput.text.toString()
         val password = binding.passwordInput.text.toString()
         val confirmPassword = binding.passwordConfirmInput.text.toString()
+        val copyToClipboard = binding.copyToClipboardSwitch.isChecked
         
         // Validate password match
         if (password != confirmPassword) {
@@ -124,6 +126,7 @@ class SettingsFragment : Fragment() {
             
             // Save new settings
             app.settingsRepository.saveSettings(endpoint, token, password)
+            app.settingsRepository.setCopyToClipboardOnPost(copyToClipboard)
             
             val msg = if (password.isNotEmpty()) {
                 "Settings saved ✓ (E2E encryption enabled)"

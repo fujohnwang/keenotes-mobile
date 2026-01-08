@@ -10,6 +10,7 @@ class SettingsService: ObservableObject {
         static let token = "token"
         static let encryptionPassword = "encryption_password"
         static let reviewDays = "review_days"
+        static let copyToClipboardOnPost = "copy_to_clipboard_on_post"
     }
     
     @Published var endpointUrl: String {
@@ -28,6 +29,10 @@ class SettingsService: ObservableObject {
         didSet { defaults.set(reviewDays, forKey: Keys.reviewDays) }
     }
     
+    @Published var copyToClipboardOnPost: Bool {
+        didSet { defaults.set(copyToClipboardOnPost, forKey: Keys.copyToClipboardOnPost) }
+    }
+    
     init() {
         self.endpointUrl = defaults.string(forKey: Keys.endpointUrl) ?? ""
         self.token = defaults.string(forKey: Keys.token) ?? ""
@@ -36,6 +41,7 @@ class SettingsService: ObservableObject {
         if self.reviewDays == 0 {
             self.reviewDays = 7
         }
+        self.copyToClipboardOnPost = defaults.bool(forKey: Keys.copyToClipboardOnPost)
     }
     
     var isConfigured: Bool {

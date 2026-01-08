@@ -148,7 +148,13 @@ struct NoteView: View {
                 isPosting = false
                 
                 if result.success {
+                    let sentContent = noteText  // Save before clearing
                     noteText = ""
+                    
+                    // Copy to clipboard if enabled
+                    if appState.settingsService.copyToClipboardOnPost {
+                        UIPasteboard.general.string = sentContent
+                    }
                     
                     // Show success checkmark
                     withAnimation(.spring()) {

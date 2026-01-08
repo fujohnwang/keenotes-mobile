@@ -18,6 +18,7 @@ public class SettingsView extends BorderPane {
     private final SettingsService settings;
     private final Runnable onBack;
     private final Runnable onOpenDebug;
+    private final CheckBox copyToClipboardCheckBox;
     
     // Easter egg: tap copyright 7 times to show debug
     private int copyrightTapCount = 0;
@@ -73,6 +74,14 @@ public class SettingsView extends BorderPane {
         Label encryptionHint = new Label("Leave both empty to disable E2E encryption");
         encryptionHint.getStyleClass().add("field-hint");
 
+        // Preferences section
+        Label preferencesLabel = new Label("Preferences");
+        preferencesLabel.getStyleClass().add("field-label");
+        preferencesLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+
+        copyToClipboardCheckBox = new CheckBox("Copy to clipboard on post success");
+        copyToClipboardCheckBox.getStyleClass().add("checkbox-field");
+
         // Debug entry (hidden by default)
         Button debugBtn = new Button("Debug");
         debugBtn.getStyleClass().add("debug-entry-btn");
@@ -92,6 +101,7 @@ public class SettingsView extends BorderPane {
                 createFieldGroup("Token", tokenField),
                 createFieldGroup("Encryption Password", encryptionPasswordField),
                 createFieldGroupWithHint("Confirm Password", encryptionPasswordConfirmField, encryptionHint),
+                new VBox(8, preferencesLabel, copyToClipboardCheckBox),
                 saveButton,
                 statusLabel,
                 debugSection,
@@ -178,6 +188,7 @@ public class SettingsView extends BorderPane {
         String savedPassword = settings.getEncryptionPassword();
         encryptionPasswordField.setText(savedPassword);
         encryptionPasswordConfirmField.setText(savedPassword);
+        copyToClipboardCheckBox.setSelected(settings.getCopyToClipboardOnPost());
     }
 
     private void saveSettings() {
@@ -216,6 +227,7 @@ public class SettingsView extends BorderPane {
         settings.setEndpointUrl(newEndpoint);
         settings.setToken(newToken);
         settings.setEncryptionPassword(newPassword);
+        settings.setCopyToClipboardOnPost(copyToClipboardCheckBox.isSelected());
         settings.save();
 
         String msg = settings.isEncryptionEnabled()

@@ -963,6 +963,14 @@ public class MainViewV2 extends BorderPane {
                 statusLabel.getStyleClass().add("success");
                 showEcho(result.echoContent());
 
+                // Copy to clipboard if enabled
+                if (SettingsService.getInstance().getCopyToClipboardOnPost()) {
+                    javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+                    javafx.scene.input.ClipboardContent clipContent = new javafx.scene.input.ClipboardContent();
+                    clipContent.putString(content);
+                    clipboard.setContent(clipContent);
+                }
+
                 // 如果有WebSocket连接，会自动同步回来
                 // 这里我们也可以立即在本地缓存中添加（如果需要）
                 if (result.noteId() != null) {
