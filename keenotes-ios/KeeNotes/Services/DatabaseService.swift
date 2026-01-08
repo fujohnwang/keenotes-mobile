@@ -29,6 +29,7 @@ class DatabaseService: ObservableObject {
                 t.column("id", .integer).primaryKey()
                 t.column("content", .text).notNull()
                 t.column("createdAt", .text).notNull()
+                t.column("syncedAt", .integer).notNull().defaults(to: 0)
             }
             
             // Create sync_state table
@@ -38,7 +39,7 @@ class DatabaseService: ObservableObject {
                 t.column("lastSyncTime", .text)
             }
             
-            // Create index for faster queries
+            // Create index on createdAt for faster sorting/querying
             try db.create(index: "idx_notes_createdAt", on: Note.databaseTableName, columns: ["createdAt"], ifNotExists: true)
         }
         
@@ -51,54 +52,96 @@ class DatabaseService: ObservableObject {
     // MARK: - Notes
     
     func insertNote(_ note: Note) async throws {
-        try await dbQueue?.write { db in
-            try note.save(db)
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
         }
-        await MainActor.run {
-            self.noteCount += 1
+        try await dbQueue.write { db in
+            try note.insert(db, onConflict: .replace)
         }
+        // Refresh actual count from database
+        await refreshNoteCount()
     }
     
     func insertNotes(_ notes: [Note]) async throws {
-        try await dbQueue?.write { db in
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        
+        var insertedCount = 0
+        try await dbQueue.write { db in
             for note in notes {
-                try note.save(db)
+                do {
+                    // Use insert with onConflict to handle duplicates
+                    try note.insert(db, onConflict: .replace)
+                    insertedCount += 1
+                } catch {
+                    print("[DB] Failed to insert note \(note.id): \(error)")
+                }
             }
         }
-        await MainActor.run {
-            self.noteCount += notes.count
-        }
+        
+        print("[DB] Successfully inserted \(insertedCount) of \(notes.count) notes")
+        
+        // Refresh actual count from database
+        await refreshNoteCount()
     }
     
     func getAllNotes() async throws -> [Note] {
-        try await dbQueue?.read { db in
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        return try await dbQueue.read { db in
             try Note.order(Note.Columns.createdAt.desc).fetchAll(db)
-        } ?? []
+        }
     }
     
     func getRecentNotes(limit: Int = 20) async throws -> [Note] {
-        try await dbQueue?.read { db in
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        return try await dbQueue.read { db in
             try Note.order(Note.Columns.createdAt.desc).limit(limit).fetchAll(db)
-        } ?? []
+        }
     }
     
     func searchNotes(query: String) async throws -> [Note] {
-        try await dbQueue?.read { db in
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        return try await dbQueue.read { db in
             try Note
                 .filter(Note.Columns.content.like("%\(query)%"))
                 .order(Note.Columns.createdAt.desc)
                 .fetchAll(db)
-        } ?? []
+        }
     }
     
     func getNoteCount() async throws -> Int {
-        try await dbQueue?.read { db in
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        return try await dbQueue.read { db in
             try Note.fetchCount(db)
-        } ?? 0
+        }
+    }
+    
+    func refreshNoteCount() async {
+        do {
+            let count = try await getNoteCount()
+            await MainActor.run {
+                self.noteCount = count
+            }
+            print("[DB] Refreshed noteCount: \(count)")
+        } catch {
+            print("[DB] Failed to refresh noteCount: \(error)")
+        }
     }
     
     func deleteAllNotes() async throws {
-        try await dbQueue?.write { db in
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        try await dbQueue.write { db in
             try Note.deleteAll(db)
         }
         await MainActor.run {
@@ -109,7 +152,10 @@ class DatabaseService: ObservableObject {
     // MARK: - Sync State
     
     func getSyncState() async throws -> SyncState? {
-        try await dbQueue?.read { db in
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        return try await dbQueue.read { db in
             try SyncState.fetchOne(db, key: SyncState.singletonId)
         }
     }
@@ -120,15 +166,21 @@ class DatabaseService: ObservableObject {
     }
     
     func updateSyncState(lastSyncId: Int64) async throws {
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
         let now = ISO8601DateFormatter().string(from: Date())
         let state = SyncState(lastSyncId: lastSyncId, lastSyncTime: now)
-        try await dbQueue?.write { db in
+        try await dbQueue.write { db in
             try state.save(db)
         }
     }
     
     func clearSyncState() async throws {
-        try await dbQueue?.write { db in
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        try await dbQueue.write { db in
             try SyncState.deleteAll(db)
         }
     }
@@ -136,12 +188,27 @@ class DatabaseService: ObservableObject {
     // MARK: - Clear All
     
     func clearAllData() async throws {
-        try await dbQueue?.write { db in
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        try await dbQueue.write { db in
             try Note.deleteAll(db)
             try SyncState.deleteAll(db)
         }
         await MainActor.run {
             self.noteCount = 0
+        }
+        print("[DB] All data cleared")
+    }
+}
+
+enum DatabaseError: Error, LocalizedError {
+    case notInitialized
+    
+    var errorDescription: String? {
+        switch self {
+        case .notInitialized:
+            return "Database not initialized"
         }
     }
 }

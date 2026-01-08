@@ -26,11 +26,16 @@ iOS native version of KeeNotes - a secure note-taking app with end-to-end encryp
 
 ## Encryption Compatibility
 
-The encryption implementation is fully compatible with:
-- JavaFX desktop version
-- Android native version
+✅ **Fully Compatible**: The encryption implementation uses the official Argon2 C library, ensuring full compatibility with:
+- JavaFX desktop version (Bouncy Castle)
+- Android native version (Bouncy Castle)
 
-Format: `Base64(version[1] + salt[16] + iv[12] + timestamp[8] + ciphertext + tag[16])`
+All platforms use the same encryption format:
+- **Key Derivation**: Argon2id (64MB memory, 3 iterations) + HKDF-SHA256
+- **Encryption**: AES-256-GCM with 128-bit authentication tag
+- **Format**: `Base64(version[1] + salt[16] + iv[12] + timestamp[8] + ciphertext + tag[16])`
+
+Notes created on any platform can be decrypted on all other platforms.
 
 ## Building
 

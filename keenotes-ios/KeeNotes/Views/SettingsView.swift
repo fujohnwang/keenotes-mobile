@@ -24,25 +24,27 @@ struct SettingsView: View {
                 // Server configuration
                 Section(header: Text("Server Configuration")) {
                     TextField("Endpoint URL", text: $endpointUrl)
-                        .textContentType(.none)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                     
                     SecureField("Token", text: $token)
-                        .textContentType(.none)
+                        .textContentType(.init(rawValue: ""))
                         .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
                 }
                 
                 // Encryption
                 Section(header: Text("Encryption"), footer: Text("E2E encryption password. Must match across all devices.")) {
                     SecureField("Password", text: $password)
-                        .textContentType(.none)
+                        .textContentType(.init(rawValue: ""))
                         .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
                     
                     SecureField("Confirm Password", text: $confirmPassword)
-                        .textContentType(.none)
+                        .textContentType(.init(rawValue: ""))
                         .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
                 }
                 
                 // Save button
@@ -100,8 +102,11 @@ struct SettingsView: View {
     }
     
     private func saveSettings() {
+        print("[Settings] saveSettings called")
+        
         // Validate password match
         guard password == confirmPassword else {
+            print("[Settings] Password mismatch")
             statusMessage = "Passwords do not match"
             isSuccess = false
             password = ""
@@ -119,12 +124,22 @@ struct SettingsView: View {
         let passwordChanged = oldPassword != password
         let configurationChanged = endpointChanged || tokenChanged || passwordChanged
         
+        print("[Settings] Configuration: endpoint=\(endpointChanged), token=\(tokenChanged), password=\(passwordChanged)")
+        
         // Save settings
-        appState.settingsService.saveSettings(
-            endpoint: endpointUrl,
-            token: token,
-            password: password
-        )
+        do {
+            appState.settingsService.saveSettings(
+                endpoint: endpointUrl,
+                token: token,
+                password: password
+            )
+            print("[Settings] Settings saved successfully")
+        } catch {
+            print("[Settings] ERROR saving settings: \(error)")
+            statusMessage = "Failed to save: \(error.localizedDescription)"
+            isSuccess = false
+            return
+        }
         
         // Update status message
         let msg = password.isEmpty ? "Settings saved ✓" : "Settings saved ✓ (E2E encryption enabled)"
@@ -132,36 +147,59 @@ struct SettingsView: View {
         if configurationChanged && wasConfigured {
             statusMessage = "Configuration changed, reconnecting..."
             isSuccess = true
+            print("[Settings] Configuration changed, reconnecting...")
             
             // Reset and reconnect
             Task {
-                appState.webSocketService.disconnect()
-                appState.webSocketService.resetState()
-                
-                try? await appState.databaseService.clearSyncState()
-                
-                if endpointChanged || tokenChanged {
-                    try? await appState.databaseService.deleteAllNotes()
-                }
-                
-                if !endpointUrl.isEmpty && !token.isEmpty {
-                    try? await Task.sleep(nanoseconds: 500_000_000)
-                    appState.webSocketService.connect()
-                    await MainActor.run {
-                        statusMessage = "\(msg) (Reconnected)"
+                do {
+                    print("[Settings] Disconnecting WebSocket...")
+                    appState.webSocketService.disconnect()
+                    appState.webSocketService.resetState()
+                    
+                    print("[Settings] Clearing sync state...")
+                    try await appState.databaseService.clearSyncState()
+                    
+                    if endpointChanged || tokenChanged {
+                        print("[Settings] Deleting all notes (endpoint/token changed)...")
+                        try await appState.databaseService.deleteAllNotes()
                     }
-                } else {
+                    
+                    if !endpointUrl.isEmpty && !token.isEmpty {
+                        print("[Settings] Reconnecting WebSocket...")
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        appState.webSocketService.connect()
+                        await MainActor.run {
+                            statusMessage = "\(msg) (Reconnected)"
+                            // Switch to Note tab after successful save
+                            appState.selectedTab = 0
+                        }
+                    } else {
+                        await MainActor.run {
+                            statusMessage = msg
+                            appState.selectedTab = 0
+                        }
+                    }
+                    print("[Settings] Reconnection complete")
+                } catch {
+                    print("[Settings] ERROR during reconnection: \(error)")
                     await MainActor.run {
-                        statusMessage = msg
+                        statusMessage = "Error: \(error.localizedDescription)"
+                        isSuccess = false
                     }
                 }
             }
         } else if !wasConfigured && !endpointUrl.isEmpty && !token.isEmpty {
             // First time configuration
+            print("[Settings] First time configuration")
             statusMessage = msg
             isSuccess = true
             appState.webSocketService.connect()
+            // Switch to Note tab after successful save
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                appState.selectedTab = 0
+            }
         } else {
+            print("[Settings] Normal save, reconnecting...")
             statusMessage = msg
             isSuccess = true
             
@@ -169,6 +207,10 @@ struct SettingsView: View {
             appState.webSocketService.disconnect()
             if !endpointUrl.isEmpty && !token.isEmpty {
                 appState.webSocketService.connect()
+            }
+            // Switch to Note tab after successful save
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                appState.selectedTab = 0
             }
         }
     }
