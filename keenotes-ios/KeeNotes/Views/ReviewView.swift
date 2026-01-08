@@ -60,6 +60,9 @@ struct ReviewView: View {
                     List {
                         ForEach(notes) { note in
                             NoteRow(note: note)
+                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
                         }
                     }
                     .listStyle(.plain)
@@ -157,7 +160,7 @@ struct SearchBar: View {
     }
 }
 
-/// Single note row in the list
+/// Single note card in the list
 struct NoteRow: View {
     let note: Note
     @State private var showCopiedAlert = false
@@ -187,16 +190,46 @@ struct NoteRow: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
+            // Note content
             Text(note.content)
                 .font(.body)
-                .lineLimit(3)
+                .foregroundColor(.primary)
+                .lineLimit(5)
+                .fixedSize(horizontal: false, vertical: true)
             
-            Text(formattedDate)
-                .font(.caption)
+            // Footer with date and copy hint
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.caption2)
+                    Text(formattedDate)
+                        .font(.caption)
+                }
                 .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "hand.tap")
+                        .font(.caption2)
+                    Text("Long press to copy")
+                        .font(.caption2)
+                }
+                .foregroundColor(.secondary)
+                .opacity(0.6)
+            }
         }
-        .padding(.vertical, 4)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(.systemGray5), lineWidth: 1)
+        )
         .contentShape(Rectangle())
         .onLongPressGesture(minimumDuration: 0.5) {
             copyToClipboard()
