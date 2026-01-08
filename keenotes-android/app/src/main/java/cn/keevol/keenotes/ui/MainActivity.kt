@@ -37,15 +37,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Update send channel status based on configuration
-        updateSendChannelStatus()
+        // Observe settings changes for send channel status
+        lifecycleScope.launch {
+            app.settingsRepository.isConfigured.collectLatest { configured ->
+                updateSendChannelStatus(configured)
+            }
+        }
     }
     
-    private fun updateSendChannelStatus() {
-        val app = application as KeeNotesApp
-        val settings = app.settingsService
-        
-        val (text, color) = if (settings.endpointUrl.isBlank() || settings.token.isBlank()) {
+    private fun updateSendChannelStatus(configured: Boolean) {
+        val (text, color) = if (!configured) {
             "Not Configured" to getColor(R.color.warning)
         } else {
             // TODO: Add network connectivity check
