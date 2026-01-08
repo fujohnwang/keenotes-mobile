@@ -6,15 +6,30 @@ struct ReviewView: View {
     @State private var notes: [Note] = []
     @State private var searchText = ""
     @State private var isLoading = false
-    @State private var isSearching = false
+    @State private var selectedPeriod = 0  // 0: 7 days, 1: 30 days, 2: 90 days, 3: All
+    @State private var searchTask: Task<Void, Never>?
+    
+    private let periods = ["7 days", "30 days", "90 days", "All"]
+    private let periodDays = [7, 30, 90, 0]  // 0 means all
     
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Search bar
-                SearchBar(text: $searchText, onSearch: performSearch)
+                // Search bar (moved to top)
+                SearchBar(text: $searchText)
                     .padding(.horizontal)
-                    .padding(.vertical, 8)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                
+                // Period selector
+                Picker("Period", selection: $selectedPeriod) {
+                    ForEach(0..<periods.count, id: \.self) { index in
+                        Text(periods[index]).tag(index)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
                 
                 // Notes list
                 if isLoading {
@@ -71,8 +86,20 @@ struct ReviewView: View {
             await loadNotes()
         }
         .task(id: appState.webSocketService.syncStatus) {
-            // Reload when syncStatus changes (to show/hide syncing state)
+            // Reload when sync completes
             if appState.webSocketService.syncStatus == .completed {
+                await loadNotes()
+            }
+        }
+        .onChange(of: selectedPeriod) { _ in
+            Task { await loadNotes() }
+        }
+        .onChange(of: searchText) { _ in
+            // Debounce search - cancel previous task and start new one
+            searchTask?.cancel()
+            searchTask = Task {
+                try? await Task.sleep(nanoseconds: 500_000_000)  // 500ms debounce
+                guard !Task.isCancelled else { return }
                 await loadNotes()
             }
         }
@@ -83,7 +110,16 @@ struct ReviewView: View {
         defer { isLoading = false }
         
         do {
-            let loadedNotes = try await appState.databaseService.getAllNotes()
+            let loadedNotes: [Note]
+            
+            if searchText.isEmpty {
+                // Load by period
+                loadedNotes = try await appState.databaseService.getNotesByPeriod(days: periodDays[selectedPeriod])
+            } else {
+                // Search
+                loadedNotes = try await appState.databaseService.searchNotes(query: searchText)
+            }
+            
             print("[ReviewView] Loaded \(loadedNotes.count) notes from database")
             await MainActor.run {
                 notes = loadedNotes
@@ -92,34 +128,11 @@ struct ReviewView: View {
             print("[ReviewView] Failed to load notes: \(error)")
         }
     }
-    
-    private func performSearch() {
-        guard !searchText.isEmpty else {
-            Task { await loadNotes() }
-            return
-        }
-        
-        isSearching = true
-        
-        Task {
-            do {
-                let results = try await appState.databaseService.searchNotes(query: searchText)
-                await MainActor.run {
-                    notes = results
-                    isSearching = false
-                }
-            } catch {
-                print("Search failed: \(error)")
-                isSearching = false
-            }
-        }
-    }
 }
 
 /// Search bar component
 struct SearchBar: View {
     @Binding var text: String
-    var onSearch: () -> Void
     
     var body: some View {
         HStack {
@@ -128,12 +141,10 @@ struct SearchBar: View {
             
             TextField("Search notes...", text: $text)
                 .textFieldStyle(.plain)
-                .onSubmit(onSearch)
             
             if !text.isEmpty {
                 Button(action: {
                     text = ""
-                    onSearch()
                 }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.gray)

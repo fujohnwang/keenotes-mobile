@@ -104,6 +104,30 @@ class DatabaseService: ObservableObject {
         }
     }
     
+    func getNotesByPeriod(days: Int) async throws -> [Note] {
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        
+        if days <= 0 {
+            // "All" - return all notes
+            return try await getAllNotes()
+        }
+        
+        // Calculate cutoff date
+        let calendar = Calendar.current
+        let cutoffDate = calendar.date(byAdding: .day, value: -days, to: Date())!
+        let formatter = ISO8601DateFormatter()
+        let cutoffString = formatter.string(from: cutoffDate)
+        
+        return try await dbQueue.read { db in
+            try Note
+                .filter(Note.Columns.createdAt >= cutoffString)
+                .order(Note.Columns.createdAt.desc)
+                .fetchAll(db)
+        }
+    }
+    
     func searchNotes(query: String) async throws -> [Note] {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized

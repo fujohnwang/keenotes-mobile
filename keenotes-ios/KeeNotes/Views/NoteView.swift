@@ -4,8 +4,9 @@ import SwiftUI
 struct NoteView: View {
     @EnvironmentObject var appState: AppState
     @State private var noteText = ""
-    @State private var statusMessage = ""
-    @State private var isSuccess = true
+    @State private var showSuccessToast = false
+    @State private var showErrorToast = false
+    @State private var errorMessage = ""
     @State private var isPosting = false
     @FocusState private var isTextFieldFocused: Bool
     
@@ -57,14 +58,6 @@ struct NoteView: View {
                     }
                     .disabled(!canPost || isPosting)
                     
-                    // Status message
-                    if !statusMessage.isEmpty {
-                        Text(statusMessage)
-                            .font(.footnote)
-                            .foregroundColor(isSuccess ? .green : .red)
-                            .multilineTextAlignment(.center)
-                    }
-                    
                     Spacer()
                 }
                 .padding()
@@ -77,6 +70,41 @@ struct NoteView: View {
                     Button("Done") {
                         isTextFieldFocused = false
                     }
+                }
+            }
+            .overlay(alignment: .center) {
+                // Success checkmark overlay (center of screen)
+                if showSuccessToast {
+                    ZStack {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 80, height: 80)
+                        
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 40, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .overlay(alignment: .top) {
+                // Error message overlay (top right)
+                if showErrorToast {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundColor(.white)
+                        Text(errorMessage)
+                            .foregroundColor(.white)
+                            .font(.subheadline)
+                            .lineLimit(2)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.red)
+                    .cornerRadius(10)
+                    .padding(.top, 60)
+                    .padding(.horizontal, 16)
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
         }
@@ -95,25 +123,43 @@ struct NoteView: View {
         isTextFieldFocused = false
         
         isPosting = true
-        statusMessage = ""
         
         Task {
             let result = await appState.apiService.postNote(content: noteText)
             
             await MainActor.run {
                 isPosting = false
-                isSuccess = result.success
-                statusMessage = result.message
                 
                 if result.success {
                     noteText = ""
                     
-                    // Clear status after 3 seconds
+                    // Show success checkmark
+                    withAnimation(.spring()) {
+                        showSuccessToast = true
+                    }
+                    
+                    // Hide after 1 second
+                    Task {
+                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                        await MainActor.run {
+                            withAnimation(.spring()) {
+                                showSuccessToast = false
+                            }
+                        }
+                    }
+                } else {
+                    // Show error toast
+                    errorMessage = result.message
+                    withAnimation(.spring()) {
+                        showErrorToast = true
+                    }
+                    
+                    // Hide after 3 seconds
                     Task {
                         try? await Task.sleep(nanoseconds: 3_000_000_000)
                         await MainActor.run {
-                            if statusMessage == result.message {
-                                statusMessage = ""
+                            withAnimation(.spring()) {
+                                showErrorToast = false
                             }
                         }
                     }
