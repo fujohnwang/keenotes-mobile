@@ -49,7 +49,10 @@ struct SettingsView: View {
                 
                 // Preferences
                 Section(header: Text("Preferences")) {
-                    Toggle("Copy to clipboard on post success", isOn: $appState.settingsService.copyToClipboardOnPost)
+                    Toggle("Copy to clipboard on post success", isOn: Binding(
+                        get: { appState.settingsService.copyToClipboardOnPost },
+                        set: { appState.settingsService.copyToClipboardOnPost = $0 }
+                    ))
                 }
                 .font(.body)
                 

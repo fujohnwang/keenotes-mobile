@@ -81,6 +81,12 @@ public class SettingsView extends BorderPane {
 
         copyToClipboardCheckBox = new CheckBox("Copy to clipboard on post success");
         copyToClipboardCheckBox.getStyleClass().add("checkbox-field");
+        
+        // Auto-save on change
+        copyToClipboardCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            settings.setCopyToClipboardOnPost(newVal);
+            settings.save();
+        });
 
         // Debug entry (hidden by default)
         Button debugBtn = new Button("Debug");
@@ -227,7 +233,7 @@ public class SettingsView extends BorderPane {
         settings.setEndpointUrl(newEndpoint);
         settings.setToken(newToken);
         settings.setEncryptionPassword(newPassword);
-        settings.setCopyToClipboardOnPost(copyToClipboardCheckBox.isSelected());
+        // copyToClipboard is auto-saved on checkbox change
         settings.save();
 
         String msg = settings.isEncryptionEnabled()

@@ -38,3 +38,19 @@ targets:
         CLANG_ENABLE_MODULES: YES
     dependencies:
       - package: GRDB
+
+schemes:
+  KeeNotes:
+    build:
+      targets:
+        KeeNotes: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

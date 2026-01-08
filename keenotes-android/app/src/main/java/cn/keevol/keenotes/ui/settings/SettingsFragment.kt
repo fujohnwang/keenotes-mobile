@@ -35,6 +35,7 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         
         setupHeader()
+        setupCopyToClipboardToggle()
         setupSaveButton()
         setupCopyrightEasterEgg()
         loadSettings()
@@ -43,6 +44,22 @@ class SettingsFragment : Fragment() {
     private fun setupHeader() {
         binding.btnBack.setOnClickListener {
             findNavController().popBackStack()
+        }
+    }
+    
+    private fun setupCopyToClipboardToggle() {
+        val app = requireActivity().application as KeeNotesApp
+        
+        // Load initial state
+        lifecycleScope.launch {
+            binding.copyToClipboardSwitch.isChecked = app.settingsRepository.copyToClipboardOnPost.first()
+        }
+        
+        // Auto-save on toggle change
+        binding.copyToClipboardSwitch.setOnCheckedChangeListener { _, isChecked ->
+            lifecycleScope.launch {
+                app.settingsRepository.setCopyToClipboardOnPost(isChecked)
+            }
         }
     }
     
@@ -88,7 +105,7 @@ class SettingsFragment : Fragment() {
             val password = app.settingsRepository.encryptionPassword.first()
             binding.passwordInput.setText(password)
             binding.passwordConfirmInput.setText(password)
-            binding.copyToClipboardSwitch.isChecked = app.settingsRepository.copyToClipboardOnPost.first()
+            // copyToClipboardSwitch is loaded in setupCopyToClipboardToggle()
         }
     }
     
@@ -97,7 +114,7 @@ class SettingsFragment : Fragment() {
         val token = binding.tokenInput.text.toString()
         val password = binding.passwordInput.text.toString()
         val confirmPassword = binding.passwordConfirmInput.text.toString()
-        val copyToClipboard = binding.copyToClipboardSwitch.isChecked
+        // copyToClipboard is auto-saved, no need to save here
         
         // Validate password match
         if (password != confirmPassword) {
@@ -126,7 +143,7 @@ class SettingsFragment : Fragment() {
             
             // Save new settings
             app.settingsRepository.saveSettings(endpoint, token, password)
-            app.settingsRepository.setCopyToClipboardOnPost(copyToClipboard)
+            // copyToClipboard is auto-saved on toggle change
             
             val msg = if (password.isNotEmpty()) {
                 "Settings saved ✓ (E2E encryption enabled)"

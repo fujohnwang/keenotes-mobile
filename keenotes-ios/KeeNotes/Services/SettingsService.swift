@@ -30,17 +30,20 @@ class SettingsService: ObservableObject {
     }
     
     @Published var copyToClipboardOnPost: Bool {
-        didSet { defaults.set(copyToClipboardOnPost, forKey: Keys.copyToClipboardOnPost) }
+        didSet { 
+            defaults.set(copyToClipboardOnPost, forKey: Keys.copyToClipboardOnPost)
+        }
     }
     
     init() {
+        // Initialize all @Published properties first
         self.endpointUrl = defaults.string(forKey: Keys.endpointUrl) ?? ""
         self.token = defaults.string(forKey: Keys.token) ?? ""
         self.encryptionPassword = defaults.string(forKey: Keys.encryptionPassword) ?? ""
-        self.reviewDays = defaults.integer(forKey: Keys.reviewDays)
-        if self.reviewDays == 0 {
-            self.reviewDays = 7
-        }
+        
+        let savedReviewDays = defaults.integer(forKey: Keys.reviewDays)
+        self.reviewDays = savedReviewDays == 0 ? 7 : savedReviewDays
+        
         self.copyToClipboardOnPost = defaults.bool(forKey: Keys.copyToClipboardOnPost)
     }
     
