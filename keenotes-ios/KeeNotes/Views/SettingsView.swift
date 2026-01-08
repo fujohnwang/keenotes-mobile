@@ -47,6 +47,12 @@ struct SettingsView: View {
                         .textInputAutocapitalization(.never)
                 }
                 
+                // Preferences
+                Section(header: Text("Preferences")) {
+                    Toggle("Copy to clipboard on post success", isOn: $appState.settingsService.copyToClipboardOnPost)
+                }
+                .font(.body)
+                
                 // Save button
                 Section {
                     Button(action: saveSettings) {

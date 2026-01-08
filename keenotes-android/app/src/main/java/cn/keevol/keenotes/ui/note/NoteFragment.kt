@@ -64,6 +64,13 @@ class NoteFragment : Fragment() {
                 binding.statusText.text = "✓ ${result.message}"
                 binding.statusText.setTextColor(requireContext().getColor(R.color.success))
                 
+                // Copy to clipboard if enabled
+                if (app.settingsRepository.getCopyToClipboardOnPost()) {
+                    val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    val clip = android.content.ClipData.newPlainText("note", content)
+                    clipboard.setPrimaryClip(clip)
+                }
+                
                 // Show echo
                 binding.echoCard.visibility = View.VISIBLE
                 binding.echoContent.text = result.echoContent
