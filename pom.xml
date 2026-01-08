@@ -16,34 +16,16 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
         <javafx.version>23.0.1</javafx.version>
+        <javafx.platform>mac</javafx.platform>
         <gluonfx.plugin.version>1.0.25</gluonfx.plugin.version>
         <attach.version>4.0.21</attach.version>
         <main.class>cn.keevol.keenotes.mobilefx.Main</main.class>
+        <!-- 支持更高版本的 Java -->
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
     </properties>
 
     <dependencies>
-        <!-- JavaFX -->
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-base</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-graphics</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-controls</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-fxml</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
-
         <!-- Gluon Attach for native device features -->
         <dependency>
             <groupId>com.gluonhq.attach</groupId>
@@ -64,13 +46,6 @@
             <groupId>com.gluonhq.attach</groupId>
             <artifactId>util</artifactId>
             <version>${attach.version}</version>
-        </dependency>
-
-        <!-- SQLite JDBC for local cache -->
-        <dependency>
-            <groupId>org.xerial</groupId>
-            <artifactId>sqlite-jdbc</artifactId>
-            <version>3.44.1.0</version>
         </dependency>
 
         <!-- OkHttp WebSocket Client -->
@@ -159,6 +134,9 @@
                         <list>fonts/MiSans-Regular.ttf</list>
                         <list>fonts/.*\\.ttf</list>
                         <list>icons/app-icon.png</list>
+                        <list>icons/app-icon.ico</list>
+                        <list>icons/app-icon-192.png</list>
+                        <list>icons/app-icon-apple.png</list>
                         <list>META-INF/.*</list>
                     </resourcesList>
                     <reflectionList>
@@ -175,13 +153,19 @@
     </build>
 
     <profiles>
-        <!-- Desktop profile (default) -->
+        <!-- Desktop profile (default) - 使用 spring-boot-maven-plugin 打 fat jar -->
         <profile>
             <id>desktop</id>
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
             <dependencies>
+                <!-- SQLite JDBC for desktop -->
+                <dependency>
+                    <groupId>org.xerial</groupId>
+                    <artifactId>sqlite-jdbc</artifactId>
+                    <version>3.44.1.0</version>
+                </dependency>
                 <!-- JavaFX with platform-specific native libraries -->
                 <dependency>
                     <groupId>org.openjfx</groupId>
@@ -211,60 +195,19 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-shade-plugin</artifactId>
-                        <version>3.5.1</version>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <version>3.2.1</version>
                         <executions>
                             <execution>
-                                <phase>package</phase>
                                 <goals>
-                                    <goal>shade</goal>
+                                    <goal>repackage</goal>
                                 </goals>
                                 <configuration>
-                                    <transformers>
-                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                            <mainClass>${main.class}</mainClass>
-                                        </transformer>
-                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                                    </transformers>
-                                    <filters>
-                                        <filter>
-                                            <artifact>*:*</artifact>
-                                            <excludes>
-                                                <exclude>META-INF/*.SF</exclude>
-                                                <exclude>META-INF/*.DSA</exclude>
-                                                <exclude>META-INF/*.RSA</exclude>
-                                            </excludes>
-                                        </filter>
-                                    </filters>
+                                    <mainClass>${main.class}</mainClass>
                                 </configuration>
                             </execution>
                         </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!-- Android profile -->
-        <profile>
-            <id>android</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>com.gluonhq</groupId>
-                        <artifactId>gluonfx-maven-plugin</artifactId>
-                        <configuration>
-                            <target>android</target>
-                            <nativeImageArgs>
-                                <!-- SQLite 相关类需要在构建时初始化 -->
-                                <arg>--initialize-at-build-time=org.sqlite.util.ProcessRunner</arg>
-                                <arg>--initialize-at-build-time=org.sqlite.util.OSInfo</arg>
-                                <arg>--initialize-at-build-time=org.sqlite.SQLiteJDBCLoader</arg>
-                                <!-- OkHttp / Vert.x 相关 -->
-                                <arg>--initialize-at-run-time=okhttp3</arg>
-                                <arg>--initialize-at-run-time=io.vertx</arg>
-                            </nativeImageArgs>
-                        </configuration>
                     </plugin>
                 </plugins>
             </build>
@@ -275,6 +218,26 @@
             <id>ios</id>
             <build>
                 <plugins>
+                    <!-- iOS版需要module-info.java -->
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>3.4.0</version>
+                        <executions>
+                            <execution>
+                                <id>add-module-info-source</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/main/java-module</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
                     <plugin>
                         <groupId>com.gluonhq</groupId>
                         <artifactId>gluonfx-maven-plugin</artifactId>

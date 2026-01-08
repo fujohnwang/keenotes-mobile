@@ -160,8 +160,8 @@ public class CryptoService {
         // 验证时间戳（防止过旧数据）
         long timestamp = ByteBuffer.wrap(timestampBytes).getLong();
         long age = System.currentTimeMillis() - timestamp;
-        if (age > 10L * 365 * 24 * 60 * 60 * 1000) {
-            throw new SecurityException("Encrypted data is too old (>10 years), possible replay attack");
+        if (age > 100L * 365 * 24 * 60 * 60 * 1000) {
+            throw new SecurityException("Encrypted data is too old (>100 years), possible replay attack");
         }
 
         // 派生加密密钥
