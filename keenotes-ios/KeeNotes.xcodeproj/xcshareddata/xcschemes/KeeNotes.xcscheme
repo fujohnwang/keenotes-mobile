@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "1500"
+   LastUpgradeVersion = "2610"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
-      buildImplicitDependencies = "YES">
+      buildImplicitDependencies = "YES"
+      buildArchitectures = "Automatic">
       <BuildActionEntries>
          <BuildActionEntry
             buildForTesting = "YES"
@@ -14,7 +15,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "KeeNotes"
+               BlueprintIdentifier = "DA2B4E34EDA97A5488829DA9"
                BuildableName = "KeeNotes.app"
                BlueprintName = "KeeNotes"
                ReferencedContainer = "container:KeeNotes.xcodeproj">
@@ -26,7 +27,8 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "YES">
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      shouldAutocreateTestPlan = "YES">
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -42,7 +44,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "KeeNotes"
+            BlueprintIdentifier = "DA2B4E34EDA97A5488829DA9"
             BuildableName = "KeeNotes.app"
             BlueprintName = "KeeNotes"
             ReferencedContainer = "container:KeeNotes.xcodeproj">
@@ -59,7 +61,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "KeeNotes"
+            BlueprintIdentifier = "DA2B4E34EDA97A5488829DA9"
             BuildableName = "KeeNotes.app"
             BlueprintName = "KeeNotes"
             ReferencedContainer = "container:KeeNotes.xcodeproj">
