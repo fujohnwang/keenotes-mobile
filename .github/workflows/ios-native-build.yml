@@ -1,15 +1,17 @@
 name: iOS Native Build
 
+# Workflow disabled - iOS builds are done locally via Xcode
+# To re-enable, uncomment the 'on:' section below
 on:
-  push:
-    branches: [ main, master ]
-    paths:
-      - 'keenotes-ios/**'
-      - '.github/workflows/ios-native-build.yml'
-  pull_request:
-    branches: [ main, master ]
-    paths:
-      - 'keenotes-ios/**'
+  # push:
+  #   branches: [ main, master ]
+  #   paths:
+  #     - 'keenotes-ios/**'
+  #     - '.github/workflows/ios-native-build.yml'
+  # pull_request:
+  #   branches: [ main, master ]
+  #   paths:
+  #     - 'keenotes-ios/**'
   workflow_dispatch:
 
 jobs:
