@@ -3,10 +3,9 @@ import SwiftUI
 /// Main tab navigation view
 struct MainTabView: View {
     @EnvironmentObject var appState: AppState
-    @State private var selectedTab = 0
     
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $appState.selectedTab) {
             NoteView()
                 .tabItem {
                     Image(systemName: "square.and.pencil")

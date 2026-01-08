@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct KeeNotesApp: App {
     @StateObject private var appState = AppState()
+    @Environment(\.scenePhase) private var scenePhase
     
     var body: some Scene {
         WindowGroup {
@@ -11,6 +12,32 @@ struct KeeNotesApp: App {
                 .onAppear {
                     appState.initialize()
                 }
+                .onChange(of: scenePhase) { newPhase in
+                    handleScenePhaseChange(newPhase: newPhase)
+                }
+        }
+    }
+    
+    private func handleScenePhaseChange(newPhase: ScenePhase) {
+        switch newPhase {
+        case .active:
+            // App became active (foreground)
+            print("[App] Became active, reconnecting WebSocket if needed")
+            if appState.settingsService.isConfigured {
+                appState.webSocketService.connect()
+            }
+            
+        case .inactive:
+            // App became inactive (transitioning)
+            print("[App] Became inactive")
+            
+        case .background:
+            // App went to background
+            print("[App] Went to background, disconnecting WebSocket")
+            appState.webSocketService.disconnect()
+            
+        @unknown default:
+            break
         }
     }
 }
@@ -19,6 +46,7 @@ struct KeeNotesApp: App {
 @MainActor
 class AppState: ObservableObject {
     @Published var isInitialized = false
+    @Published var selectedTab = 0  // 0: Note, 1: Review, 2: Settings
     
     // Services
     let settingsService = SettingsService()

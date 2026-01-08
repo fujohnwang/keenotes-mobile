@@ -21,6 +21,16 @@ struct ReviewView: View {
                     Spacer()
                     ProgressView("Loading...")
                     Spacer()
+                } else if appState.webSocketService.syncStatus == .syncing && notes.isEmpty {
+                    // Syncing state - show when actively syncing and no local notes yet
+                    Spacer()
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("Syncing notes...")
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
                 } else if notes.isEmpty {
                     Spacer()
                     VStack(spacing: 12) {
@@ -54,12 +64,17 @@ struct ReviewView: View {
             }
         }
         .onAppear {
-            if notes.isEmpty {
-                Task { await loadNotes() }
-            }
-        }
-        .onChange(of: appState.databaseService.noteCount) { _ in
             Task { await loadNotes() }
+        }
+        .task(id: appState.databaseService.noteCount) {
+            // Reload when noteCount changes
+            await loadNotes()
+        }
+        .task(id: appState.webSocketService.syncStatus) {
+            // Reload when syncStatus changes (to show/hide syncing state)
+            if appState.webSocketService.syncStatus == .completed {
+                await loadNotes()
+            }
         }
     }
     
@@ -69,11 +84,12 @@ struct ReviewView: View {
         
         do {
             let loadedNotes = try await appState.databaseService.getAllNotes()
+            print("[ReviewView] Loaded \(loadedNotes.count) notes from database")
             await MainActor.run {
                 notes = loadedNotes
             }
         } catch {
-            print("Failed to load notes: \(error)")
+            print("[ReviewView] Failed to load notes: \(error)")
         }
     }
     
@@ -133,6 +149,7 @@ struct SearchBar: View {
 /// Single note row in the list
 struct NoteRow: View {
     let note: Note
+    @State private var showCopiedAlert = false
     
     private var formattedDate: String {
         // Parse ISO date or custom format
@@ -169,5 +186,51 @@ struct NoteRow: View {
                 .foregroundColor(.secondary)
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onLongPressGesture(minimumDuration: 0.5) {
+            copyToClipboard()
+        }
+        .overlay(
+            Group {
+                if showCopiedAlert {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.white)
+                            Text("Copied")
+                                .foregroundColor(.white)
+                                .font(.subheadline)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.black.opacity(0.7))
+                        .cornerRadius(20)
+                        .padding(.bottom, 20)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+        )
+    }
+    
+    private func copyToClipboard() {
+        UIPasteboard.general.string = note.content
+        
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        
+        // Show copied feedback
+        withAnimation {
+            showCopiedAlert = true
+        }
+        
+        // Hide after 1.5 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation {
+                showCopiedAlert = false
+            }
+        }
     }
 }

@@ -122,7 +122,9 @@ class CryptoService {
         let tag = ciphertextAndTag[(pos+ciphertextLength)...]
         
         // Validate timestamp (not older than 100 years)
-        let timestamp = timestampBytes.withUnsafeBytes { $0.load(as: Int64.self).bigEndian }
+        // Convert Data.SubSequence to Data to ensure proper memory alignment
+        let timestampData = Data(timestampBytes)
+        let timestamp = timestampData.withUnsafeBytes { $0.load(as: Int64.self).bigEndian }
         let age = Int64(Date().timeIntervalSince1970 * 1000) - timestamp
         let maxAge: Int64 = 100 * 365 * 24 * 60 * 60 * 1000
         guard age <= maxAge else {
@@ -139,7 +141,7 @@ class CryptoService {
             tag: tag
         )
         
-        let plaintext = try AES.GCM.open(sealedBox, using: key, authenticating: Data(timestampBytes))
+        let plaintext = try AES.GCM.open(sealedBox, using: key, authenticating: timestampData)
         
         guard let result = String(data: plaintext, encoding: .utf8) else {
             throw CryptoError.decryptionFailed
@@ -172,8 +174,7 @@ class CryptoService {
         return derivedKey
     }
     
-    /// Argon2id implementation
-    /// Note: iOS doesn't have native Argon2, so we use a pure Swift implementation
+    /// Argon2id implementation using pure Swift
     private func argon2id(
         password: String,
         salt: Data,

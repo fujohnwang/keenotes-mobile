@@ -91,6 +91,9 @@ struct NoteView: View {
     private func postNote() {
         guard canPost else { return }
         
+        // 收起键盘
+        isTextFieldFocused = false
+        
         isPosting = true
         statusMessage = ""
         

@@ -212,16 +212,22 @@ class WebSocketService: NSObject, ObservableObject {
             return
         }
         
+        // Process messages synchronously to maintain order
+        // Use DispatchQueue.main.sync to block until processing completes
+        let semaphore = DispatchSemaphore(value: 0)
+        
         Task {
+            defer { semaphore.signal() }
+            
             switch type {
             case "sync_batch":
-                await handleSyncBatch(json)
+                await self.handleSyncBatch(json)
             case "sync_complete":
-                await handleSyncComplete(json)
+                await self.handleSyncComplete(json)
             case "realtime_update":
-                await handleRealtimeUpdate(json)
+                await self.handleRealtimeUpdate(json)
             case "ping":
-                sendPong()
+                self.sendPong()
             case "pong":
                 print("[WS] Received pong")
             case "error":
@@ -234,6 +240,9 @@ class WebSocketService: NSObject, ObservableObject {
                 print("[WS] Unknown message type: \(type)")
             }
         }
+        
+        // Wait for processing to complete before returning
+        semaphore.wait()
     }
     
     private func handleSyncBatch(_ json: [String: Any]) async {

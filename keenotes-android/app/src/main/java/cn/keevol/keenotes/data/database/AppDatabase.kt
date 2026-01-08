@@ -11,7 +11,7 @@ import cn.keevol.keenotes.data.entity.SyncState
 
 @Database(
     entities = [Note::class, SyncState::class],
-    version = 1,
+    version = 2,  // Incremented for index addition
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -29,7 +29,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "keenotes.db"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()  // Allow schema changes
+                    .build()
                 INSTANCE = instance
                 instance
             }

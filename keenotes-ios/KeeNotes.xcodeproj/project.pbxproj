@@ -3,40 +3,61 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1522A18793715A66AF3C5B1E /* encoding.c in Sources */ = {isa = PBXBuildFile; fileRef = CD8A13501AA7A7CAB9DD2D6B /* encoding.c */; };
 		185B386682B6638BD824635B /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516619C5BAA926CB01F4B456 /* DatabaseService.swift */; };
+		2FAF71FD90FB24A293D9C1DC /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = 599C37F5BE3DA3E0B0E48AD9 /* core.c */; };
 		382B7B75B8E85659AAED35AD /* SettingsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC56614EF00CDBBE7B740F99 /* SettingsService.swift */; };
 		3D3A986E86CF4FAC5FBCDA0A /* DebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71854385AA7C1EECC7F20F2 /* DebugView.swift */; };
 		41F5062EB8A1F683E01EC160 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EAA89252DC520456A6A43EEC /* Assets.xcassets */; };
+		572FEB1514AA9583B65E7A6B /* thread.c in Sources */ = {isa = PBXBuildFile; fileRef = 12CB0C7E4D18D06ED6D1966A /* thread.c */; };
 		5DD67890F51B1621810AB13C /* WebSocketService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE252BFDC15087E4D34EB51 /* WebSocketService.swift */; };
 		6D81FA454D6E54D241F31894 /* Note.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58873415E76E9E252DEA0F7A /* Note.swift */; };
 		6FB30AE0AADAFBFDFCE3F48E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */; };
 		85535D4D227727012D31DE0F /* CryptoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3630EFD2F3AD1B593AE659EA /* CryptoService.swift */; };
 		8B963F8CCE2F5E131B06788B /* Argon2Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8DCBEC22348C792E803554 /* Argon2Swift.swift */; };
+		928FB5A4314467ABDBE9CCBE /* blake2b.c in Sources */ = {isa = PBXBuildFile; fileRef = CEED188D3B81AF7268E2D579 /* blake2b.c */; };
 		946E8578E0A828A727191C99 /* ApiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CCFBB1C4E585233C8949042 /* ApiService.swift */; };
 		9E1AA8C7DADD4E82A4D437BC /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87901956656FA3E18B94F424 /* ReviewView.swift */; };
 		C0AE7EC02E4C49132B40A4A0 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 149970AB595EDA07A0940B31 /* GRDB */; };
+		DA5DD2A22882D996C37B27EF /* argon2.c in Sources */ = {isa = PBXBuildFile; fileRef = 6D467341E90F4D144FCEC974 /* argon2.c */; };
 		E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC48816DBEEFEE56707E5302 /* NoteView.swift */; };
 		E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9040A9739D8D0416CE13A31 /* MainTabView.swift */; };
+		E641EC093049E5F7E4D0D094 /* ref.c in Sources */ = {isa = PBXBuildFile; fileRef = 9946B1EE523C44AB196C6446 /* ref.c */; };
 		FBDF52C9E3B0CF6AFF1CAF1A /* KeeNotesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D8A3032850BEA6F1E1698E /* KeeNotesApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		03605D0E1E6AE5D607639961 /* blamka-round-ref.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blamka-round-ref.h"; sourceTree = "<group>"; };
 		0CCFBB1C4E585233C8949042 /* ApiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiService.swift; sourceTree = "<group>"; };
 		0F0DB648B1399AF3B170E27B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		12CB0C7E4D18D06ED6D1966A /* thread.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = thread.c; sourceTree = "<group>"; };
+		1575BB23A63EC55E1FFE55B3 /* blake2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = blake2.h; sourceTree = "<group>"; };
+		2770ABCD494AC650EFA448AD /* thread.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = thread.h; sourceTree = "<group>"; };
 		3630EFD2F3AD1B593AE659EA /* CryptoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoService.swift; sourceTree = "<group>"; };
 		3B8DCBEC22348C792E803554 /* Argon2Swift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2Swift.swift; sourceTree = "<group>"; };
 		40D8A3032850BEA6F1E1698E /* KeeNotesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeeNotesApp.swift; sourceTree = "<group>"; };
 		516619C5BAA926CB01F4B456 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		58873415E76E9E252DEA0F7A /* Note.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Note.swift; sourceTree = "<group>"; };
+		599C37F5BE3DA3E0B0E48AD9 /* core.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = core.c; sourceTree = "<group>"; };
 		6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		6D467341E90F4D144FCEC974 /* argon2.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = argon2.c; sourceTree = "<group>"; };
+		76A65FB003A8C97D156D2E71 /* core.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = core.h; sourceTree = "<group>"; };
 		87901956656FA3E18B94F424 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
+		8E07C8BA817350735F9023F6 /* blamka-round-opt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blamka-round-opt.h"; sourceTree = "<group>"; };
+		9946B1EE523C44AB196C6446 /* ref.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ref.c; sourceTree = "<group>"; };
 		A9040A9739D8D0416CE13A31 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
-		B5515BAE55139991A54308D6 /* KeeNotes.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = KeeNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B5515BAE55139991A54308D6 /* KeeNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KeeNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC48816DBEEFEE56707E5302 /* NoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteView.swift; sourceTree = "<group>"; };
+		C41FB2074330D7D199860EB8 /* encoding.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = encoding.h; sourceTree = "<group>"; };
+		CD8A13501AA7A7CAB9DD2D6B /* encoding.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = encoding.c; sourceTree = "<group>"; };
+		CEED188D3B81AF7268E2D579 /* blake2b.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = blake2b.c; sourceTree = "<group>"; };
+		D1DA3D7B9EC0F4278F1C8070 /* argon2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = argon2.h; sourceTree = "<group>"; };
+		D34FAB7AB6D6F412B2AD704B /* KeeNotes-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "KeeNotes-Bridging-Header.h"; sourceTree = "<group>"; };
+		D6B16CD3673E6F843DF0CC2C /* blake2-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blake2-impl.h"; sourceTree = "<group>"; };
 		DFE252BFDC15087E4D34EB51 /* WebSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketService.swift; sourceTree = "<group>"; };
 		E71854385AA7C1EECC7F20F2 /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
 		EAA89252DC520456A6A43EEC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -91,11 +112,24 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		7CF6953E7127E723D579AC14 /* blake2 */ = {
+			isa = PBXGroup;
+			children = (
+				D6B16CD3673E6F843DF0CC2C /* blake2-impl.h */,
+				1575BB23A63EC55E1FFE55B3 /* blake2.h */,
+				CEED188D3B81AF7268E2D579 /* blake2b.c */,
+				8E07C8BA817350735F9023F6 /* blamka-round-opt.h */,
+				03605D0E1E6AE5D607639961 /* blamka-round-ref.h */,
+			);
+			path = blake2;
+			sourceTree = "<group>";
+		};
 		CB806CCF58F50E1D69B1F341 /* KeeNotes */ = {
 			isa = PBXGroup;
 			children = (
 				0F0DB648B1399AF3B170E27B /* Info.plist */,
 				386952B9571FC91450A59B21 /* App */,
+				E0C208039B9B256537E57024 /* CArgon2 */,
 				DCCD92D783D643109735F540 /* Models */,
 				7115A82AAC7A5B280DF232F5 /* Resources */,
 				CF67526C0F11CA16B6415E62 /* Services */,
@@ -123,6 +157,24 @@
 				58873415E76E9E252DEA0F7A /* Note.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		E0C208039B9B256537E57024 /* CArgon2 */ = {
+			isa = PBXGroup;
+			children = (
+				6D467341E90F4D144FCEC974 /* argon2.c */,
+				D1DA3D7B9EC0F4278F1C8070 /* argon2.h */,
+				599C37F5BE3DA3E0B0E48AD9 /* core.c */,
+				76A65FB003A8C97D156D2E71 /* core.h */,
+				CD8A13501AA7A7CAB9DD2D6B /* encoding.c */,
+				C41FB2074330D7D199860EB8 /* encoding.h */,
+				D34FAB7AB6D6F412B2AD704B /* KeeNotes-Bridging-Header.h */,
+				9946B1EE523C44AB196C6446 /* ref.c */,
+				12CB0C7E4D18D06ED6D1966A /* thread.c */,
+				2770ABCD494AC650EFA448AD /* thread.h */,
+				7CF6953E7127E723D579AC14 /* blake2 */,
+			);
+			path = CArgon2;
 			sourceTree = "<group>";
 		};
 		FEBE91F7B35D8EFFF38E18D9 /* Products */ = {
@@ -178,7 +230,6 @@
 			packageReferences = (
 				1E52851DC31606B4CE57CCD7 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -216,6 +267,12 @@
 				382B7B75B8E85659AAED35AD /* SettingsService.swift in Sources */,
 				6FB30AE0AADAFBFDFCE3F48E /* SettingsView.swift in Sources */,
 				5DD67890F51B1621810AB13C /* WebSocketService.swift in Sources */,
+				DA5DD2A22882D996C37B27EF /* argon2.c in Sources */,
+				928FB5A4314467ABDBE9CCBE /* blake2b.c in Sources */,
+				2FAF71FD90FB24A293D9C1DC /* core.c in Sources */,
+				1522A18793715A66AF3C5B1E /* encoding.c in Sources */,
+				E641EC093049E5F7E4D0D094 /* ref.c in Sources */,
+				572FEB1514AA9583B65E7A6B /* thread.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -292,8 +349,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NG744CF46S;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = KeeNotes/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -303,6 +362,7 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -311,8 +371,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NG744CF46S;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = KeeNotes/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -322,6 +384,7 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
