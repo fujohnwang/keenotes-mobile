@@ -965,8 +965,8 @@ public class MainViewV2 extends BorderPane {
 
                 // Copy to clipboard if enabled
                 if (SettingsService.getInstance().getCopyToClipboardOnPost()) {
-                    javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
-                    javafx.scene.input.ClipboardContent clipContent = new javafx.scene.input.ClipboardContent();
+                    Clipboard clipboard = Clipboard.getSystemClipboard();
+                    ClipboardContent clipContent = new ClipboardContent();
                     clipContent.putString(content);
                     clipboard.setContent(clipContent);
                 }
