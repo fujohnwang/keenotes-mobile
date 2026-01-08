@@ -1,113 +1,122 @@
 package cn.keevol.keenotes.mobilefx;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
+import okhttp3.*;
+
+import javax.net.ssl.*;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * API Service V2 - 只保留POST功能
- * 搜索和回顾功能已移到本地LocalCacheService
+ * 使用 OkHttp（与 WebSocket 统一）
  */
 public class ApiServiceV2 {
 
-    private static final Duration TIMEOUT = Duration.ofSeconds(30);
     private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
-    private final HttpClient httpClient;
+    private final OkHttpClient httpClient;
     private final SettingsService settings;
     private final CryptoService cryptoService;
 
     public ApiServiceV2() {
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(TIMEOUT)
-                .build();
+        this.httpClient = createClient();
         this.settings = SettingsService.getInstance();
         this.cryptoService = new CryptoService();
     }
 
-    /**
-     * Result of API call.
-     */
+    private OkHttpClient createClient() {
+        try {
+            // 信任所有证书
+            TrustManager[] trustAll = new TrustManager[]{
+                new X509TrustManager() {
+                    public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+                    public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+                    public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                }
+            };
+
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustAll, new SecureRandom());
+
+            return new OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .writeTimeout(30, TimeUnit.SECONDS)
+                    .sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager) trustAll[0])
+                    .hostnameVerifier((h, s) -> true)
+                    .build();
+        } catch (Exception e) {
+            System.err.println("[ApiServiceV2] SSL config failed: " + e.getMessage());
+            return new OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .writeTimeout(30, TimeUnit.SECONDS)
+                    .build();
+        }
+    }
+
     public record ApiResult(boolean success, String message, String echoContent, Long noteId) {
         public static ApiResult success(String echoContent, Long noteId) {
             return new ApiResult(true, "Note saved successfully!", echoContent, noteId);
         }
-
         public static ApiResult failure(String message) {
             return new ApiResult(false, message, null, null);
         }
     }
 
-    /**
-     * Post a note to the API asynchronously.
-     * 所有内容在发送前必须加密
-     */
     public CompletableFuture<ApiResult> postNote(String content) {
         String endpointUrl = settings.getEndpointUrl();
         String token = settings.getToken();
 
         if (endpointUrl == null || endpointUrl.isBlank()) {
-            return CompletableFuture.completedFuture(
-                    ApiResult.failure("Endpoint URL not configured. Please check Settings."));
+            return CompletableFuture.completedFuture(ApiResult.failure("Endpoint URL not configured."));
         }
         if (token == null || token.isBlank()) {
-            return CompletableFuture.completedFuture(
-                    ApiResult.failure("Token not configured. Please check Settings."));
+            return CompletableFuture.completedFuture(ApiResult.failure("Token not configured."));
         }
         if (content == null || content.isBlank()) {
-            return CompletableFuture.completedFuture(
-                    ApiResult.failure("Note content cannot be empty."));
+            return CompletableFuture.completedFuture(ApiResult.failure("Note content cannot be empty."));
+        }
+        if (!cryptoService.isEncryptionEnabled()) {
+            return CompletableFuture.completedFuture(ApiResult.failure("PIN code not set."));
         }
 
-        try {
-            // 加密内容 - 所有离开客户端的内容必须加密
-            if (!cryptoService.isEncryptionEnabled()) {
-                return CompletableFuture.completedFuture(
-                        ApiResult.failure("Encryption password not set. Please set PIN code in Settings."));
+        final String originalContent = content;
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                String encrypted = cryptoService.encrypt(content);
+                String ts = LocalDateTime.now().format(TS_FORMATTER);
+                String json = String.format(
+                    "{\"channel\":\"mobile\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":true}",
+                    escapeJson(encrypted), ts
+                );
+
+                Request request = new Request.Builder()
+                        .url(endpointUrl)
+                        .header("Content-Type", "application/json")
+                        .header("Authorization", "Bearer " + token)
+                        .post(RequestBody.create(json, JSON))
+                        .build();
+
+                try (Response response = httpClient.newCall(request).execute()) {
+                    if (response.isSuccessful()) {
+                        String body = response.body() != null ? response.body().string() : "";
+                        return ApiResult.success(originalContent, parseNoteId(body));
+                    } else {
+                        return ApiResult.failure("Server error: " + response.code());
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ApiResult.failure("Network error: " + e.getMessage());
             }
-
-            String encryptedContent = cryptoService.encrypt(content);
-            String timestamp = LocalDateTime.now().format(TS_FORMATTER);
-
-            String jsonPayload = buildJsonPayload(encryptedContent, timestamp);
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(endpointUrl))
-                    .timeout(TIMEOUT)
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + token)
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
-                    .build();
-
-            final String originalContent = content;
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                    .thenApply(response -> {
-                        if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                            // 解析返回的id
-                            Long noteId = parseNoteId(response.body());
-                            return ApiResult.success(originalContent, noteId);
-                        } else {
-                            return ApiResult.failure("Server error: " + response.statusCode());
-                        }
-                    })
-                    .exceptionally(ex -> ApiResult.failure("Network error: " + ex.getMessage()));
-        } catch (Exception e) {
-            return CompletableFuture.completedFuture(
-                    ApiResult.failure("Encryption failed: " + e.getMessage()));
-        }
-    }
-
-    private String buildJsonPayload(String encryptedContent, String timestamp) {
-        return String.format(
-                "{\"channel\":\"mobile\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":true}",
-                escapeJson(encryptedContent),
-                timestamp
-        );
+        });
     }
 
     private String escapeJson(String text) {
@@ -120,40 +129,25 @@ public class ApiServiceV2 {
                 + "\"";
     }
 
-    private Long parseNoteId(String responseBody) {
+    private Long parseNoteId(String body) {
         try {
-            int idStart = responseBody.indexOf("\"id\":");
-            if (idStart == -1) return null;
-
-            int valueStart = idStart + 5;
-            while (valueStart < responseBody.length() && Character.isWhitespace(responseBody.charAt(valueStart))) {
-                valueStart++;
-            }
-
-            int valueEnd = valueStart;
-            while (valueEnd < responseBody.length() && Character.isDigit(responseBody.charAt(valueEnd))) {
-                valueEnd++;
-            }
-
-            String idStr = responseBody.substring(valueStart, valueEnd);
-            return Long.parseLong(idStr);
+            int i = body.indexOf("\"id\":");
+            if (i == -1) return null;
+            int start = i + 5;
+            while (start < body.length() && !Character.isDigit(body.charAt(start))) start++;
+            int end = start;
+            while (end < body.length() && Character.isDigit(body.charAt(end))) end++;
+            return Long.parseLong(body.substring(start, end));
         } catch (Exception e) {
             return null;
         }
     }
 
-    /**
-     * 检查API是否已配置
-     */
     public boolean isConfigured() {
-        String endpointUrl = settings.getEndpointUrl();
-        String token = settings.getToken();
-        return endpointUrl != null && !endpointUrl.isBlank() && token != null && !token.isBlank();
+        return settings.getEndpointUrl() != null && !settings.getEndpointUrl().isBlank()
+                && settings.getToken() != null && !settings.getToken().isBlank();
     }
 
-    /**
-     * 检查加密是否已启用
-     */
     public boolean isEncryptionEnabled() {
         return cryptoService.isEncryptionEnabled();
     }

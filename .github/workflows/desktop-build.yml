@@ -24,10 +24,6 @@ jobs:
         shell: bash
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=win"
 
-      - name: List target directory
-        run: ls -la target/
-        shell: bash
-
       - name: Create Windows EXE Installer
         shell: pwsh
         run: |
@@ -35,11 +31,35 @@ jobs:
             --input target `
             --name KeeNotes `
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar `
-            --main-class cn.keevol.keenotes.mobilefx.Main `
+            --main-class org.springframework.boot.loader.launch.JarLauncher `
             --type exe `
             --app-version 1.0.0 `
-            --vendor "Keevol" `
-            --icon "src/main/resources/icons/icon-512.png" `
+            --vendor "KEEVOL" `
+            --icon "src/main/resources/icons/app-icon.ico" `
+            --java-options "-Xmx512m" `
+            --win-shortcut `
+            --win-menu `
+            --win-menu-group "KEEVOL" `
+            --win-dir-chooser `
+            --dest dist
+
+      - name: Create Windows MSI Installer
+        shell: pwsh
+        run: |
+          jpackage `
+            --input target `
+            --name KeeNotes `
+            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar `
+            --main-class org.springframework.boot.loader.launch.JarLauncher `
+            --type msi `
+            --app-version 1.0.0 `
+            --vendor "KEEVOL" `
+            --icon "src/main/resources/icons/app-icon.ico" `
+            --java-options "-Xmx512m" `
+            --win-shortcut `
+            --win-menu `
+            --win-menu-group "KEEVOL" `
+            --win-dir-chooser `
             --dest dist
 
       - name: Upload Windows Installers
@@ -47,9 +67,19 @@ jobs:
         with:
           name: windows-installers
           path: dist/*
+          if-no-files-found: error
 
   build-macos:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - arch: mac
+            name-suffix: Intel
+            runner: macos-15-intel
+          - arch: mac-aarch64  
+            name-suffix: AppleSilicon
+            runner: macos-latest
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,30 +90,51 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Build JAR
-        run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=mac-aarch64"
+      - name: Build JAR for ${{ matrix.arch }}
+        run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=${{ matrix.arch }}"
 
-      - name: List target directory
-        run: ls -la target/
-
-      - name: Create macOS DMG
+      - name: Create macOS DMG for ${{ matrix.name-suffix }}
         run: |
           jpackage \
             --input target \
-            --name KeeNotes \
+            --name "KeeNotes" \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class cn.keevol.keenotes.mobilefx.Main \
+            --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type dmg \
             --app-version 1.0.0 \
-            --vendor "Keevol" \
+            --vendor "KEEVOL" \
             --icon "src/main/resources/icons/keenotes.icns" \
+            --mac-package-identifier "cn.keevol.keenotes" \
+            --mac-package-name "KeeNotes" \
+            --java-options "-Xmx512m" \
+            --java-options "-Xdock:name=KeeNotes" \
             --dest dist
+          mv dist/KeeNotes-1.0.0.dmg dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.dmg
 
-      - name: Upload macOS DMG
+      - name: Create macOS PKG for ${{ matrix.name-suffix }}
+        run: |
+          jpackage \
+            --input target \
+            --name "KeeNotes" \
+            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
+            --main-class org.springframework.boot.loader.launch.JarLauncher \
+            --type pkg \
+            --app-version 1.0.0 \
+            --vendor "KEEVOL" \
+            --icon "src/main/resources/icons/keenotes.icns" \
+            --mac-package-identifier "cn.keevol.keenotes" \
+            --mac-package-name "KeeNotes" \
+            --java-options "-Xmx512m" \
+            --java-options "-Xdock:name=KeeNotes" \
+            --dest dist
+          mv dist/KeeNotes-1.0.0.pkg dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.pkg
+
+      - name: Upload macOS Packages (${{ matrix.name-suffix }})
         uses: actions/upload-artifact@v4
         with:
-          name: macos-dmg
-          path: dist/*.dmg
+          name: macos-packages-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
 
   build-linux:
     runs-on: ubuntu-latest
@@ -100,20 +151,18 @@ jobs:
       - name: Build JAR
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=linux"
 
-      - name: List target directory
-        run: ls -la target/
-
       - name: Create DEB Package
         run: |
           jpackage \
             --input target \
             --name keenotes \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class cn.keevol.keenotes.mobilefx.Main \
+            --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type deb \
             --app-version 1.0.0 \
-            --vendor "Keevol" \
+            --vendor "KEEVOL" \
             --icon "src/main/resources/icons/icon-512.png" \
+            --java-options "-Xmx512m" \
             --linux-shortcut \
             --dest dist
 
@@ -123,16 +172,23 @@ jobs:
             --input target \
             --name keenotes \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class cn.keevol.keenotes.mobilefx.Main \
+            --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type rpm \
             --app-version 1.0.0 \
-            --vendor "Keevol" \
+            --vendor "KEEVOL" \
             --icon "src/main/resources/icons/icon-512.png" \
+            --java-options "-Xmx512m" \
             --linux-shortcut \
             --dest dist
+
+      - name: Create Standalone JAR
+        run: |
+          mkdir -p dist
+          cp target/keenotes-mobile-1.0.0-SNAPSHOT.jar dist/keenotes-linux-standalone.jar
 
       - name: Upload Linux Packages
         uses: actions/upload-artifact@v4
         with:
           name: linux-packages
           path: dist/*
+          if-no-files-found: error

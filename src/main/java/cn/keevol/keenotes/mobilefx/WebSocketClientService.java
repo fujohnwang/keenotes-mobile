@@ -529,6 +529,7 @@ public class WebSocketClientService {
         syncBatchBuffer.clear();
         expectedBatches = 0;
         receivedBatches = 0;
+        isConnected.set(false);
         isConnecting.set(false);
     }
 
