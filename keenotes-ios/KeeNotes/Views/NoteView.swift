@@ -1,4 +1,5 @@
 import SwiftUI
+import Network
 
 /// Note input view for creating new notes
 struct NoteView: View {
@@ -59,14 +60,30 @@ struct NoteView: View {
                     .disabled(!canPost || isPosting)
                     
                     Spacer()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // Tap empty space to dismiss keyboard
+                            isTextFieldFocused = false
+                        }
                 }
                 .padding()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // Tap outside to dismiss keyboard
+                    isTextFieldFocused = false
+                }
             }
             .navigationTitle("KeeNotes")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
+                    // Keyboard hint
+                    Text("Tap outside or")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
                     Spacer()
+                    
                     Button("Done") {
                         isTextFieldFocused = false
                     }
@@ -169,48 +186,115 @@ struct NoteView: View {
     }
 }
 
-/// Connection status indicator bar
+/// Connection status indicator bar with two separate channels
 struct ConnectionStatusBar: View {
     @EnvironmentObject var appState: AppState
+    @StateObject private var networkMonitor = NetworkMonitor()
     
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            
-            Text(statusText)
-                .font(.caption)
-                .foregroundColor(.secondary)
+        HStack(spacing: 12) {
+            // Send Channel Status (HTTP API) - Left
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(sendChannelColor)
+                    .frame(width: 8, height: 8)
+                
+                Text("Send Channel:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Text(sendChannelText)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(sendChannelColor)
+            }
             
             Spacer()
             
-            if appState.webSocketService.syncStatus == .syncing {
-                ProgressView()
-                    .scaleEffect(0.7)
-                Text("Syncing...")
+            // Sync Channel Status (WebSocket) - Right
+            HStack(spacing: 6) {
+                if appState.webSocketService.syncStatus == .syncing {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                } else {
+                    Circle()
+                        .fill(syncChannelColor)
+                        .frame(width: 8, height: 8)
+                }
+                
+                Text("Sync Channel:")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                
+                Text(syncChannelText)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(syncChannelColor)
             }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .background(Color(.systemGray6))
     }
     
-    private var statusColor: Color {
+    // MARK: - Send Channel (HTTP API)
+    
+    private var sendChannelColor: Color {
+        if !appState.settingsService.isConfigured {
+            return .orange
+        }
+        return networkMonitor.isConnected ? .green : .red
+    }
+    
+    private var sendChannelText: String {
+        if !appState.settingsService.isConfigured {
+            return "Not Configured"
+        }
+        return networkMonitor.isConnected ? "Ready" : "No Network"
+    }
+    
+    // MARK: - Sync Channel (WebSocket)
+    
+    private var syncChannelColor: Color {
         switch appState.webSocketService.connectionState {
         case .connected: return .green
         case .connecting: return .orange
-        case .disconnected: return .red
+        case .disconnected: return .gray
         }
     }
     
-    private var statusText: String {
+    private var syncChannelText: String {
+        if appState.webSocketService.syncStatus == .syncing {
+            return "Syncing..."
+        }
+        
         switch appState.webSocketService.connectionState {
         case .connected: return "Connected"
         case .connecting: return "Connecting..."
         case .disconnected: return "Disconnected"
         }
+    }
+}
+
+/// Network connectivity monitor using NWPathMonitor
+class NetworkMonitor: ObservableObject {
+    private let monitor = NWPathMonitor()
+    private let queue = DispatchQueue(label: "NetworkMonitor")
+    
+    @Published var isConnected = true
+    @Published var connectionType: NWInterface.InterfaceType?
+    
+    init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                self?.isConnected = path.status == .satisfied
+                self?.connectionType = path.availableInterfaces.first?.type
+            }
+        }
+        monitor.start(queue: queue)
+    }
+    
+    deinit {
+        monitor.cancel()
     }
 }
