@@ -365,7 +365,7 @@ class Argon2Swift {
     
     private func bytesToBlock(_ data: Data) -> [UInt64] {
         var block = [UInt64](repeating: 0, count: 128)
-        data.withUnsafeBytes { ptr in
+        data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
             for i in 0..<128 {
                 block[i] = ptr.load(fromByteOffset: i * 8, as: UInt64.self).littleEndian
             }
@@ -375,7 +375,7 @@ class Argon2Swift {
     
     private func blockToBytes(_ block: [UInt64]) -> Data {
         var data = Data(count: 1024)
-        data.withUnsafeMutableBytes { ptr in
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutableRawBufferPointer) in
             for i in 0..<128 {
                 ptr.storeBytes(of: block[i].littleEndian, toByteOffset: i * 8, as: UInt64.self)
             }
@@ -477,7 +477,7 @@ class Argon2Swift {
             v[14] ^= isLast ? ~UInt64(0) : 0
             
             var m = [UInt64](repeating: 0, count: 16)
-            block.withUnsafeBytes { ptr in
+            block.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
                 for j in 0..<16 {
                     m[j] = ptr.load(fromByteOffset: j * 8, as: UInt64.self).littleEndian
                 }
@@ -501,7 +501,7 @@ class Argon2Swift {
         }
         
         var result = Data(count: outputLength)
-        result.withUnsafeMutableBytes { ptr in
+        result.withUnsafeMutableBytes { (ptr: UnsafeMutableRawBufferPointer) in
             for i in 0..<min(8, (outputLength + 7) / 8) {
                 let bytes = min(8, outputLength - i * 8)
                 for j in 0..<bytes {

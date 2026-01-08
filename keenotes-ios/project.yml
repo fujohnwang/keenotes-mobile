@@ -1,0 +1,38 @@
+name: KeeNotes
+options:
+  bundleIdPrefix: cn.keevol
+  deploymentTarget:
+    iOS: "15.0"
+  xcodeVersion: "15.0"
+
+settings:
+  base:
+    SDKROOT: iphoneos
+    SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+    SUPPORTS_MACCATALYST: NO
+    TARGETED_DEVICE_FAMILY: "1,2"
+    SWIFT_VERSION: "5.0"
+
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift.git
+    from: "6.24.0"
+
+targets:
+  KeeNotes:
+    type: application
+    platform: iOS
+    sources:
+      - path: KeeNotes
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        INFOPLIST_FILE: KeeNotes/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: cn.keevol.keenotes
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+    dependencies:
+      - package: GRDB

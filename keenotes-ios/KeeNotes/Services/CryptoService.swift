@@ -47,7 +47,7 @@ class CryptoService {
         
         // Timestamp as big-endian Int64
         let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
-        var timestampBytes = withUnsafeBytes(of: timestamp.bigEndian) { Data($0) }
+        let timestampBytes = withUnsafeBytes(of: timestamp.bigEndian) { Data($0) }
         
         // Derive key using Argon2id + HKDF
         let key = try deriveKey(password: password, salt: salt)
