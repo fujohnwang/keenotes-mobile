@@ -141,27 +141,43 @@ public class Main extends Application {
     }
 
     /**
-     * 更新服务状态UI - 使用StatusFooter显示连接状态
+     * 更新服务状态UI - 使用StatusFooter显示双通道状态
      */
     private void updateServiceStatusUI(String status, String message) {
         Platform.runLater(() -> {
             if (statusFooter != null) {
+                // Update Send Channel status based on configuration
+                SettingsService settings = SettingsService.getInstance();
+                if (settings.getEndpointUrl().isEmpty() || settings.getToken().isEmpty()) {
+                    statusFooter.setSendChannelState(StatusFooter.SendChannelState.NOT_CONFIGURED);
+                } else {
+                    // Assume network is available (JavaFX doesn't have easy network detection)
+                    statusFooter.setSendChannelState(StatusFooter.SendChannelState.READY);
+                }
+                
+                // Update Sync Channel status
                 switch (status.toLowerCase()) {
                     case "websocket_connected":
-                        statusFooter.setConnectionState(StatusFooter.ConnectionState.CONNECTED);
+                        statusFooter.setSyncChannelState(StatusFooter.ConnectionState.CONNECTED);
                         break;
                     case "websocket_disconnected":
                     case "not_configured":
                     case "connect_error":
                     case "websocket_error":
-                        statusFooter.setConnectionState(StatusFooter.ConnectionState.DISCONNECTED);
+                        statusFooter.setSyncChannelState(StatusFooter.ConnectionState.DISCONNECTED);
                         break;
                     case "reinitializing":
-                        statusFooter.setConnectionState(StatusFooter.ConnectionState.CONNECTING);
+                        statusFooter.setSyncChannelState(StatusFooter.ConnectionState.CONNECTING);
+                        break;
+                    case "syncing":
+                        statusFooter.setSyncStatusMessage("Syncing...", "#FFC107");
+                        break;
+                    case "sync_complete":
+                        // Restore connected state after sync
+                        statusFooter.setSyncChannelState(StatusFooter.ConnectionState.CONNECTED);
                         break;
                     default:
-                        // For other status messages (sync_complete, local_cache_ready, etc.)
-                        // Keep current connection state but could show message if needed
+                        // For other status messages, keep current state
                         break;
                 }
             }
