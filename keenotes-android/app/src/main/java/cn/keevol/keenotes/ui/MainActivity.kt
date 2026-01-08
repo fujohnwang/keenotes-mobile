@@ -30,26 +30,53 @@ class MainActivity : AppCompatActivity() {
     private fun setupStatusBar() {
         val app = application as KeeNotesApp
         
+        // Observe WebSocket connection state for sync channel
         lifecycleScope.launch {
             app.webSocketService.connectionState.collectLatest { state ->
-                updateConnectionStatus(state)
+                updateSyncChannelStatus(state)
             }
         }
+        
+        // Update send channel status based on configuration
+        updateSendChannelStatus()
     }
     
-    private fun updateConnectionStatus(state: WebSocketService.ConnectionState) {
+    private fun updateSendChannelStatus() {
+        val app = application as KeeNotesApp
+        val settings = app.settingsService
+        
+        val (text, color) = if (settings.endpointUrl.isBlank() || settings.token.isBlank()) {
+            "Not Configured" to getColor(R.color.warning)
+        } else {
+            // TODO: Add network connectivity check
+            "Ready" to getColor(R.color.success)
+        }
+        
+        binding.sendIndicator.setColorFilter(color)
+        binding.sendStatusText.text = text
+        binding.sendStatusText.setTextColor(color)
+    }
+    
+    private fun updateSyncChannelStatus(state: WebSocketService.ConnectionState) {
         val (text, color) = when (state) {
             WebSocketService.ConnectionState.CONNECTED -> 
                 getString(R.string.status_connected) to getColor(R.color.success)
             WebSocketService.ConnectionState.CONNECTING -> 
                 getString(R.string.status_connecting) to getColor(R.color.warning)
             WebSocketService.ConnectionState.DISCONNECTED -> 
-                getString(R.string.status_disconnected) to getColor(R.color.error)
+                getString(R.string.status_disconnected) to getColor(R.color.text_secondary)
         }
         
-        binding.statusIndicator.setColorFilter(color)
-        binding.statusText.text = text
-        binding.statusText.setTextColor(color)
+        binding.syncIndicator.setColorFilter(color)
+        binding.syncStatusText.text = text
+        binding.syncStatusText.setTextColor(color)
+    }
+    
+    fun setSyncChannelSyncing() {
+        val color = getColor(R.color.warning)
+        binding.syncIndicator.setColorFilter(color)
+        binding.syncStatusText.text = "Syncing..."
+        binding.syncStatusText.setTextColor(color)
     }
     
     private fun setupNavigation() {
