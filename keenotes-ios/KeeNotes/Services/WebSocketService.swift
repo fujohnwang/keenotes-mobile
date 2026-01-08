@@ -65,53 +65,45 @@ class WebSocketService: NSObject, ObservableObject {
         isConnecting = true
         
         Task {
-            do {
-                // Cache encryption password before connection
-                cachedPassword = settingsService.encryptionPassword.isEmpty ? nil : settingsService.encryptionPassword
-                print("[WS] Cached encryption password: \(cachedPassword != nil ? "yes" : "no")")
-                
-                // Load last sync ID
-                lastSyncId = (try? await databaseService.getLastSyncId()) ?? -1
-                print("[WS] Loaded lastSyncId: \(lastSyncId)")
-                
-                // Build WebSocket URL
-                guard let wsUrl = buildWebSocketUrl() else {
-                    print("[WS] Failed to build WebSocket URL")
-                    isConnecting = false
-                    return
-                }
-                
-                print("[WS] Connecting to: \(wsUrl)")
-                await MainActor.run { connectionState = .connecting }
-                
-                var request = URLRequest(url: wsUrl)
-                request.setValue("Bearer \(settingsService.token)", forHTTPHeaderField: "Authorization")
-                
-                // Build origin header
-                if let components = URLComponents(string: settingsService.endpointUrl) {
-                    let scheme = components.scheme == "wss" || components.scheme == "https" ? "https" : "http"
-                    let origin = "\(scheme)://\(components.host ?? "")"
-                    request.setValue(origin, forHTTPHeaderField: "Origin")
-                }
-                
-                webSocketTask = session.webSocketTask(with: request)
-                webSocketTask?.resume()
-                
+            // Cache encryption password before connection
+            cachedPassword = settingsService.encryptionPassword.isEmpty ? nil : settingsService.encryptionPassword
+            print("[WS] Cached encryption password: \(cachedPassword != nil ? "yes" : "no")")
+            
+            // Load last sync ID
+            lastSyncId = (try? await databaseService.getLastSyncId()) ?? -1
+            print("[WS] Loaded lastSyncId: \(lastSyncId)")
+            
+            // Build WebSocket URL
+            guard let wsUrl = buildWebSocketUrl() else {
+                print("[WS] Failed to build WebSocket URL")
                 isConnecting = false
-                await MainActor.run { connectionState = .connected }
-                
-                // Send handshake
-                sendHandshake()
-                
-                // Start receiving messages
-                receiveMessage()
-                
-            } catch {
-                print("[WS] Connection error: \(error)")
-                isConnecting = false
-                await MainActor.run { connectionState = .disconnected }
-                scheduleReconnect()
+                return
             }
+            
+            print("[WS] Connecting to: \(wsUrl)")
+            await MainActor.run { connectionState = .connecting }
+            
+            var request = URLRequest(url: wsUrl)
+            request.setValue("Bearer \(settingsService.token)", forHTTPHeaderField: "Authorization")
+            
+            // Build origin header
+            if let components = URLComponents(string: settingsService.endpointUrl) {
+                let scheme = components.scheme == "wss" || components.scheme == "https" ? "https" : "http"
+                let origin = "\(scheme)://\(components.host ?? "")"
+                request.setValue(origin, forHTTPHeaderField: "Origin")
+            }
+            
+            webSocketTask = session.webSocketTask(with: request)
+            webSocketTask?.resume()
+            
+            isConnecting = false
+            await MainActor.run { connectionState = .connected }
+            
+            // Send handshake
+            sendHandshake()
+            
+            // Start receiving messages
+            receiveMessage()
         }
     }
     

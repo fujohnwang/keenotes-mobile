@@ -24,21 +24,25 @@ struct SettingsView: View {
                 // Server configuration
                 Section(header: Text("Server Configuration")) {
                     TextField("Endpoint URL", text: $endpointUrl)
-                        .textContentType(.URL)
-                        .autocapitalization(.none)
+                        .textContentType(.none)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                         .keyboardType(.URL)
                     
                     SecureField("Token", text: $token)
-                        .textContentType(.password)
+                        .textContentType(.none)
+                        .autocorrectionDisabled()
                 }
                 
                 // Encryption
                 Section(header: Text("Encryption"), footer: Text("E2E encryption password. Must match across all devices.")) {
                     SecureField("Password", text: $password)
-                        .textContentType(.newPassword)
+                        .textContentType(.none)
+                        .autocorrectionDisabled()
                     
                     SecureField("Confirm Password", text: $confirmPassword)
-                        .textContentType(.newPassword)
+                        .textContentType(.none)
+                        .autocorrectionDisabled()
                 }
                 
                 // Save button
@@ -50,13 +54,6 @@ struct SettingsView: View {
                                 .fontWeight(.semibold)
                             Spacer()
                         }
-                    }
-                    
-                    // Status message
-                    if !statusMessage.isEmpty {
-                        Text(statusMessage)
-                            .font(.footnote)
-                            .foregroundColor(isSuccess ? .green : .red)
                     }
                 }
                 
@@ -71,14 +68,19 @@ struct SettingsView: View {
                 
                 // Copyright with easter egg
                 Section {
-                    Text("© 2025 Keevol. All rights reserved.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            handleCopyrightTap()
-                        }
+                    VStack(spacing: 4) {
+                        Text("©2025 王福强(Fuqiang Wang) All Rights Reserved")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                        
+                        Link("https://keenotes.afoo.me", destination: URL(string: "https://keenotes.afoo.me")!)
+                            .font(.footnote)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        handleCopyrightTap()
+                    }
                 }
             }
             .navigationTitle("Settings")
@@ -183,12 +185,6 @@ struct SettingsView: View {
         
         if copyrightTapCount >= 7 && !showDebugSection {
             showDebugSection = true
-            statusMessage = "Debug mode enabled!"
-            isSuccess = true
-        } else if copyrightTapCount >= 4 && copyrightTapCount < 7 {
-            let remaining = 7 - copyrightTapCount
-            statusMessage = "\(remaining) more tap(s) to enable debug mode"
-            isSuccess = true
         }
     }
 }

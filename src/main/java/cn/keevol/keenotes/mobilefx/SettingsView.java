@@ -63,7 +63,7 @@ public class SettingsView extends BorderPane {
         copyrightLabel.getStyleClass().add("copyright-label");
         copyrightLabel.setOnMouseClicked(e -> onCopyrightTap());
 
-        Label websiteLabel = new Label("https://afoo.me");
+        Label websiteLabel = new Label("https://keenotes.afoo.me");
         websiteLabel.getStyleClass().add("copyright-link");
 
         VBox footer = new VBox(4, copyrightLabel, websiteLabel);
