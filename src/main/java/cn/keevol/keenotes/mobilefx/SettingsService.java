@@ -19,6 +19,7 @@ public class SettingsService {
     private static final String KEY_TOKEN = "token";
     private static final String KEY_REVIEW_DAYS = "review.days";
     private static final String KEY_ENCRYPTION_PASSWORD = "encryption.password";
+    private static final String KEY_COPY_TO_CLIPBOARD = "copy.to.clipboard.on.post";
     private static final int DEFAULT_REVIEW_DAYS = 7;
 
     private static SettingsService instance;
@@ -132,5 +133,13 @@ public class SettingsService {
     public boolean isEncryptionEnabled() {
         String pwd = getEncryptionPassword();
         return pwd != null && !pwd.isEmpty();
+    }
+    
+    public boolean getCopyToClipboardOnPost() {
+        return Boolean.parseBoolean(properties.getProperty(KEY_COPY_TO_CLIPBOARD, "false"));
+    }
+    
+    public void setCopyToClipboardOnPost(boolean enabled) {
+        properties.setProperty(KEY_COPY_TO_CLIPBOARD, String.valueOf(enabled));
     }
 }

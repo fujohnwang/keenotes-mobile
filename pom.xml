@@ -213,46 +213,6 @@
             </build>
         </profile>
 
-        <!-- iOS profile -->
-        <profile>
-            <id>ios</id>
-            <build>
-                <plugins>
-                    <!-- iOS版需要module-info.java -->
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <version>3.4.0</version>
-                        <executions>
-                            <execution>
-                                <id>add-module-info-source</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/java-module</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>com.gluonhq</groupId>
-                        <artifactId>gluonfx-maven-plugin</artifactId>
-                        <configuration>
-                            <target>ios</target>
-                            <releaseConfiguration>
-                                <bundleName>KeeNotes</bundleName>
-                                <bundleVersion>1.0.0</bundleVersion>
-                                <bundleShortVersion>1.0</bundleShortVersion>
-                                <skipSigning>true</skipSigning>
-                            </releaseConfiguration>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
+        <!-- iOS profile removed - iOS native version is now in keenotes-ios/ -->
     </profiles>
 </project>

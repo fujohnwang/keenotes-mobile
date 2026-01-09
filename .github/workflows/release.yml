@@ -253,15 +253,105 @@ jobs:
         with:
           gradle-version: '8.4'
 
-      - name: Build Release APK
-        working-directory: keenotes-android
-        run: gradle assembleRelease --no-daemon -PversionName=${{ steps.version.outputs.version }} -PversionCode=${{ steps.version.outputs.versionCode }}
+      # Decode keystore from secrets
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/keystore.jks
 
-      - name: Upload Android Artifacts
+      # Build signed Release APK
+      - name: Build Signed Release APK
+        working-directory: keenotes-android
+        run: |
+          gradle assembleRelease --no-daemon \
+            -PKEYSTORE_FILE=${{ github.workspace }}/keystore.jks \
+            -PKEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -PKEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -PKEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            -PversionName=${{ steps.version.outputs.version }} \
+            -PversionCode=${{ steps.version.outputs.versionCode }}
+
+      # Build signed Release AAB (for Google Play)
+      - name: Build Signed Release AAB
+        working-directory: keenotes-android
+        run: |
+          gradle bundleRelease --no-daemon \
+            -PKEYSTORE_FILE=${{ github.workspace }}/keystore.jks \
+            -PKEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -PKEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -PKEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            -PversionName=${{ steps.version.outputs.version }} \
+            -PversionCode=${{ steps.version.outputs.versionCode }}
+
+      # Cleanup keystore for security
+      - name: Cleanup Keystore
+        if: always()
+        run: rm -f ${{ github.workspace }}/keystore.jks
+
+      # Upload APK
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: keenotes-android/app/build/outputs/apk/release/*.apk
+
+      # Upload AAB
+      - name: Upload Android AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: keenotes-android/app/build/outputs/bundle/release/*.aab
+
+  # build-ios:
+  #   runs-on: macos-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+
+  #     - name: Extract version
+  #       id: version
+  #       run: |
+  #         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+  #           VERSION="${{ github.event.inputs.version }}"
+  #         else
+  #           VERSION="${GITHUB_REF_NAME#v}"
+  #           VERSION="${VERSION#V}"
+  #         fi
+  #         echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  #     - name: Select Xcode version
+  #       run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+
+  #     - name: Resolve Swift Package Dependencies
+  #       working-directory: keenotes-ios
+  #       run: xcodebuild -resolvePackageDependencies -project KeeNotes.xcodeproj -scheme KeeNotes
+
+  #     - name: Build Release Archive
+  #       working-directory: keenotes-ios
+  #       run: |
+  #         xcodebuild archive \
+  #           -project KeeNotes.xcodeproj \
+  #           -scheme KeeNotes \
+  #           -destination 'generic/platform=iOS' \
+  #           -archivePath build/KeeNotes.xcarchive \
+  #           -configuration Release \
+  #           CODE_SIGN_IDENTITY="" \
+  #           CODE_SIGNING_REQUIRED=NO \
+  #           CODE_SIGNING_ALLOWED=NO \
+  #           SKIP_INSTALL=NO \
+  #           MARKETING_VERSION=${{ steps.version.outputs.version }}
+
+  #     - name: Create unsigned IPA
+  #       working-directory: keenotes-ios
+  #       run: |
+  #         mkdir -p build/Payload
+  #         cp -r build/KeeNotes.xcarchive/Products/Applications/KeeNotes.app build/Payload/
+  #         cd build && zip -r KeeNotes-${{ steps.version.outputs.version }}-unsigned.ipa Payload
+
+  #     - name: Upload iOS Artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: ios-ipa
+  #         path: keenotes-ios/build/*.ipa
 
   release:
     needs: [build-windows, build-macos, build-linux, build-android]
@@ -290,3 +380,5 @@ jobs:
             artifacts/macos-mac-aarch64/*
             artifacts/linux-packages/*
             artifacts/android-apk/*
+            artifacts/android-aab/*
+            # artifacts/ios-ipa/*

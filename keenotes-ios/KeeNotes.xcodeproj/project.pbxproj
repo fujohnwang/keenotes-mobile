@@ -1,0 +1,494 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 63;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1522A18793715A66AF3C5B1E /* encoding.c in Sources */ = {isa = PBXBuildFile; fileRef = CD8A13501AA7A7CAB9DD2D6B /* encoding.c */; };
+		185B386682B6638BD824635B /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516619C5BAA926CB01F4B456 /* DatabaseService.swift */; };
+		2FAF71FD90FB24A293D9C1DC /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = 599C37F5BE3DA3E0B0E48AD9 /* core.c */; };
+		382B7B75B8E85659AAED35AD /* SettingsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC56614EF00CDBBE7B740F99 /* SettingsService.swift */; };
+		3D3A986E86CF4FAC5FBCDA0A /* DebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71854385AA7C1EECC7F20F2 /* DebugView.swift */; };
+		41F5062EB8A1F683E01EC160 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EAA89252DC520456A6A43EEC /* Assets.xcassets */; };
+		572FEB1514AA9583B65E7A6B /* thread.c in Sources */ = {isa = PBXBuildFile; fileRef = 12CB0C7E4D18D06ED6D1966A /* thread.c */; };
+		5DD67890F51B1621810AB13C /* WebSocketService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE252BFDC15087E4D34EB51 /* WebSocketService.swift */; };
+		6D81FA454D6E54D241F31894 /* Note.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58873415E76E9E252DEA0F7A /* Note.swift */; };
+		6FB30AE0AADAFBFDFCE3F48E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */; };
+		85535D4D227727012D31DE0F /* CryptoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3630EFD2F3AD1B593AE659EA /* CryptoService.swift */; };
+		8B963F8CCE2F5E131B06788B /* Argon2Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8DCBEC22348C792E803554 /* Argon2Swift.swift */; };
+		928FB5A4314467ABDBE9CCBE /* blake2b.c in Sources */ = {isa = PBXBuildFile; fileRef = CEED188D3B81AF7268E2D579 /* blake2b.c */; };
+		946E8578E0A828A727191C99 /* ApiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CCFBB1C4E585233C8949042 /* ApiService.swift */; };
+		9E1AA8C7DADD4E82A4D437BC /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87901956656FA3E18B94F424 /* ReviewView.swift */; };
+		C0AE7EC02E4C49132B40A4A0 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 149970AB595EDA07A0940B31 /* GRDB */; };
+		DA5DD2A22882D996C37B27EF /* argon2.c in Sources */ = {isa = PBXBuildFile; fileRef = 6D467341E90F4D144FCEC974 /* argon2.c */; };
+		E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC48816DBEEFEE56707E5302 /* NoteView.swift */; };
+		E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9040A9739D8D0416CE13A31 /* MainTabView.swift */; };
+		E641EC093049E5F7E4D0D094 /* ref.c in Sources */ = {isa = PBXBuildFile; fileRef = 9946B1EE523C44AB196C6446 /* ref.c */; };
+		FBDF52C9E3B0CF6AFF1CAF1A /* KeeNotesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D8A3032850BEA6F1E1698E /* KeeNotesApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		03605D0E1E6AE5D607639961 /* blamka-round-ref.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blamka-round-ref.h"; sourceTree = "<group>"; };
+		0CCFBB1C4E585233C8949042 /* ApiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiService.swift; sourceTree = "<group>"; };
+		0F0DB648B1399AF3B170E27B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		12CB0C7E4D18D06ED6D1966A /* thread.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = thread.c; sourceTree = "<group>"; };
+		1575BB23A63EC55E1FFE55B3 /* blake2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = blake2.h; sourceTree = "<group>"; };
+		2770ABCD494AC650EFA448AD /* thread.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = thread.h; sourceTree = "<group>"; };
+		3630EFD2F3AD1B593AE659EA /* CryptoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoService.swift; sourceTree = "<group>"; };
+		3B8DCBEC22348C792E803554 /* Argon2Swift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2Swift.swift; sourceTree = "<group>"; };
+		40D8A3032850BEA6F1E1698E /* KeeNotesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeeNotesApp.swift; sourceTree = "<group>"; };
+		516619C5BAA926CB01F4B456 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
+		58873415E76E9E252DEA0F7A /* Note.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Note.swift; sourceTree = "<group>"; };
+		599C37F5BE3DA3E0B0E48AD9 /* core.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = core.c; sourceTree = "<group>"; };
+		6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		6D467341E90F4D144FCEC974 /* argon2.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = argon2.c; sourceTree = "<group>"; };
+		76A65FB003A8C97D156D2E71 /* core.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = core.h; sourceTree = "<group>"; };
+		87901956656FA3E18B94F424 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
+		8E07C8BA817350735F9023F6 /* blamka-round-opt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blamka-round-opt.h"; sourceTree = "<group>"; };
+		9946B1EE523C44AB196C6446 /* ref.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ref.c; sourceTree = "<group>"; };
+		A9040A9739D8D0416CE13A31 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		B5515BAE55139991A54308D6 /* KeeNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KeeNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC48816DBEEFEE56707E5302 /* NoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteView.swift; sourceTree = "<group>"; };
+		C41FB2074330D7D199860EB8 /* encoding.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = encoding.h; sourceTree = "<group>"; };
+		CD8A13501AA7A7CAB9DD2D6B /* encoding.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = encoding.c; sourceTree = "<group>"; };
+		CEED188D3B81AF7268E2D579 /* blake2b.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = blake2b.c; sourceTree = "<group>"; };
+		D1DA3D7B9EC0F4278F1C8070 /* argon2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = argon2.h; sourceTree = "<group>"; };
+		D34FAB7AB6D6F412B2AD704B /* KeeNotes-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "KeeNotes-Bridging-Header.h"; sourceTree = "<group>"; };
+		D6B16CD3673E6F843DF0CC2C /* blake2-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blake2-impl.h"; sourceTree = "<group>"; };
+		DFE252BFDC15087E4D34EB51 /* WebSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketService.swift; sourceTree = "<group>"; };
+		E71854385AA7C1EECC7F20F2 /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
+		EAA89252DC520456A6A43EEC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		EC56614EF00CDBBE7B740F99 /* SettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsService.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B262B634F42FF02F41DA15B2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C0AE7EC02E4C49132B40A4A0 /* GRDB in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		250EE154E5A91CD32969F357 = {
+			isa = PBXGroup;
+			children = (
+				CB806CCF58F50E1D69B1F341 /* KeeNotes */,
+				FEBE91F7B35D8EFFF38E18D9 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		27988A83321BB36CAEDE057E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				E71854385AA7C1EECC7F20F2 /* DebugView.swift */,
+				A9040A9739D8D0416CE13A31 /* MainTabView.swift */,
+				BC48816DBEEFEE56707E5302 /* NoteView.swift */,
+				87901956656FA3E18B94F424 /* ReviewView.swift */,
+				6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		386952B9571FC91450A59B21 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				40D8A3032850BEA6F1E1698E /* KeeNotesApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		7115A82AAC7A5B280DF232F5 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				EAA89252DC520456A6A43EEC /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		7CF6953E7127E723D579AC14 /* blake2 */ = {
+			isa = PBXGroup;
+			children = (
+				D6B16CD3673E6F843DF0CC2C /* blake2-impl.h */,
+				1575BB23A63EC55E1FFE55B3 /* blake2.h */,
+				CEED188D3B81AF7268E2D579 /* blake2b.c */,
+				8E07C8BA817350735F9023F6 /* blamka-round-opt.h */,
+				03605D0E1E6AE5D607639961 /* blamka-round-ref.h */,
+			);
+			path = blake2;
+			sourceTree = "<group>";
+		};
+		CB806CCF58F50E1D69B1F341 /* KeeNotes */ = {
+			isa = PBXGroup;
+			children = (
+				0F0DB648B1399AF3B170E27B /* Info.plist */,
+				386952B9571FC91450A59B21 /* App */,
+				E0C208039B9B256537E57024 /* CArgon2 */,
+				DCCD92D783D643109735F540 /* Models */,
+				7115A82AAC7A5B280DF232F5 /* Resources */,
+				CF67526C0F11CA16B6415E62 /* Services */,
+				27988A83321BB36CAEDE057E /* Views */,
+			);
+			path = KeeNotes;
+			sourceTree = "<group>";
+		};
+		CF67526C0F11CA16B6415E62 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				0CCFBB1C4E585233C8949042 /* ApiService.swift */,
+				3B8DCBEC22348C792E803554 /* Argon2Swift.swift */,
+				3630EFD2F3AD1B593AE659EA /* CryptoService.swift */,
+				516619C5BAA926CB01F4B456 /* DatabaseService.swift */,
+				EC56614EF00CDBBE7B740F99 /* SettingsService.swift */,
+				DFE252BFDC15087E4D34EB51 /* WebSocketService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		DCCD92D783D643109735F540 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				58873415E76E9E252DEA0F7A /* Note.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		E0C208039B9B256537E57024 /* CArgon2 */ = {
+			isa = PBXGroup;
+			children = (
+				6D467341E90F4D144FCEC974 /* argon2.c */,
+				D1DA3D7B9EC0F4278F1C8070 /* argon2.h */,
+				599C37F5BE3DA3E0B0E48AD9 /* core.c */,
+				76A65FB003A8C97D156D2E71 /* core.h */,
+				CD8A13501AA7A7CAB9DD2D6B /* encoding.c */,
+				C41FB2074330D7D199860EB8 /* encoding.h */,
+				D34FAB7AB6D6F412B2AD704B /* KeeNotes-Bridging-Header.h */,
+				9946B1EE523C44AB196C6446 /* ref.c */,
+				12CB0C7E4D18D06ED6D1966A /* thread.c */,
+				2770ABCD494AC650EFA448AD /* thread.h */,
+				7CF6953E7127E723D579AC14 /* blake2 */,
+			);
+			path = CArgon2;
+			sourceTree = "<group>";
+		};
+		FEBE91F7B35D8EFFF38E18D9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B5515BAE55139991A54308D6 /* KeeNotes.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DA2B4E34EDA97A5488829DA9 /* KeeNotes */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1F0CB57DCB3CD110C0F1845C /* Build configuration list for PBXNativeTarget "KeeNotes" */;
+			buildPhases = (
+				0E16E440722F0313DC521662 /* Sources */,
+				21D1DD8E0B8CD0F4B498199F /* Resources */,
+				B262B634F42FF02F41DA15B2 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KeeNotes;
+			packageProductDependencies = (
+				149970AB595EDA07A0940B31 /* GRDB */,
+			);
+			productName = KeeNotes;
+			productReference = B5515BAE55139991A54308D6 /* KeeNotes.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B5DF191C32E12F2D1F116CCD /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = A5A6524E6A9AD08921C1A119 /* Build configuration list for PBXProject "KeeNotes" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 250EE154E5A91CD32969F357;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1E52851DC31606B4CE57CCD7 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+			);
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DA2B4E34EDA97A5488829DA9 /* KeeNotes */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		21D1DD8E0B8CD0F4B498199F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				41F5062EB8A1F683E01EC160 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0E16E440722F0313DC521662 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				946E8578E0A828A727191C99 /* ApiService.swift in Sources */,
+				8B963F8CCE2F5E131B06788B /* Argon2Swift.swift in Sources */,
+				85535D4D227727012D31DE0F /* CryptoService.swift in Sources */,
+				185B386682B6638BD824635B /* DatabaseService.swift in Sources */,
+				3D3A986E86CF4FAC5FBCDA0A /* DebugView.swift in Sources */,
+				FBDF52C9E3B0CF6AFF1CAF1A /* KeeNotesApp.swift in Sources */,
+				E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */,
+				6D81FA454D6E54D241F31894 /* Note.swift in Sources */,
+				E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */,
+				9E1AA8C7DADD4E82A4D437BC /* ReviewView.swift in Sources */,
+				382B7B75B8E85659AAED35AD /* SettingsService.swift in Sources */,
+				6FB30AE0AADAFBFDFCE3F48E /* SettingsView.swift in Sources */,
+				5DD67890F51B1621810AB13C /* WebSocketService.swift in Sources */,
+				DA5DD2A22882D996C37B27EF /* argon2.c in Sources */,
+				928FB5A4314467ABDBE9CCBE /* blake2b.c in Sources */,
+				2FAF71FD90FB24A293D9C1DC /* core.c in Sources */,
+				1522A18793715A66AF3C5B1E /* encoding.c in Sources */,
+				E641EC093049E5F7E4D0D094 /* ref.c in Sources */,
+				572FEB1514AA9583B65E7A6B /* thread.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		8F74ED998E69EFED99C762DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		95478F1170343C331996AF6B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NG744CF46S;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = KeeNotes/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
+				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		97E649B5C76B1E13F3476E97 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NG744CF46S;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = KeeNotes/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
+				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1226A4FAA6BC11847978952 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1F0CB57DCB3CD110C0F1845C /* Build configuration list for PBXNativeTarget "KeeNotes" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				97E649B5C76B1E13F3476E97 /* Debug */,
+				95478F1170343C331996AF6B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A5A6524E6A9AD08921C1A119 /* Build configuration list for PBXProject "KeeNotes" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8F74ED998E69EFED99C762DA /* Debug */,
+				A1226A4FAA6BC11847978952 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1E52851DC31606B4CE57CCD7 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.24.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		149970AB595EDA07A0940B31 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1E52851DC31606B4CE57CCD7 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = B5DF191C32E12F2D1F116CCD /* Project object */;
+}

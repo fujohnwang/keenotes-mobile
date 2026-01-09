@@ -1,6 +1,8 @@
 package cn.keevol.keenotes.ui.settings
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -35,6 +37,7 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         
         setupHeader()
+        setupCopyToClipboardToggle()
         setupSaveButton()
         setupCopyrightEasterEgg()
         loadSettings()
@@ -43,6 +46,22 @@ class SettingsFragment : Fragment() {
     private fun setupHeader() {
         binding.btnBack.setOnClickListener {
             findNavController().popBackStack()
+        }
+    }
+    
+    private fun setupCopyToClipboardToggle() {
+        val app = requireActivity().application as KeeNotesApp
+        
+        // Load initial state
+        lifecycleScope.launch {
+            binding.copyToClipboardSwitch.isChecked = app.settingsRepository.copyToClipboardOnPost.first()
+        }
+        
+        // Auto-save on toggle change
+        binding.copyToClipboardSwitch.setOnCheckedChangeListener { _, isChecked ->
+            lifecycleScope.launch {
+                app.settingsRepository.setCopyToClipboardOnPost(isChecked)
+            }
         }
     }
     
@@ -88,6 +107,7 @@ class SettingsFragment : Fragment() {
             val password = app.settingsRepository.encryptionPassword.first()
             binding.passwordInput.setText(password)
             binding.passwordConfirmInput.setText(password)
+            // copyToClipboardSwitch is loaded in setupCopyToClipboardToggle()
         }
     }
     
@@ -96,6 +116,7 @@ class SettingsFragment : Fragment() {
         val token = binding.tokenInput.text.toString()
         val password = binding.passwordInput.text.toString()
         val confirmPassword = binding.passwordConfirmInput.text.toString()
+        // copyToClipboard is auto-saved, no need to save here
         
         // Validate password match
         if (password != confirmPassword) {
@@ -124,6 +145,7 @@ class SettingsFragment : Fragment() {
             
             // Save new settings
             app.settingsRepository.saveSettings(endpoint, token, password)
+            // copyToClipboard is auto-saved on toggle change
             
             val msg = if (password.isNotEmpty()) {
                 "Settings saved ✓ (E2E encryption enabled)"
@@ -156,11 +178,21 @@ class SettingsFragment : Fragment() {
                     binding.statusText.text = msg
                 }
                 
+                // Navigate back to Note fragment after 1 second delay
+                Handler(Looper.getMainLooper()).postDelayed({
+                    findNavController().popBackStack()
+                }, 1000)
+                
             } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
                 // First time configuration
                 binding.statusText.text = msg
                 binding.statusText.setTextColor(requireContext().getColor(R.color.success))
                 app.webSocketService.connect()
+                
+                // Navigate back to Note fragment after 500ms delay
+                Handler(Looper.getMainLooper()).postDelayed({
+                    findNavController().popBackStack()
+                }, 500)
                 
             } else {
                 // No critical configuration change
@@ -172,6 +204,11 @@ class SettingsFragment : Fragment() {
                 if (endpoint.isNotBlank() && token.isNotBlank()) {
                     app.webSocketService.connect()
                 }
+                
+                // Navigate back to Note fragment after 500ms delay
+                Handler(Looper.getMainLooper()).postDelayed({
+                    findNavController().popBackStack()
+                }, 500)
             }
         }
     }

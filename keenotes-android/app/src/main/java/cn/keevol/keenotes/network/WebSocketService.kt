@@ -56,6 +56,10 @@ class WebSocketService(
     
     private var webSocket: WebSocket? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    
+    // Use single-threaded dispatcher for message processing to maintain order
+    private val messageDispatcher = Dispatchers.IO.limitedParallelism(1)
+    
     private val clientId = UUID.randomUUID().toString()
     
     // Use @Volatile to ensure visibility across threads (OkHttp callbacks run on different thread)
@@ -217,10 +221,9 @@ class WebSocketService(
         
         override fun onMessage(ws: WebSocket, text: String) {
             Log.i(TAG, "onMessage received, length=${text.length}")
-            // CRITICAL: Process messages synchronously to maintain order
-            // JavaFX processes messages synchronously in handleTextMessage()
-            // Using scope.launch would cause race conditions between sync_batch and sync_complete
-            runBlocking {
+            // Use single-threaded dispatcher to maintain message order
+            // This avoids blocking OkHttp's callback thread while ensuring sequential processing
+            scope.launch(messageDispatcher) {
                 handleMessage(text)
             }
         }
@@ -381,12 +384,20 @@ class WebSocketService(
             
             if (notesToInsert.isNotEmpty()) {
                 Log.i(TAG, "Inserting ${notesToInsert.size} notes to database...")
+                
+                // CRITICAL: Insert notes BEFORE setting COMPLETED state
+                // This ensures UI sees data when state changes to COMPLETED
                 noteDao.insertAll(notesToInsert)
+                
                 Log.i(TAG, "SUCCESS: Inserted ${notesToInsert.size} notes to database")
                 
                 // Verify insertion
                 val count = noteDao.getNoteCount()
                 Log.i(TAG, "Database now has $count notes total")
+                
+                // Small delay to ensure Room's Flow has time to emit the update
+                // Room uses a background thread to notify observers
+                delay(100)
             } else {
                 Log.w(TAG, "WARNING: syncBatchBuffer is empty, nothing to insert!")
             }
@@ -400,21 +411,27 @@ class WebSocketService(
             } else {
                 Log.i(TAG, "Not updating lastSyncId: totalSynced=$totalSynced, newLastSyncId=$newLastSyncId")
             }
+            
+            // CRITICAL: Set COMPLETED state AFTER database insertion and delay
+            // This prevents "No notes yet" flash in UI
+            _syncState.value = SyncState.COMPLETED
+            
+            Log.i(TAG, "Sync complete: $totalSynced notes processed, state set to COMPLETED")
+            
         } catch (e: Exception) {
             Log.e(TAG, "CRITICAL: Failed to save synced notes: ${e.message}", e)
             e.printStackTrace()
+            
+            // Set IDLE state on error
+            _syncState.value = SyncState.IDLE
+        } finally {
+            // Clean up buffer
+            synchronized(syncBatchBuffer) {
+                syncBatchBuffer.clear()
+            }
+            expectedBatches = 0
+            receivedBatches = 0
         }
-        
-        synchronized(syncBatchBuffer) {
-            syncBatchBuffer.clear()
-        }
-        expectedBatches = 0
-        receivedBatches = 0
-        
-        // Set sync completed state
-        _syncState.value = SyncState.COMPLETED
-        
-        Log.i(TAG, "Sync complete: $totalSynced notes processed")
     }
     
     private suspend fun handleRealtimeUpdate(json: JSONObject) {

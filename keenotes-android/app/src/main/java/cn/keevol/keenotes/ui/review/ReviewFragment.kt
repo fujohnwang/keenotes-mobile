@@ -4,15 +4,12 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
-import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.FragmentReviewBinding
 import cn.keevol.keenotes.network.WebSocketService
 import kotlinx.coroutines.Job
@@ -30,6 +27,7 @@ class ReviewFragment : Fragment() {
     private val notesAdapter = NotesAdapter()
     private var currentPeriod = "7 days"
     private var notesJob: Job? = null
+    private var dotsAnimationJob: Job? = null
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -56,17 +54,20 @@ class ReviewFragment : Fragment() {
     }
     
     private fun setupPeriodSelector() {
-        val periods = arrayOf("7 days", "30 days", "90 days", "All")
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, periods)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.periodSpinner.adapter = adapter
+        // Set default selection to 7 days
+        binding.period7Days.isChecked = true
         
-        binding.periodSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                currentPeriod = periods[position]
+        binding.periodToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                currentPeriod = when (checkedId) {
+                    R.id.period7Days -> "7 days"
+                    R.id.period30Days -> "30 days"
+                    R.id.period90Days -> "90 days"
+                    R.id.periodAll -> "All"
+                    else -> "7 days"
+                }
                 observeNotes(currentPeriod)
             }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
     }
     
@@ -79,11 +80,12 @@ class ReviewFragment : Fragment() {
     
     /**
      * Observe notes from database using Flow - auto-updates when data changes
-     * Also observes sync state to show appropriate empty message
+     * Simplified logic: primarily rely on notes data, use syncState only for empty message
      */
     private fun observeNotes(period: String) {
         val app = requireActivity().application as KeeNotesApp
         
+        // Show initial loading state
         binding.loadingText.visibility = View.VISIBLE
         binding.notesRecyclerView.visibility = View.GONE
         binding.emptyText.visibility = View.GONE
@@ -108,20 +110,31 @@ class ReviewFragment : Fragment() {
             ) { notes, syncState ->
                 Pair(notes, syncState)
             }.collectLatest { (notes, syncState) ->
-                binding.loadingText.visibility = View.GONE
-                
                 if (notes.isEmpty()) {
+                    // Hide loading, show empty state
+                    binding.loadingText.visibility = View.GONE
                     binding.emptyText.visibility = View.VISIBLE
                     binding.notesRecyclerView.visibility = View.GONE
                     
                     // Show different message based on sync state
-                    binding.emptyText.text = when (syncState) {
-                        WebSocketService.SyncState.SYNCING -> "Notes syncing..."
-                        WebSocketService.SyncState.IDLE -> "Waiting for sync..."
-                        WebSocketService.SyncState.COMPLETED -> "No notes found for $period"
+                    when (syncState) {
+                        WebSocketService.SyncState.SYNCING -> {
+                            startDotsAnimation("Notes syncing")
+                        }
+                        WebSocketService.SyncState.IDLE -> {
+                            stopDotsAnimation()
+                            binding.emptyText.text = "Waiting for sync..."
+                        }
+                        WebSocketService.SyncState.COMPLETED -> {
+                            stopDotsAnimation()
+                            binding.emptyText.text = "No notes found for $period"
+                        }
                     }
                     binding.countText.text = "0 note(s)"
                 } else {
+                    // Show notes list
+                    stopDotsAnimation()
+                    binding.loadingText.visibility = View.GONE
                     binding.emptyText.visibility = View.GONE
                     binding.notesRecyclerView.visibility = View.VISIBLE
                     binding.countText.text = "${notes.size} note(s)"
@@ -131,9 +144,28 @@ class ReviewFragment : Fragment() {
         }
     }
     
+    private fun startDotsAnimation(baseText: String) {
+        stopDotsAnimation()
+        dotsAnimationJob = lifecycleScope.launch {
+            var dotCount = 0
+            while (true) {
+                val dots = ".".repeat(dotCount)
+                binding.emptyText.text = "$baseText$dots"
+                dotCount = (dotCount + 1) % 4  // 0, 1, 2, 3, then back to 0
+                kotlinx.coroutines.delay(500)  // Update every 500ms
+            }
+        }
+    }
+    
+    private fun stopDotsAnimation() {
+        dotsAnimationJob?.cancel()
+        dotsAnimationJob = null
+    }
+    
     override fun onDestroyView() {
         super.onDestroyView()
         notesJob?.cancel()
+        stopDotsAnimation()
         _binding = null
     }
 }
