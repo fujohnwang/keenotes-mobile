@@ -1,6 +1,8 @@
 package cn.keevol.keenotes.ui.settings
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -176,8 +178,10 @@ class SettingsFragment : Fragment() {
                     binding.statusText.text = msg
                 }
                 
-                // Navigate back to Note fragment
-                findNavController().popBackStack()
+                // Navigate back to Note fragment after 1 second delay
+                Handler(Looper.getMainLooper()).postDelayed({
+                    findNavController().popBackStack()
+                }, 1000)
                 
             } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
                 // First time configuration
@@ -185,8 +189,10 @@ class SettingsFragment : Fragment() {
                 binding.statusText.setTextColor(requireContext().getColor(R.color.success))
                 app.webSocketService.connect()
                 
-                // Navigate back to Note fragment
-                findNavController().popBackStack()
+                // Navigate back to Note fragment after 1 second delay
+                Handler(Looper.getMainLooper()).postDelayed({
+                    findNavController().popBackStack()
+                }, 1000)
                 
             } else {
                 // No critical configuration change
@@ -199,8 +205,10 @@ class SettingsFragment : Fragment() {
                     app.webSocketService.connect()
                 }
                 
-                // Navigate back to Note fragment
-                findNavController().popBackStack()
+                // Navigate back to Note fragment after 1 second delay
+                Handler(Looper.getMainLooper()).postDelayed({
+                    findNavController().popBackStack()
+                }, 1000)
             }
         }
     }
