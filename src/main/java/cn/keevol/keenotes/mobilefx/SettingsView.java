@@ -18,7 +18,7 @@ public class SettingsView extends BorderPane {
     private final SettingsService settings;
     private final Runnable onBack;
     private final Runnable onOpenDebug;
-    private final CheckBox copyToClipboardCheckBox;
+    private final ToggleSwitch copyToClipboardToggle;
     
     // Easter egg: tap copyright 7 times to show debug
     private int copyrightTapCount = 0;
@@ -79,14 +79,19 @@ public class SettingsView extends BorderPane {
         preferencesLabel.getStyleClass().add("field-label");
         preferencesLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
 
-        copyToClipboardCheckBox = new CheckBox("Copy to clipboard on post success");
-        copyToClipboardCheckBox.getStyleClass().add("checkbox-field");
+        copyToClipboardToggle = new ToggleSwitch();
         
         // Auto-save on change
-        copyToClipboardCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+        copyToClipboardToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
             settings.setCopyToClipboardOnPost(newVal);
             settings.save();
         });
+        
+        Label toggleLabel = new Label("Copy to clipboard on post success");
+        toggleLabel.getStyleClass().add("field-label");
+        
+        HBox toggleRow = new HBox(12, toggleLabel, copyToClipboardToggle);
+        toggleRow.setAlignment(Pos.CENTER_LEFT);
 
         // Debug entry (hidden by default)
         Button debugBtn = new Button("Debug");
@@ -107,7 +112,7 @@ public class SettingsView extends BorderPane {
                 createFieldGroup("Token", tokenField),
                 createFieldGroup("Encryption Password", encryptionPasswordField),
                 createFieldGroupWithHint("Confirm Password", encryptionPasswordConfirmField, encryptionHint),
-                new VBox(8, preferencesLabel, copyToClipboardCheckBox),
+                new VBox(8, preferencesLabel, toggleRow),
                 saveButton,
                 statusLabel,
                 debugSection,
@@ -194,7 +199,7 @@ public class SettingsView extends BorderPane {
         String savedPassword = settings.getEncryptionPassword();
         encryptionPasswordField.setText(savedPassword);
         encryptionPasswordConfirmField.setText(savedPassword);
-        copyToClipboardCheckBox.setSelected(settings.getCopyToClipboardOnPost());
+        copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
     }
 
     private void saveSettings() {
