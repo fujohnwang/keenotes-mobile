@@ -261,26 +261,24 @@ jobs:
       # Build signed Release APK
       - name: Build Signed Release APK
         working-directory: keenotes-android
-        env:
-          KEYSTORE_FILE: ${{ github.workspace }}/keystore.jks
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           gradle assembleRelease --no-daemon \
+            -PKEYSTORE_FILE=${{ github.workspace }}/keystore.jks \
+            -PKEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -PKEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -PKEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}" \
             -PversionName=${{ steps.version.outputs.version }} \
             -PversionCode=${{ steps.version.outputs.versionCode }}
 
       # Build signed Release AAB (for Google Play)
       - name: Build Signed Release AAB
         working-directory: keenotes-android
-        env:
-          KEYSTORE_FILE: ${{ github.workspace }}/keystore.jks
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           gradle bundleRelease --no-daemon \
+            -PKEYSTORE_FILE=${{ github.workspace }}/keystore.jks \
+            -PKEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -PKEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -PKEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}" \
             -PversionName=${{ steps.version.outputs.version }} \
             -PversionCode=${{ steps.version.outputs.versionCode }}
 
