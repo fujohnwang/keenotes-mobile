@@ -108,13 +108,9 @@ class ReviewFragment : Fragment() {
             ) { notes, syncState ->
                 Pair(notes, syncState)
             }.collectLatest { (notes, syncState) ->
-                // Hide loading once we have data or sync is complete
-                if (notes.isNotEmpty() || syncState == WebSocketService.SyncState.COMPLETED) {
-                    binding.loadingText.visibility = View.GONE
-                }
-                
                 if (notes.isEmpty()) {
-                    // Show empty state
+                    // Hide loading, show empty state
+                    binding.loadingText.visibility = View.GONE
                     binding.emptyText.visibility = View.VISIBLE
                     binding.notesRecyclerView.visibility = View.GONE
                     
