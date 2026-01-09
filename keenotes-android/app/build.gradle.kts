@@ -29,26 +29,32 @@ android {
         getByName("debug") {
             // Use default debug keystore
         }
-        create("release") {
-            // Read from environment variables (for CI/CD) or gradle.properties (for local)
-            val keystoreFile = System.getenv("KEYSTORE_FILE") 
-                ?: project.findProperty("KEYSTORE_FILE") as String?
-            val keystorePassword = System.getenv("KEYSTORE_PASSWORD") 
-                ?: project.findProperty("KEYSTORE_PASSWORD") as String?
-            val keyAlias = System.getenv("KEY_ALIAS") 
-                ?: project.findProperty("KEY_ALIAS") as String?
-            val keyPassword = System.getenv("KEY_PASSWORD") 
-                ?: project.findProperty("KEY_PASSWORD") as String?
-            
-            if (keystoreFile != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
+        
+        // Only create release signing config if all required properties are present
+        val keystoreFile = System.getenv("KEYSTORE_FILE") 
+            ?: project.findProperty("KEYSTORE_FILE") as String?
+        val keystorePassword = System.getenv("KEYSTORE_PASSWORD") 
+            ?: project.findProperty("KEYSTORE_PASSWORD") as String?
+        val keyAlias = System.getenv("KEY_ALIAS") 
+            ?: project.findProperty("KEY_ALIAS") as String?
+        val keyPassword = System.getenv("KEY_PASSWORD") 
+            ?: project.findProperty("KEY_PASSWORD") as String?
+        
+        if (keystoreFile != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
+            create("release") {
                 storeFile = file(keystoreFile)
                 storePassword = keystorePassword
                 this.keyAlias = keyAlias
                 this.keyPassword = keyPassword
-            } else {
-                // Fallback to debug signing if release signing not configured
-                println("WARNING: Release signing not configured, using debug keystore")
+                println("✓ Release signing configured with keystore: $keystoreFile")
             }
+        } else {
+            println("⚠ WARNING: Release signing not configured (missing environment variables)")
+            println("  KEYSTORE_FILE: ${if (keystoreFile != null) "✓" else "✗"}")
+            println("  KEYSTORE_PASSWORD: ${if (keystorePassword != null) "✓" else "✗"}")
+            println("  KEY_ALIAS: ${if (keyAlias != null) "✓" else "✗"}")
+            println("  KEY_PASSWORD: ${if (keyPassword != null) "✓" else "✗"}")
+            println("  → Will use debug keystore for release build")
         }
     }
 
@@ -60,12 +66,10 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // Use release signing if configured, otherwise fall back to debug
-            signingConfig = if (signingConfigs.findByName("release") != null) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            
+            // Use release signing if available, otherwise fall back to debug
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
