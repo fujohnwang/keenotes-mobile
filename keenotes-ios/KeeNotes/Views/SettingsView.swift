@@ -66,6 +66,14 @@ struct SettingsView: View {
                             Spacer()
                         }
                     }
+                    
+                    // Status message
+                    if !statusMessage.isEmpty {
+                        Text(statusMessage)
+                            .font(.footnote)
+                            .foregroundColor(isSuccess ? .green : .red)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
                 }
                 
                 // Debug section (hidden by default)
