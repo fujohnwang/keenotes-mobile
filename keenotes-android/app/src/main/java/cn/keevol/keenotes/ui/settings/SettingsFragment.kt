@@ -189,10 +189,10 @@ class SettingsFragment : Fragment() {
                 binding.statusText.setTextColor(requireContext().getColor(R.color.success))
                 app.webSocketService.connect()
                 
-                // Navigate back to Note fragment after 1 second delay
+                // Navigate back to Note fragment after 500ms delay
                 Handler(Looper.getMainLooper()).postDelayed({
                     findNavController().popBackStack()
-                }, 1000)
+                }, 500)
                 
             } else {
                 // No critical configuration change
@@ -205,10 +205,10 @@ class SettingsFragment : Fragment() {
                     app.webSocketService.connect()
                 }
                 
-                // Navigate back to Note fragment after 1 second delay
+                // Navigate back to Note fragment after 500ms delay
                 Handler(Looper.getMainLooper()).postDelayed({
                     findNavController().popBackStack()
-                }, 1000)
+                }, 500)
             }
         }
     }

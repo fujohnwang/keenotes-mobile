@@ -277,8 +277,8 @@ public class SettingsView extends BorderPane {
                     // 更新UI状态
                     javafx.application.Platform.runLater(() -> {
                         statusLabel.setText(msg + " (Reconnected)");
-                        // Wait 1 second then navigate back
-                        PauseTransition delay = new PauseTransition(Duration.seconds(1));
+                        // Wait 500ms then navigate back
+                        PauseTransition delay = new PauseTransition(Duration.millis(500));
                         delay.setOnFinished(e -> onBack.run());
                         delay.play();
                     });
@@ -309,8 +309,8 @@ public class SettingsView extends BorderPane {
                 }
             }, "SettingsInit").start();
 
-            // Wait 1 second then navigate back
-            PauseTransition delay = new PauseTransition(Duration.seconds(1));
+            // Wait 500ms then navigate back
+            PauseTransition delay = new PauseTransition(Duration.millis(500));
             delay.setOnFinished(e -> onBack.run());
             delay.play();
 
@@ -320,8 +320,8 @@ public class SettingsView extends BorderPane {
             statusLabel.getStyleClass().removeAll("error", "success");
             statusLabel.getStyleClass().add("success");
 
-            // Wait 1 second then navigate back
-            PauseTransition delay = new PauseTransition(Duration.seconds(1));
+            // Wait 500ms then navigate back
+            PauseTransition delay = new PauseTransition(Duration.millis(500));
             delay.setOnFinished(e -> onBack.run());
             delay.play();
         }
