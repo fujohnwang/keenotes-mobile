@@ -4,27 +4,54 @@ import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import androidx.core.widget.addTextChangedListener
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.ActivityMainBinding
 import cn.keevol.keenotes.network.WebSocketService
+import cn.keevol.keenotes.ui.review.ReviewViewModel
+import cn.keevol.keenotes.ui.review.ReviewViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     
     private lateinit var binding: ActivityMainBinding
+    private lateinit var reviewViewModel: ReviewViewModel
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
+        setupViewModel()
+        setupSearchField()
         setupStatusBar()
         setupNavigation()
         connectWebSocket()
+    }
+    
+    private fun setupViewModel() {
+        val app = application as KeeNotesApp
+        val factory = ReviewViewModelFactory(app.database.noteDao())
+        reviewViewModel = ViewModelProvider(this, factory)[ReviewViewModel::class.java]
+    }
+    
+    private fun setupSearchField() {
+        // Listen to search field text changes
+        binding.searchField.addTextChangedListener { text ->
+            reviewViewModel.setSearchQuery(text?.toString() ?: "")
+        }
+        
+        // Clear button functionality (optional enhancement)
+        binding.searchField.setOnEditorActionListener { _, _, _ ->
+            // Hide keyboard on search action
+            binding.searchField.clearFocus()
+            false
+        }
     }
     
     private fun setupStatusBar() {
@@ -127,4 +154,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         (application as KeeNotesApp).webSocketService.disconnect()
     }
+    
+    // Provide ViewModel to fragments
+    fun getReviewViewModel(): ReviewViewModel = reviewViewModel
 }

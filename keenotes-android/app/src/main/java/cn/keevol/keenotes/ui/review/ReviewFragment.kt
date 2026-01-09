@@ -12,15 +12,12 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
-import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.FragmentReviewBinding
 import cn.keevol.keenotes.network.WebSocketService
-import kotlinx.coroutines.Job
+import cn.keevol.keenotes.ui.MainActivity
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 class ReviewFragment : Fragment() {
     
@@ -28,8 +25,7 @@ class ReviewFragment : Fragment() {
     private val binding get() = _binding!!
     
     private val notesAdapter = NotesAdapter()
-    private var currentPeriod = "7 days"
-    private var notesJob: Job? = null
+    private lateinit var reviewViewModel: ReviewViewModel
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -43,10 +39,13 @@ class ReviewFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
+        // Get ViewModel from MainActivity
+        reviewViewModel = (requireActivity() as MainActivity).getReviewViewModel()
+        
         setupHeader()
         setupPeriodSelector()
         setupRecyclerView()
-        observeNotes(currentPeriod)
+        observeViewModel()
     }
     
     private fun setupHeader() {
@@ -63,8 +62,7 @@ class ReviewFragment : Fragment() {
         
         binding.periodSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                currentPeriod = periods[position]
-                observeNotes(currentPeriod)
+                reviewViewModel.setSelectedPeriod(periods[position])
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -78,62 +76,59 @@ class ReviewFragment : Fragment() {
     }
     
     /**
-     * Observe notes from database using Flow - auto-updates when data changes
-     * Also observes sync state to show appropriate empty message
+     * Observe ViewModel state changes
      */
-    private fun observeNotes(period: String) {
+    private fun observeViewModel() {
         val app = requireActivity().application as KeeNotesApp
         
-        binding.loadingText.visibility = View.VISIBLE
-        binding.notesRecyclerView.visibility = View.GONE
-        binding.emptyText.visibility = View.GONE
-        
-        // Cancel previous observation
-        notesJob?.cancel()
-        
-        val days = when (period) {
-            "30 days" -> 30
-            "90 days" -> 90
-            "All" -> 3650
-            else -> 7
-        }
-        
-        val since = Instant.now().minus(days.toLong(), ChronoUnit.DAYS).toString()
-        
-        notesJob = lifecycleScope.launch {
-            // Combine notes flow with sync state flow
+        lifecycleScope.launch {
+            // Combine notes, loading state, search query, and sync state
             combine(
-                app.database.noteDao().getNotesForReviewFlow(since),
+                reviewViewModel.notes,
+                reviewViewModel.isLoading,
+                reviewViewModel.searchQuery,
                 app.webSocketService.syncState
-            ) { notes, syncState ->
-                Pair(notes, syncState)
-            }.collectLatest { (notes, syncState) ->
-                binding.loadingText.visibility = View.GONE
-                
-                if (notes.isEmpty()) {
-                    binding.emptyText.visibility = View.VISIBLE
-                    binding.notesRecyclerView.visibility = View.GONE
-                    
-                    // Show different message based on sync state
-                    binding.emptyText.text = when (syncState) {
-                        WebSocketService.SyncState.SYNCING -> "Notes syncing..."
-                        WebSocketService.SyncState.IDLE -> "Waiting for sync..."
-                        WebSocketService.SyncState.COMPLETED -> "No notes found for $period"
-                    }
-                    binding.countText.text = "0 note(s)"
-                } else {
-                    binding.emptyText.visibility = View.GONE
-                    binding.notesRecyclerView.visibility = View.VISIBLE
-                    binding.countText.text = "${notes.size} note(s)"
-                    notesAdapter.submitList(notes)
-                }
+            ) { notes, isLoading, searchQuery, syncState ->
+                ViewState(notes, isLoading, searchQuery, syncState)
+            }.collectLatest { state ->
+                updateUI(state)
             }
+        }
+    }
+    
+    private data class ViewState(
+        val notes: List<cn.keevol.keenotes.data.entity.Note>,
+        val isLoading: Boolean,
+        val searchQuery: String,
+        val syncState: WebSocketService.SyncState
+    )
+    
+    private fun updateUI(state: ViewState) {
+        // Show/hide loading
+        binding.loadingText.visibility = if (state.isLoading) View.VISIBLE else View.GONE
+        
+        if (state.notes.isEmpty() && !state.isLoading) {
+            binding.emptyText.visibility = View.VISIBLE
+            binding.notesRecyclerView.visibility = View.GONE
+            
+            // Show different message based on context
+            binding.emptyText.text = when {
+                state.searchQuery.isNotBlank() -> "No results found for \"${state.searchQuery}\""
+                state.syncState == WebSocketService.SyncState.SYNCING -> "Notes syncing..."
+                state.syncState == WebSocketService.SyncState.IDLE -> "Waiting for sync..."
+                else -> "No notes found"
+            }
+            binding.countText.text = "0 note(s)"
+        } else if (!state.isLoading) {
+            binding.emptyText.visibility = View.GONE
+            binding.notesRecyclerView.visibility = View.VISIBLE
+            binding.countText.text = "${state.notes.size} note(s)"
+            notesAdapter.submitList(state.notes)
         }
     }
     
     override fun onDestroyView() {
         super.onDestroyView()
-        notesJob?.cancel()
         _binding = null
     }
 }
