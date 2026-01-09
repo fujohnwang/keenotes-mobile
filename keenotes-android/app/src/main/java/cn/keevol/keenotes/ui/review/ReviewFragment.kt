@@ -4,8 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -55,17 +53,20 @@ class ReviewFragment : Fragment() {
     }
     
     private fun setupPeriodSelector() {
-        val periods = arrayOf("7 days", "30 days", "90 days", "All")
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, periods)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.periodSpinner.adapter = adapter
+        // Set default selection to 7 days
+        binding.period7Days.isChecked = true
         
-        binding.periodSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                currentPeriod = periods[position]
+        binding.periodToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                currentPeriod = when (checkedId) {
+                    R.id.period7Days -> "7 days"
+                    R.id.period30Days -> "30 days"
+                    R.id.period90Days -> "90 days"
+                    R.id.periodAll -> "All"
+                    else -> "7 days"
+                }
                 observeNotes(currentPeriod)
             }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
     }
     

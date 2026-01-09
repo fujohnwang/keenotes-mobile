@@ -307,26 +307,27 @@ public class MainViewV2 extends BorderPane {
     }
 
     private VBox createReviewPane() {
-        // Period selection dropdown - vertically centered
-        HBox periodControls = new HBox(8);
+        // Period selection with segmented toggle buttons
+        HBox periodControls = new HBox(0);
         periodControls.setPadding(new Insets(8, 16, 8, 16));
-        periodControls.setAlignment(Pos.CENTER_LEFT);
+        periodControls.setAlignment(Pos.CENTER);
 
-        ComboBox<String> periodSelect = new ComboBox<>();
-        periodSelect.getItems().addAll("7 days", "30 days", "90 days", "All");
-        periodSelect.setValue("7 days");
-        periodSelect.getStyleClass().add("review-period-select");
-        periodSelect.setOnAction(e -> loadReviewNotes(periodSelect.getValue()));
-
-        // Add label for context - vertically centered
-        Label periodLabel = new Label("Review Period:");
-        periodLabel.getStyleClass().add("period-label");
-
-        // Wrap in VBox for vertical centering
-        VBox labelBox = new VBox(periodLabel);
-        labelBox.setAlignment(Pos.CENTER);
-
-        periodControls.getChildren().addAll(labelBox, periodSelect);
+        ToggleGroup periodGroup = new ToggleGroup();
+        
+        ToggleButton period7Days = createPeriodButton("7 days", periodGroup, true);
+        ToggleButton period30Days = createPeriodButton("30 days", periodGroup, false);
+        ToggleButton period90Days = createPeriodButton("90 days", periodGroup, false);
+        ToggleButton periodAll = createPeriodButton("All", periodGroup, false);
+        
+        periodControls.getChildren().addAll(period7Days, period30Days, period90Days, periodAll);
+        
+        // Listen to selection changes
+        periodGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                ToggleButton selected = (ToggleButton) newVal;
+                loadReviewNotes(selected.getText());
+            }
+        });
 
         // Results container
         reviewResultsContainer.setPadding(new Insets(8, 16, 16, 16));
@@ -340,6 +341,16 @@ public class MainViewV2 extends BorderPane {
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
         pane.getStyleClass().add("review-pane");
         return pane;
+    }
+    
+    private ToggleButton createPeriodButton(String text, ToggleGroup group, boolean selected) {
+        ToggleButton button = new ToggleButton(text);
+        button.setToggleGroup(group);
+        button.setSelected(selected);
+        button.getStyleClass().add("period-toggle-button");
+        button.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(button, Priority.ALWAYS);
+        return button;
     }
 
     private VBox createSearchPane() {
