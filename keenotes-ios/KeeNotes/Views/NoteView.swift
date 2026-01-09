@@ -14,9 +14,6 @@ struct NoteView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Connection status bar
-                ConnectionStatusBar()
-                
                 // Main content
                 VStack(spacing: 16) {
                     // Note input area
@@ -53,11 +50,15 @@ struct NoteView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(canPost ? Color.blue : Color.gray)
+                        .background(buttonBackgroundColor)
                         .foregroundColor(.white)
                         .cornerRadius(10)
+                        .opacity(isPosting ? 0.6 : 1.0)
                     }
                     .disabled(!canPost || isPosting)
+                    
+                    // Connection status bar
+                    ConnectionStatusBar()
                     
                     Spacer()
                         .contentShape(Rectangle())
@@ -133,11 +134,13 @@ struct NoteView: View {
         appState.settingsService.isEncryptionEnabled
     }
     
+    private var buttonBackgroundColor: Color {
+        // Keep blue color, use opacity to indicate posting state
+        return canPost ? Color.blue : Color.gray
+    }
+    
     private func postNote() {
         guard canPost else { return }
-        
-        // 收起键盘
-        isTextFieldFocused = false
         
         isPosting = true
         
@@ -148,6 +151,9 @@ struct NoteView: View {
                 isPosting = false
                 
                 if result.success {
+                    // Hide keyboard on success
+                    isTextFieldFocused = false
+                    
                     let sentContent = noteText  // Save before clearing
                     noteText = ""
                     
@@ -171,6 +177,7 @@ struct NoteView: View {
                         }
                     }
                 } else {
+                    // Keep keyboard visible on failure so user can edit and retry
                     // Show error toast
                     errorMessage = result.message
                     withAnimation(.spring()) {
@@ -240,7 +247,7 @@ struct ConnectionStatusBar: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Color(.systemGray6))
+        .background(Color.clear)
     }
     
     // MARK: - Send Channel (HTTP API)
@@ -256,7 +263,7 @@ struct ConnectionStatusBar: View {
         if !appState.settingsService.isConfigured {
             return "Not Configured"
         }
-        return networkMonitor.isConnected ? "Ready" : "No Network"
+        return networkMonitor.isConnected ? "✓" : "No Network"
     }
     
     // MARK: - Sync Channel (WebSocket)
@@ -275,7 +282,7 @@ struct ConnectionStatusBar: View {
         }
         
         switch appState.webSocketService.connectionState {
-        case .connected: return "Connected"
+        case .connected: return "✓"
         case .connecting: return "Connecting..."
         case .disconnected: return "Disconnected"
         }
