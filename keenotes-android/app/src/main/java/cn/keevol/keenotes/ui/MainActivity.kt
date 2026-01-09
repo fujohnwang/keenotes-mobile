@@ -47,6 +47,9 @@ class MainActivity : AppCompatActivity() {
         binding.searchField.addTextChangedListener { text ->
             val query = text?.toString()?.trim() ?: ""
             
+            // Show/hide clear button
+            binding.searchClearButton.visibility = if (query.isNotEmpty()) View.VISIBLE else View.GONE
+            
             // Cancel previous search
             searchJob?.cancel()
             
@@ -65,6 +68,12 @@ class MainActivity : AppCompatActivity() {
                     performSearch(query)
                 }
             }
+        }
+        
+        // Clear button click
+        binding.searchClearButton.setOnClickListener {
+            binding.searchField.text?.clear()
+            binding.searchField.clearFocus()
         }
     }
     
