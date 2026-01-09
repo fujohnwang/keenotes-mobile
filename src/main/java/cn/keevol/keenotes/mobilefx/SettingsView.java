@@ -1,9 +1,11 @@
 package cn.keevol.keenotes.mobilefx;
 
+import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.util.Duration;
 
 /**
  * Settings view for configuring API endpoint and token.
@@ -275,6 +277,10 @@ public class SettingsView extends BorderPane {
                     // 更新UI状态
                     javafx.application.Platform.runLater(() -> {
                         statusLabel.setText(msg + " (Reconnected)");
+                        // Wait 1 second then navigate back
+                        PauseTransition delay = new PauseTransition(Duration.seconds(1));
+                        delay.setOnFinished(e -> onBack.run());
+                        delay.play();
                     });
                 } catch (Exception e) {
                     System.err.println("[SettingsView] Reinitialization failed: " + e.getMessage());
@@ -303,11 +309,21 @@ public class SettingsView extends BorderPane {
                 }
             }, "SettingsInit").start();
 
+            // Wait 1 second then navigate back
+            PauseTransition delay = new PauseTransition(Duration.seconds(1));
+            delay.setOnFinished(e -> onBack.run());
+            delay.play();
+
         } else {
             // 无关键配置变更或配置为空
             statusLabel.setText(msg);
             statusLabel.getStyleClass().removeAll("error", "success");
             statusLabel.getStyleClass().add("success");
+
+            // Wait 1 second then navigate back
+            PauseTransition delay = new PauseTransition(Duration.seconds(1));
+            delay.setOnFinished(e -> onBack.run());
+            delay.play();
         }
     }
 }

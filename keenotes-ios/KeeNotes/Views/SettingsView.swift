@@ -179,13 +179,17 @@ struct SettingsView: View {
                         appState.webSocketService.connect()
                         await MainActor.run {
                             statusMessage = "\(msg) (Reconnected)"
-                            // Switch to Note tab after successful save
-                            appState.selectedTab = 0
+                            // Switch to Note tab after 1 second delay
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                appState.selectedTab = 0
+                            }
                         }
                     } else {
                         await MainActor.run {
                             statusMessage = msg
-                            appState.selectedTab = 0
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                appState.selectedTab = 0
+                            }
                         }
                     }
                     print("[Settings] Reconnection complete")
@@ -203,8 +207,8 @@ struct SettingsView: View {
             statusMessage = msg
             isSuccess = true
             appState.webSocketService.connect()
-            // Switch to Note tab after successful save
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Switch to Note tab after 1 second delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 appState.selectedTab = 0
             }
         } else {
@@ -217,8 +221,8 @@ struct SettingsView: View {
             if !endpointUrl.isEmpty && !token.isEmpty {
                 appState.webSocketService.connect()
             }
-            // Switch to Note tab after successful save
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Switch to Note tab after 1 second delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 appState.selectedTab = 0
             }
         }
