@@ -17,20 +17,41 @@
         android:background="@color/surface"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- Search Field -->
-        <EditText
-            android:id="@+id/searchField"
+        <!-- Search Field Container -->
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="40dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_search_field"
-            android:hint="@string/hint_search"
-            android:textColorHint="@color/text_secondary"
-            android:textColor="@color/text_primary"
-            android:paddingHorizontal="16dp"
-            android:inputType="text"
-            android:imeOptions="actionSearch"
-            android:maxLines="1" />
+            android:layout_weight="1">
+
+            <!-- Search Field -->
+            <EditText
+                android:id="@+id/searchField"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_search_field"
+                android:hint="@string/hint_search"
+                android:textColorHint="@color/text_secondary"
+                android:textColor="@color/text_primary"
+                android:paddingStart="16dp"
+                android:paddingEnd="40dp"
+                android:inputType="text"
+                android:imeOptions="actionSearch"
+                android:maxLines="1" />
+
+            <!-- Clear button (X) -->
+            <ImageButton
+                android:id="@+id/searchClearButton"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:contentDescription="Clear search"
+                android:visibility="gone"
+                app:tint="@color/text_secondary" />
+
+        </FrameLayout>
 
         <!-- Review Button -->
         <LinearLayout
@@ -97,7 +118,47 @@
         app:layout_constraintTop_toBottomOf="@id/headerLayout"
         app:layout_constraintBottom_toTopOf="@id/statusBar" />
 
-    <!-- Status Bar -->
+    <!-- Search Results Overlay -->
+    <FrameLayout
+        android:id="@+id/searchOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:background="@color/background"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/headerLayout"
+        app:layout_constraintBottom_toTopOf="@id/statusBar">
+
+        <!-- Loading indicator -->
+        <ProgressBar
+            android:id="@+id/searchLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <!-- Empty state -->
+        <TextView
+            android:id="@+id/searchEmptyText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="No results found"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <!-- Search results list -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/searchResultsRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingVertical="8dp"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <!-- Status Bar with dual channels -->
     <LinearLayout
         android:id="@+id/statusBar"
         android:layout_width="match_parent"
@@ -108,21 +169,64 @@
         android:background="@color/surface"
         app:layout_constraintBottom_toBottomOf="parent">
 
+        <!-- Send Channel (Left) -->
         <ImageView
-            android:id="@+id/statusIndicator"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
+            android:id="@+id/sendIndicator"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
             android:src="@drawable/ic_circle"
-            app:tint="@color/error" />
+            app:tint="@color/warning" />
 
         <TextView
-            android:id="@+id/statusText"
+            android:id="@+id/sendLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="@string/status_disconnected"
-            android:textSize="12sp"
-            android:textColor="@color/error" />
+            android:layout_marginStart="6dp"
+            android:text="Send Channel:"
+            android:textSize="11sp"
+            android:textColor="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/sendStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="Not Configured"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/warning" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Sync Channel (Right) -->
+        <ImageView
+            android:id="@+id/syncIndicator"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:src="@drawable/ic_circle"
+            app:tint="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/syncLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="Sync Channel:"
+            android:textSize="11sp"
+            android:textColor="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/syncStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="Disconnected"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_secondary" />
 
     </LinearLayout>
 

@@ -1,0 +1,70 @@
+name: iOS Native Build
+
+# Workflow disabled - iOS builds are done locally via Xcode
+# To re-enable, uncomment the 'on:' section below
+on:
+  # push:
+  #   branches: [ main, master ]
+  #   paths:
+  #     - 'keenotes-ios/**'
+  #     - '.github/workflows/ios-native-build.yml'
+  # pull_request:
+  #   branches: [ main, master ]
+  #   paths:
+  #     - 'keenotes-ios/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode version
+        run: |
+          # List available Xcode versions and select the latest
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
+          # Use the default Xcode on the runner (macos-latest typically has latest stable Xcode)
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Resolve Swift Package Dependencies
+        working-directory: keenotes-ios
+        run: xcodebuild -resolvePackageDependencies -project KeeNotes.xcodeproj -scheme KeeNotes
+
+      - name: Build for iOS Simulator
+        working-directory: keenotes-ios
+        run: |
+          xcodebuild build \
+            -project KeeNotes.xcodeproj \
+            -scheme KeeNotes \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Build Release Archive
+        working-directory: keenotes-ios
+        run: |
+          xcodebuild archive \
+            -project KeeNotes.xcodeproj \
+            -scheme KeeNotes \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/KeeNotes.xcarchive \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            SKIP_INSTALL=NO
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: keenotes-ios-build
+          path: keenotes-ios/build/
+          retention-days: 30

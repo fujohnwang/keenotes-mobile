@@ -141,6 +141,26 @@
                 android:textColor="@color/warning"
                 android:textSize="12sp" />
 
+            <!-- Preferences Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Preferences"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/copyToClipboardSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Copy to clipboard on post success"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:padding="12dp" />
+
             <!-- Save Button -->
             <Button
                 android:id="@+id/btnSave"

@@ -1,9 +1,11 @@
 package cn.keevol.keenotes.mobilefx;
 
+import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.util.Duration;
 
 /**
  * Settings view for configuring API endpoint and token.
@@ -18,6 +20,7 @@ public class SettingsView extends BorderPane {
     private final SettingsService settings;
     private final Runnable onBack;
     private final Runnable onOpenDebug;
+    private final ToggleSwitch copyToClipboardToggle;
     
     // Easter egg: tap copyright 7 times to show debug
     private int copyrightTapCount = 0;
@@ -63,7 +66,7 @@ public class SettingsView extends BorderPane {
         copyrightLabel.getStyleClass().add("copyright-label");
         copyrightLabel.setOnMouseClicked(e -> onCopyrightTap());
 
-        Label websiteLabel = new Label("https://afoo.me");
+        Label websiteLabel = new Label("https://keenotes.afoo.me");
         websiteLabel.getStyleClass().add("copyright-link");
 
         VBox footer = new VBox(4, copyrightLabel, websiteLabel);
@@ -72,6 +75,31 @@ public class SettingsView extends BorderPane {
         // Encryption hint
         Label encryptionHint = new Label("Leave both empty to disable E2E encryption");
         encryptionHint.getStyleClass().add("field-hint");
+
+        // Preferences section
+        Label preferencesLabel = new Label("Preferences");
+        preferencesLabel.getStyleClass().add("field-label");
+        preferencesLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+
+        copyToClipboardToggle = new ToggleSwitch();
+        
+        // Auto-save on change
+        copyToClipboardToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            settings.setCopyToClipboardOnPost(newVal);
+            settings.save();
+        });
+        
+        Label toggleLabel = new Label("Copy to clipboard on post success");
+        toggleLabel.getStyleClass().add("field-label");
+        
+        // HBox with CENTER_LEFT alignment to vertically center toggle with label
+        HBox toggleRow = new HBox(12, toggleLabel, copyToClipboardToggle);
+        toggleRow.setAlignment(Pos.CENTER_LEFT);
+        toggleRow.setPadding(new Insets(4, 0, 4, 0)); // Add vertical padding
+        
+        // Preferences container with proper spacing
+        VBox preferencesSection = new VBox(8, preferencesLabel, toggleRow);
+        preferencesSection.setPadding(new Insets(8, 0, 8, 0)); // Add top/bottom padding
 
         // Debug entry (hidden by default)
         Button debugBtn = new Button("Debug");
@@ -92,6 +120,7 @@ public class SettingsView extends BorderPane {
                 createFieldGroup("Token", tokenField),
                 createFieldGroup("Encryption Password", encryptionPasswordField),
                 createFieldGroupWithHint("Confirm Password", encryptionPasswordConfirmField, encryptionHint),
+                preferencesSection,
                 saveButton,
                 statusLabel,
                 debugSection,
@@ -178,6 +207,7 @@ public class SettingsView extends BorderPane {
         String savedPassword = settings.getEncryptionPassword();
         encryptionPasswordField.setText(savedPassword);
         encryptionPasswordConfirmField.setText(savedPassword);
+        copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
     }
 
     private void saveSettings() {
@@ -216,6 +246,7 @@ public class SettingsView extends BorderPane {
         settings.setEndpointUrl(newEndpoint);
         settings.setToken(newToken);
         settings.setEncryptionPassword(newPassword);
+        // copyToClipboard is auto-saved on checkbox change
         settings.save();
 
         String msg = settings.isEncryptionEnabled()
@@ -246,6 +277,10 @@ public class SettingsView extends BorderPane {
                     // 更新UI状态
                     javafx.application.Platform.runLater(() -> {
                         statusLabel.setText(msg + " (Reconnected)");
+                        // Wait 500ms then navigate back
+                        PauseTransition delay = new PauseTransition(Duration.millis(500));
+                        delay.setOnFinished(e -> onBack.run());
+                        delay.play();
                     });
                 } catch (Exception e) {
                     System.err.println("[SettingsView] Reinitialization failed: " + e.getMessage());
@@ -274,11 +309,21 @@ public class SettingsView extends BorderPane {
                 }
             }, "SettingsInit").start();
 
+            // Wait 500ms then navigate back
+            PauseTransition delay = new PauseTransition(Duration.millis(500));
+            delay.setOnFinished(e -> onBack.run());
+            delay.play();
+
         } else {
             // 无关键配置变更或配置为空
             statusLabel.setText(msg);
             statusLabel.getStyleClass().removeAll("error", "success");
             statusLabel.getStyleClass().add("success");
+
+            // Wait 500ms then navigate back
+            PauseTransition delay = new PauseTransition(Duration.millis(500));
+            delay.setOnFinished(e -> onBack.run());
+            delay.play();
         }
     }
 }
