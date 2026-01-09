@@ -93,9 +93,11 @@ public class SettingsView extends BorderPane {
         // HBox with CENTER_LEFT alignment to vertically center toggle with label
         HBox toggleRow = new HBox(12, toggleLabel, copyToClipboardToggle);
         toggleRow.setAlignment(Pos.CENTER_LEFT);
+        toggleRow.setPadding(new Insets(4, 0, 4, 0)); // Add vertical padding
         
         // Preferences container with proper spacing
         VBox preferencesSection = new VBox(8, preferencesLabel, toggleRow);
+        preferencesSection.setPadding(new Insets(8, 0, 8, 0)); // Add top/bottom padding
 
         // Debug entry (hidden by default)
         Button debugBtn = new Button("Debug");
