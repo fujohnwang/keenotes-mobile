@@ -1,3 +1,4 @@
+*.jks
 API.md
 .kiro/
 snapshots
