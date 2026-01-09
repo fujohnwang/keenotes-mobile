@@ -78,11 +78,12 @@ class ReviewFragment : Fragment() {
     
     /**
      * Observe notes from database using Flow - auto-updates when data changes
-     * Also observes sync state to show appropriate empty message
+     * Simplified logic: primarily rely on notes data, use syncState only for empty message
      */
     private fun observeNotes(period: String) {
         val app = requireActivity().application as KeeNotesApp
         
+        // Show initial loading state
         binding.loadingText.visibility = View.VISIBLE
         binding.notesRecyclerView.visibility = View.GONE
         binding.emptyText.visibility = View.GONE
@@ -107,9 +108,13 @@ class ReviewFragment : Fragment() {
             ) { notes, syncState ->
                 Pair(notes, syncState)
             }.collectLatest { (notes, syncState) ->
-                binding.loadingText.visibility = View.GONE
+                // Hide loading once we have data or sync is complete
+                if (notes.isNotEmpty() || syncState == WebSocketService.SyncState.COMPLETED) {
+                    binding.loadingText.visibility = View.GONE
+                }
                 
                 if (notes.isEmpty()) {
+                    // Show empty state
                     binding.emptyText.visibility = View.VISIBLE
                     binding.notesRecyclerView.visibility = View.GONE
                     
@@ -121,6 +126,8 @@ class ReviewFragment : Fragment() {
                     }
                     binding.countText.text = "0 note(s)"
                 } else {
+                    // Show notes list
+                    binding.loadingText.visibility = View.GONE
                     binding.emptyText.visibility = View.GONE
                     binding.notesRecyclerView.visibility = View.VISIBLE
                     binding.countText.text = "${notes.size} note(s)"
