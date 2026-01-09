@@ -253,15 +253,55 @@ jobs:
         with:
           gradle-version: '8.4'
 
-      - name: Build Release APK
-        working-directory: keenotes-android
-        run: gradle assembleRelease --no-daemon -PversionName=${{ steps.version.outputs.version }} -PversionCode=${{ steps.version.outputs.versionCode }}
+      # Decode keystore from secrets
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/keystore.jks
 
-      - name: Upload Android Artifacts
+      # Build signed Release APK
+      - name: Build Signed Release APK
+        working-directory: keenotes-android
+        env:
+          KEYSTORE_FILE: ${{ github.workspace }}/keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          gradle assembleRelease --no-daemon \
+            -PversionName=${{ steps.version.outputs.version }} \
+            -PversionCode=${{ steps.version.outputs.versionCode }}
+
+      # Build signed Release AAB (for Google Play)
+      - name: Build Signed Release AAB
+        working-directory: keenotes-android
+        env:
+          KEYSTORE_FILE: ${{ github.workspace }}/keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          gradle bundleRelease --no-daemon \
+            -PversionName=${{ steps.version.outputs.version }} \
+            -PversionCode=${{ steps.version.outputs.versionCode }}
+
+      # Cleanup keystore for security
+      - name: Cleanup Keystore
+        if: always()
+        run: rm -f ${{ github.workspace }}/keystore.jks
+
+      # Upload APK
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: keenotes-android/app/build/outputs/apk/release/*.apk
+
+      # Upload AAB
+      - name: Upload Android AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: keenotes-android/app/build/outputs/bundle/release/*.aab
 
   # build-ios:
   #   runs-on: macos-latest
@@ -342,4 +382,5 @@ jobs:
             artifacts/macos-mac-aarch64/*
             artifacts/linux-packages/*
             artifacts/android-apk/*
+            artifacts/android-aab/*
             # artifacts/ios-ipa/*

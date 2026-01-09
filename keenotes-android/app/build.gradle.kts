@@ -29,6 +29,27 @@ android {
         getByName("debug") {
             // Use default debug keystore
         }
+        create("release") {
+            // Read from environment variables (for CI/CD) or gradle.properties (for local)
+            val keystoreFile = System.getenv("KEYSTORE_FILE") 
+                ?: project.findProperty("KEYSTORE_FILE") as String?
+            val keystorePassword = System.getenv("KEYSTORE_PASSWORD") 
+                ?: project.findProperty("KEYSTORE_PASSWORD") as String?
+            val keyAlias = System.getenv("KEY_ALIAS") 
+                ?: project.findProperty("KEY_ALIAS") as String?
+            val keyPassword = System.getenv("KEY_PASSWORD") 
+                ?: project.findProperty("KEY_PASSWORD") as String?
+            
+            if (keystoreFile != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
+                storeFile = file(keystoreFile)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            } else {
+                // Fallback to debug signing if release signing not configured
+                println("WARNING: Release signing not configured, using debug keystore")
+            }
+        }
     }
 
     buildTypes {
@@ -38,7 +59,13 @@ android {
         }
         release {
             isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("debug") // Use debug signing for now
+            isShrinkResources = true
+            // Use release signing if configured, otherwise fall back to debug
+            signingConfig = if (signingConfigs.findByName("release") != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
