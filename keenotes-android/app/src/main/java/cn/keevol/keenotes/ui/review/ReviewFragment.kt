@@ -27,6 +27,7 @@ class ReviewFragment : Fragment() {
     private val notesAdapter = NotesAdapter()
     private var currentPeriod = "7 days"
     private var notesJob: Job? = null
+    private var dotsAnimationJob: Job? = null
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -116,14 +117,23 @@ class ReviewFragment : Fragment() {
                     binding.notesRecyclerView.visibility = View.GONE
                     
                     // Show different message based on sync state
-                    binding.emptyText.text = when (syncState) {
-                        WebSocketService.SyncState.SYNCING -> "Notes syncing..."
-                        WebSocketService.SyncState.IDLE -> "Waiting for sync..."
-                        WebSocketService.SyncState.COMPLETED -> "No notes found for $period"
+                    when (syncState) {
+                        WebSocketService.SyncState.SYNCING -> {
+                            startDotsAnimation("Notes syncing")
+                        }
+                        WebSocketService.SyncState.IDLE -> {
+                            stopDotsAnimation()
+                            binding.emptyText.text = "Waiting for sync..."
+                        }
+                        WebSocketService.SyncState.COMPLETED -> {
+                            stopDotsAnimation()
+                            binding.emptyText.text = "No notes found for $period"
+                        }
                     }
                     binding.countText.text = "0 note(s)"
                 } else {
                     // Show notes list
+                    stopDotsAnimation()
                     binding.loadingText.visibility = View.GONE
                     binding.emptyText.visibility = View.GONE
                     binding.notesRecyclerView.visibility = View.VISIBLE
@@ -134,9 +144,28 @@ class ReviewFragment : Fragment() {
         }
     }
     
+    private fun startDotsAnimation(baseText: String) {
+        stopDotsAnimation()
+        dotsAnimationJob = lifecycleScope.launch {
+            var dotCount = 0
+            while (true) {
+                val dots = ".".repeat(dotCount)
+                binding.emptyText.text = "$baseText$dots"
+                dotCount = (dotCount + 1) % 4  // 0, 1, 2, 3, then back to 0
+                kotlinx.coroutines.delay(500)  // Update every 500ms
+            }
+        }
+    }
+    
+    private fun stopDotsAnimation() {
+        dotsAnimationJob?.cancel()
+        dotsAnimationJob = null
+    }
+    
     override fun onDestroyView() {
         super.onDestroyView()
         notesJob?.cancel()
+        stopDotsAnimation()
         _binding = null
     }
 }

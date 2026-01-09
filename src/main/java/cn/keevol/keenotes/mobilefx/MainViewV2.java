@@ -57,6 +57,10 @@ public class MainViewV2 extends BorderPane {
 
     // Lazy-loaded services
     private LocalCacheService localCache;
+    
+    // Dots animation for loading states
+    private PauseTransition dotsAnimation;
+    private Label currentAnimatedLabel;
 
     public MainViewV2(Runnable onOpenSettings, Runnable onClearSearchToNoteView) {
         this.onOpenSettings = onOpenSettings;
@@ -470,10 +474,12 @@ public class MainViewV2 extends BorderPane {
                 } else if (state == ServiceManager.InitializationState.INITIALIZING) {
                     // 正在初始化
                     Platform.runLater(() -> {
+                        stopDotsAnimation();
                         searchResultsContainer.getChildren().clear();
-                        Label initializingLabel = new Label("Cache is initializing. Please wait...");
+                        Label initializingLabel = new Label("Cache is initializing");
                         initializingLabel.getStyleClass().add("search-loading");
                         searchResultsContainer.getChildren().add(initializingLabel);
+                        startDotsAnimation(initializingLabel, "Cache is initializing");
                         
                         // 延迟重试，但限制重试次数
                         new Thread(() -> {
@@ -508,10 +514,12 @@ public class MainViewV2 extends BorderPane {
                 } else {
                     // NOT_STARTED - 触发初始化
                     Platform.runLater(() -> {
+                        stopDotsAnimation();
                         searchResultsContainer.getChildren().clear();
-                        Label initLabel = new Label("Initializing cache...");
+                        Label initLabel = new Label("Initializing cache");
                         initLabel.getStyleClass().add("search-loading");
                         searchResultsContainer.getChildren().add(initLabel);
+                        startDotsAnimation(initLabel, "Initializing cache");
                         
                         // 触发初始化
                         serviceManager.getLocalCacheService();
@@ -627,10 +635,12 @@ public class MainViewV2 extends BorderPane {
     }
 
     private void loadReviewNotes(String period) {
+        stopDotsAnimation();
         reviewResultsContainer.getChildren().clear();
-        Label loadingLabel = new Label("Loading notes...");
+        Label loadingLabel = new Label("Loading notes");
         loadingLabel.getStyleClass().add("search-loading");
         reviewResultsContainer.getChildren().add(loadingLabel);
+        startDotsAnimation(loadingLabel, "Loading notes");
 
         int days = switch (period) {
             case "30 days" -> 30;
@@ -672,6 +682,7 @@ public class MainViewV2 extends BorderPane {
                     List<LocalCacheService.NoteData> results = cache.getNotesForReview(days);
                     
                     Platform.runLater(() -> {
+                        stopDotsAnimation();
                         reviewResultsContainer.getChildren().clear();
                         
                         System.out.println("[DEBUG loadReviewNotes] results.size=" + results.size());
@@ -731,10 +742,12 @@ public class MainViewV2 extends BorderPane {
                 } else if (state == ServiceManager.InitializationState.INITIALIZING) {
                     // 正在初始化，显示加载状态
                     Platform.runLater(() -> {
+                        stopDotsAnimation();
                         reviewResultsContainer.getChildren().clear();
-                        Label initializingLabel = new Label("Cache is initializing. Please wait...");
+                        Label initializingLabel = new Label("Cache is initializing");
                         initializingLabel.getStyleClass().add("search-loading");
                         reviewResultsContainer.getChildren().add(initializingLabel);
+                        startDotsAnimation(initializingLabel, "Cache is initializing");
                         
                         // 延迟重试，但限制重试次数
                         new Thread(() -> {
@@ -821,10 +834,12 @@ public class MainViewV2 extends BorderPane {
                 } else {
                     // NOT_STARTED - 触发初始化
                     Platform.runLater(() -> {
+                        stopDotsAnimation();
                         reviewResultsContainer.getChildren().clear();
-                        Label initLabel = new Label("Initializing cache...");
+                        Label initLabel = new Label("Initializing cache");
                         initLabel.getStyleClass().add("search-loading");
                         reviewResultsContainer.getChildren().add(initLabel);
+                        startDotsAnimation(initLabel, "Initializing cache");
                         
                         // 触发初始化
                         serviceManager.getLocalCacheService();
@@ -1125,5 +1140,37 @@ public class MainViewV2 extends BorderPane {
                 }
             }).start();
         }
+    }
+    
+    /**
+     * Start animated dots for a loading label
+     * Pattern: "Text", "Text.", "Text..", "Text..."
+     */
+    private void startDotsAnimation(Label label, String baseText) {
+        stopDotsAnimation();
+        currentAnimatedLabel = label;
+        
+        final int[] dotCount = {0};
+        dotsAnimation = new PauseTransition(Duration.millis(500));
+        dotsAnimation.setOnFinished(e -> {
+            if (currentAnimatedLabel == label) {
+                String dots = ".".repeat(dotCount[0]);
+                label.setText(baseText + dots);
+                dotCount[0] = (dotCount[0] + 1) % 4;  // 0, 1, 2, 3, then back to 0
+                dotsAnimation.playFromStart();
+            }
+        });
+        dotsAnimation.play();
+    }
+    
+    /**
+     * Stop the dots animation
+     */
+    private void stopDotsAnimation() {
+        if (dotsAnimation != null) {
+            dotsAnimation.stop();
+            dotsAnimation = null;
+        }
+        currentAnimatedLabel = null;
     }
 }
