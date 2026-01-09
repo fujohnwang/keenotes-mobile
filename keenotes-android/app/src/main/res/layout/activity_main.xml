@@ -17,20 +17,41 @@
         android:background="@color/surface"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- Search Field -->
-        <EditText
-            android:id="@+id/searchField"
+        <!-- Search Field Container -->
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="40dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_search_field"
-            android:hint="@string/hint_search"
-            android:textColorHint="@color/text_secondary"
-            android:textColor="@color/text_primary"
-            android:paddingHorizontal="16dp"
-            android:inputType="text"
-            android:imeOptions="actionSearch"
-            android:maxLines="1" />
+            android:layout_weight="1">
+
+            <!-- Search Field -->
+            <EditText
+                android:id="@+id/searchField"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_search_field"
+                android:hint="@string/hint_search"
+                android:textColorHint="@color/text_secondary"
+                android:textColor="@color/text_primary"
+                android:paddingStart="16dp"
+                android:paddingEnd="40dp"
+                android:inputType="text"
+                android:imeOptions="actionSearch"
+                android:maxLines="1" />
+
+            <!-- Clear button (X) -->
+            <ImageButton
+                android:id="@+id/searchClearButton"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:contentDescription="Clear search"
+                android:visibility="gone"
+                app:tint="@color/text_secondary" />
+
+        </FrameLayout>
 
         <!-- Review Button -->
         <LinearLayout

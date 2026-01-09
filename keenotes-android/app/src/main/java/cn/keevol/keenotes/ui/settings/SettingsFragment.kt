@@ -176,11 +176,17 @@ class SettingsFragment : Fragment() {
                     binding.statusText.text = msg
                 }
                 
+                // Navigate back to Note fragment
+                findNavController().popBackStack()
+                
             } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
                 // First time configuration
                 binding.statusText.text = msg
                 binding.statusText.setTextColor(requireContext().getColor(R.color.success))
                 app.webSocketService.connect()
+                
+                // Navigate back to Note fragment
+                findNavController().popBackStack()
                 
             } else {
                 // No critical configuration change
@@ -192,6 +198,9 @@ class SettingsFragment : Fragment() {
                 if (endpoint.isNotBlank() && token.isNotBlank()) {
                     app.webSocketService.connect()
                 }
+                
+                // Navigate back to Note fragment
+                findNavController().popBackStack()
             }
         }
     }
