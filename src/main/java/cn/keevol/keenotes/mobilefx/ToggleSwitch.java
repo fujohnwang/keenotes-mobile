@@ -3,8 +3,8 @@ package cn.keevol.keenotes.mobilefx;
 import javafx.animation.TranslateTransition;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
-import javafx.scene.control.Control;
-import javafx.scene.layout.Pane;
+import javafx.geometry.Pos;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
@@ -13,10 +13,9 @@ import javafx.util.Duration;
 /**
  * Custom Toggle Switch component similar to iOS/Android toggle
  */
-public class ToggleSwitch extends Control {
+public class ToggleSwitch extends StackPane {
     
     private final BooleanProperty selected = new SimpleBooleanProperty(false);
-    private final Pane container;
     private final Rectangle background;
     private final Circle thumb;
     private final TranslateTransition transition;
@@ -33,10 +32,10 @@ public class ToggleSwitch extends Control {
     private static final double PADDING = 3;
     
     public ToggleSwitch() {
-        container = new Pane();
-        container.setPrefSize(WIDTH, HEIGHT);
-        container.setMaxSize(WIDTH, HEIGHT);
-        container.setMinSize(WIDTH, HEIGHT);
+        // Set fixed size
+        setPrefSize(WIDTH, HEIGHT);
+        setMaxSize(WIDTH, HEIGHT);
+        setMinSize(WIDTH, HEIGHT);
         
         // Background track
         background = new Rectangle(WIDTH, HEIGHT);
@@ -51,28 +50,29 @@ public class ToggleSwitch extends Control {
         thumb.setStroke(Color.web("#DDDDDD"));
         thumb.setStrokeWidth(1);
         
-        // Position thumb at OFF position initially
-        thumb.setTranslateX(PADDING + THUMB_RADIUS);
-        thumb.setTranslateY(HEIGHT / 2);
+        // Position thumb at OFF position initially (left side)
+        double offPosition = -WIDTH / 2 + PADDING + THUMB_RADIUS;
+        thumb.setTranslateX(offPosition);
         
         // Animation for thumb movement
         transition = new TranslateTransition(Duration.millis(150), thumb);
         
-        container.getChildren().addAll(background, thumb);
-        getChildren().add(container);
+        // Add to container
+        getChildren().addAll(background, thumb);
+        setAlignment(Pos.CENTER);
         
         // Click handler
-        container.setOnMouseClicked(event -> {
+        setOnMouseClicked(event -> {
             setSelected(!isSelected());
         });
         
         // Hover effect
-        container.setOnMouseEntered(event -> {
-            container.setStyle("-fx-cursor: hand;");
+        setOnMouseEntered(event -> {
+            setStyle("-fx-cursor: hand;");
         });
         
-        container.setOnMouseExited(event -> {
-            container.setStyle("-fx-cursor: default;");
+        setOnMouseExited(event -> {
+            setStyle("-fx-cursor: default;");
         });
         
         // Listen to selected property changes
@@ -82,13 +82,16 @@ public class ToggleSwitch extends Control {
     }
     
     private void updateVisuals(boolean isSelected) {
+        double offPosition = -WIDTH / 2 + PADDING + THUMB_RADIUS;
+        double onPosition = WIDTH / 2 - PADDING - THUMB_RADIUS;
+        
         if (isSelected) {
             // Move thumb to ON position (right side)
-            transition.setToX(WIDTH - PADDING - THUMB_RADIUS);
+            transition.setToX(onPosition);
             background.setFill(COLOR_ON);
         } else {
             // Move thumb to OFF position (left side)
-            transition.setToX(PADDING + THUMB_RADIUS);
+            transition.setToX(offPosition);
             background.setFill(COLOR_OFF);
         }
         transition.play();
