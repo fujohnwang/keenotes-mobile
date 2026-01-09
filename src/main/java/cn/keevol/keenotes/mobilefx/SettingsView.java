@@ -90,8 +90,12 @@ public class SettingsView extends BorderPane {
         Label toggleLabel = new Label("Copy to clipboard on post success");
         toggleLabel.getStyleClass().add("field-label");
         
+        // HBox with CENTER_LEFT alignment to vertically center toggle with label
         HBox toggleRow = new HBox(12, toggleLabel, copyToClipboardToggle);
         toggleRow.setAlignment(Pos.CENTER_LEFT);
+        
+        // Preferences container with proper spacing
+        VBox preferencesSection = new VBox(8, preferencesLabel, toggleRow);
 
         // Debug entry (hidden by default)
         Button debugBtn = new Button("Debug");
@@ -112,7 +116,7 @@ public class SettingsView extends BorderPane {
                 createFieldGroup("Token", tokenField),
                 createFieldGroup("Encryption Password", encryptionPasswordField),
                 createFieldGroupWithHint("Confirm Password", encryptionPasswordConfirmField, encryptionHint),
-                new VBox(8, preferencesLabel, toggleRow),
+                preferencesSection,
                 saveButton,
                 statusLabel,
                 debugSection,
