@@ -263,60 +263,60 @@ jobs:
           name: android-apk
           path: keenotes-android/app/build/outputs/apk/release/*.apk
 
-  build-ios:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+  # build-ios:
+  #   runs-on: macos-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
 
-      - name: Extract version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${GITHUB_REF_NAME#v}"
-            VERSION="${VERSION#V}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+  #     - name: Extract version
+  #       id: version
+  #       run: |
+  #         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+  #           VERSION="${{ github.event.inputs.version }}"
+  #         else
+  #           VERSION="${GITHUB_REF_NAME#v}"
+  #           VERSION="${VERSION#V}"
+  #         fi
+  #         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Select Xcode version
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+  #     - name: Select Xcode version
+  #       run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
 
-      - name: Resolve Swift Package Dependencies
-        working-directory: keenotes-ios
-        run: xcodebuild -resolvePackageDependencies -project KeeNotes.xcodeproj -scheme KeeNotes
+  #     - name: Resolve Swift Package Dependencies
+  #       working-directory: keenotes-ios
+  #       run: xcodebuild -resolvePackageDependencies -project KeeNotes.xcodeproj -scheme KeeNotes
 
-      - name: Build Release Archive
-        working-directory: keenotes-ios
-        run: |
-          xcodebuild archive \
-            -project KeeNotes.xcodeproj \
-            -scheme KeeNotes \
-            -destination 'generic/platform=iOS' \
-            -archivePath build/KeeNotes.xcarchive \
-            -configuration Release \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            SKIP_INSTALL=NO \
-            MARKETING_VERSION=${{ steps.version.outputs.version }}
+  #     - name: Build Release Archive
+  #       working-directory: keenotes-ios
+  #       run: |
+  #         xcodebuild archive \
+  #           -project KeeNotes.xcodeproj \
+  #           -scheme KeeNotes \
+  #           -destination 'generic/platform=iOS' \
+  #           -archivePath build/KeeNotes.xcarchive \
+  #           -configuration Release \
+  #           CODE_SIGN_IDENTITY="" \
+  #           CODE_SIGNING_REQUIRED=NO \
+  #           CODE_SIGNING_ALLOWED=NO \
+  #           SKIP_INSTALL=NO \
+  #           MARKETING_VERSION=${{ steps.version.outputs.version }}
 
-      - name: Create unsigned IPA
-        working-directory: keenotes-ios
-        run: |
-          mkdir -p build/Payload
-          cp -r build/KeeNotes.xcarchive/Products/Applications/KeeNotes.app build/Payload/
-          cd build && zip -r KeeNotes-${{ steps.version.outputs.version }}-unsigned.ipa Payload
+  #     - name: Create unsigned IPA
+  #       working-directory: keenotes-ios
+  #       run: |
+  #         mkdir -p build/Payload
+  #         cp -r build/KeeNotes.xcarchive/Products/Applications/KeeNotes.app build/Payload/
+  #         cd build && zip -r KeeNotes-${{ steps.version.outputs.version }}-unsigned.ipa Payload
 
-      - name: Upload iOS Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-ipa
-          path: keenotes-ios/build/*.ipa
+  #     - name: Upload iOS Artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: ios-ipa
+  #         path: keenotes-ios/build/*.ipa
 
   release:
-    needs: [build-windows, build-macos, build-linux, build-android, build-ios]
+    needs: [build-windows, build-macos, build-linux, build-android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -342,4 +342,4 @@ jobs:
             artifacts/macos-mac-aarch64/*
             artifacts/linux-packages/*
             artifacts/android-apk/*
-            artifacts/ios-ipa/*
+            # artifacts/ios-ipa/*
