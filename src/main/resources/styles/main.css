@@ -689,3 +689,44 @@
     -fx-text-fill: -fx-primary;
     -fx-font-weight: bold;
 }
+
+/* ==================== Period Toggle Buttons (Segmented Control) ==================== */
+.period-toggle-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-size: 13px;
+    -fx-padding: 10 16;
+    -fx-border-color: -fx-border;
+    -fx-border-width: 1;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-cursor: hand;
+}
+
+.period-toggle-button:hover {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-text-fill: -fx-text-primary;
+}
+
+.period-toggle-button:selected {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: -fx-background;
+    -fx-font-weight: bold;
+}
+
+/* First button - rounded left corners */
+.period-toggle-button:first-child {
+    -fx-background-radius: 8 0 0 8;
+    -fx-border-radius: 8 0 0 8;
+}
+
+/* Last button - rounded right corners */
+.period-toggle-button:last-child {
+    -fx-background-radius: 0 8 8 0;
+    -fx-border-radius: 0 8 8 0;
+}
+
+/* Middle buttons - no rounding, remove left border to avoid double borders */
+.period-toggle-button:nth-child(n+2) {
+    -fx-border-width: 1 1 1 0;
+}
