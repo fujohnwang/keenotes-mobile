@@ -31,6 +31,8 @@ public class SidebarView extends VBox {
     // Status indicators
     private Circle sendChannelIndicator;
     private Circle syncChannelIndicator;
+    private Circle dataSyncIndicator;
+    private Label dataSyncLabel;
     
     public SidebarView(Consumer<DesktopMainView.ViewMode> onNavigationChanged) {
         this.onNavigationChanged = onNavigationChanged;
@@ -184,8 +186,106 @@ public class SidebarView extends VBox {
         HBox syncChannelRow = new HBox(8, syncChannelIndicator, syncChannelLabel);
         syncChannelRow.setAlignment(Pos.CENTER_LEFT);
         
-        statusArea.getChildren().addAll(sendChannelRow, syncChannelRow);
+        // Data sync status (global initialization status)
+        dataSyncIndicator = new Circle(4);
+        dataSyncIndicator.setFill(Color.web("#848D97")); // Gray initially
+        dataSyncIndicator.getStyleClass().add("status-indicator");
+        
+        dataSyncLabel = new Label("Data: --");
+        dataSyncLabel.getStyleClass().addAll("status-label");
+        dataSyncLabel.setId("dataSyncStatus");
+        
+        HBox dataSyncRow = new HBox(8, dataSyncIndicator, dataSyncLabel);
+        dataSyncRow.setAlignment(Pos.CENTER_LEFT);
+        
+        statusArea.getChildren().addAll(sendChannelRow, syncChannelRow, dataSyncRow);
+        
+        // Listen to ServiceManager for global sync status
+        setupGlobalSyncStatusListener();
+        
         return statusArea;
+    }
+    
+    /**
+     * Setup listener for global data sync status
+     */
+    private void setupGlobalSyncStatusListener() {
+        ServiceManager serviceManager = ServiceManager.getInstance();
+        
+        // Add listener for service status changes
+        serviceManager.addListener((status, message) -> {
+            javafx.application.Platform.runLater(() -> {
+                switch (status) {
+                    case "local_cache_ready" -> updateDataSyncStatus("Ready", true);
+                    case "local_cache_error" -> updateDataSyncStatus("Error", false);
+                    case "sync_complete" -> updateDataSyncStatus("Synced", true);
+                    case "reinitializing" -> updateDataSyncStatus("Syncing...", false);
+                    case "not_configured" -> updateDataSyncStatus("Not configured", false);
+                }
+            });
+        });
+        
+        // Also listen to WebSocket sync events for progress
+        WebSocketClientService webSocketService = serviceManager.getWebSocketService();
+        webSocketService.addListener(new WebSocketClientService.SyncListener() {
+            @Override
+            public void onConnectionStatus(boolean connected) {
+                // Handled by existing status
+            }
+            
+            @Override
+            public void onSyncProgress(int current, int total) {
+                javafx.application.Platform.runLater(() -> {
+                    updateDataSyncStatus("Syncing " + current + "/" + total, false);
+                });
+            }
+            
+            @Override
+            public void onSyncComplete(int total, long lastSyncId) {
+                javafx.application.Platform.runLater(() -> {
+                    updateDataSyncStatus("Synced (" + total + ")", true);
+                });
+            }
+            
+            @Override
+            public void onRealtimeUpdate(long id, String content) {
+                // Not needed here
+            }
+            
+            @Override
+            public void onError(String error) {
+                javafx.application.Platform.runLater(() -> {
+                    updateDataSyncStatus("Sync error", false);
+                });
+            }
+        });
+        
+        // Check initial state
+        ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
+        switch (state) {
+            case READY -> updateDataSyncStatus("Ready", true);
+            case INITIALIZING -> updateDataSyncStatus("Initializing...", false);
+            case ERROR -> updateDataSyncStatus("Error", false);
+            case NOT_STARTED -> updateDataSyncStatus("--", false);
+        }
+    }
+    
+    /**
+     * Update data sync status display
+     */
+    private void updateDataSyncStatus(String status, boolean isReady) {
+        if (dataSyncLabel != null) {
+            dataSyncLabel.setText("Data: " + status);
+        }
+        if (dataSyncIndicator != null) {
+            if (isReady) {
+                dataSyncIndicator.setFill(Color.web("#3FB950")); // Green
+            } else if (status.contains("Error")) {
+                dataSyncIndicator.setFill(Color.web("#F85149")); // Red
+            } else {
+                dataSyncIndicator.setFill(Color.web("#D29922")); // Yellow/Orange for in-progress
+            }
+        }
     }
     
     /**

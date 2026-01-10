@@ -67,18 +67,23 @@ public class MainContentArea extends StackPane {
             
             @Override
             public void onSyncComplete(int total, long lastSyncId) {
-                // Check for new notes and add them incrementally (only if Note mode is visible)
+                // Check for new notes (only if Note mode is visible)
                 Platform.runLater(() -> {
                     if (currentPanel == noteModePanel) {
                         System.out.println("[MainContentArea] Sync complete, checking for new notes");
-                        checkAndAddNewNotes();
+                        // If displayedNoteIds is empty, this is initial load after sync
+                        if (displayedNoteIds.isEmpty()) {
+                            loadRecentNotes();
+                        } else {
+                            checkAndAddNewNotes();
+                        }
                     }
                 });
             }
             
             @Override
             public void onRealtimeUpdate(long id, String content) {
-                // Handle realtime updates (single note pushed from server)
+                // Handle realtime updates (only if Note mode is visible)
                 Platform.runLater(() -> {
                     if (currentPanel == noteModePanel) {
                         System.out.println("[MainContentArea] Realtime update for note " + id);
@@ -90,6 +95,19 @@ public class MainContentArea extends StackPane {
             @Override
             public void onError(String error) {
                 // Not needed here
+            }
+        });
+        
+        // Listen to ServiceManager for cache ready event
+        ServiceManager.getInstance().addListener((status, message) -> {
+            if ("local_cache_ready".equals(status)) {
+                Platform.runLater(() -> {
+                    // If Note mode is visible and no notes displayed yet, load them
+                    if (currentPanel == noteModePanel && displayedNoteIds.isEmpty()) {
+                        System.out.println("[MainContentArea] Cache ready, loading notes");
+                        loadRecentNotes();
+                    }
+                });
             }
         });
         
@@ -478,65 +496,41 @@ public class MainContentArea extends StackPane {
     
     /**
      * Load recent notes (last 7 days)
+     * Simple logic: just load from local DB, assume DB is ready
+     * Global initialization is handled separately by ServiceManager
      */
     private void loadRecentNotes() {
         Platform.runLater(() -> notesDisplayPanel.showLoading("Loading recent notes"));
         
         new Thread(() -> {
             try {
-                // Wait a bit for cache to initialize
-                Thread.sleep(500);
-                
                 ServiceManager serviceManager = ServiceManager.getInstance();
-                ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
+                localCache = serviceManager.getLocalCacheService();
                 
-                System.out.println("[MainContentArea] Cache state: " + state);
-                
-                if (state == ServiceManager.InitializationState.READY) {
-                    localCache = serviceManager.getLocalCacheService();
-                    var notes = localCache.getNotesForReview(7);
-                    
-                    // Track displayed note IDs
-                    displayedNoteIds.clear();
-                    for (var note : notes) {
-                        displayedNoteIds.add(note.id);
-                    }
-                    
+                // If cache not ready yet, show empty state (global init will handle it)
+                if (localCache == null || !localCache.isInitialized()) {
                     Platform.runLater(() -> {
-                        if (notes.isEmpty()) {
-                            notesDisplayPanel.showEmptyState("No recent notes (last 7 days)");
-                        } else {
-                            notesDisplayPanel.displayNotes(notes);
-                        }
+                        notesDisplayPanel.showEmptyState("Waiting for data sync...");
                     });
-                } else if (state == ServiceManager.InitializationState.INITIALIZING) {
-                    Platform.runLater(() -> notesDisplayPanel.showLoading("Cache is initializing"));
-                    // Retry after a delay
-                    new Thread(() -> {
-                        try {
-                            Thread.sleep(2000);
-                            loadRecentNotes();
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }).start();
-                } else if (state == ServiceManager.InitializationState.ERROR) {
-                    String errorMsg = serviceManager.getLocalCacheErrorMessage();
-                    Platform.runLater(() -> notesDisplayPanel.showError("Cache initialization failed: " + errorMsg));
-                } else {
-                    // NOT_STARTED - trigger initialization
-                    Platform.runLater(() -> notesDisplayPanel.showLoading("Initializing cache"));
-                    serviceManager.getLocalCacheService();
-                    // Retry after initialization
-                    new Thread(() -> {
-                        try {
-                            Thread.sleep(1000);
-                            loadRecentNotes();
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }).start();
+                    return;
                 }
+                
+                var notes = localCache.getNotesForReview(7);
+                
+                // Track displayed note IDs for incremental updates
+                displayedNoteIds.clear();
+                for (var note : notes) {
+                    displayedNoteIds.add(note.id);
+                }
+                
+                Platform.runLater(() -> {
+                    if (notes.isEmpty()) {
+                        notesDisplayPanel.showEmptyState("No recent notes (last 7 days)");
+                    } else {
+                        notesDisplayPanel.displayNotes(notes);
+                    }
+                    System.out.println("[MainContentArea] Note list loaded with " + notes.size() + " notes");
+                });
             } catch (Exception e) {
                 e.printStackTrace();
                 Platform.runLater(() -> notesDisplayPanel.showError("Error loading notes: " + e.getMessage()));
@@ -588,6 +582,13 @@ public class MainContentArea extends StackPane {
             FadeTransition fadeIn = new FadeTransition(Duration.millis(150), targetPanel);
             fadeIn.setFromValue(0.0);
             fadeIn.setToValue(1.0);
+            
+            // Reload Note list when entering Note mode
+            if (targetPanel == noteModePanel) {
+                loadRecentNotes();
+            }
+            
+            fadeIn.play();
             fadeIn.play();
             
             currentPanel = targetPanel;
