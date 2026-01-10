@@ -95,12 +95,17 @@ jobs:
 
       # Import signing certificate if secrets are available
       - name: Import Code Signing Certificate
-        if: ${{ secrets.MACOS_CERTIFICATE != '' }}
+        continue-on-error: true
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+          if [ -z "$MACOS_CERTIFICATE" ]; then
+            echo "No signing certificate configured, skipping..."
+            exit 0
+          fi
+          
           # Create keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
@@ -162,12 +167,17 @@ jobs:
 
       # Notarize if credentials are available
       - name: Notarize DMG
-        if: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID != '' }}
+        continue-on-error: true
         env:
           APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PWD }}
           APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
         run: |
+          if [ -z "$APPLE_ID" ]; then
+            echo "No notarization credentials configured, skipping..."
+            exit 0
+          fi
+          
           # Submit for notarization
           xcrun notarytool submit dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.dmg \
             --apple-id "$APPLE_ID" \
@@ -208,12 +218,17 @@ jobs:
 
       # Notarize PKG if credentials are available
       - name: Notarize PKG
-        if: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID != '' }}
+        continue-on-error: true
         env:
           APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PWD }}
           APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
         run: |
+          if [ -z "$APPLE_ID" ]; then
+            echo "No notarization credentials configured, skipping..."
+            exit 0
+          fi
+          
           # Submit for notarization
           xcrun notarytool submit dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.pkg \
             --apple-id "$APPLE_ID" \
