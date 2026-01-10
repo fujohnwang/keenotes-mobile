@@ -4,7 +4,6 @@ import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -21,7 +20,6 @@ public class SearchInputPanel extends VBox {
     
     private final TextField searchField;
     private final Button clearButton;
-    private final Label hintLabel;
     private final Consumer<String> onSearch;
     private PauseTransition searchDebounce;
     
@@ -32,9 +30,9 @@ public class SearchInputPanel extends VBox {
         setSpacing(8);
         setPadding(new Insets(16));
         
-        // Search field
+        // Search field with hint as placeholder
         searchField = new TextField();
-        searchField.setPromptText("Search notes...");
+        searchField.setPromptText("Enter keywords to search your notes");
         searchField.getStyleClass().add("search-field");
         HBox.setHgrow(searchField, Priority.ALWAYS);
         
@@ -49,11 +47,7 @@ public class SearchInputPanel extends VBox {
         HBox searchBox = new HBox(8, searchField, clearButton);
         searchBox.setAlignment(Pos.CENTER_LEFT);
         
-        // Hint label
-        hintLabel = new Label("Enter keywords to search your notes");
-        hintLabel.getStyleClass().add("field-hint");
-        
-        getChildren().addAll(searchBox, hintLabel);
+        getChildren().add(searchBox);
         
         // Setup search debouncing (500ms)
         searchDebounce = new PauseTransition(Duration.millis(500));

@@ -702,11 +702,36 @@
     -fx-border-width: 0 1 0 0;
 }
 
-.sidebar-logo {
+.sidebar-logo-text {
     -fx-font-size: 20px;
     -fx-font-weight: bold;
     -fx-text-fill: -fx-primary;
-    -fx-padding: 8 0 16 0;
+}
+
+/* Sidebar Status Area */
+.sidebar-status-area {
+    -fx-background-color: transparent;
+}
+
+.sidebar-status-area .status-indicator {
+    -fx-stroke: transparent;
+}
+
+.sidebar-status-area .status-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.sidebar-status-area .status-label.connected {
+    -fx-text-fill: -fx-success;
+}
+
+.sidebar-status-area .status-label.disconnected {
+    -fx-text-fill: -fx-error;
+}
+
+.sidebar-status-area .status-label.connecting {
+    -fx-text-fill: #FFC107;
 }
 
 .navigation-group {

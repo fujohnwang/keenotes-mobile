@@ -329,15 +329,20 @@ public class MainContentArea extends StackPane {
                     clipboard.setContent(clipContent);
                 }
                 
-                // Reload recent notes after a short delay
-                new Thread(() -> {
-                    try {
-                        Thread.sleep(1000);
-                        Platform.runLater(this::loadRecentNotes);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                }).start();
+                // Instead of reloading entire list, add the new note at top with animation
+                // Create a NoteData for the new note
+                String timestamp = java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+                LocalCacheService.NoteData newNote = new LocalCacheService.NoteData(
+                    0L, // id will be assigned by server
+                    content,
+                    "default", // channel
+                    timestamp,
+                    null // encryptedContent not needed for display
+                );
+                
+                // Add to display with pop-in animation (no reload, just insert)
+                notesDisplayPanel.addNoteAtTop(newNote);
                 
                 // Hide status after 2 seconds
                 new Thread(() -> {
