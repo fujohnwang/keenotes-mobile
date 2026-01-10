@@ -20,84 +20,60 @@ public class ToggleSwitch extends StackPane {
     private final Circle thumb;
     private final TranslateTransition transition;
     
-    // Colors
-    private static final Color COLOR_OFF = Color.web("#CCCCCC");
-    private static final Color COLOR_ON = Color.web("#4CAF50");
-    private static final Color THUMB_COLOR = Color.WHITE;
-    
-    // Dimensions
     private static final double WIDTH = 50;
     private static final double HEIGHT = 26;
-    private static final double THUMB_RADIUS = 10;
-    private static final double PADDING = 3;
+    private static final double THUMB_RADIUS = 9; // Slightly smaller to fit inside track
+    private static final double PADDING = 3; // Padding from edge
     
     public ToggleSwitch() {
-        // Set fixed size
-        setPrefSize(WIDTH, HEIGHT);
-        setMaxSize(WIDTH, HEIGHT);
-        setMinSize(WIDTH, HEIGHT);
-        
         // Background track
         background = new Rectangle(WIDTH, HEIGHT);
         background.setArcWidth(HEIGHT);
         background.setArcHeight(HEIGHT);
-        background.setFill(COLOR_OFF);
-        background.setStroke(Color.TRANSPARENT);
+        background.setFill(Color.web("#8B949E")); // Gray when off
         
-        // Thumb (circle)
+        // Thumb (circle) - smaller and with padding
         thumb = new Circle(THUMB_RADIUS);
-        thumb.setFill(THUMB_COLOR);
-        thumb.setStroke(Color.web("#DDDDDD"));
-        thumb.setStrokeWidth(1);
+        thumb.setFill(Color.WHITE);
         
-        // Position thumb at OFF position initially (left side)
-        double offPosition = -WIDTH / 2 + PADDING + THUMB_RADIUS;
-        thumb.setTranslateX(offPosition);
+        // Calculate positions to keep thumb inside track
+        // Left position: -WIDTH/2 + PADDING + THUMB_RADIUS
+        // Right position: WIDTH/2 - PADDING - THUMB_RADIUS
+        double leftPos = -WIDTH / 2 + PADDING + THUMB_RADIUS;
+        double rightPos = WIDTH / 2 - PADDING - THUMB_RADIUS;
         
-        // Animation for thumb movement
-        transition = new TranslateTransition(Duration.millis(150), thumb);
+        thumb.setTranslateX(leftPos); // Start position (left)
         
-        // Add to container
         getChildren().addAll(background, thumb);
         setAlignment(Pos.CENTER);
         
+        // Animation
+        transition = new TranslateTransition(Duration.millis(200), thumb);
+        
         // Click handler
-        setOnMouseClicked(event -> {
-            setSelected(!isSelected());
-        });
+        setOnMouseClicked(e -> setSelected(!isSelected()));
+        setCursor(javafx.scene.Cursor.HAND);
         
-        // Hover effect
-        setOnMouseEntered(event -> {
-            setStyle("-fx-cursor: hand;");
-        });
-        
-        setOnMouseExited(event -> {
-            setStyle("-fx-cursor: default;");
-        });
-        
-        // Listen to selected property changes
+        // Listen to selected property
         selected.addListener((obs, oldVal, newVal) -> {
-            updateVisuals(newVal);
+            if (newVal) {
+                // Move to right, change to blue
+                transition.setToX(rightPos);
+                background.setFill(Color.web("#00D4FF")); // Primary color
+            } else {
+                // Move to left, change to gray
+                transition.setToX(leftPos);
+                background.setFill(Color.web("#8B949E"));
+            }
+            transition.play();
         });
-    }
-    
-    private void updateVisuals(boolean isSelected) {
-        double offPosition = -WIDTH / 2 + PADDING + THUMB_RADIUS;
-        double onPosition = WIDTH / 2 - PADDING - THUMB_RADIUS;
         
-        if (isSelected) {
-            // Move thumb to ON position (right side)
-            transition.setToX(onPosition);
-            background.setFill(COLOR_ON);
-        } else {
-            // Move thumb to OFF position (left side)
-            transition.setToX(offPosition);
-            background.setFill(COLOR_OFF);
-        }
-        transition.play();
+        // Set initial size
+        setMinSize(WIDTH, HEIGHT);
+        setMaxSize(WIDTH, HEIGHT);
+        setPrefSize(WIDTH, HEIGHT);
     }
     
-    // Property accessors
     public BooleanProperty selectedProperty() {
         return selected;
     }
