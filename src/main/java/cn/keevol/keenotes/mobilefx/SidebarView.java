@@ -236,14 +236,14 @@ public class SidebarView extends VBox {
             @Override
             public void onSyncProgress(int current, int total) {
                 javafx.application.Platform.runLater(() -> {
-                    updateDataSyncStatus("Syncing " + current + "/" + total, false);
+                    updateDataSyncStatus("Syncing...", false);
                 });
             }
             
             @Override
             public void onSyncComplete(int total, long lastSyncId) {
                 javafx.application.Platform.runLater(() -> {
-                    updateDataSyncStatus("Synced (" + total + ")", true);
+                    updateDataSyncStatus("Synced", true);
                 });
             }
             
