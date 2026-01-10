@@ -166,40 +166,30 @@ struct NoteRow: View {
     @State private var showCopiedAlert = false
     
     private var formattedDate: String {
-        // Parse ISO date or custom format
+        // Simply return the first 19 characters (yyyy-MM-dd HH:mm:ss)
+        // Most notes already have this format from the server
+        if note.createdAt.count >= 19 {
+            return String(note.createdAt.prefix(19))
+        }
+        
+        // Fallback: try to parse and format
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         
         if let date = dateFormatter.date(from: note.createdAt) {
             let displayFormatter = DateFormatter()
-            displayFormatter.dateStyle = .medium
-            displayFormatter.timeStyle = .short
+            displayFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
             return displayFormatter.string(from: date)
         }
         
-        // Try alternative format
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        if let date = dateFormatter.date(from: note.createdAt) {
-            let displayFormatter = DateFormatter()
-            displayFormatter.dateStyle = .medium
-            displayFormatter.timeStyle = .short
-            return displayFormatter.string(from: date)
-        }
-        
+        // If all else fails, return as-is
         return note.createdAt
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Note content
-            Text(note.content)
-                .font(.body)
-                .foregroundColor(.primary)
-                .lineLimit(5)
-                .fixedSize(horizontal: false, vertical: true)
-            
-            // Footer with date and copy hint
-            HStack {
+            // Header: Date and Channel
+            HStack(spacing: 8) {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
                         .font(.caption2)
@@ -208,18 +198,25 @@ struct NoteRow: View {
                 }
                 .foregroundColor(.secondary)
                 
-                Spacer()
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "hand.tap")
-                        .font(.caption2)
-                    Text("Long press to copy")
-                        .font(.caption2)
+                // Channel info
+                if !note.channel.isEmpty {
+                    Text("•")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(note.channel)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                .foregroundColor(.secondary)
-                .opacity(0.6)
             }
+            
+            // Note content (full text with auto wrap)
+            Text(note.content)
+                .font(.body)
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 12)
@@ -231,7 +228,7 @@ struct NoteRow: View {
                 .stroke(Color(.systemGray5), lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onLongPressGesture(minimumDuration: 0.5) {
+        .onTapGesture {
             copyToClipboard()
         }
         .overlay(

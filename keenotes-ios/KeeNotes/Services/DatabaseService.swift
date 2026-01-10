@@ -28,8 +28,22 @@ class DatabaseService: ObservableObject {
             try db.create(table: Note.databaseTableName, ifNotExists: true) { t in
                 t.column("id", .integer).primaryKey()
                 t.column("content", .text).notNull()
+                t.column("channel", .text).notNull().defaults(to: "default")
                 t.column("createdAt", .text).notNull()
                 t.column("syncedAt", .integer).notNull().defaults(to: 0)
+            }
+            
+            // Migrate existing tables - add channel column if it doesn't exist
+            if try db.tableExists(Note.databaseTableName) {
+                let columns = try db.columns(in: Note.databaseTableName)
+                let hasChannel = columns.contains { $0.name == "channel" }
+                
+                if !hasChannel {
+                    print("[DB] Migrating notes table: adding channel column")
+                    try db.alter(table: Note.databaseTableName) { t in
+                        t.add(column: "channel", .text).notNull().defaults(to: "default")
+                    }
+                }
             }
             
             // Create sync_state table
