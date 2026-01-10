@@ -19,17 +19,10 @@ public class SettingsView extends BorderPane {
     private final Label statusLabel;
     private final SettingsService settings;
     private final Runnable onBack;
-    private final Runnable onOpenDebug;
     private final ToggleSwitch copyToClipboardToggle;
-    
-    // Easter egg: tap copyright 7 times to show debug
-    private int copyrightTapCount = 0;
-    private long lastTapTime = 0;
-    private VBox debugSection;
 
-    public SettingsView(Runnable onBack, Runnable onOpenDebug) {
+    public SettingsView(Runnable onBack) {
         this.onBack = onBack;
-        this.onOpenDebug = onOpenDebug;
         this.settings = SettingsService.getInstance();
         getStyleClass().add("main-view");
 
@@ -61,10 +54,9 @@ public class SettingsView extends BorderPane {
         saveButton.setMaxWidth(Double.MAX_VALUE);
         saveButton.setOnAction(e -> saveSettings());
 
-        // Copyright footer with easter egg
+        // Copyright footer
         Label copyrightLabel = new Label("©2025 王福强(Fuqiang Wang)  All Rights Reserved");
         copyrightLabel.getStyleClass().add("copyright-label");
-        copyrightLabel.setOnMouseClicked(e -> onCopyrightTap());
 
         Label websiteLabel = new Label("https://keenotes.afoo.me");
         websiteLabel.getStyleClass().add("copyright-link");
@@ -101,19 +93,7 @@ public class SettingsView extends BorderPane {
         VBox preferencesSection = new VBox(8, preferencesLabel, toggleRow);
         preferencesSection.setPadding(new Insets(8, 0, 8, 0)); // Add top/bottom padding
 
-        // Debug entry (hidden by default)
-        Button debugBtn = new Button("Debug");
-        debugBtn.getStyleClass().add("debug-entry-btn");
-        debugBtn.setMaxWidth(Double.MAX_VALUE);
-        debugBtn.setOnAction(e -> onOpenDebug.run());
-
-        Label debugHint = new Label("Click to access debug tools (for development)");
-        debugHint.getStyleClass().add("field-hint");
-
-        debugSection = new VBox(4, debugBtn, debugHint);
-        debugSection.setPadding(new Insets(8, 0, 0, 0));
-        debugSection.setVisible(false);
-        debugSection.setManaged(false);
+        // Debug entry (hidden by default) - removed for desktop version
 
         VBox form = new VBox(16,
                 createFieldGroup("Endpoint URL", endpointField),
@@ -123,7 +103,6 @@ public class SettingsView extends BorderPane {
                 preferencesSection,
                 saveButton,
                 statusLabel,
-                debugSection,
                 footer
         );
         form.setPadding(new Insets(24));
@@ -173,32 +152,6 @@ public class SettingsView extends BorderPane {
         label.getStyleClass().add("field-label");
         VBox group = new VBox(6, label, field, hint);
         return group;
-    }
-
-    /**
-     * Easter egg: tap copyright 7 times to reveal debug section
-     */
-    private void onCopyrightTap() {
-        long now = System.currentTimeMillis();
-        
-        // Reset count if more than 1 second since last tap
-        if (now - lastTapTime > 1000) {
-            copyrightTapCount = 0;
-        }
-        lastTapTime = now;
-        copyrightTapCount++;
-        
-        if (copyrightTapCount >= 7 && !debugSection.isVisible()) {
-            debugSection.setVisible(true);
-            debugSection.setManaged(true);
-            statusLabel.setText("Debug mode enabled!");
-            statusLabel.getStyleClass().removeAll("error", "success");
-            statusLabel.getStyleClass().add("success");
-        } else if (copyrightTapCount >= 4 && copyrightTapCount < 7) {
-            int remaining = 7 - copyrightTapCount;
-            statusLabel.setText(remaining + " more tap(s) to enable debug mode");
-            statusLabel.getStyleClass().removeAll("error", "success");
-        }
     }
 
     private void loadSettings() {
