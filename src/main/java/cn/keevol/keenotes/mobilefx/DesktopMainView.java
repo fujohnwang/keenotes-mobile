@@ -62,7 +62,16 @@ public class DesktopMainView extends BorderPane {
      * Switch to a different view mode
      */
     private void switchToMode(ViewMode mode) {
-        System.out.println("[DesktopMainView] Switching to mode: " + mode);
+        switchToMode(mode, true);
+    }
+    
+    /**
+     * Switch to a different view mode
+     * @param mode The view mode to switch to
+     * @param loadDefaultData Whether to load default data for the mode
+     */
+    private void switchToMode(ViewMode mode, boolean loadDefaultData) {
+        System.out.println("[DesktopMainView] Switching to mode: " + mode + ", loadDefaultData: " + loadDefaultData);
         currentMode = mode;
         
         // Update sidebar selection
@@ -72,7 +81,7 @@ public class DesktopMainView extends BorderPane {
         mainContent.showMode(mode);
         
         // Load data for specific modes
-        if (mode == ViewMode.REVIEW) {
+        if (mode == ViewMode.REVIEW && loadDefaultData) {
             // Load default period (7 days) when entering review mode
             mainContent.loadReviewNotes("7 days");
         }
@@ -83,7 +92,9 @@ public class DesktopMainView extends BorderPane {
      */
     public void onReviewPeriodSelected(String period) {
         System.out.println("[DesktopMainView] Review period selected: " + period);
-        switchToMode(ViewMode.REVIEW);
+        // Switch to REVIEW mode without loading default data
+        switchToMode(ViewMode.REVIEW, false);
+        // Load the selected period
         mainContent.loadReviewNotes(period);
     }
     

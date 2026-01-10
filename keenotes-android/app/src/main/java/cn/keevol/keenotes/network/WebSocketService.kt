@@ -458,9 +458,10 @@ class WebSocketService(
             val id = json.getLong("id")
             val encryptedContent = json.getString("content")
             val createdAt = json.optString("created_at", json.optString("createdAt", ""))
+            val channel = json.optString("channel", "default")
             
             val password = cachedPassword
-            Log.i(TAG, "parseNote: id=$id, createdAt=$createdAt, hasPassword=${password != null}")
+            Log.i(TAG, "parseNote: id=$id, createdAt=$createdAt, channel=$channel, hasPassword=${password != null}")
             
             val content = if (password != null) {
                 try {
@@ -478,7 +479,7 @@ class WebSocketService(
                 encryptedContent
             }
             
-            Note(id = id, content = content, createdAt = createdAt)
+            Note(id = id, content = content, channel = channel, createdAt = createdAt)
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing note JSON: ${e.message}", e)
             e.printStackTrace()
