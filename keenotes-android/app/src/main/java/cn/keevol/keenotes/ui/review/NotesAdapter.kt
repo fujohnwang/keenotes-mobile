@@ -1,18 +1,16 @@
 package cn.keevol.keenotes.ui.review
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.ItemNoteBinding
+import com.google.android.material.snackbar.Snackbar
 
 class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCallback()) {
     
@@ -34,8 +32,13 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
     ) : RecyclerView.ViewHolder(binding.root) {
         
         fun bind(note: Note) {
-            // Date (just date part, not time)
-            binding.dateText.text = note.createdAt.take(10)
+            // Date and time (yyyy-MM-dd HH:mm:ss format)
+            // Take first 19 characters to get "yyyy-MM-dd HH:mm:ss"
+            binding.dateText.text = if (note.createdAt.length >= 19) {
+                note.createdAt.take(19)
+            } else {
+                note.createdAt
+            }
             
             // Channel with bullet separator
             val channelText = if (note.channel.isNotEmpty()) note.channel else "default"
@@ -56,27 +59,8 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
             val clip = ClipData.newPlainText("note", content)
             clipboard.setPrimaryClip(clip)
             
-            // Show popup with fade animation
-            binding.copiedPopup.visibility = View.VISIBLE
-            binding.copiedPopup.alpha = 0f
-            binding.copiedPopup.animate()
-                .alpha(1f)
-                .setDuration(200)
-                .setListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        // Fade out after delay
-                        binding.copiedPopup.postDelayed({
-                            binding.copiedPopup.animate()
-                                .alpha(0f)
-                                .setDuration(200)
-                                .setListener(object : AnimatorListenerAdapter() {
-                                    override fun onAnimationEnd(animation: Animator) {
-                                        binding.copiedPopup.visibility = View.GONE
-                                    }
-                                })
-                        }, 1500)
-                    }
-                })
+            // Show Snackbar (Android standard way)
+            Snackbar.make(binding.root, "✓ Copied to clipboard", Snackbar.LENGTH_SHORT).show()
         }
     }
     

@@ -337,6 +337,7 @@ class WebSocketService: NSObject, ObservableObject {
         }
         
         let createdAt = json["created_at"] as? String ?? json["createdAt"] as? String ?? ""
+        let channel = json["channel"] as? String ?? "default"
         
         let content: String
         if let password = cachedPassword {
@@ -352,7 +353,7 @@ class WebSocketService: NSObject, ObservableObject {
             content = encryptedContent
         }
         
-        return Note(id: id, content: content, createdAt: createdAt)
+        return Note(id: id, content: content, channel: channel, createdAt: createdAt)
     }
     
     private func sendPong() {
