@@ -436,25 +436,16 @@ public class MainContentArea extends StackPane {
                         // Sort by timestamp (newest first)
                         newNotes.sort((a, b) -> b.createdAt.compareTo(a.createdAt));
                         
-                        // Add new notes with animation (with small delay between each)
-                        Platform.runLater(() -> {
-                            for (int i = 0; i < newNotes.size(); i++) {
-                                LocalCacheService.NoteData note = newNotes.get(i);
-                                final int delay = i * 100; // 100ms delay between each note
-                                
-                                new Thread(() -> {
-                                    try {
-                                        Thread.sleep(delay);
-                                        Platform.runLater(() -> {
-                                            notesDisplayPanel.addNoteAtTop(note);
-                                            displayedNoteIds.add(note.id);
-                                        });
-                                    } catch (InterruptedException e) {
-                                        Thread.currentThread().interrupt();
-                                    }
-                                }).start();
-                            }
-                        });
+                        // Add new notes sequentially with animation (single thread, no race condition)
+                        for (LocalCacheService.NoteData note : newNotes) {
+                            Platform.runLater(() -> {
+                                notesDisplayPanel.addNoteAtTop(note);
+                                displayedNoteIds.add(note.id);
+                            });
+                            
+                            // Small delay between each note for visual effect
+                            Thread.sleep(150);
+                        }
                     }
                 }
             } catch (Exception e) {
