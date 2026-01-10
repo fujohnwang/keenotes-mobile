@@ -37,9 +37,13 @@ public class MainContentArea extends StackPane {
     // Services
     private ApiServiceV2 apiService;
     private LocalCacheService localCache;
+    private WebSocketClientService webSocketService;
     
     // Current visible panel
     private VBox currentPanel;
+    
+    // Track displayed notes in Note mode to detect new ones
+    private java.util.Set<Long> displayedNoteIds = new java.util.HashSet<>();
     
     public MainContentArea() {
         getStyleClass().add("main-content-area");
@@ -47,6 +51,47 @@ public class MainContentArea extends StackPane {
         
         // Get services
         this.apiService = ServiceManager.getInstance().getApiService();
+        this.webSocketService = ServiceManager.getInstance().getWebSocketService();
+        
+        // Listen to WebSocket events for incremental updates
+        webSocketService.addListener(new WebSocketClientService.SyncListener() {
+            @Override
+            public void onConnectionStatus(boolean connected) {
+                // Not needed here
+            }
+            
+            @Override
+            public void onSyncProgress(int current, int total) {
+                // Not needed here
+            }
+            
+            @Override
+            public void onSyncComplete(int total, long lastSyncId) {
+                // Check for new notes and add them incrementally (only if Note mode is visible)
+                Platform.runLater(() -> {
+                    if (currentPanel == noteModePanel) {
+                        System.out.println("[MainContentArea] Sync complete, checking for new notes");
+                        checkAndAddNewNotes();
+                    }
+                });
+            }
+            
+            @Override
+            public void onRealtimeUpdate(long id, String content) {
+                // Handle realtime updates (single note pushed from server)
+                Platform.runLater(() -> {
+                    if (currentPanel == noteModePanel) {
+                        System.out.println("[MainContentArea] Realtime update for note " + id);
+                        checkAndAddNewNotes();
+                    }
+                });
+            }
+            
+            @Override
+            public void onError(String error) {
+                // Not needed here
+            }
+        });
         
         setupPanels();
     }
@@ -343,20 +388,9 @@ public class MainContentArea extends StackPane {
                     clipboard.setContent(clipContent);
                 }
                 
-                // Instead of reloading entire list, add the new note at top with animation
-                // Create a NoteData for the new note with desktop channel
-                String timestamp = java.time.LocalDateTime.now()
-                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
-                LocalCacheService.NoteData newNote = new LocalCacheService.NoteData(
-                    0L, // id will be assigned by server
-                    content,
-                    getDesktopChannel(), // Use desktop-{os} channel
-                    timestamp,
-                    null // encryptedContent not needed for display
-                );
-                
-                // Add to display with pop-in animation (no reload, just insert)
-                notesDisplayPanel.addNoteAtTop(newNote);
+                // Note: Don't manually add note here
+                // Wait for WebSocket sync/realtime update to add it automatically
+                // This ensures consistent behavior for all new notes (sent or received)
                 
                 // Hide status after 2 seconds
                 new Thread(() -> {
@@ -373,6 +407,61 @@ public class MainContentArea extends StackPane {
             
             noteInputPanel.setSendButtonEnabled(true);
         }));
+    }
+    
+    /**
+     * Check for new notes and add them incrementally with animation
+     */
+    private void checkAndAddNewNotes() {
+        new Thread(() -> {
+            try {
+                ServiceManager serviceManager = ServiceManager.getInstance();
+                ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
+                
+                if (state == ServiceManager.InitializationState.READY) {
+                    localCache = serviceManager.getLocalCacheService();
+                    var allNotes = localCache.getNotesForReview(7); // Last 7 days
+                    
+                    // Find new notes (not in displayedNoteIds)
+                    java.util.List<LocalCacheService.NoteData> newNotes = new java.util.ArrayList<>();
+                    for (var note : allNotes) {
+                        if (!displayedNoteIds.contains(note.id)) {
+                            newNotes.add(note);
+                        }
+                    }
+                    
+                    if (!newNotes.isEmpty()) {
+                        System.out.println("[MainContentArea] Found " + newNotes.size() + " new notes");
+                        
+                        // Sort by timestamp (newest first)
+                        newNotes.sort((a, b) -> b.createdAt.compareTo(a.createdAt));
+                        
+                        // Add new notes with animation (with small delay between each)
+                        Platform.runLater(() -> {
+                            for (int i = 0; i < newNotes.size(); i++) {
+                                LocalCacheService.NoteData note = newNotes.get(i);
+                                final int delay = i * 100; // 100ms delay between each note
+                                
+                                new Thread(() -> {
+                                    try {
+                                        Thread.sleep(delay);
+                                        Platform.runLater(() -> {
+                                            notesDisplayPanel.addNoteAtTop(note);
+                                            displayedNoteIds.add(note.id);
+                                        });
+                                    } catch (InterruptedException e) {
+                                        Thread.currentThread().interrupt();
+                                    }
+                                }).start();
+                            }
+                        });
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[MainContentArea] Error checking for new notes: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }).start();
     }
     
     /**
@@ -415,6 +504,12 @@ public class MainContentArea extends StackPane {
                 if (state == ServiceManager.InitializationState.READY) {
                     localCache = serviceManager.getLocalCacheService();
                     var notes = localCache.getNotesForReview(7);
+                    
+                    // Track displayed note IDs
+                    displayedNoteIds.clear();
+                    for (var note : notes) {
+                        displayedNoteIds.add(note.id);
+                    }
                     
                     Platform.runLater(() -> {
                         if (notes.isEmpty()) {
