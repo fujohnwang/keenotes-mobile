@@ -113,22 +113,11 @@ public class NotesDisplayPanel extends VBox {
     private void loadInitialNotes() {
         int toLoad = Math.min(INITIAL_LOAD_COUNT, allNotes.size());
         
+        // Add all cards without individual animation
         for (int i = 0; i < toLoad; i++) {
             LocalCacheService.NoteData note = allNotes.get(i);
             NoteCardView card = new NoteCardView(note);
-            
-            // Set initial opacity to 0
-            card.setOpacity(0);
             notesContainer.getChildren().add(card);
-            
-            // Create fade-in animation with delay based on index
-            javafx.animation.FadeTransition fadeIn = new javafx.animation.FadeTransition(
-                javafx.util.Duration.millis(300), card
-            );
-            fadeIn.setFromValue(0);
-            fadeIn.setToValue(1);
-            fadeIn.setDelay(javafx.util.Duration.millis(i * 30)); // 30ms delay per card
-            fadeIn.play();
         }
         
         displayedCount = toLoad;
@@ -140,8 +129,16 @@ public class NotesDisplayPanel extends VBox {
             loadMoreHint.setStyle("-fx-padding: 16 0 0 0;");
             notesContainer.getChildren().add(loadMoreHint);
         }
+        
+        // Fade in the entire container
+        notesContainer.setOpacity(0);
+        javafx.animation.FadeTransition fadeIn = new javafx.animation.FadeTransition(
+            javafx.util.Duration.millis(300), notesContainer
+        );
+        fadeIn.setFromValue(0);
+        fadeIn.setToValue(1);
+        fadeIn.play();
     }
-    
     /**
      * Load more notes when scrolling to bottom
      */
@@ -164,22 +161,11 @@ public class NotesDisplayPanel extends VBox {
         int startIndex = displayedCount;
         int endIndex = Math.min(startIndex + LOAD_MORE_COUNT, allNotes.size());
         
-        // Add new cards with animation
+        // Add new cards without animation (lazy loading should be fast)
         for (int i = startIndex; i < endIndex; i++) {
             LocalCacheService.NoteData note = allNotes.get(i);
             NoteCardView card = new NoteCardView(note);
-            
-            card.setOpacity(0);
             notesContainer.getChildren().add(card);
-            
-            // Animate in
-            javafx.animation.FadeTransition fadeIn = new javafx.animation.FadeTransition(
-                javafx.util.Duration.millis(300), card
-            );
-            fadeIn.setFromValue(0);
-            fadeIn.setToValue(1);
-            fadeIn.setDelay(javafx.util.Duration.millis((i - startIndex) * 30));
-            fadeIn.play();
         }
         
         displayedCount = endIndex;
