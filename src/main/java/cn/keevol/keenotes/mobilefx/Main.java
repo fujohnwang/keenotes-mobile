@@ -92,34 +92,34 @@ public class Main extends Application {
             SettingsService settings = SettingsService.getInstance();
             boolean isConfigured = !settings.getEndpointUrl().isEmpty() && !settings.getToken().isEmpty();
             
-            StatusFooterBar footer = mainView.getFooter();
+            SidebarView sidebar = mainView.getSidebar();
             
             // Update Send Channel status
             if (!isConfigured) {
-                footer.updateSendChannelStatus(false, "Not Configured");
+                sidebar.updateStatus("sendChannelStatus", "Send Channel: Not Configured", false);
             } else {
-                footer.updateSendChannelStatus(true, "✓");
+                sidebar.updateStatus("sendChannelStatus", "Send Channel: ✓", true);
             }
             
             // Update Sync Channel status
             switch (status.toLowerCase()) {
                 case "websocket_connected":
-                    footer.updateSyncChannelStatus(true, "✓");
+                    sidebar.updateStatus("syncChannelStatus", "Sync Channel: ✓", true);
                     break;
                 case "websocket_disconnected":
                 case "not_configured":
                 case "connect_error":
                 case "websocket_error":
-                    footer.updateSyncChannelStatus(false, "Disconnected");
+                    sidebar.updateStatus("syncChannelStatus", "Sync Channel: Disconnected", false);
                     break;
                 case "reinitializing":
-                    footer.updateSyncChannelStatus(false, "Connecting...");
+                    sidebar.updateStatus("syncChannelStatus", "Sync Channel: Connecting...", false);
                     break;
                 case "syncing":
-                    footer.updateSyncChannelStatus(true, "Syncing...");
+                    sidebar.updateStatus("syncChannelStatus", "Sync Channel: Syncing...", true);
                     break;
                 case "sync_complete":
-                    footer.updateSyncChannelStatus(true, "✓");
+                    sidebar.updateStatus("syncChannelStatus", "Sync Channel: ✓", true);
                     break;
             }
         });

@@ -183,7 +183,8 @@ public class NotesDisplayPanel extends VBox {
     }
     
     /**
-     * Add a single note at the top with animation (for new notes)
+     * Add a single note at the top with pop-in animation (for new notes)
+     * Animation: slide down from top + scale up + fade in
      */
     public void addNoteAtTop(LocalCacheService.NoteData note) {
         stopDotsAnimation();
@@ -197,19 +198,52 @@ public class NotesDisplayPanel extends VBox {
         
         // Create new card
         NoteCardView card = new NoteCardView(note);
+        
+        // Set initial state for pop-in animation
         card.setOpacity(0);
+        card.setScaleX(0.8);
+        card.setScaleY(0.8);
+        card.setTranslateY(-30); // Start above
         
         // Insert after count label (index 1) or at beginning if no count label
         int insertIndex = (countLabel != null && notesContainer.getChildren().contains(countLabel)) ? 1 : 0;
         notesContainer.getChildren().add(insertIndex, card);
         
-        // Animate in
+        // Scroll to top to show the new card
+        scrollPane.setVvalue(0);
+        
+        // Create parallel animation: fade + scale + slide
         javafx.animation.FadeTransition fadeIn = new javafx.animation.FadeTransition(
             javafx.util.Duration.millis(400), card
         );
         fadeIn.setFromValue(0);
         fadeIn.setToValue(1);
-        fadeIn.play();
+        
+        javafx.animation.ScaleTransition scaleIn = new javafx.animation.ScaleTransition(
+            javafx.util.Duration.millis(400), card
+        );
+        scaleIn.setFromX(0.8);
+        scaleIn.setFromY(0.8);
+        scaleIn.setToX(1.0);
+        scaleIn.setToY(1.0);
+        
+        javafx.animation.TranslateTransition slideIn = new javafx.animation.TranslateTransition(
+            javafx.util.Duration.millis(400), card
+        );
+        slideIn.setFromY(-30);
+        slideIn.setToY(0);
+        
+        // Use ease-out interpolator for smooth deceleration
+        javafx.animation.Interpolator easeOut = javafx.animation.Interpolator.SPLINE(0.25, 0.1, 0.25, 1.0);
+        fadeIn.setInterpolator(easeOut);
+        scaleIn.setInterpolator(easeOut);
+        slideIn.setInterpolator(easeOut);
+        
+        // Play all animations together
+        javafx.animation.ParallelTransition popIn = new javafx.animation.ParallelTransition(
+            fadeIn, scaleIn, slideIn
+        );
+        popIn.play();
     }
     
     /**

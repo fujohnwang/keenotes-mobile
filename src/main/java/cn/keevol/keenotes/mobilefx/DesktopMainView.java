@@ -13,7 +13,6 @@ public class DesktopMainView extends BorderPane {
     // Components
     private final SidebarView sidebar;
     private final MainContentArea mainContent;
-    private final StatusFooterBar footer;
     
     // Current mode
     private ViewMode currentMode = ViewMode.NOTE;
@@ -31,7 +30,6 @@ public class DesktopMainView extends BorderPane {
         // Create components
         sidebar = new SidebarView(this::onNavigationChanged);
         mainContent = new MainContentArea();
-        footer = new StatusFooterBar();
         
         // Setup layout
         setupLayout();
@@ -47,11 +45,8 @@ public class DesktopMainView extends BorderPane {
         sidebar.setMinWidth(250);
         sidebar.setMaxWidth(250);
         
-        // Center: Main content area with footer (flexible)
-        VBox centerContainer = new VBox();
-        VBox.setVgrow(mainContent, Priority.ALWAYS);
-        centerContainer.getChildren().addAll(mainContent, footer);
-        setCenter(centerContainer);
+        // Center: Main content area (flexible, no footer)
+        setCenter(mainContent);
     }
     
     /**
@@ -107,9 +102,9 @@ public class DesktopMainView extends BorderPane {
     }
     
     /**
-     * Get the status footer bar (for status updates from Main)
+     * Get the sidebar (for status updates from Main)
      */
-    public StatusFooterBar getFooter() {
-        return footer;
+    public SidebarView getSidebar() {
+        return sidebar;
     }
 }
