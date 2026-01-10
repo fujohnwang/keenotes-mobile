@@ -16,6 +16,7 @@ data class Note(
     @PrimaryKey
     val id: Long,
     val content: String,
+    val channel: String = "default",  // Source channel (e.g., mobile-android, desktop-mac)
     val createdAt: String,  // ISO 8601 format
     val syncedAt: Long = System.currentTimeMillis()
 )

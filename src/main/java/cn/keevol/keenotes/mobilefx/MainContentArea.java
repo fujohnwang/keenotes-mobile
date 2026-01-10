@@ -142,6 +142,7 @@ public class MainContentArea extends StackPane {
      * Load review notes for a specific period
      */
     public void loadReviewNotes(String period) {
+        System.out.println("[MainContentArea] loadReviewNotes called with period: " + period);
         currentReviewPeriod = period;
         Platform.runLater(() -> reviewNotesPanel.showLoading("Loading notes"));
         
@@ -160,13 +161,26 @@ public class MainContentArea extends StackPane {
                         default -> 7;
                     };
                     
+                    System.out.println("[MainContentArea] Loading notes for " + days + " days");
+                    
                     var notes = localCache.getNotesForReview(days);
+                    
+                    // Format period info for display
+                    String periodInfo = switch (period) {
+                        case "7 days" -> "Last 7 days";
+                        case "30 days" -> "Last 30 days";
+                        case "90 days" -> "Last 90 days";
+                        case "All" -> "All time";
+                        default -> "Last 7 days";
+                    };
+                    
+                    System.out.println("[MainContentArea] Period info: " + periodInfo + ", notes count: " + notes.size());
                     
                     Platform.runLater(() -> {
                         if (notes.isEmpty()) {
                             reviewNotesPanel.showEmptyState("No notes found for " + period);
                         } else {
-                            reviewNotesPanel.displayNotes(notes);
+                            reviewNotesPanel.displayNotes(notes, periodInfo);
                         }
                     });
                 } else if (state == ServiceManager.InitializationState.INITIALIZING) {
@@ -330,13 +344,13 @@ public class MainContentArea extends StackPane {
                 }
                 
                 // Instead of reloading entire list, add the new note at top with animation
-                // Create a NoteData for the new note
+                // Create a NoteData for the new note with desktop channel
                 String timestamp = java.time.LocalDateTime.now()
                     .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
                 LocalCacheService.NoteData newNote = new LocalCacheService.NoteData(
                     0L, // id will be assigned by server
                     content,
-                    "default", // channel
+                    getDesktopChannel(), // Use desktop-{os} channel
                     timestamp,
                     null // encryptedContent not needed for display
                 );
@@ -359,6 +373,27 @@ public class MainContentArea extends StackPane {
             
             noteInputPanel.setSendButtonEnabled(true);
         }));
+    }
+    
+    /**
+     * Get desktop channel name based on platform
+     * Format: desktop-{os} (e.g., desktop-mac, desktop-win, desktop-linux)
+     */
+    private String getDesktopChannel() {
+        String os = System.getProperty("os.name", "unknown").toLowerCase();
+        String osType;
+        
+        if (os.contains("mac") || os.contains("darwin")) {
+            osType = "mac";
+        } else if (os.contains("win")) {
+            osType = "win";
+        } else if (os.contains("nux") || os.contains("nix")) {
+            osType = "linux";
+        } else {
+            osType = "unknown";
+        }
+        
+        return "desktop-" + osType;
     }
     
     /**

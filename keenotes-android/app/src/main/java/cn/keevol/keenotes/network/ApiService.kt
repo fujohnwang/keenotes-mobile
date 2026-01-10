@@ -85,7 +85,7 @@ class ApiService(
             
             // Build JSON body - match JavaFX format exactly
             val json = JSONObject().apply {
-                put("channel", "mobile")
+                put("channel", "mobile-android")
                 put("text", encrypted)
                 put("ts", ts)
                 put("encrypted", true)

@@ -222,10 +222,20 @@ public class SidebarView extends VBox {
      * Handle review period selection
      */
     private void onReviewPeriodSelected(String period) {
-        // Get parent DesktopMainView and notify
-        if (getParent() != null && getParent().getParent() instanceof DesktopMainView) {
-            ((DesktopMainView) getParent().getParent()).onReviewPeriodSelected(period);
+        System.out.println("[SidebarView] Period selected: " + period);
+        
+        // Navigate up the scene graph to find DesktopMainView
+        javafx.scene.Node node = this;
+        while (node != null) {
+            System.out.println("[SidebarView] Checking node: " + node.getClass().getSimpleName());
+            if (node instanceof DesktopMainView) {
+                System.out.println("[SidebarView] Found DesktopMainView, calling onReviewPeriodSelected");
+                ((DesktopMainView) node).onReviewPeriodSelected(period);
+                return;
+            }
+            node = node.getParent();
         }
+        System.err.println("[SidebarView] ERROR: Could not find DesktopMainView in parent hierarchy");
     }
     
     /**

@@ -69,6 +69,15 @@ public class NotesDisplayPanel extends VBox {
      * Display a list of notes with fade-in animation and lazy loading
      */
     public void displayNotes(List<LocalCacheService.NoteData> notes) {
+        displayNotes(notes, null);
+    }
+    
+    /**
+     * Display a list of notes with fade-in animation and lazy loading
+     * @param notes List of notes to display
+     * @param periodInfo Optional period information (e.g., "Last 7 days", "Last 30 days")
+     */
+    public void displayNotes(List<LocalCacheService.NoteData> notes, String periodInfo) {
         stopDotsAnimation();
         notesContainer.getChildren().clear();
         statusLabel.setVisible(false);
@@ -86,7 +95,11 @@ public class NotesDisplayPanel extends VBox {
         displayedCount = 0;
         
         // Add count label inside notes container (will scroll with content)
-        countLabel = new Label(notes.size() + " note(s)");
+        String countText = notes.size() + " note(s)";
+        if (periodInfo != null && !periodInfo.isEmpty()) {
+            countText += " - " + periodInfo;
+        }
+        countLabel = new Label(countText);
         countLabel.getStyleClass().add("search-count");
         notesContainer.getChildren().add(countLabel);
         

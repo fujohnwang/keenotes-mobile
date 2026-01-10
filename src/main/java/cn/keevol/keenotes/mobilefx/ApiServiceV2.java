@@ -70,6 +70,10 @@ public class ApiServiceV2 {
     }
 
     public CompletableFuture<ApiResult> postNote(String content) {
+        return postNote(content, getDefaultChannel());
+    }
+    
+    public CompletableFuture<ApiResult> postNote(String content, String channel) {
         String endpointUrl = settings.getEndpointUrl();
         String token = settings.getToken();
 
@@ -93,8 +97,8 @@ public class ApiServiceV2 {
                 String encrypted = cryptoService.encrypt(content);
                 String ts = LocalDateTime.now().format(TS_FORMATTER);
                 String json = String.format(
-                    "{\"channel\":\"mobile\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":true}",
-                    escapeJson(encrypted), ts
+                    "{\"channel\":\"%s\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":true}",
+                    channel, escapeJson(encrypted), ts
                 );
 
                 Request request = new Request.Builder()
@@ -117,6 +121,27 @@ public class ApiServiceV2 {
                 return ApiResult.failure("Network error: " + e.getMessage());
             }
         });
+    }
+    
+    /**
+     * Get default channel name based on platform
+     * Format: desktop-{os} (e.g., desktop-mac, desktop-win, desktop-linux)
+     */
+    private String getDefaultChannel() {
+        String os = System.getProperty("os.name", "unknown").toLowerCase();
+        String osType;
+        
+        if (os.contains("mac") || os.contains("darwin")) {
+            osType = "mac";
+        } else if (os.contains("win")) {
+            osType = "win";
+        } else if (os.contains("nux") || os.contains("nix")) {
+            osType = "linux";
+        } else {
+            osType = "unknown";
+        }
+        
+        return "desktop-" + osType;
     }
 
     private String escapeJson(String text) {
