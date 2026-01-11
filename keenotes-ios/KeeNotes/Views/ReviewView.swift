@@ -210,11 +210,13 @@ struct NoteRow: View {
             }
             
             // Note content (full text with auto wrap)
+            // Long press to select text fragments
             Text(note.content)
                 .font(.body)
                 .foregroundColor(.primary)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)

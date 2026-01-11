@@ -971,3 +971,74 @@
     -fx-pref-width: 1200px;
     -fx-pref-height: 800px;
 }
+
+
+/* ==================== Note Card Content Area (Selectable Text) ==================== */
+.note-content-area {
+    -fx-cursor: hand;
+}
+
+.note-content-area .content {
+    -fx-cursor: hand;
+}
+
+.note-content-area .scroll-pane {
+    -fx-cursor: hand;
+}
+
+.note-content-area .scroll-pane .viewport {
+    -fx-cursor: hand;
+}
+
+.note-content-area .text {
+    -fx-cursor: hand;
+}
+
+
+/* ==================== Context Menu (Right-click Menu) ==================== */
+.context-menu {
+    -fx-background-color: -fx-surface;
+    -fx-background-radius: 8px;
+    -fx-border-color: -fx-border;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1px;
+    -fx-padding: 4px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 12, 0, 0, 4);
+}
+
+.context-menu .menu-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 6px;
+    -fx-padding: 8px 16px;
+    -fx-cursor: hand;
+}
+
+.context-menu .menu-item .label {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-size: 13px;
+}
+
+.context-menu .menu-item:hover {
+    -fx-background-color: rgba(0, 212, 255, 0.15);
+}
+
+.context-menu .menu-item:hover .label {
+    -fx-text-fill: -fx-primary;
+}
+
+.context-menu .menu-item:focused {
+    -fx-background-color: rgba(0, 212, 255, 0.15);
+}
+
+.context-menu .menu-item:focused .label {
+    -fx-text-fill: -fx-primary;
+}
+
+.context-menu .separator {
+    -fx-padding: 4px 8px;
+}
+
+.context-menu .separator .line {
+    -fx-border-color: -fx-border;
+    -fx-border-width: 1px 0 0 0;
+}

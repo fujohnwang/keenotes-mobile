@@ -39,7 +39,7 @@
 
         </LinearLayout>
 
-        <!-- Full content (always visible) -->
+        <!-- Full content (always visible, long press to select text) -->
         <TextView
             android:id="@+id/contentText"
             android:layout_width="match_parent"
@@ -47,7 +47,8 @@
             android:layout_marginTop="8dp"
             android:textSize="14sp"
             android:textColor="@color/text_primary"
-            android:lineSpacingExtra="2dp" />
+            android:lineSpacingExtra="2dp"
+            android:textIsSelectable="true" />
 
     </LinearLayout>
 
