@@ -4,28 +4,40 @@ import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.TextArea;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
 /**
  * Individual note card component for displaying a single note
- * Click to copy content to clipboard
+ * Click card to copy entire content to clipboard
+ * Select text with mouse, right-click or Ctrl+C to copy selection
  */
-public class NoteCardView extends VBox {
+public class NoteCardView extends StackPane {
     
     private final LocalCacheService.NoteData noteData;
     private final Label copiedPopup;
+    private final TextArea contentArea;
     
     public NoteCardView(LocalCacheService.NoteData noteData) {
         this.noteData = noteData;
         
         getStyleClass().add("search-result-card");
-        setPadding(new Insets(16));
-        setSpacing(8);
+        
+        // Main content container
+        VBox contentBox = new VBox(8);
+        contentBox.setPadding(new Insets(16));
         
         // Header row: date and channel
         HBox headerRow = new HBox(12);
@@ -44,34 +56,87 @@ public class NoteCardView extends VBox {
         
         headerRow.getChildren().addAll(dateLabel, channelLabel);
         
-        // Full content (always visible, no height limit)
-        Label contentLabel = new Label(noteData.content);
-        contentLabel.setWrapText(true);
-        contentLabel.setMaxWidth(Double.MAX_VALUE);
-        contentLabel.getStyleClass().add("note-content-full");
-        contentLabel.setStyle("-fx-text-fill: #E6EDF3; -fx-font-size: 14px; -fx-line-spacing: 2px;");
+        // Full content using TextArea (read-only, selectable)
+        contentArea = new TextArea(noteData.content);
+        contentArea.setEditable(false);
+        contentArea.setWrapText(true);
+        contentArea.getStyleClass().add("note-content-area");
+        contentArea.setStyle(
+            "-fx-control-inner-background: transparent; " +
+            "-fx-background-color: transparent; " +
+            "-fx-text-fill: #E6EDF3; " +
+            "-fx-font-size: 14px; " +
+            "-fx-border-width: 0; " +
+            "-fx-focus-color: transparent; " +
+            "-fx-faint-focus-color: transparent; " +
+            "-fx-cursor: hand;"
+        );
         
-        // Copied popup (initially hidden)
-        copiedPopup = new Label("✓ Copied to clipboard");
+        // Auto-resize height based on content
+        contentArea.setPrefRowCount(1);
+        contentArea.setMinHeight(30);
+        contentArea.setPrefHeight(USE_COMPUTED_SIZE);
+        
+        // Calculate and set height based on content
+        adjustTextAreaHeight();
+        contentArea.textProperty().addListener((obs, oldVal, newVal) -> adjustTextAreaHeight());
+        
+        // Custom context menu for copy
+        ContextMenu contextMenu = new ContextMenu();
+        contextMenu.getStyleClass().add("note-context-menu");
+        MenuItem copyItem = new MenuItem("Copy");
+        copyItem.setOnAction(e -> copySelectedOrAll());
+        MenuItem copyAllItem = new MenuItem("Copy All");
+        copyAllItem.setOnAction(e -> handleCopy());
+        contextMenu.getItems().addAll(copyItem, copyAllItem);
+        contentArea.setContextMenu(contextMenu);
+        
+        // Keyboard shortcut Ctrl+C / Cmd+C for copy
+        contentArea.setOnKeyPressed(e -> {
+            if (new KeyCodeCombination(KeyCode.C, KeyCombination.SHORTCUT_DOWN).match(e)) {
+                copySelectedOrAll();
+                e.consume();
+            }
+        });
+        
+        // Click on TextArea (when no text selected) to copy all
+        contentArea.setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 1) {
+                String selected = contentArea.getSelectedText();
+                if (selected == null || selected.isEmpty()) {
+                    handleCopy();
+                }
+            }
+        });
+        
+        contentBox.getChildren().addAll(headerRow, contentArea);
+        
+        // Copied popup (positioned at top-right)
+        copiedPopup = new Label("✓ Copied");
         copiedPopup.getStyleClass().add("copied-popup");
         copiedPopup.setStyle(
             "-fx-background-color: rgba(0, 212, 255, 0.2); " +
             "-fx-text-fill: #00D4FF; " +
-            "-fx-padding: 6 12; " +
+            "-fx-padding: 4 8; " +
             "-fx-background-radius: 4; " +
-            "-fx-font-size: 12px;"
+            "-fx-font-size: 11px;"
         );
         copiedPopup.setVisible(false);
-        copiedPopup.setManaged(false);
         copiedPopup.setOpacity(0);
+        StackPane.setAlignment(copiedPopup, Pos.TOP_RIGHT);
+        StackPane.setMargin(copiedPopup, new Insets(8, 8, 0, 0));
         
-        getChildren().addAll(headerRow, contentLabel, copiedPopup);
+        getChildren().addAll(contentBox, copiedPopup);
         
-        // Click to copy
-        setOnMouseClicked(e -> handleCopy());
+        // Click anywhere on card (outside TextArea) to copy all
+        setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY) {
+                handleCopy();
+            }
+        });
         setCursor(javafx.scene.Cursor.HAND);
         
-        // Hover effect
+        // Hover effect on card
         setOnMouseEntered(e -> {
             setStyle("-fx-background-color: rgba(255, 255, 255, 0.05); " +
                     "-fx-border-color: #30363D; " +
@@ -84,32 +149,75 @@ public class NoteCardView extends VBox {
         });
     }
     
+    /**
+     * Adjust TextArea height based on content
+     */
+    private void adjustTextAreaHeight() {
+        // Estimate line count based on content
+        String text = contentArea.getText();
+        int lineCount = text.split("\n", -1).length;
+        
+        // Also consider wrapped lines (rough estimate: 80 chars per line)
+        int estimatedWrappedLines = 0;
+        for (String line : text.split("\n", -1)) {
+            estimatedWrappedLines += Math.max(1, (int) Math.ceil(line.length() / 60.0));
+        }
+        
+        int totalLines = Math.max(lineCount, estimatedWrappedLines);
+        double lineHeight = 20; // Approximate line height
+        double padding = 16;
+        double height = Math.max(30, totalLines * lineHeight + padding);
+        
+        contentArea.setPrefHeight(height);
+        contentArea.setMaxHeight(height);
+    }
+    
+    /**
+     * Copy selected text, or all content if nothing selected
+     */
+    private void copySelectedOrAll() {
+        String selected = contentArea.getSelectedText();
+        if (selected != null && !selected.isEmpty()) {
+            // Copy selection
+            Clipboard clipboard = Clipboard.getSystemClipboard();
+            ClipboardContent content = new ClipboardContent();
+            content.putString(selected);
+            clipboard.setContent(content);
+            showCopiedPopup();
+        } else {
+            // Copy all
+            handleCopy();
+        }
+    }
+    
     private void handleCopy() {
-        // Copy to clipboard
+        // Copy entire content to clipboard
         Clipboard clipboard = Clipboard.getSystemClipboard();
         ClipboardContent content = new ClipboardContent();
         content.putString(noteData.content);
         clipboard.setContent(content);
         
+        showCopiedPopup();
+    }
+    
+    private void showCopiedPopup() {
         // Show popup with fade in/out animation
         copiedPopup.setVisible(true);
-        copiedPopup.setManaged(true);
         
         // Fade in
-        FadeTransition fadeIn = new FadeTransition(Duration.millis(200), copiedPopup);
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(150), copiedPopup);
         fadeIn.setFromValue(0);
         fadeIn.setToValue(1);
         fadeIn.play();
         
         // Fade out after delay
-        PauseTransition pause = new PauseTransition(Duration.millis(1500));
+        PauseTransition pause = new PauseTransition(Duration.millis(1200));
         pause.setOnFinished(e -> {
-            FadeTransition fadeOut = new FadeTransition(Duration.millis(200), copiedPopup);
+            FadeTransition fadeOut = new FadeTransition(Duration.millis(150), copiedPopup);
             fadeOut.setFromValue(1);
             fadeOut.setToValue(0);
             fadeOut.setOnFinished(ev -> {
                 copiedPopup.setVisible(false);
-                copiedPopup.setManaged(false);
             });
             fadeOut.play();
         });
