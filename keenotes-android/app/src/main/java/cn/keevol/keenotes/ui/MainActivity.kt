@@ -34,13 +34,10 @@ class MainActivity : AppCompatActivity() {
     
     /**
      * Navigate to Note tab
-     * Called from other fragments to navigate back to Note screen
+     * Simply trigger the bottom navigation click
      */
     fun navigateToNote() {
-        runOnUiThread {
-            // Use BottomNavigationView to switch to Note tab
-            binding.bottomNavigation.selectedItemId = R.id.noteFragment
-        }
+        binding.bottomNavigation.selectedItemId = R.id.noteFragment
     }
     
     private fun connectWebSocket() {

@@ -149,7 +149,7 @@ class ReviewFragment : Fragment() {
                 app.webSocketService.syncState
             ) { notes, syncState ->
                 Pair(notes, syncState)
-            }.collectLatest { (notes, syncState) ->
+            }.collect { (notes, syncState) ->
                 // Update syncing indicator in header
                 updateSyncingIndicator(syncState)
                 
@@ -170,7 +170,8 @@ class ReviewFragment : Fragment() {
                         (previousFirstNoteId != null && notes.first().id != previousFirstNoteId)
                     )
                     
-                    // Submit list - create a new list instance to ensure DiffUtil detects changes
+                    // Always submit the list to ensure updates
+                    notesAdapter.submitList(null) // Clear first
                     notesAdapter.submitList(ArrayList(notes)) {
                         // Callback after list is submitted and animations are complete
                         if (hasNewNotes && previousNotesCount > 0) {

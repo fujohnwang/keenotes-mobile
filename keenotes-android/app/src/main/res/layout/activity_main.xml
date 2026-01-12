@@ -20,6 +20,7 @@
     <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigation"
+        style="@style/Widget.KeeNotes.BottomNavigationView"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:paddingTop="4dp"
@@ -29,8 +30,6 @@
         android:background="@color/surface"
         app:menu="@menu/bottom_nav_menu"
         app:labelVisibilityMode="labeled"
-        app:itemIconTint="@color/bottom_nav_item_color"
-        app:itemTextColor="@color/bottom_nav_item_color"
         app:itemBackground="@drawable/bottom_nav_item_background"
         app:itemIconSize="20dp"
         app:itemPaddingTop="2dp"
