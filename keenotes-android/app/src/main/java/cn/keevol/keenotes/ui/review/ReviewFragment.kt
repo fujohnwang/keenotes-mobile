@@ -27,6 +27,9 @@ class ReviewFragment : Fragment() {
     private var currentPeriod = "7 days"
     private var notesJob: Job? = null
     private var dotsAnimationJob: Job? = null
+    private var newNotesIndicatorJob: Job? = null
+    private var previousNotesCount = 0
+    private var previousFirstNoteId: Long? = null
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -59,6 +62,9 @@ class ReviewFragment : Fragment() {
                     R.id.periodAll -> "All"
                     else -> "7 days"
                 }
+                // Reset tracking when period changes
+                previousNotesCount = 0
+                previousFirstNoteId = null
                 observeNotes(currentPeriod)
             }
         }
@@ -68,6 +74,13 @@ class ReviewFragment : Fragment() {
         binding.notesRecyclerView.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = notesAdapter
+            // Enable item animations (default animator should handle insertions)
+            itemAnimator?.apply {
+                addDuration = 300
+                changeDuration = 300
+                moveDuration = 300
+                removeDuration = 300
+            }
         }
     }
     
@@ -97,9 +110,22 @@ class ReviewFragment : Fragment() {
         binding.syncStatusText.setTextColor(color)
     }
     
+    private fun updateSyncingIndicator(syncState: WebSocketService.SyncState) {
+        when (syncState) {
+            WebSocketService.SyncState.SYNCING -> {
+                startDotsAnimation()
+                binding.syncingText.visibility = View.VISIBLE
+            }
+            else -> {
+                stopDotsAnimation()
+                binding.syncingText.visibility = View.GONE
+            }
+        }
+    }
+    
     /**
      * Observe notes from database using Flow - auto-updates when data changes
-     * Simplified logic: primarily rely on notes data, use syncState only for empty message
+     * Simplified logic: primarily rely on notes data, use syncState only for syncing indicator
      */
     private fun observeNotes(period: String) {
         val app = requireActivity().application as KeeNotesApp
@@ -129,6 +155,9 @@ class ReviewFragment : Fragment() {
             ) { notes, syncState ->
                 Pair(notes, syncState)
             }.collectLatest { (notes, syncState) ->
+                // Update syncing indicator in header
+                updateSyncingIndicator(syncState)
+                
                 if (notes.isEmpty()) {
                     // Hide loading, show empty state
                     binding.loadingText.visibility = View.GONE
@@ -138,26 +167,42 @@ class ReviewFragment : Fragment() {
                     // Show different message based on sync state
                     when (syncState) {
                         WebSocketService.SyncState.SYNCING -> {
-                            startDotsAnimation("Notes syncing")
+                            binding.emptyText.text = "Waiting for sync..."
                         }
                         WebSocketService.SyncState.IDLE -> {
-                            stopDotsAnimation()
                             binding.emptyText.text = "Waiting for sync..."
                         }
                         WebSocketService.SyncState.COMPLETED -> {
-                            stopDotsAnimation()
                             binding.emptyText.text = "No notes found for $period"
                         }
                     }
                     updateCountText(0, period)
+                    previousNotesCount = 0
+                    previousFirstNoteId = null
                 } else {
                     // Show notes list
-                    stopDotsAnimation()
                     binding.loadingText.visibility = View.GONE
                     binding.emptyText.visibility = View.GONE
                     binding.notesRecyclerView.visibility = View.VISIBLE
                     updateCountText(notes.size, period)
-                    notesAdapter.submitList(notes)
+                    
+                    // Check if new notes arrived at the top
+                    val hasNewNotes = notes.isNotEmpty() && (
+                        notes.size > previousNotesCount || 
+                        (previousFirstNoteId != null && notes.first().id != previousFirstNoteId)
+                    )
+                    
+                    // Submit list - create a new list instance to ensure DiffUtil detects changes
+                    notesAdapter.submitList(notes.toList()) {
+                        // Callback after list is submitted and animations are complete
+                        if (hasNewNotes && previousNotesCount > 0) {
+                            showNewNotesIndicator()
+                        }
+                    }
+                    
+                    // Update tracking variables
+                    previousNotesCount = notes.size
+                    previousFirstNoteId = notes.firstOrNull()?.id
                 }
             }
         }
@@ -174,13 +219,13 @@ class ReviewFragment : Fragment() {
         binding.countText.text = "$count note(s)$periodInfo"
     }
     
-    private fun startDotsAnimation(baseText: String) {
+    private fun startDotsAnimation() {
         stopDotsAnimation()
         dotsAnimationJob = lifecycleScope.launch {
             var dotCount = 0
             while (true) {
                 val dots = ".".repeat(dotCount)
-                binding.emptyText.text = "$baseText$dots"
+                binding.syncingText.text = "Syncing$dots"
                 dotCount = (dotCount + 1) % 4  // 0, 1, 2, 3, then back to 0
                 kotlinx.coroutines.delay(500)  // Update every 500ms
             }
@@ -192,10 +237,38 @@ class ReviewFragment : Fragment() {
         dotsAnimationJob = null
     }
     
+    private fun showNewNotesIndicator() {
+        // Cancel any existing indicator job
+        newNotesIndicatorJob?.cancel()
+        
+        // Show indicator with fade-in animation
+        binding.newNotesIndicator.apply {
+            alpha = 0f
+            visibility = View.VISIBLE
+            animate()
+                .alpha(1f)
+                .setDuration(200)
+                .start()
+        }
+        
+        // Hide after 2 seconds with fade-out animation
+        newNotesIndicatorJob = lifecycleScope.launch {
+            kotlinx.coroutines.delay(2000)
+            binding.newNotesIndicator.animate()
+                .alpha(0f)
+                .setDuration(200)
+                .withEndAction {
+                    binding.newNotesIndicator.visibility = View.GONE
+                }
+                .start()
+        }
+    }
+    
     override fun onDestroyView() {
         super.onDestroyView()
         notesJob?.cancel()
         stopDotsAnimation()
+        newNotesIndicatorJob?.cancel()
         _binding = null
     }
 }

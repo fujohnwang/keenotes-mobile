@@ -110,7 +110,9 @@
                             android:text="Send"
                             android:textColor="@color/background"
                             android:backgroundTint="@color/primary"
-                            android:paddingHorizontal="16dp"
+                            android:paddingHorizontal="20dp"
+                            android:gravity="center"
+                            android:textAllCaps="false"
                             app:cornerRadius="8dp" />
 
                     </LinearLayout>
