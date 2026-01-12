@@ -120,18 +120,7 @@ class DebugFragment : Fragment() {
     }
     
     private fun viewDebugLogs() {
-        val app = requireActivity().application as KeeNotesApp
-        lifecycleScope.launch {
-            val logs = app.database.debugLogDao().getRecentLogs(50)
-            val sb = StringBuilder("=== Debug Logs (${logs.size}) ===\n\n")
-            logs.forEach { log ->
-                val time = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
-                    .format(java.util.Date(log.timestamp))
-                sb.append("[$time] ${log.tag}\n${log.message}\n\n")
-            }
-            statusText.text = sb.toString()
-            Log.i("DebugFragment", "Loaded ${logs.size} debug logs")
-        }
+        findNavController().navigate(R.id.action_debug_to_logs)
     }
     
     private fun clearDebugLogs() {
