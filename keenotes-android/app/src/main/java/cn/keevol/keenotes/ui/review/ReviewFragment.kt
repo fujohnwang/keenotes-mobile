@@ -164,17 +164,10 @@ class ReviewFragment : Fragment() {
                     binding.emptyText.visibility = View.VISIBLE
                     binding.notesRecyclerView.visibility = View.GONE
                     
-                    // Show different message based on sync state
-                    when (syncState) {
-                        WebSocketService.SyncState.SYNCING -> {
-                            binding.emptyText.text = "Waiting for sync..."
-                        }
-                        WebSocketService.SyncState.IDLE -> {
-                            binding.emptyText.text = "Waiting for sync..."
-                        }
-                        WebSocketService.SyncState.COMPLETED -> {
-                            binding.emptyText.text = "No notes found for $period"
-                        }
+                    // Show message based on sync state
+                    binding.emptyText.text = when (syncState) {
+                        WebSocketService.SyncState.COMPLETED -> "No notes found for $period"
+                        else -> "No notes yet"
                     }
                     updateCountText(0, period)
                     previousNotesCount = 0

@@ -37,7 +37,11 @@ class MainActivity : AppCompatActivity() {
      * Called from other fragments to navigate back to Note screen
      */
     fun selectNoteTab() {
-        binding.bottomNavigation.selectedItemId = R.id.noteFragment
+        runOnUiThread {
+            if (!isFinishing && !isDestroyed) {
+                binding.bottomNavigation.selectedItemId = R.id.noteFragment
+            }
+        }
     }
     
     private fun connectWebSocket() {
