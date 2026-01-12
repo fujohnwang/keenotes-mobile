@@ -193,10 +193,13 @@ class SettingsFragment : Fragment() {
             }
             
             // Navigate back to Note fragment after showing status
-            // Use a short delay to let user see the success message
-            view?.postDelayed({
-                (activity as? MainActivity)?.navigateToNote()
-            }, 500)
+            // Use lifecycleScope to ensure navigation happens safely
+            lifecycleScope.launch {
+                kotlinx.coroutines.delay(500)
+                if (isAdded && activity != null) {
+                    (activity as? MainActivity)?.navigateToNote()
+                }
+            }
         }
     }
     
