@@ -6,6 +6,7 @@ import cn.keevol.keenotes.data.database.AppDatabase
 import cn.keevol.keenotes.data.repository.SettingsRepository
 import cn.keevol.keenotes.network.ApiService
 import cn.keevol.keenotes.network.WebSocketService
+import cn.keevol.keenotes.util.DebugLogger
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -34,6 +35,10 @@ class KeeNotesApp : Application() {
         // Initialize dependencies
         database = AppDatabase.getInstance(this)
         settingsRepository = SettingsRepository(this)
+        
+        // Initialize DebugLogger
+        DebugLogger.init(database.debugLogDao())
+        DebugLogger.log("KeeNotesApp", "Application started")
         
         cryptoService = CryptoService {
             runBlocking { settingsRepository.getEncryptionPassword().takeIf { it.isNotBlank() } }
