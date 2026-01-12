@@ -588,11 +588,34 @@ public class MainContentArea extends StackPane {
                 loadRecentNotes();
             }
             
-            fadeIn.play();
+            fadeIn.setOnFinished(ev -> {
+                // Focus search input after animation completes
+                if (targetPanel == searchModePanel && pendingSearchFocus) {
+                    pendingSearchFocus = false;
+                    searchInputPanel.requestSearchFocus();
+                }
+            });
+            
             fadeIn.play();
             
             currentPanel = targetPanel;
         });
         fadeOut.play();
+    }
+    
+    // Flag to track if search focus is pending
+    private boolean pendingSearchFocus = false;
+    
+    /**
+     * Focus on search input field
+     */
+    public void focusSearchInput() {
+        if (currentPanel == searchModePanel && searchInputPanel != null) {
+            // Already on search panel, focus immediately
+            searchInputPanel.requestSearchFocus();
+        } else {
+            // Set flag to focus after animation completes
+            pendingSearchFocus = true;
+        }
     }
 }
