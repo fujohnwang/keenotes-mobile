@@ -175,7 +175,7 @@ class SettingsFragment : Fragment() {
                 // Navigate back to Note fragment after 1 second delay
                 Handler(Looper.getMainLooper()).postDelayed({
                     if (isAdded && activity != null) {
-                        (requireActivity() as? MainActivity)?.selectNoteTab()
+                        (requireActivity() as? MainActivity)?.navigateToNote()
                     }
                 }, 1000)
                 
@@ -188,7 +188,7 @@ class SettingsFragment : Fragment() {
                 // Navigate back to Note fragment after 500ms delay
                 Handler(Looper.getMainLooper()).postDelayed({
                     if (isAdded && activity != null) {
-                        (requireActivity() as? MainActivity)?.selectNoteTab()
+                        (requireActivity() as? MainActivity)?.navigateToNote()
                     }
                 }, 500)
                 
@@ -197,16 +197,10 @@ class SettingsFragment : Fragment() {
                 binding.statusText.text = msg
                 binding.statusText.setTextColor(requireContext().getColor(R.color.success))
                 
-                // Still reconnect if configured (in case connection was lost)
-                app.webSocketService.disconnect()
-                if (endpoint.isNotBlank() && token.isNotBlank()) {
-                    app.webSocketService.connect()
-                }
-                
                 // Navigate back to Note fragment after 500ms delay
                 Handler(Looper.getMainLooper()).postDelayed({
                     if (isAdded && activity != null) {
-                        (requireActivity() as? MainActivity)?.selectNoteTab()
+                        (requireActivity() as? MainActivity)?.navigateToNote()
                     }
                 }, 500)
             }
