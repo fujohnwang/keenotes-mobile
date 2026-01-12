@@ -6,107 +6,6 @@
     android:layout_height="match_parent"
     android:background="@color/background">
 
-    <!-- Header -->
-    <LinearLayout
-        android:id="@+id/headerLayout"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="12dp"
-        android:background="@color/surface"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <!-- Search Field Container -->
-        <FrameLayout
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1">
-
-            <!-- Search Field -->
-            <EditText
-                android:id="@+id/searchField"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/bg_search_field"
-                android:hint="@string/hint_search"
-                android:textColorHint="@color/text_secondary"
-                android:textColor="@color/text_primary"
-                android:paddingStart="16dp"
-                android:paddingEnd="40dp"
-                android:inputType="text"
-                android:imeOptions="actionSearch"
-                android:maxLines="1" />
-
-            <!-- Clear button (X) -->
-            <ImageButton
-                android:id="@+id/searchClearButton"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_gravity="end|center_vertical"
-                android:layout_marginEnd="4dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:contentDescription="Clear search"
-                android:visibility="gone"
-                app:tint="@color/text_secondary" />
-
-        </FrameLayout>
-
-        <!-- Review Button -->
-        <LinearLayout
-            android:id="@+id/btnReview"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:padding="8dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_review"
-                app:tint="@color/text_secondary" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/nav_review"
-                android:textSize="10sp"
-                android:textColor="@color/text_secondary" />
-        </LinearLayout>
-
-        <!-- Settings Button -->
-        <LinearLayout
-            android:id="@+id/btnSettings"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:padding="8dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_settings"
-                app:tint="@color/text_secondary" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/nav_settings"
-                android:textSize="10sp"
-                android:textColor="@color/text_secondary" />
-        </LinearLayout>
-
-    </LinearLayout>
-
     <!-- Content -->
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/nav_host_fragment"
@@ -115,48 +14,8 @@
         android:layout_height="0dp"
         app:defaultNavHost="true"
         app:navGraph="@navigation/nav_graph"
-        app:layout_constraintTop_toBottomOf="@id/headerLayout"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toTopOf="@id/statusBar" />
-
-    <!-- Search Results Overlay -->
-    <FrameLayout
-        android:id="@+id/searchOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:background="@color/background"
-        android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/headerLayout"
-        app:layout_constraintBottom_toTopOf="@id/statusBar">
-
-        <!-- Loading indicator -->
-        <ProgressBar
-            android:id="@+id/searchLoading"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="gone" />
-
-        <!-- Empty state -->
-        <TextView
-            android:id="@+id/searchEmptyText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="No results found"
-            android:textColor="@color/text_secondary"
-            android:textSize="16sp"
-            android:visibility="gone" />
-
-        <!-- Search results list -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/searchResultsRecyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingVertical="8dp"
-            android:visibility="gone" />
-
-    </FrameLayout>
 
     <!-- Status Bar with dual channels -->
     <LinearLayout
@@ -167,7 +26,7 @@
         android:gravity="center_vertical"
         android:paddingHorizontal="16dp"
         android:background="@color/surface"
-        app:layout_constraintBottom_toBottomOf="parent">
+        app:layout_constraintBottom_toTopOf="@id/bottomNavigation">
 
         <!-- Send Channel (Left) -->
         <ImageView
@@ -229,5 +88,17 @@
             android:textColor="@color/text_secondary" />
 
     </LinearLayout>
+
+    <!-- Bottom Navigation -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/surface"
+        app:menu="@menu/bottom_nav_menu"
+        app:labelVisibilityMode="labeled"
+        app:itemIconTint="@color/text_secondary"
+        app:itemTextColor="@color/text_secondary"
+        app:layout_constraintBottom_toBottomOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

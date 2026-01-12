@@ -36,17 +36,10 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
-        setupHeader()
         setupCopyToClipboardToggle()
         setupSaveButton()
         setupCopyrightEasterEgg()
         loadSettings()
-    }
-    
-    private fun setupHeader() {
-        binding.btnBack.setOnClickListener {
-            findNavController().popBackStack()
-        }
     }
     
     private fun setupCopyToClipboardToggle() {
@@ -180,7 +173,7 @@ class SettingsFragment : Fragment() {
                 
                 // Navigate back to Note fragment after 1 second delay
                 Handler(Looper.getMainLooper()).postDelayed({
-                    findNavController().popBackStack()
+                    findNavController().navigate(R.id.noteFragment)
                 }, 1000)
                 
             } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
@@ -191,7 +184,7 @@ class SettingsFragment : Fragment() {
                 
                 // Navigate back to Note fragment after 500ms delay
                 Handler(Looper.getMainLooper()).postDelayed({
-                    findNavController().popBackStack()
+                    findNavController().navigate(R.id.noteFragment)
                 }, 500)
                 
             } else {
@@ -207,7 +200,7 @@ class SettingsFragment : Fragment() {
                 
                 // Navigate back to Note fragment after 500ms delay
                 Handler(Looper.getMainLooper()).postDelayed({
-                    findNavController().popBackStack()
+                    findNavController().navigate(R.id.noteFragment)
                 }, 500)
             }
         }

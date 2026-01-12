@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
@@ -41,16 +40,10 @@ class ReviewFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
-        setupHeader()
         setupPeriodSelector()
         setupRecyclerView()
+        setupSyncChannelStatus()
         observeNotes(currentPeriod)
-    }
-    
-    private fun setupHeader() {
-        binding.btnBack.setOnClickListener {
-            findNavController().popBackStack()
-        }
     }
     
     private fun setupPeriodSelector() {
@@ -76,6 +69,32 @@ class ReviewFragment : Fragment() {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = notesAdapter
         }
+    }
+    
+    private fun setupSyncChannelStatus() {
+        val app = requireActivity().application as KeeNotesApp
+        
+        // Observe WebSocket connection state
+        lifecycleScope.launch {
+            app.webSocketService.connectionState.collectLatest { state ->
+                updateSyncChannelStatus(state)
+            }
+        }
+    }
+    
+    private fun updateSyncChannelStatus(state: WebSocketService.ConnectionState) {
+        val (text, color) = when (state) {
+            WebSocketService.ConnectionState.CONNECTED -> 
+                "✓" to requireContext().getColor(R.color.success)
+            WebSocketService.ConnectionState.CONNECTING -> 
+                "..." to requireContext().getColor(R.color.warning)
+            WebSocketService.ConnectionState.DISCONNECTED -> 
+                "✗" to requireContext().getColor(R.color.text_secondary)
+        }
+        
+        binding.syncIndicator.setColorFilter(color)
+        binding.syncStatusText.text = text
+        binding.syncStatusText.setTextColor(color)
     }
     
     /**
@@ -130,18 +149,29 @@ class ReviewFragment : Fragment() {
                             binding.emptyText.text = "No notes found for $period"
                         }
                     }
-                    binding.countText.text = "0 note(s)"
+                    updateCountText(0, period)
                 } else {
                     // Show notes list
                     stopDotsAnimation()
                     binding.loadingText.visibility = View.GONE
                     binding.emptyText.visibility = View.GONE
                     binding.notesRecyclerView.visibility = View.VISIBLE
-                    binding.countText.text = "${notes.size} note(s)"
+                    updateCountText(notes.size, period)
                     notesAdapter.submitList(notes)
                 }
             }
         }
+    }
+    
+    private fun updateCountText(count: Int, period: String) {
+        val periodInfo = when (period) {
+            "7 days" -> " - Last 7 days"
+            "30 days" -> " - Last 30 days"
+            "90 days" -> " - Last 90 days"
+            "All" -> " - All"
+            else -> ""
+        }
+        binding.countText.text = "$count note(s)$periodInfo"
     }
     
     private fun startDotsAnimation(baseText: String) {
