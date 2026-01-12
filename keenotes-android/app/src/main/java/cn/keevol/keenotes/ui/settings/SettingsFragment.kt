@@ -1,9 +1,11 @@
 package cn.keevol.keenotes.ui.settings
 
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -59,7 +61,15 @@ class SettingsFragment : Fragment() {
     
     private fun setupSaveButton() {
         binding.btnSave.setOnClickListener {
+            hideKeyboard()
             saveSettings()
+        }
+    }
+    
+    private fun hideKeyboard() {
+        val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        view?.windowToken?.let { token ->
+            imm.hideSoftInputFromWindow(token, 0)
         }
     }
     
