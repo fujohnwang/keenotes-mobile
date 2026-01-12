@@ -67,15 +67,25 @@ class DebugFragment : Fragment() {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 24, 24, 24)
             
-            // Status text
+            // Status text in a ScrollView
+            val scrollView = android.widget.ScrollView(requireContext()).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    400  // Fixed height for scrollable area
+                )
+            }
             statusText = TextView(requireContext()).apply {
-                textSize = 14f
+                textSize = 12f
                 setTextColor(requireContext().getColor(R.color.text_secondary))
                 setPadding(0, 0, 0, 16)
+                setTextIsSelectable(true)
             }
-            addView(statusText)
+            scrollView.addView(statusText)
+            addView(scrollView)
             
             // Debug buttons
+            addView(createDebugButton("View Debug Logs") { viewDebugLogs() })
+            addView(createDebugButton("Clear Debug Logs") { clearDebugLogs() })
             addView(createDebugButton("Check DB Count") { checkDbCount() })
             addView(createDebugButton("Dump All Notes") { dumpAllNotes() })
             addView(createDebugButton("Reset Sync State") { resetSyncState() })
@@ -106,6 +116,30 @@ class DebugFragment : Fragment() {
             statusText.text = msg
             Log.i("DebugFragment", msg)
             Toast.makeText(requireContext(), "Count: $count", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun viewDebugLogs() {
+        val app = requireActivity().application as KeeNotesApp
+        lifecycleScope.launch {
+            val logs = app.database.debugLogDao().getRecentLogs(50)
+            val sb = StringBuilder("=== Debug Logs (${logs.size}) ===\n\n")
+            logs.forEach { log ->
+                val time = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
+                    .format(java.util.Date(log.timestamp))
+                sb.append("[$time] ${log.tag}\n${log.message}\n\n")
+            }
+            statusText.text = sb.toString()
+            Log.i("DebugFragment", "Loaded ${logs.size} debug logs")
+        }
+    }
+    
+    private fun clearDebugLogs() {
+        val app = requireActivity().application as KeeNotesApp
+        lifecycleScope.launch {
+            app.database.debugLogDao().clearAll()
+            statusText.text = "Debug logs cleared"
+            Toast.makeText(requireContext(), "Logs cleared", Toast.LENGTH_SHORT).show()
         }
     }
     

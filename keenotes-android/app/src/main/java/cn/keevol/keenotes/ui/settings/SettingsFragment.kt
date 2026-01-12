@@ -13,6 +13,7 @@ import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentSettingsBinding
 import cn.keevol.keenotes.ui.MainActivity
+import cn.keevol.keenotes.util.DebugLogger
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -114,11 +115,15 @@ class SettingsFragment : Fragment() {
     }
     
     private fun saveSettings() {
+        DebugLogger.log("Settings", "saveSettings() called")
+        
         val endpoint = binding.endpointInput.text.toString().trim()
         val token = binding.tokenInput.text.toString()
         val password = binding.passwordInput.text.toString()
         val confirmPassword = binding.passwordConfirmInput.text.toString()
         // copyToClipboard is auto-saved, no need to save here
+        
+        DebugLogger.log("Settings", "endpoint=${endpoint.take(30)}..., token=${token.take(10)}..., hasPassword=${password.isNotEmpty()}")
         
         // Validate password match
         if (password != confirmPassword) {
@@ -127,17 +132,22 @@ class SettingsFragment : Fragment() {
             binding.passwordInput.requestFocus()
             binding.statusText.text = "Passwords do not match"
             binding.statusText.setTextColor(requireContext().getColor(R.color.error))
+            DebugLogger.log("Settings", "Password mismatch, returning")
             return
         }
         
         val app = requireActivity().application as KeeNotesApp
         
         lifecycleScope.launch {
+            DebugLogger.log("Settings", "Inside lifecycleScope.launch")
+            
             // Get old settings to detect changes
             val oldEndpoint = app.settingsRepository.endpointUrl.first()
             val oldToken = app.settingsRepository.token.first()
             val oldPassword = app.settingsRepository.encryptionPassword.first()
             val wasConfigured = oldEndpoint.isNotBlank() && oldToken.isNotBlank()
+            
+            DebugLogger.log("Settings", "wasConfigured=$wasConfigured")
             
             // Check if configuration changed
             val endpointChanged = oldEndpoint != endpoint
@@ -145,9 +155,11 @@ class SettingsFragment : Fragment() {
             val passwordChanged = oldPassword != password
             val configurationChanged = endpointChanged || tokenChanged || passwordChanged
             
+            DebugLogger.log("Settings", "configurationChanged=$configurationChanged (endpoint=$endpointChanged, token=$tokenChanged, password=$passwordChanged)")
+            
             // Save new settings
             app.settingsRepository.saveSettings(endpoint, token, password)
-            // copyToClipboard is auto-saved on toggle change
+            DebugLogger.log("Settings", "Settings saved to repository")
             
             val msg = if (password.isNotEmpty()) {
                 "Settings saved ✓ (E2E encryption enabled)"
@@ -159,6 +171,7 @@ class SettingsFragment : Fragment() {
             binding.statusText.setTextColor(requireContext().getColor(R.color.success))
             
             if (configurationChanged && wasConfigured) {
+                DebugLogger.log("Settings", "Branch: configurationChanged && wasConfigured")
                 // Configuration changed: need to reset state and reconnect
                 binding.statusText.text = "Configuration changed, reconnecting..."
                 
@@ -183,31 +196,46 @@ class SettingsFragment : Fragment() {
                 }
                 
             } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
+                DebugLogger.log("Settings", "Branch: First time configuration")
                 // First time configuration
                 binding.statusText.text = msg
+                DebugLogger.log("Settings", "About to call webSocketService.connect()")
                 app.webSocketService.connect()
+                DebugLogger.log("Settings", "webSocketService.connect() called")
                 
             } else {
+                DebugLogger.log("Settings", "Branch: No critical configuration change")
                 // No critical configuration change
                 binding.statusText.text = msg
             }
             
             // Navigate back to Note fragment after showing status
-            // Use main thread handler to ensure UI operations are safe
+            DebugLogger.log("Settings", "About to delay 500ms before navigation")
             kotlinx.coroutines.delay(500)
+            DebugLogger.log("Settings", "Delay complete, isAdded=$isAdded, activity=${activity != null}")
+            
             if (isAdded && activity != null) {
+                DebugLogger.log("Settings", "Calling runOnUiThread for navigation")
                 activity?.runOnUiThread {
                     try {
+                        DebugLogger.log("Settings", "Inside runOnUiThread, about to navigate")
                         // Directly set the selected item on bottom navigation
                         (activity as? MainActivity)?.let { mainActivity ->
-                            mainActivity.findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNavigation)?.selectedItemId = R.id.noteFragment
+                            val bottomNav = mainActivity.findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNavigation)
+                            DebugLogger.log("Settings", "bottomNav found: ${bottomNav != null}")
+                            bottomNav?.selectedItemId = R.id.noteFragment
+                            DebugLogger.log("Settings", "selectedItemId set to noteFragment")
                         }
                     } catch (e: Exception) {
-                        android.util.Log.e("SettingsFragment", "Navigation failed: ${e.message}", e)
+                        DebugLogger.error("Settings", "Navigation failed", e)
                     }
                 }
+                DebugLogger.log("Settings", "runOnUiThread posted")
+            } else {
+                DebugLogger.log("Settings", "Skipped navigation: isAdded=$isAdded, activity=${activity != null}")
             }
         }
+        DebugLogger.log("Settings", "saveSettings() returning (coroutine launched)")
     }
     
     override fun onDestroyView() {
