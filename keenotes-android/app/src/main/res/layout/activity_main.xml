@@ -22,17 +22,16 @@
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="64dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
         android:background="@color/surface"
         app:menu="@menu/bottom_nav_menu"
         app:labelVisibilityMode="labeled"
-        app:itemIconTint="@color/text_secondary"
-        app:itemTextColor="@color/text_secondary"
+        app:itemIconTint="@color/bottom_nav_item_color"
+        app:itemTextColor="@color/bottom_nav_item_color"
         app:itemIconSize="24dp"
-        app:itemPaddingTop="4dp"
-        app:itemPaddingBottom="4dp"
+        app:itemTextAppearanceActive="@style/BottomNavTextActive"
+        app:itemTextAppearanceInactive="@style/BottomNavTextInactive"
         app:layout_constraintBottom_toBottomOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

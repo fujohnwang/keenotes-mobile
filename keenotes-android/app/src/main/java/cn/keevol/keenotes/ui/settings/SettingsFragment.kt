@@ -12,6 +12,7 @@ import androidx.navigation.fragment.findNavController
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentSettingsBinding
+import cn.keevol.keenotes.ui.MainActivity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -173,7 +174,7 @@ class SettingsFragment : Fragment() {
                 
                 // Navigate back to Note fragment after 1 second delay
                 Handler(Looper.getMainLooper()).postDelayed({
-                    findNavController().navigate(R.id.noteFragment)
+                    (requireActivity() as? MainActivity)?.selectNoteTab()
                 }, 1000)
                 
             } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
@@ -184,7 +185,7 @@ class SettingsFragment : Fragment() {
                 
                 // Navigate back to Note fragment after 500ms delay
                 Handler(Looper.getMainLooper()).postDelayed({
-                    findNavController().navigate(R.id.noteFragment)
+                    (requireActivity() as? MainActivity)?.selectNoteTab()
                 }, 500)
                 
             } else {
@@ -200,7 +201,7 @@ class SettingsFragment : Fragment() {
                 
                 // Navigate back to Note fragment after 500ms delay
                 Handler(Looper.getMainLooper()).postDelayed({
-                    findNavController().navigate(R.id.noteFragment)
+                    (requireActivity() as? MainActivity)?.selectNoteTab()
                 }, 500)
             }
         }

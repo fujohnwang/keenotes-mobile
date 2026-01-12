@@ -32,6 +32,14 @@ class MainActivity : AppCompatActivity() {
         binding.bottomNavigation.setupWithNavController(navController)
     }
     
+    /**
+     * Select Note tab in bottom navigation
+     * Called from other fragments to navigate back to Note screen
+     */
+    fun selectNoteTab() {
+        binding.bottomNavigation.selectedItemId = R.id.noteFragment
+    }
+    
     private fun connectWebSocket() {
         val app = application as KeeNotesApp
         

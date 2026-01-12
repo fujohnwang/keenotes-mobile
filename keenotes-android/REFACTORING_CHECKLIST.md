@@ -135,12 +135,20 @@
 
 ## Phase 5: Settings 界面调整
 
-- [ ] 5.1 更新 SettingsFragment 标题
+- [x] 5.1 更新 SettingsFragment 标题
   - 修改标题为 "KeeNotes Settings"
   - 可能需要更新 `strings.xml` 或直接在代码中设置
 
-- [ ] 5.2 测试 Settings 界面
+- [x] 5.2 修复 Settings 保存后应用退出问题
+  - 问题：使用 `findNavController().navigate(R.id.noteFragment)` 导致导航失败
+  - 解决：替换为 `(requireActivity() as? MainActivity)?.selectNoteTab()`
+  - 在 MainActivity 中添加 `selectNoteTab()` 方法
+  - 在 SettingsFragment 中替换所有 navigate 调用（共3处）
+
+- [x] 5.3 测试 Settings 界面
   - 验证标题显示正确
+  - 验证保存后正确返回 Note 界面
+  - 验证底部导航栏正确高亮
   - 验证功能正常
 
 ## Phase 6: 清理和优化
