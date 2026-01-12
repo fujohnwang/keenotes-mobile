@@ -15,27 +15,116 @@
         app:defaultNavHost="true"
         app:navGraph="@navigation/nav_graph"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavigation" />
+        app:layout_constraintBottom_toTopOf="@id/customTabBar" />
 
-    <!-- Bottom Navigation -->
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottomNavigation"
-        style="@style/Widget.KeeNotes.BottomNavigationView"
+    <!-- Custom iOS-style Tab Bar -->
+    <LinearLayout
+        android:id="@+id/customTabBar"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
+        android:layout_height="60dp"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="8dp"
         android:background="@color/surface"
-        app:menu="@menu/bottom_nav_menu"
-        app:labelVisibilityMode="labeled"
-        app:itemBackground="@drawable/bottom_nav_item_background"
-        app:itemIconSize="20dp"
-        app:itemPaddingTop="0dp"
-        app:itemPaddingBottom="0dp"
-        app:itemTextAppearanceActive="@style/BottomNavTextActive"
-        app:itemTextAppearanceInactive="@style/BottomNavTextInactive"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <!-- Note Tab -->
+        <LinearLayout
+            android:id="@+id/tabNote"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="4dp"
+            android:background="@drawable/tab_capsule_background"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:id="@+id/tabNoteIcon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_note"
+                app:tint="@color/text_secondary" />
+
+            <TextView
+                android:id="@+id/tabNoteText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Note"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary" />
+
+        </LinearLayout>
+
+        <!-- Review Tab -->
+        <LinearLayout
+            android:id="@+id/tabReview"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="4dp"
+            android:background="@drawable/tab_capsule_background"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:id="@+id/tabReviewIcon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_review"
+                app:tint="@color/text_secondary" />
+
+            <TextView
+                android:id="@+id/tabReviewText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Review"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary" />
+
+        </LinearLayout>
+
+        <!-- Settings Tab -->
+        <LinearLayout
+            android:id="@+id/tabSettings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="4dp"
+            android:background="@drawable/tab_capsule_background"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:id="@+id/tabSettingsIcon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_settings"
+                app:tint="@color/text_secondary" />
+
+            <TextView
+                android:id="@+id/tabSettingsText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Settings"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
