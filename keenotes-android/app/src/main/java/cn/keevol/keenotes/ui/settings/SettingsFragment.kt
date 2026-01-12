@@ -1,8 +1,6 @@
 package cn.keevol.keenotes.ui.settings
 
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -147,10 +145,12 @@ class SettingsFragment : Fragment() {
                 "Settings saved ✓"
             }
             
+            // Show success message
+            binding.statusText.setTextColor(requireContext().getColor(R.color.success))
+            
             if (configurationChanged && wasConfigured) {
                 // Configuration changed: need to reset state and reconnect
                 binding.statusText.text = "Configuration changed, reconnecting..."
-                binding.statusText.setTextColor(requireContext().getColor(R.color.success))
                 
                 // 1. Disconnect old WebSocket and reset internal state
                 app.webSocketService.disconnect()
@@ -172,32 +172,21 @@ class SettingsFragment : Fragment() {
                     binding.statusText.text = msg
                 }
                 
-                // Navigate back to Note fragment after 1 second delay
-                Handler(Looper.getMainLooper()).postDelayed({
-                    (activity as? MainActivity)?.navigateToNote()
-                }, 1000)
-                
             } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
                 // First time configuration
                 binding.statusText.text = msg
-                binding.statusText.setTextColor(requireContext().getColor(R.color.success))
                 app.webSocketService.connect()
-                
-                // Navigate back to Note fragment after 500ms delay
-                Handler(Looper.getMainLooper()).postDelayed({
-                    (activity as? MainActivity)?.navigateToNote()
-                }, 500)
                 
             } else {
                 // No critical configuration change
                 binding.statusText.text = msg
-                binding.statusText.setTextColor(requireContext().getColor(R.color.success))
-                
-                // Navigate back to Note fragment after 500ms delay
-                Handler(Looper.getMainLooper()).postDelayed({
-                    (activity as? MainActivity)?.navigateToNote()
-                }, 500)
             }
+            
+            // Navigate back to Note fragment after showing status
+            // Use a short delay to let user see the success message
+            view?.postDelayed({
+                (activity as? MainActivity)?.navigateToNote()
+            }, 500)
         }
     }
     

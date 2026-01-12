@@ -102,18 +102,43 @@
                             android:textStyle="bold"
                             android:textColor="@color/warning" />
 
-                        <!-- Send button (right) - shows "Sending..." when posting -->
-                        <Button
+                        <!-- Send button (right) - shows icon + text, or spinner + "Sending..." when posting -->
+                        <LinearLayout
                             android:id="@+id/btnSend"
                             android:layout_width="wrap_content"
                             android:layout_height="36dp"
-                            android:text="Send"
-                            android:textColor="@color/background"
-                            android:backgroundTint="@color/primary"
-                            android:paddingHorizontal="20dp"
+                            android:orientation="horizontal"
                             android:gravity="center"
-                            android:textAllCaps="false"
-                            app:cornerRadius="8dp" />
+                            android:paddingHorizontal="16dp"
+                            android:background="@drawable/bg_send_button"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ProgressBar
+                                android:id="@+id/sendProgress"
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:indeterminateTint="@color/background"
+                                android:visibility="gone" />
+
+                            <ImageView
+                                android:id="@+id/sendIcon"
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:src="@drawable/ic_send"
+                                app:tint="@color/background" />
+
+                            <TextView
+                                android:id="@+id/sendText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:text="Send"
+                                android:textSize="14sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/background" />
+
+                        </LinearLayout>
 
                     </LinearLayout>
 
