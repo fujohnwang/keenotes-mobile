@@ -47,8 +47,7 @@
                 android:id="@+id/tabNoteIcon"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
-                android:src="@drawable/ic_note"
-                app:tint="@color/text_secondary" />
+                android:src="@drawable/ic_note" />
 
             <TextView
                 android:id="@+id/tabNoteText"
@@ -79,8 +78,7 @@
                 android:id="@+id/tabReviewIcon"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
-                android:src="@drawable/ic_review"
-                app:tint="@color/text_secondary" />
+                android:src="@drawable/ic_review" />
 
             <TextView
                 android:id="@+id/tabReviewText"
@@ -111,8 +109,7 @@
                 android:id="@+id/tabSettingsIcon"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
-                android:src="@drawable/ic_settings"
-                app:tint="@color/text_secondary" />
+                android:src="@drawable/ic_settings" />
 
             <TextView
                 android:id="@+id/tabSettingsText"

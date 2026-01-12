@@ -60,6 +60,11 @@ class MainActivity : AppCompatActivity() {
         tabReview = binding.tabReview
         tabSettings = binding.tabSettings
         
+        // Set initial colors for all icons
+        binding.tabNoteIcon.setColorFilter(unselectedColor)
+        binding.tabReviewIcon.setColorFilter(unselectedColor)
+        binding.tabSettingsIcon.setColorFilter(unselectedColor)
+        
         tabNote.setOnClickListener {
             navController.navigate(R.id.noteFragment)
         }
