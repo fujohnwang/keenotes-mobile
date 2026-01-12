@@ -174,7 +174,9 @@ class SettingsFragment : Fragment() {
                 
                 // Navigate back to Note fragment after 1 second delay
                 Handler(Looper.getMainLooper()).postDelayed({
-                    (requireActivity() as? MainActivity)?.selectNoteTab()
+                    if (isAdded && activity != null) {
+                        (requireActivity() as? MainActivity)?.selectNoteTab()
+                    }
                 }, 1000)
                 
             } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
@@ -185,7 +187,9 @@ class SettingsFragment : Fragment() {
                 
                 // Navigate back to Note fragment after 500ms delay
                 Handler(Looper.getMainLooper()).postDelayed({
-                    (requireActivity() as? MainActivity)?.selectNoteTab()
+                    if (isAdded && activity != null) {
+                        (requireActivity() as? MainActivity)?.selectNoteTab()
+                    }
                 }, 500)
                 
             } else {
@@ -201,7 +205,9 @@ class SettingsFragment : Fragment() {
                 
                 // Navigate back to Note fragment after 500ms delay
                 Handler(Looper.getMainLooper()).postDelayed({
-                    (requireActivity() as? MainActivity)?.selectNoteTab()
+                    if (isAdded && activity != null) {
+                        (requireActivity() as? MainActivity)?.selectNoteTab()
+                    }
                 }, 500)
             }
         }
