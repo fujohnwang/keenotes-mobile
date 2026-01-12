@@ -47,8 +47,13 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
             // Full content (always visible, no truncation)
             binding.contentText.text = note.content
             
-            // Click to copy
+            // Click on card to copy (works on header and margins)
             binding.root.setOnClickListener {
+                copyToClipboard(note.content)
+            }
+            
+            // Click on content text to copy (when not selecting text)
+            binding.contentText.setOnClickListener {
                 copyToClipboard(note.content)
             }
         }
