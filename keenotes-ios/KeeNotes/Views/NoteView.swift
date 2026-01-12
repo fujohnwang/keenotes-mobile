@@ -107,6 +107,14 @@ struct NoteView: View {
             .navigationTitle("KeeNotes")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Search button (right)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: SearchView().environmentObject(appState)) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 17))
+                    }
+                }
+                
                 ToolbarItemGroup(placement: .keyboard) {
                     // Keyboard hint
                     Text("Tap outside or")
