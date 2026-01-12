@@ -175,6 +175,8 @@ class ReviewFragment : Fragment() {
                     notesAdapter.submitList(notes.toMutableList()) {
                         // Callback after list is submitted and animations are complete
                         if (hasNewNotes && previousNotesCount > 0) {
+                            // Scroll to top to show new notes
+                            binding.notesRecyclerView.scrollToPosition(0)
                             showNewNotesIndicator()
                         }
                     }
