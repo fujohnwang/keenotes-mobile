@@ -15,90 +15,24 @@
         app:defaultNavHost="true"
         app:navGraph="@navigation/nav_graph"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/statusBar" />
-
-    <!-- Status Bar with dual channels -->
-    <LinearLayout
-        android:id="@+id/statusBar"
-        android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="16dp"
-        android:background="@color/surface"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavigation">
-
-        <!-- Send Channel (Left) -->
-        <ImageView
-            android:id="@+id/sendIndicator"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
-            android:src="@drawable/ic_circle"
-            app:tint="@color/warning" />
-
-        <TextView
-            android:id="@+id/sendLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:text="Send Channel:"
-            android:textSize="11sp"
-            android:textColor="@color/text_secondary" />
-
-        <TextView
-            android:id="@+id/sendStatusText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:text="Not Configured"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:textColor="@color/warning" />
-
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
-
-        <!-- Sync Channel (Right) -->
-        <ImageView
-            android:id="@+id/syncIndicator"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
-            android:src="@drawable/ic_circle"
-            app:tint="@color/text_secondary" />
-
-        <TextView
-            android:id="@+id/syncLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:text="Sync Channel:"
-            android:textSize="11sp"
-            android:textColor="@color/text_secondary" />
-
-        <TextView
-            android:id="@+id/syncStatusText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:text="Disconnected"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_secondary" />
-
-    </LinearLayout>
+        app:layout_constraintBottom_toTopOf="@id/bottomNavigation" />
 
     <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="wrap_content"
+        android:minHeight="64dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
         android:background="@color/surface"
         app:menu="@menu/bottom_nav_menu"
         app:labelVisibilityMode="labeled"
         app:itemIconTint="@color/text_secondary"
         app:itemTextColor="@color/text_secondary"
+        app:itemIconSize="24dp"
+        app:itemPaddingTop="4dp"
+        app:itemPaddingBottom="4dp"
         app:layout_constraintBottom_toBottomOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

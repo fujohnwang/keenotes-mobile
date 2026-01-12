@@ -77,7 +77,7 @@
 
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
-        <!-- Header row: Notes count (left) + Sync Channel status (right) -->
+        <!-- Header row: Notes count with period info + Sync Channel status (same line) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -88,11 +88,15 @@
             <!-- Notes count with period info -->
             <TextView
                 android:id="@+id/countText"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
             <!-- Sync Channel status -->
             <ImageView
