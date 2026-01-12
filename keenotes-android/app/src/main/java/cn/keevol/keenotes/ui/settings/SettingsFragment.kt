@@ -193,11 +193,18 @@ class SettingsFragment : Fragment() {
             }
             
             // Navigate back to Note fragment after showing status
-            // Use lifecycleScope to ensure navigation happens safely
-            lifecycleScope.launch {
-                kotlinx.coroutines.delay(500)
-                if (isAdded && activity != null) {
-                    (activity as? MainActivity)?.navigateToNote()
+            // Use main thread handler to ensure UI operations are safe
+            kotlinx.coroutines.delay(500)
+            if (isAdded && activity != null) {
+                activity?.runOnUiThread {
+                    try {
+                        // Directly set the selected item on bottom navigation
+                        (activity as? MainActivity)?.let { mainActivity ->
+                            mainActivity.findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNavigation)?.selectedItemId = R.id.noteFragment
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("SettingsFragment", "Navigation failed: ${e.message}", e)
+                    }
                 }
             }
         }

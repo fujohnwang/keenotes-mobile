@@ -116,15 +116,15 @@
 
                             <ProgressBar
                                 android:id="@+id/sendProgress"
-                                android:layout_width="14dp"
-                                android:layout_height="14dp"
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
                                 android:indeterminateTint="@color/background"
                                 android:visibility="gone" />
 
                             <ImageView
                                 android:id="@+id/sendIcon"
-                                android:layout_width="14dp"
-                                android:layout_height="14dp"
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
                                 android:src="@drawable/ic_send"
                                 app:tint="@color/background" />
 
