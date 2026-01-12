@@ -37,11 +37,9 @@ class MainActivity : AppCompatActivity() {
      * Called from other fragments to navigate back to Note screen
      */
     fun navigateToNote() {
-        val navHostFragment = supportFragmentManager
-            .findFragmentById(R.id.nav_host_fragment) as? NavHostFragment
-        navHostFragment?.navController?.let { navController ->
-            // Pop back to note fragment (the start destination)
-            navController.popBackStack(R.id.noteFragment, false)
+        runOnUiThread {
+            // Use BottomNavigationView to switch to Note tab
+            binding.bottomNavigation.selectedItemId = R.id.noteFragment
         }
     }
     

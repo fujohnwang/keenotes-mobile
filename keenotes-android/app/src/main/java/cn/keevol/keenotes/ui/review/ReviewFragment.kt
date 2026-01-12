@@ -130,11 +130,6 @@ class ReviewFragment : Fragment() {
     private fun observeNotes(period: String) {
         val app = requireActivity().application as KeeNotesApp
         
-        // Show initial loading state
-        binding.loadingText.visibility = View.VISIBLE
-        binding.notesRecyclerView.visibility = View.GONE
-        binding.emptyText.visibility = View.GONE
-        
         // Cancel previous observation
         notesJob?.cancel()
         
@@ -159,23 +154,13 @@ class ReviewFragment : Fragment() {
                 updateSyncingIndicator(syncState)
                 
                 if (notes.isEmpty()) {
-                    // Hide loading, show empty state
-                    binding.loadingText.visibility = View.GONE
-                    binding.emptyText.visibility = View.VISIBLE
+                    // Hide notes list when empty
                     binding.notesRecyclerView.visibility = View.GONE
-                    
-                    // Show message based on sync state
-                    binding.emptyText.text = when (syncState) {
-                        WebSocketService.SyncState.COMPLETED -> "No notes found for $period"
-                        else -> "No notes yet"
-                    }
                     updateCountText(0, period)
                     previousNotesCount = 0
                     previousFirstNoteId = null
                 } else {
                     // Show notes list
-                    binding.loadingText.visibility = View.GONE
-                    binding.emptyText.visibility = View.GONE
                     binding.notesRecyclerView.visibility = View.VISIBLE
                     updateCountText(notes.size, period)
                     
@@ -186,7 +171,7 @@ class ReviewFragment : Fragment() {
                     )
                     
                     // Submit list - create a new list instance to ensure DiffUtil detects changes
-                    notesAdapter.submitList(notes.toList()) {
+                    notesAdapter.submitList(ArrayList(notes)) {
                         // Callback after list is submitted and animations are complete
                         if (hasNewNotes && previousNotesCount > 0) {
                             showNewNotesIndicator()
