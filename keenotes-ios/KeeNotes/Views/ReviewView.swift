@@ -14,72 +14,100 @@ struct ReviewView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Search bar (moved to top)
-                SearchBar(text: $searchText)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
-                
-                // Period selector
-                Picker("Period", selection: $selectedPeriod) {
-                    ForEach(0..<periods.count, id: \.self) { index in
-                        Text(periods[index]).tag(index)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                
-                // Notes list
-                if isLoading {
-                    Spacer()
-                    ProgressView("Loading...")
-                    Spacer()
-                } else if appState.webSocketService.syncStatus == .syncing && notes.isEmpty {
-                    // Syncing state - show when actively syncing and no local notes yet
-                    Spacer()
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                        Text("Syncing notes...")
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                } else if notes.isEmpty {
-                    Spacer()
-                    VStack(spacing: 12) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 48))
-                            .foregroundColor(.gray)
-                        Text(searchText.isEmpty ? "No notes yet" : "No results found")
-                            .foregroundColor(.gray)
-                    }
-                    Spacer()
-                } else {
-                    List {
-                        ForEach(notes) { note in
-                            NoteRow(note: note)
-                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
+            ZStack {
+                VStack(spacing: 0) {
+                    // Search bar (moved to top)
+                    SearchBar(text: $searchText)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
+                    
+                    // Period selector
+                    Picker("Period", selection: $selectedPeriod) {
+                        ForEach(0..<periods.count, id: \.self) { index in
+                            Text(periods[index]).tag(index)
                         }
                     }
-                    .listStyle(.plain)
-                    .refreshable {
-                        await loadNotes()
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    
+                    // Header row: Notes count (left) + Sync Channel status (right)
+                    HStack {
+                        // Notes count with period info (left)
+                        Text(notesCountText)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        // Sync Channel status (right)
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(syncChannelColor)
+                                .frame(width: 8, height: 8)
+                            
+                            Text("Sync Channel:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text(syncChannelText)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(syncChannelColor)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    
+                    // Notes list
+                    if isLoading {
+                        Spacer()
+                        ProgressView("Loading...")
+                        Spacer()
+                    } else if notes.isEmpty {
+                        Spacer()
+                        VStack(spacing: 12) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 48))
+                                .foregroundColor(.gray)
+                            Text(searchText.isEmpty ? "No notes yet" : "No results found")
+                                .foregroundColor(.gray)
+                        }
+                        Spacer()
+                    } else {
+                        List {
+                            ForEach(notes) { note in
+                                NoteRow(note: note)
+                                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                            }
+                        }
+                        .listStyle(.plain)
+                        .refreshable {
+                            await loadNotes()
+                        }
                     }
                 }
+                
+                // Centered sync spinner (transient, shown during sync)
+                if appState.webSocketService.syncStatus == .syncing {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        Text("Syncing...")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                    }
+                    .padding(24)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(16)
+                }
             }
-            .navigationTitle("Review")
+            .navigationTitle("KeeNotes Review")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { Task { await loadNotes() } }) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-            }
         }
         .onAppear {
             Task { await loadNotes() }
@@ -130,6 +158,47 @@ struct ReviewView: View {
         } catch {
             print("[ReviewView] Failed to load notes: \(error)")
         }
+    }
+    
+    // MARK: - Sync Channel Status
+    
+    private var syncChannelColor: Color {
+        switch appState.webSocketService.connectionState {
+        case .connected: return .green
+        case .connecting: return .orange
+        case .disconnected: return .gray
+        }
+    }
+    
+    private var syncChannelText: String {
+        switch appState.webSocketService.connectionState {
+        case .connected: return "✓"
+        case .connecting: return "..."
+        case .disconnected: return "✗"
+        }
+    }
+    
+    // MARK: - Notes Count Text
+    
+    private var notesCountText: String {
+        let count = notes.count
+        let periodInfo: String
+        
+        if searchText.isEmpty {
+            // Show period info only when not searching
+            switch selectedPeriod {
+            case 0: periodInfo = " - Last 7 days"
+            case 1: periodInfo = " - Last 30 days"
+            case 2: periodInfo = " - Last 90 days"
+            case 3: periodInfo = " - All"
+            default: periodInfo = ""
+            }
+        } else {
+            // When searching, show search indicator
+            periodInfo = " - Search results"
+        }
+        
+        return "\(count) note(s)\(periodInfo)"
     }
 }
 

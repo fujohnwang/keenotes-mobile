@@ -102,7 +102,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("KeeNotes Settings")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear(perform: loadSettings)
             .sheet(isPresented: $showDebugView) {
