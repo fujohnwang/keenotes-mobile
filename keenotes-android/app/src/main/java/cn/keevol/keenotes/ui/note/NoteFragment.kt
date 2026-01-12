@@ -106,13 +106,15 @@ class NoteFragment : Fragment() {
     private fun saveNote(content: String) {
         val app = requireActivity().application as KeeNotesApp
         
+        // Disable button and show "Sending..." text
         binding.btnSend.isEnabled = false
-        binding.sendingOverlay.visibility = View.VISIBLE
+        binding.btnSend.text = "Sending..."
         
         lifecycleScope.launch {
             val result = app.apiService.postNote(content)
             
-            binding.sendingOverlay.visibility = View.GONE
+            // Restore button text
+            binding.btnSend.text = "Send"
             
             if (result.success) {
                 // Copy to clipboard if enabled
