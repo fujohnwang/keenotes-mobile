@@ -139,22 +139,6 @@
 
     </LinearLayout>
 
-    <!-- New notes indicator (shown briefly when new notes arrive) -->
-    <TextView
-        android:id="@+id/newNotesIndicator"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="8dp"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp"
-        android:background="@drawable/rounded_background"
-        android:text="New notes synced"
-        android:textSize="12sp"
-        android:textColor="@color/text_primary"
-        android:visibility="gone"
-        android:elevation="4dp" />
-
     <!-- Notes list -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/notesRecyclerView"

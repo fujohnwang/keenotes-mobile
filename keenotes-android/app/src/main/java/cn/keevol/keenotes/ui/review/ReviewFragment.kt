@@ -27,7 +27,6 @@ class ReviewFragment : Fragment() {
     private var currentPeriod = "7 days"
     private var notesJob: Job? = null
     private var dotsAnimationJob: Job? = null
-    private var newNotesIndicatorJob: Job? = null
     private var previousNotesCount = 0
     private var previousFirstNoteId: Long? = null
     
@@ -177,7 +176,6 @@ class ReviewFragment : Fragment() {
                         if (hasNewNotes && previousNotesCount > 0) {
                             // Scroll to top to show new notes
                             binding.notesRecyclerView.scrollToPosition(0)
-                            showNewNotesIndicator()
                         }
                     }
                     
@@ -218,38 +216,10 @@ class ReviewFragment : Fragment() {
         dotsAnimationJob = null
     }
     
-    private fun showNewNotesIndicator() {
-        // Cancel any existing indicator job
-        newNotesIndicatorJob?.cancel()
-        
-        // Show indicator with fade-in animation
-        binding.newNotesIndicator.apply {
-            alpha = 0f
-            visibility = View.VISIBLE
-            animate()
-                .alpha(1f)
-                .setDuration(200)
-                .start()
-        }
-        
-        // Hide after 2 seconds with fade-out animation
-        newNotesIndicatorJob = lifecycleScope.launch {
-            kotlinx.coroutines.delay(2000)
-            binding.newNotesIndicator.animate()
-                .alpha(0f)
-                .setDuration(200)
-                .withEndAction {
-                    binding.newNotesIndicator.visibility = View.GONE
-                }
-                .start()
-        }
-    }
-    
     override fun onDestroyView() {
         super.onDestroyView()
         notesJob?.cancel()
         stopDotsAnimation()
-        newNotesIndicatorJob?.cancel()
         _binding = null
     }
 }
