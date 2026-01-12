@@ -2,6 +2,8 @@ package cn.keevol.keenotes.ui.settings
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,10 +14,11 @@ import androidx.navigation.fragment.findNavController
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentSettingsBinding
-import cn.keevol.keenotes.ui.MainActivity
 import cn.keevol.keenotes.util.DebugLogger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsFragment : Fragment() {
     
@@ -121,7 +124,6 @@ class SettingsFragment : Fragment() {
         val token = binding.tokenInput.text.toString()
         val password = binding.passwordInput.text.toString()
         val confirmPassword = binding.passwordConfirmInput.text.toString()
-        // copyToClipboard is auto-saved, no need to save here
         
         DebugLogger.log("Settings", "endpoint=${endpoint.take(30)}..., token=${token.take(10)}..., hasPassword=${password.isNotEmpty()}")
         
@@ -138,104 +140,112 @@ class SettingsFragment : Fragment() {
         
         val app = requireActivity().application as KeeNotesApp
         
-        lifecycleScope.launch {
-            DebugLogger.log("Settings", "Inside lifecycleScope.launch")
-            
-            // Get old settings to detect changes
-            val oldEndpoint = app.settingsRepository.endpointUrl.first()
-            val oldToken = app.settingsRepository.token.first()
-            val oldPassword = app.settingsRepository.encryptionPassword.first()
-            val wasConfigured = oldEndpoint.isNotBlank() && oldToken.isNotBlank()
-            
-            DebugLogger.log("Settings", "wasConfigured=$wasConfigured")
-            
-            // Check if configuration changed
-            val endpointChanged = oldEndpoint != endpoint
-            val tokenChanged = oldToken != token
-            val passwordChanged = oldPassword != password
-            val configurationChanged = endpointChanged || tokenChanged || passwordChanged
-            
-            DebugLogger.log("Settings", "configurationChanged=$configurationChanged (endpoint=$endpointChanged, token=$tokenChanged, password=$passwordChanged)")
-            
-            // Save new settings
-            app.settingsRepository.saveSettings(endpoint, token, password)
-            DebugLogger.log("Settings", "Settings saved to repository")
-            
-            val msg = if (password.isNotEmpty()) {
-                "Settings saved ✓ (E2E encryption enabled)"
-            } else {
-                "Settings saved ✓"
-            }
-            
-            // Show success message
-            binding.statusText.setTextColor(requireContext().getColor(R.color.success))
-            
-            if (configurationChanged && wasConfigured) {
-                DebugLogger.log("Settings", "Branch: configurationChanged && wasConfigured")
-                // Configuration changed: need to reset state and reconnect
-                binding.statusText.text = "Configuration changed, reconnecting..."
-                
-                // 1. Disconnect old WebSocket and reset internal state
-                app.webSocketService.disconnect()
-                app.webSocketService.resetState()
-                
-                // 2. Reset sync state (set lastSyncId to -1 to trigger full re-sync)
-                app.database.syncStateDao().clearSyncState()
-                
-                // 3. Clear notes if endpoint or token changed (different server or account = different data)
-                if (endpointChanged || tokenChanged) {
-                    app.database.noteDao().deleteAll()
+        // Show saving status immediately on UI thread
+        binding.statusText.text = "Saving..."
+        binding.statusText.setTextColor(requireContext().getColor(R.color.text_secondary))
+        
+        // Branch 1: Start navigation timer immediately (independent of save logic)
+        // Use Handler for Android 10 compatibility and UI thread safety
+        val mainHandler = Handler(Looper.getMainLooper())
+        mainHandler.postDelayed({
+            DebugLogger.log("Settings", "Navigation timer fired, isAdded=$isAdded")
+            if (isAdded && activity != null && _binding != null) {
+                try {
+                    DebugLogger.log("Settings", "Navigating to noteFragment via bottom nav")
+                    val bottomNav = activity?.findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNavigation)
+                    bottomNav?.selectedItemId = R.id.noteFragment
+                    DebugLogger.log("Settings", "Navigation complete")
+                } catch (e: Exception) {
+                    DebugLogger.error("Settings", "Navigation failed", e)
                 }
+            } else {
+                DebugLogger.log("Settings", "Skipped navigation: fragment not attached")
+            }
+        }, 500)
+        
+        // Branch 2: Save settings and connect WebSocket in background
+        lifecycleScope.launch(Dispatchers.IO) {
+            DebugLogger.log("Settings", "Background save started")
+            
+            try {
+                // Get old settings to detect changes
+                val oldEndpoint = app.settingsRepository.endpointUrl.first()
+                val oldToken = app.settingsRepository.token.first()
+                val oldPassword = app.settingsRepository.encryptionPassword.first()
+                val wasConfigured = oldEndpoint.isNotBlank() && oldToken.isNotBlank()
                 
-                // 4. Reconnect with new settings
-                if (endpoint.isNotBlank() && token.isNotBlank()) {
-                    app.webSocketService.connect()
-                    binding.statusText.text = "$msg (Reconnected)"
+                DebugLogger.log("Settings", "wasConfigured=$wasConfigured")
+                
+                // Check if configuration changed
+                val endpointChanged = oldEndpoint != endpoint
+                val tokenChanged = oldToken != token
+                val passwordChanged = oldPassword != password
+                val configurationChanged = endpointChanged || tokenChanged || passwordChanged
+                
+                DebugLogger.log("Settings", "configurationChanged=$configurationChanged")
+                
+                // Save new settings (IO operation)
+                app.settingsRepository.saveSettings(endpoint, token, password)
+                DebugLogger.log("Settings", "Settings saved to repository")
+                
+                val msg = if (password.isNotEmpty()) {
+                    "Settings saved ✓ (E2E encryption enabled)"
                 } else {
-                    binding.statusText.text = msg
+                    "Settings saved ✓"
                 }
                 
-            } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
-                DebugLogger.log("Settings", "Branch: First time configuration")
-                // First time configuration
-                binding.statusText.text = msg
-                DebugLogger.log("Settings", "About to call webSocketService.connect()")
-                app.webSocketService.connect()
-                DebugLogger.log("Settings", "webSocketService.connect() called")
-                
-            } else {
-                DebugLogger.log("Settings", "Branch: No critical configuration change")
-                // No critical configuration change
-                binding.statusText.text = msg
-            }
-            
-            // Navigate back to Note fragment after showing status
-            DebugLogger.log("Settings", "About to delay 500ms before navigation")
-            kotlinx.coroutines.delay(500)
-            DebugLogger.log("Settings", "Delay complete, isAdded=$isAdded, activity=${activity != null}")
-            
-            if (isAdded && activity != null) {
-                DebugLogger.log("Settings", "Calling runOnUiThread for navigation")
-                activity?.runOnUiThread {
-                    try {
-                        DebugLogger.log("Settings", "Inside runOnUiThread, about to navigate")
-                        // Directly set the selected item on bottom navigation
-                        (activity as? MainActivity)?.let { mainActivity ->
-                            val bottomNav = mainActivity.findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNavigation)
-                            DebugLogger.log("Settings", "bottomNav found: ${bottomNav != null}")
-                            bottomNav?.selectedItemId = R.id.noteFragment
-                            DebugLogger.log("Settings", "selectedItemId set to noteFragment")
-                        }
-                    } catch (e: Exception) {
-                        DebugLogger.error("Settings", "Navigation failed", e)
+                // Update UI on main thread
+                withContext(Dispatchers.Main) {
+                    if (_binding != null) {
+                        binding.statusText.setTextColor(requireContext().getColor(R.color.success))
+                        binding.statusText.text = msg
                     }
                 }
-                DebugLogger.log("Settings", "runOnUiThread posted")
-            } else {
-                DebugLogger.log("Settings", "Skipped navigation: isAdded=$isAdded, activity=${activity != null}")
+                
+                // Handle WebSocket connection based on configuration state
+                if (configurationChanged && wasConfigured) {
+                    DebugLogger.log("Settings", "Branch: configurationChanged && wasConfigured")
+                    
+                    app.webSocketService.disconnect()
+                    app.webSocketService.resetState()
+                    app.database.syncStateDao().clearSyncState()
+                    
+                    if (endpointChanged || tokenChanged) {
+                        app.database.noteDao().deleteAll()
+                    }
+                    
+                    if (endpoint.isNotBlank() && token.isNotBlank()) {
+                        app.webSocketService.connect()
+                        withContext(Dispatchers.Main) {
+                            if (_binding != null) {
+                                binding.statusText.text = "$msg (Reconnected)"
+                            }
+                        }
+                    }
+                    
+                } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
+                    DebugLogger.log("Settings", "Branch: First time configuration")
+                    app.webSocketService.connect()
+                    DebugLogger.log("Settings", "webSocketService.connect() called")
+                    
+                } else {
+                    DebugLogger.log("Settings", "Branch: No critical configuration change")
+                }
+                
+                DebugLogger.log("Settings", "Background save completed")
+                
+            } catch (e: Exception) {
+                DebugLogger.error("Settings", "Save failed", e)
+                withContext(Dispatchers.Main) {
+                    if (_binding != null) {
+                        binding.statusText.text = "Save failed: ${e.message}"
+                        binding.statusText.setTextColor(requireContext().getColor(R.color.error))
+                    }
+                }
             }
         }
-        DebugLogger.log("Settings", "saveSettings() returning (coroutine launched)")
+        
+        DebugLogger.log("Settings", "saveSettings() returning")
     }
     
     override fun onDestroyView() {
