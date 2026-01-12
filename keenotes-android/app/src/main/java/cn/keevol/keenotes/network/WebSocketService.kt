@@ -7,6 +7,7 @@ import cn.keevol.keenotes.data.dao.SyncStateDao
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.data.entity.SyncState
 import cn.keevol.keenotes.data.repository.SettingsRepository
+import cn.keevol.keenotes.util.DebugLogger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -116,11 +117,15 @@ class WebSocketService(
         }
         
         isConnecting = true
+        DebugLogger.log("WebSocket", "connect() called, starting scope.launch")
         
         scope.launch {
             try {
+                DebugLogger.log("WebSocket", "Inside scope.launch, about to get endpoint")
                 val endpoint = settingsRepository.getEndpointUrl()
+                DebugLogger.log("WebSocket", "Got endpoint: ${endpoint.take(30)}...")
                 val token = settingsRepository.getToken()
+                DebugLogger.log("WebSocket", "Got token: ${token.take(10)}...")
                 
                 if (endpoint.isBlank() || token.isBlank()) {
                     Log.w(TAG, "Not configured, skipping connection")
@@ -129,11 +134,12 @@ class WebSocketService(
                 }
                 
                 // CRITICAL: Cache the encryption password BEFORE WebSocket connection
-                // This avoids nested runBlocking calls in onMessage callback
+                DebugLogger.log("WebSocket", "About to get encryption password")
                 cachedPassword = settingsRepository.getEncryptionPassword().takeIf { it.isNotBlank() }
-                Log.i(TAG, "Cached encryption password: ${if (cachedPassword != null) "yes (${cachedPassword!!.length} chars)" else "no"}")
+                DebugLogger.log("WebSocket", "Cached password: ${if (cachedPassword != null) "yes" else "no"}")
                 
                 // Parse URL and build WebSocket URL
+                DebugLogger.log("WebSocket", "Parsing URL")
                 val uri = URI(endpoint)
                 val host = uri.host
                 val ssl = uri.scheme.equals("https", ignoreCase = true) || uri.scheme.equals("wss", ignoreCase = true)
@@ -150,16 +156,14 @@ class WebSocketService(
                 val protocol = if (ssl) "wss" else "ws"
                 val wsUrl = "$protocol://$host:$port$path"
                 
-                Log.i(TAG, "WebSocket connecting to: $wsUrl")
+                DebugLogger.log("WebSocket", "Connecting to: $wsUrl")
                 _connectionState.value = ConnectionState.CONNECTING
                 
                 // CRITICAL: Load last sync ID BEFORE creating WebSocket
-                // OkHttp's onOpen callback runs on a different thread, so we must
-                // ensure lastSyncId is set before newWebSocket() is called
-                // If no sync_state record exists, use -1 (means never synced)
+                DebugLogger.log("WebSocket", "About to get sync state from DB")
                 val syncState = syncStateDao.getSyncState()
                 lastSyncId = syncState?.lastSyncId ?: -1
-                Log.i(TAG, "Loaded lastSyncId: $lastSyncId (syncState exists: ${syncState != null})")
+                DebugLogger.log("WebSocket", "Loaded lastSyncId: $lastSyncId")
                 
                 // Build request with headers (match JavaFX)
                 val origin = "${if (ssl) "https" else "http"}://$host"
@@ -169,13 +173,14 @@ class WebSocketService(
                     .addHeader("Authorization", "Bearer $token")
                     .build()
                 
-                Log.i(TAG, "Adding Authorization header: Bearer ${token.take(4)}...")
+                DebugLogger.log("WebSocket", "About to create WebSocket")
                 
-                // Create WebSocket - onOpen callback will use the lastSyncId we just set
-                // @Volatile ensures lastSyncId is visible to OkHttp's callback thread
+                // Create WebSocket
                 webSocket = client.newWebSocket(request, createWebSocketListener())
+                DebugLogger.log("WebSocket", "WebSocket created successfully")
                 
             } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "Connection error", e)
                 Log.e(TAG, "Connection error", e)
                 _connectionState.value = ConnectionState.DISCONNECTED
                 isConnecting = false
