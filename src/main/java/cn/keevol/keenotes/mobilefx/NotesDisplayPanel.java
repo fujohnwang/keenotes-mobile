@@ -5,9 +5,14 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
 import java.util.ArrayList;
@@ -17,15 +22,26 @@ import java.util.List;
  * Panel for displaying a list of notes
  * Reusable for Note mode, Search mode, and Review mode
  * Supports lazy loading - initially shows 20 notes, loads more on scroll
+ * Includes Sync Channel status and Sync Indicator
  */
 public class NotesDisplayPanel extends VBox {
     
     private final VBox notesContainer;
     private final ScrollPane scrollPane;
     private final Label statusLabel;
-    private Label countLabel; // Count label inside notes container
+    private HBox headerRow; // Header row with count + sync indicator + sync channel
+    private Label countLabel;
     private PauseTransition dotsAnimation;
     private String baseLoadingText;
+    
+    // Sync Channel status (long-term)
+    private Circle syncChannelIndicator;
+    private Label syncChannelLabel;
+    
+    // Sync Indicator (transient)
+    private ProgressIndicator syncSpinner;
+    private Label syncStatusLabel;
+    private HBox syncIndicatorBox;
     
     // Lazy loading
     private List<LocalCacheService.NoteData> allNotes = new ArrayList<>();
@@ -38,7 +54,7 @@ public class NotesDisplayPanel extends VBox {
         getStyleClass().add("notes-display-panel");
         setSpacing(0);
         
-        // Notes container (includes count label and note cards)
+        // Notes container (includes header row and note cards)
         notesContainer = new VBox(12);
         notesContainer.setPadding(new Insets(0, 16, 16, 16));
         notesContainer.getStyleClass().add("notes-container");
@@ -63,6 +79,139 @@ public class NotesDisplayPanel extends VBox {
         statusLabel.setManaged(false);
         
         getChildren().addAll(scrollPane, statusLabel);
+        
+        // Setup WebSocket listener for sync status
+        setupSyncStatusListener();
+    }
+    
+    /**
+     * Setup listener for sync status updates
+     */
+    private void setupSyncStatusListener() {
+        WebSocketClientService webSocketService = ServiceManager.getInstance().getWebSocketService();
+        
+        webSocketService.addListener(new WebSocketClientService.SyncListener() {
+            @Override
+            public void onConnectionStatus(boolean connected) {
+                Platform.runLater(() -> updateSyncChannelStatus(connected));
+            }
+            
+            @Override
+            public void onSyncProgress(int current, int total) {
+                Platform.runLater(() -> showSyncIndicator("Syncing..."));
+            }
+            
+            @Override
+            public void onSyncComplete(int total, long lastSyncId) {
+                Platform.runLater(() -> hideSyncIndicator());
+            }
+            
+            @Override
+            public void onRealtimeUpdate(long id, String content) {
+                // Brief indicator for realtime updates
+                Platform.runLater(() -> {
+                    showSyncIndicator("Syncing...");
+                    // Hide after short delay
+                    PauseTransition hideDelay = new PauseTransition(Duration.millis(500));
+                    hideDelay.setOnFinished(e -> hideSyncIndicator());
+                    hideDelay.play();
+                });
+            }
+            
+            @Override
+            public void onError(String error) {
+                Platform.runLater(() -> hideSyncIndicator());
+            }
+        });
+        
+        // Initial status
+        updateSyncChannelStatus(webSocketService.isConnected());
+    }
+
+    
+    /**
+     * Create header row with count, sync indicator, and sync channel status
+     */
+    private HBox createHeaderRow(String countText) {
+        headerRow = new HBox(12);
+        headerRow.setAlignment(Pos.CENTER_LEFT);
+        headerRow.setPadding(new Insets(0, 0, 8, 0));
+        
+        // Count label (left)
+        countLabel = new Label(countText);
+        countLabel.getStyleClass().add("search-count");
+        
+        // Sync indicator (transient, next to count)
+        syncSpinner = new ProgressIndicator();
+        syncSpinner.setMaxSize(14, 14);
+        syncSpinner.setPrefSize(14, 14);
+        syncSpinner.setStyle("-fx-progress-color: #00D4FF;");
+        
+        syncStatusLabel = new Label("Syncing...");
+        syncStatusLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #8B949E;");
+        
+        syncIndicatorBox = new HBox(4, syncSpinner, syncStatusLabel);
+        syncIndicatorBox.setAlignment(Pos.CENTER_LEFT);
+        syncIndicatorBox.setVisible(false);
+        syncIndicatorBox.setManaged(false);
+        
+        // Spacer
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        
+        // Sync Channel status (right)
+        syncChannelIndicator = new Circle(4);
+        syncChannelIndicator.setFill(Color.web("#3FB950")); // Green by default
+        
+        syncChannelLabel = new Label("Sync Channel: ✓");
+        syncChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #3FB950;");
+        
+        HBox syncChannelBox = new HBox(6, syncChannelIndicator, syncChannelLabel);
+        syncChannelBox.setAlignment(Pos.CENTER_RIGHT);
+        
+        headerRow.getChildren().addAll(countLabel, syncIndicatorBox, spacer, syncChannelBox);
+        
+        return headerRow;
+    }
+    
+    /**
+     * Update sync channel status display
+     */
+    public void updateSyncChannelStatus(boolean connected) {
+        if (syncChannelIndicator == null || syncChannelLabel == null) {
+            return;
+        }
+        
+        if (connected) {
+            syncChannelIndicator.setFill(Color.web("#3FB950")); // Green
+            syncChannelLabel.setText("Sync Channel: ✓");
+            syncChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #3FB950;");
+        } else {
+            syncChannelIndicator.setFill(Color.web("#F85149")); // Red
+            syncChannelLabel.setText("Sync Channel: ✗");
+            syncChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #F85149;");
+        }
+    }
+    
+    /**
+     * Show sync indicator (transient)
+     */
+    public void showSyncIndicator(String message) {
+        if (syncIndicatorBox != null) {
+            syncStatusLabel.setText(message);
+            syncIndicatorBox.setVisible(true);
+            syncIndicatorBox.setManaged(true);
+        }
+    }
+    
+    /**
+     * Hide sync indicator
+     */
+    public void hideSyncIndicator() {
+        if (syncIndicatorBox != null) {
+            syncIndicatorBox.setVisible(false);
+            syncIndicatorBox.setManaged(false);
+        }
     }
     
     /**
@@ -94,14 +243,13 @@ public class NotesDisplayPanel extends VBox {
         allNotes = new ArrayList<>(notes);
         displayedCount = 0;
         
-        // Add count label inside notes container (will scroll with content)
+        // Create header row with count + sync indicator + sync channel
         String countText = notes.size() + " note(s)";
         if (periodInfo != null && !periodInfo.isEmpty()) {
             countText += " - " + periodInfo;
         }
-        countLabel = new Label(countText);
-        countLabel.getStyleClass().add("search-count");
-        notesContainer.getChildren().add(countLabel);
+        HBox header = createHeaderRow(countText);
+        notesContainer.getChildren().add(header);
         
         // Load initial batch
         loadInitialNotes();
@@ -139,6 +287,8 @@ public class NotesDisplayPanel extends VBox {
         fadeIn.setToValue(1);
         fadeIn.play();
     }
+
+    
     /**
      * Load more notes when scrolling to bottom
      */
@@ -189,10 +339,19 @@ public class NotesDisplayPanel extends VBox {
         stopDotsAnimation();
         
         // Update count label if exists
-        if (countLabel != null && notesContainer.getChildren().contains(countLabel)) {
+        if (countLabel != null) {
             String currentText = countLabel.getText();
-            int count = Integer.parseInt(currentText.split(" ")[0]) + 1;
-            countLabel.setText(count + " note(s)");
+            try {
+                int count = Integer.parseInt(currentText.split(" ")[0]) + 1;
+                String newText = count + " note(s)";
+                // Preserve period info if present
+                if (currentText.contains(" - ")) {
+                    newText += currentText.substring(currentText.indexOf(" - "));
+                }
+                countLabel.setText(newText);
+            } catch (NumberFormatException e) {
+                // Ignore parsing errors
+            }
         }
         
         // Create new card
@@ -204,8 +363,8 @@ public class NotesDisplayPanel extends VBox {
         card.setScaleY(0.8);
         card.setTranslateY(-30); // Start above
         
-        // Insert after count label (index 1) or at beginning if no count label
-        int insertIndex = (countLabel != null && notesContainer.getChildren().contains(countLabel)) ? 1 : 0;
+        // Insert after header row (index 1) or at beginning if no header
+        int insertIndex = (headerRow != null && notesContainer.getChildren().contains(headerRow)) ? 1 : 0;
         notesContainer.getChildren().add(insertIndex, card);
         
         // Scroll to top to show the new card
@@ -250,6 +409,7 @@ public class NotesDisplayPanel extends VBox {
      */
     public void showLoading(String message) {
         notesContainer.getChildren().clear();
+        headerRow = null;
         countLabel = null;
         
         // Add loading label inside notes container (shows at top)
@@ -268,6 +428,7 @@ public class NotesDisplayPanel extends VBox {
     public void showEmptyState(String message) {
         stopDotsAnimation();
         notesContainer.getChildren().clear();
+        headerRow = null;
         countLabel = null;
         
         Label emptyLabel = new Label(message);
@@ -284,6 +445,7 @@ public class NotesDisplayPanel extends VBox {
     public void showError(String message) {
         stopDotsAnimation();
         notesContainer.getChildren().clear();
+        headerRow = null;
         countLabel = null;
         
         Label errorLabel = new Label(message);
@@ -302,6 +464,7 @@ public class NotesDisplayPanel extends VBox {
     public void clear() {
         stopDotsAnimation();
         notesContainer.getChildren().clear();
+        headerRow = null;
         countLabel = null;
         statusLabel.setVisible(false);
         statusLabel.setManaged(false);

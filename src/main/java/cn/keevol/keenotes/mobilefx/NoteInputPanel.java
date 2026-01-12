@@ -8,6 +8,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 
@@ -24,6 +26,10 @@ public class NoteInputPanel extends VBox {
     private final Label statusLabel;
     private final StackPane inputContainer;
     private final Consumer<String> onSendNote;
+    
+    // Send channel status
+    private final Circle sendChannelIndicator;
+    private final Label sendChannelLabel;
     
     // Dots animation
     private PauseTransition dotsAnimation;
@@ -72,21 +78,63 @@ public class NoteInputPanel extends VBox {
         StackPane.setAlignment(sendButton, Pos.BOTTOM_RIGHT);
         StackPane.setMargin(sendButton, new Insets(0, 8, 8, 0));
         
-        // Status label (embedded in bottom-left corner of input container)
+        // Send Channel status (bottom-left corner)
+        sendChannelIndicator = new Circle(4);
+        sendChannelIndicator.setFill(Color.web("#3FB950")); // Green by default
+        
+        sendChannelLabel = new Label("Send Channel: ✓");
+        sendChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #3FB950;");
+        
+        HBox sendChannelBox = new HBox(6, sendChannelIndicator, sendChannelLabel);
+        sendChannelBox.setAlignment(Pos.CENTER_LEFT);
+        sendChannelBox.getStyleClass().add("send-channel-status");
+        
+        StackPane.setAlignment(sendChannelBox, Pos.BOTTOM_LEFT);
+        StackPane.setMargin(sendChannelBox, new Insets(0, 0, 8, 12)); // Same bottom margin as send button
+        
+        // Status label (centered in input container for send status)
         statusLabel = new Label();
         statusLabel.getStyleClass().add("unified-status-label");
         statusLabel.setWrapText(true);
         statusLabel.setVisible(false);
-        statusLabel.setMaxWidth(400); // Limit width to not overlap with send button
+        statusLabel.setMaxWidth(300);
         
-        // Position status label in bottom-left corner
-        StackPane.setAlignment(statusLabel, Pos.BOTTOM_LEFT);
-        StackPane.setMargin(statusLabel, new Insets(0, 0, 12, 12));
+        // Position status label in center
+        StackPane.setAlignment(statusLabel, Pos.CENTER);
         
-        inputContainer.getChildren().addAll(noteInput, statusLabel, sendButton);
+        inputContainer.getChildren().addAll(noteInput, statusLabel, sendChannelBox, sendButton);
         
         getChildren().add(inputContainer);
         VBox.setVgrow(inputContainer, Priority.NEVER);
+        
+        // Listen to API service status (simplified - check periodically or on action)
+        setupSendChannelListener();
+    }
+    
+    /**
+     * Setup listener for send channel status
+     */
+    private void setupSendChannelListener() {
+        // Check if settings are configured
+        boolean configured = SettingsService.getInstance().isConfigured();
+        updateSendChannelStatus(configured);
+    }
+    
+    /**
+     * Update send channel status display
+     */
+    public void updateSendChannelStatus(boolean connected) {
+        javafx.application.Platform.runLater(() -> {
+            if (connected) {
+                sendChannelIndicator.setFill(Color.web("#3FB950")); // Green
+                sendChannelLabel.setText("Send Channel: ✓");
+                sendChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #3FB950;");
+            } else {
+                sendChannelIndicator.setFill(Color.web("#F85149")); // Red
+                sendChannelLabel.setText("Send Channel: ✗");
+                sendChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #F85149;");
+            }
+        });
     }
     
     private void handleSend() {
@@ -104,7 +152,7 @@ public class NoteInputPanel extends VBox {
     }
     
     /**
-     * Show status message with fade-in animation (embedded in input container)
+     * Show status message with fade-in animation (centered in input container)
      * If not an error, shows animated dots
      */
     public void showStatus(String message, boolean isError) {
