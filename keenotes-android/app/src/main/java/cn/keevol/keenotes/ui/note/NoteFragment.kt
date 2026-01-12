@@ -64,12 +64,12 @@ class NoteFragment : Fragment() {
     
     private fun setupNoteInput() {
         binding.noteInput.addTextChangedListener {
-            binding.btnSend.isEnabled = !it.isNullOrBlank()
+            updateSendButtonState(!it.isNullOrBlank())
         }
     }
     
     private fun setupSendButton() {
-        binding.btnSend.isEnabled = false
+        updateSendButtonState(false)
         
         binding.btnSend.setOnClickListener {
             val content = binding.noteInput.text.toString().trim()
@@ -77,6 +77,11 @@ class NoteFragment : Fragment() {
                 saveNote(content)
             }
         }
+    }
+    
+    private fun updateSendButtonState(enabled: Boolean) {
+        binding.btnSend.isEnabled = enabled
+        binding.btnSend.alpha = if (enabled) 1.0f else 0.5f
     }
     
     private fun setupSendChannelStatus() {
@@ -106,15 +111,20 @@ class NoteFragment : Fragment() {
     private fun saveNote(content: String) {
         val app = requireActivity().application as KeeNotesApp
         
-        // Disable button and show "Sending..." text
+        // Disable button and show sending state
         binding.btnSend.isEnabled = false
-        binding.btnSend.text = "Sending..."
+        binding.btnSend.alpha = 0.7f
+        binding.sendIcon.visibility = View.GONE
+        binding.sendProgress.visibility = View.VISIBLE
+        binding.sendText.text = "Sending..."
         
         lifecycleScope.launch {
             val result = app.apiService.postNote(content)
             
-            // Restore button text
-            binding.btnSend.text = "Send"
+            // Restore button state
+            binding.sendProgress.visibility = View.GONE
+            binding.sendIcon.visibility = View.VISIBLE
+            binding.sendText.text = "Send"
             
             if (result.success) {
                 // Copy to clipboard if enabled
@@ -136,7 +146,7 @@ class NoteFragment : Fragment() {
                 binding.echoContent.text = "Error: ${result.message}"
             }
             
-            binding.btnSend.isEnabled = binding.noteInput.text?.isNotBlank() == true
+            updateSendButtonState(binding.noteInput.text?.isNotBlank() == true)
         }
     }
     

@@ -30,14 +30,26 @@ class MainActivity : AppCompatActivity() {
         
         // Setup BottomNavigationView with NavController
         binding.bottomNavigation.setupWithNavController(navController)
+        
+        // Disable the Material 3 active indicator (the pill-shaped background on icon)
+        binding.bottomNavigation.isItemActiveIndicatorEnabled = false
+        
+        // Force icon tint to use our color selector (override Material 3 defaults)
+        val iconTint = androidx.appcompat.content.res.AppCompatResources.getColorStateList(
+            this, R.color.bottom_nav_item_color
+        )
+        binding.bottomNavigation.itemIconTintList = iconTint
+        binding.bottomNavigation.itemTextColor = iconTint
     }
     
     /**
      * Navigate to Note tab
-     * Simply trigger the bottom navigation click
+     * Simply trigger the bottom navigation selection
      */
     fun navigateToNote() {
-        binding.bottomNavigation.selectedItemId = R.id.noteFragment
+        binding.bottomNavigation.post {
+            binding.bottomNavigation.selectedItemId = R.id.noteFragment
+        }
     }
     
     private fun connectWebSocket() {

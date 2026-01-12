@@ -170,9 +170,9 @@ class ReviewFragment : Fragment() {
                         (previousFirstNoteId != null && notes.first().id != previousFirstNoteId)
                     )
                     
-                    // Always submit the list to ensure updates
-                    notesAdapter.submitList(null) // Clear first
-                    notesAdapter.submitList(ArrayList(notes)) {
+                    // Submit list - DiffUtil will handle incremental updates automatically
+                    // Only new/changed items will be updated, not the entire list
+                    notesAdapter.submitList(notes.toMutableList()) {
                         // Callback after list is submitted and animations are complete
                         if (hasNewNotes && previousNotesCount > 0) {
                             showNewNotesIndicator()
