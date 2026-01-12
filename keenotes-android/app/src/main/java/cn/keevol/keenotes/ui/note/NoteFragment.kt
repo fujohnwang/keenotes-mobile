@@ -2,14 +2,21 @@ package cn.keevol.keenotes.ui.note
 
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.MenuProvider
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentNoteBinding
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class NoteFragment : Fragment() {
@@ -29,20 +36,42 @@ class NoteFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
+        setupToolbar()
         setupNoteInput()
-        setupSaveButton()
+        setupSendButton()
+        setupSendChannelStatus()
+    }
+    
+    private fun setupToolbar() {
+        // Add menu to toolbar
+        requireActivity().addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menu.clear()
+                menuInflater.inflate(R.menu.note_menu, menu)
+            }
+            
+            override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+                return when (menuItem.itemId) {
+                    R.id.action_search -> {
+                        findNavController().navigate(R.id.action_note_to_search)
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
     }
     
     private fun setupNoteInput() {
         binding.noteInput.addTextChangedListener {
-            binding.btnSave.isEnabled = !it.isNullOrBlank()
+            binding.btnSend.isEnabled = !it.isNullOrBlank()
         }
     }
     
-    private fun setupSaveButton() {
-        binding.btnSave.isEnabled = false
+    private fun setupSendButton() {
+        binding.btnSend.isEnabled = false
         
-        binding.btnSave.setOnClickListener {
+        binding.btnSend.setOnClickListener {
             val content = binding.noteInput.text.toString().trim()
             if (content.isNotEmpty()) {
                 saveNote(content)
@@ -50,20 +79,42 @@ class NoteFragment : Fragment() {
         }
     }
     
+    private fun setupSendChannelStatus() {
+        val app = requireActivity().application as KeeNotesApp
+        
+        // Observe settings changes for send channel status
+        lifecycleScope.launch {
+            app.settingsRepository.isConfigured.collectLatest { configured ->
+                updateSendChannelStatus(configured)
+            }
+        }
+    }
+    
+    private fun updateSendChannelStatus(configured: Boolean) {
+        val (text, color) = if (!configured) {
+            "Not Configured" to requireContext().getColor(R.color.warning)
+        } else {
+            // TODO: Add network connectivity check
+            "✓" to requireContext().getColor(R.color.success)
+        }
+        
+        binding.sendIndicator.setColorFilter(color)
+        binding.sendStatusText.text = text
+        binding.sendStatusText.setTextColor(color)
+    }
+    
     private fun saveNote(content: String) {
         val app = requireActivity().application as KeeNotesApp
         
-        binding.btnSave.isEnabled = false
-        binding.statusText.text = "Encrypting and sending..."
-        binding.statusText.setTextColor(requireContext().getColor(R.color.text_secondary))
+        binding.btnSend.isEnabled = false
+        binding.sendingOverlay.visibility = View.VISIBLE
         
         lifecycleScope.launch {
             val result = app.apiService.postNote(content)
             
+            binding.sendingOverlay.visibility = View.GONE
+            
             if (result.success) {
-                binding.statusText.text = "✓ ${result.message}"
-                binding.statusText.setTextColor(requireContext().getColor(R.color.success))
-                
                 // Copy to clipboard if enabled
                 if (app.settingsRepository.getCopyToClipboardOnPost()) {
                     val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -78,11 +129,12 @@ class NoteFragment : Fragment() {
                 // Clear input
                 binding.noteInput.text?.clear()
             } else {
-                binding.statusText.text = "✗ ${result.message}"
-                binding.statusText.setTextColor(requireContext().getColor(R.color.error))
+                // Show error (could add a toast or snackbar here)
+                binding.echoCard.visibility = View.VISIBLE
+                binding.echoContent.text = "Error: ${result.message}"
             }
             
-            binding.btnSave.isEnabled = binding.noteInput.text?.isNotBlank() == true
+            binding.btnSend.isEnabled = binding.noteInput.text?.isNotBlank() == true
         }
     }
     

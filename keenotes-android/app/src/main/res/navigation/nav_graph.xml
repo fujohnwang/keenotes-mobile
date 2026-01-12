@@ -9,15 +9,8 @@
         android:name="cn.keevol.keenotes.ui.note.NoteFragment"
         android:label="Note">
         <action
-            android:id="@+id/action_note_to_review"
-            app:destination="@id/reviewFragment"
-            app:enterAnim="@anim/slide_in_right"
-            app:exitAnim="@anim/slide_out_left"
-            app:popEnterAnim="@anim/slide_in_left"
-            app:popExitAnim="@anim/slide_out_right" />
-        <action
-            android:id="@+id/action_note_to_settings"
-            app:destination="@id/settingsFragment"
+            android:id="@+id/action_note_to_search"
+            app:destination="@id/searchFragment"
             app:enterAnim="@anim/slide_in_right"
             app:exitAnim="@anim/slide_out_left"
             app:popEnterAnim="@anim/slide_in_left"
@@ -27,15 +20,7 @@
     <fragment
         android:id="@+id/reviewFragment"
         android:name="cn.keevol.keenotes.ui.review.ReviewFragment"
-        android:label="Review">
-        <action
-            android:id="@+id/action_review_to_settings"
-            app:destination="@id/settingsFragment"
-            app:enterAnim="@anim/slide_in_right"
-            app:exitAnim="@anim/slide_out_left"
-            app:popEnterAnim="@anim/slide_in_left"
-            app:popExitAnim="@anim/slide_out_right" />
-    </fragment>
+        android:label="Review" />
 
     <fragment
         android:id="@+id/settingsFragment"
@@ -54,5 +39,10 @@
         android:id="@+id/debugFragment"
         android:name="cn.keevol.keenotes.ui.debug.DebugFragment"
         android:label="Debug" />
+
+    <fragment
+        android:id="@+id/searchFragment"
+        android:name="cn.keevol.keenotes.ui.search.SearchFragment"
+        android:label="Search" />
 
 </navigation>

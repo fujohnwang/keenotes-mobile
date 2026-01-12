@@ -12,27 +12,17 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Header with back button and centered title -->
+        <!-- Header with centered title -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:background="@color/surface">
 
-            <ImageButton
-                android:id="@+id/btnBack"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="start|center_vertical"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_back"
-                android:contentDescription="Back"
-                app:tint="@color/text_secondary" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:text="@string/nav_settings"
+                android:text="KeeNotes Settings"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary" />
