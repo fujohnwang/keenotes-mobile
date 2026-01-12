@@ -196,9 +196,11 @@ class SettingsFragment : Fragment() {
                 
                 // Update UI on main thread
                 withContext(Dispatchers.Main) {
-                    if (_binding != null) {
-                        binding.statusText.setTextColor(requireContext().getColor(R.color.success))
-                        binding.statusText.text = msg
+                    if (_binding != null && context != null) {
+                        context?.let { ctx ->
+                            binding.statusText.setTextColor(ctx.getColor(R.color.success))
+                            binding.statusText.text = msg
+                        }
                     }
                 }
                 
@@ -217,7 +219,7 @@ class SettingsFragment : Fragment() {
                     if (endpoint.isNotBlank() && token.isNotBlank()) {
                         app.webSocketService.connect()
                         withContext(Dispatchers.Main) {
-                            if (_binding != null) {
+                            if (_binding != null && context != null) {
                                 binding.statusText.text = "$msg (Reconnected)"
                             }
                         }
@@ -237,9 +239,11 @@ class SettingsFragment : Fragment() {
             } catch (e: Exception) {
                 DebugLogger.error("Settings", "Save failed", e)
                 withContext(Dispatchers.Main) {
-                    if (_binding != null) {
-                        binding.statusText.text = "Save failed: ${e.message}"
-                        binding.statusText.setTextColor(requireContext().getColor(R.color.error))
+                    if (_binding != null && context != null) {
+                        context?.let { ctx ->
+                            binding.statusText.text = "Save failed: ${e.message}"
+                            binding.statusText.setTextColor(ctx.getColor(R.color.error))
+                        }
                     }
                 }
             }
