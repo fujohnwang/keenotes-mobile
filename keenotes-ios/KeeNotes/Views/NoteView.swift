@@ -46,42 +46,32 @@ struct NoteView: View {
                             
                             Spacer()
                             
-                            // Send button (right)
+                            // Send button (right) - shows "Sending..." when posting
                             Button(action: postNote) {
                                 HStack(spacing: 6) {
-                                    Image(systemName: "paperplane.fill")
-                                        .font(.system(size: 14))
-                                    Text("Send")
-                                        .fontWeight(.semibold)
+                                    if isPosting {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(0.8)
+                                        Text("Sending...")
+                                            .fontWeight(.semibold)
+                                    } else {
+                                        Image(systemName: "paperplane.fill")
+                                            .font(.system(size: 14))
+                                        Text("Send")
+                                            .fontWeight(.semibold)
+                                    }
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
                                 .background(buttonBackgroundColor)
                                 .foregroundColor(.white)
                                 .cornerRadius(8)
-                                .opacity(isPosting ? 0.6 : 1.0)
                             }
                             .disabled(!canPost || isPosting)
                         }
                         .padding(.horizontal, 12)
                         .padding(.bottom, 10)
-                        
-                        // Sending status (centered, overlay)
-                        if isPosting {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                                Text("Sending...")
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(Color.black.opacity(0.7))
-                            .cornerRadius(20)
-                            .padding(.bottom, 60)
-                        }
                     }
                     .background(Color.clear)
                     .cornerRadius(12)
