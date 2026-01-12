@@ -16,49 +16,79 @@ struct NoteView: View {
             VStack(spacing: 0) {
                 // Main content
                 VStack(spacing: 16) {
-                    // Note input area
-                    TextEditor(text: $noteText)
-                        .focused($isTextFieldFocused)
-                        .frame(minHeight: 150)
-                        .padding(12)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color(.systemGray4), lineWidth: 1)
-                        )
-                        .overlay(alignment: .topLeading) {
-                            if noteText.isEmpty {
-                                Text("Write your note here...")
-                                    .foregroundColor(.gray)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 20)
-                                    .allowsHitTesting(false)
+                    // Unified input container with embedded Send Channel and Send button
+                    ZStack(alignment: .bottom) {
+                        // Note input area (keep border, remove fill background)
+                        TextEditor(text: $noteText)
+                            .focused($isTextFieldFocused)
+                            .frame(minHeight: 150)
+                            .padding(.top, 12)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 48) // Space for bottom row
+                            .onAppear {
+                                // Hide default TextEditor background for iOS 15 compatibility
+                                UITextView.appearance().backgroundColor = .clear
                             }
-                        }
-                    
-                    // Send button
-                    Button(action: postNote) {
+                            .overlay(alignment: .topLeading) {
+                                if noteText.isEmpty {
+                                    Text("Write your note here...")
+                                        .foregroundColor(.gray)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 20)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                        
+                        // Bottom row: Send Channel (left) + Send button (right)
                         HStack {
-                            if isPosting {
+                            // Send Channel status (left)
+                            SendChannelStatus()
+                            
+                            Spacer()
+                            
+                            // Send button (right)
+                            Button(action: postNote) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "paperplane.fill")
+                                        .font(.system(size: 14))
+                                    Text("Send")
+                                        .fontWeight(.semibold)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(buttonBackgroundColor)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                                .opacity(isPosting ? 0.6 : 1.0)
+                            }
+                            .disabled(!canPost || isPosting)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                        
+                        // Sending status (centered, overlay)
+                        if isPosting {
+                            HStack(spacing: 8) {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                     .scaleEffect(0.8)
+                                Text("Sending...")
+                                    .font(.subheadline)
+                                    .foregroundColor(.white)
                             }
-                            Text(isPosting ? "Sending..." : "Send")
-                                .fontWeight(.semibold)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.black.opacity(0.7))
+                            .cornerRadius(20)
+                            .padding(.bottom, 60)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(buttonBackgroundColor)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                        .opacity(isPosting ? 0.6 : 1.0)
                     }
-                    .disabled(!canPost || isPosting)
-                    
-                    // Connection status bar
-                    ConnectionStatusBar()
+                    .background(Color.clear)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(.systemGray4), lineWidth: 1)
+                    )
                     
                     Spacer()
                         .contentShape(Rectangle())
@@ -199,58 +229,27 @@ struct NoteView: View {
     }
 }
 
-/// Connection status indicator bar with two separate channels
-struct ConnectionStatusBar: View {
+/// Send Channel status indicator (embedded in input area)
+struct SendChannelStatus: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var networkMonitor = NetworkMonitor()
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Send Channel Status (HTTP API) - Left
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(sendChannelColor)
-                    .frame(width: 8, height: 8)
-                
-                Text("Send Channel:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Text(sendChannelText)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(sendChannelColor)
-            }
+        HStack(spacing: 6) {
+            Circle()
+                .fill(sendChannelColor)
+                .frame(width: 8, height: 8)
             
-            Spacer()
+            Text("Send Channel:")
+                .font(.caption)
+                .foregroundColor(.secondary)
             
-            // Sync Channel Status (WebSocket) - Right
-            HStack(spacing: 6) {
-                if appState.webSocketService.syncStatus == .syncing {
-                    ProgressView()
-                        .scaleEffect(0.6)
-                } else {
-                    Circle()
-                        .fill(syncChannelColor)
-                        .frame(width: 8, height: 8)
-                }
-                
-                Text("Sync Channel:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Text(syncChannelText)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(syncChannelColor)
-            }
+            Text(sendChannelText)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(sendChannelColor)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Color.clear)
     }
-    
-    // MARK: - Send Channel (HTTP API)
     
     private var sendChannelColor: Color {
         if !appState.settingsService.isConfigured {
@@ -265,8 +264,28 @@ struct ConnectionStatusBar: View {
         }
         return networkMonitor.isConnected ? "✓" : "No Network"
     }
+}
+
+/// Sync Channel status indicator (for Review view toolbar)
+struct SyncChannelStatus: View {
+    @EnvironmentObject var appState: AppState
     
-    // MARK: - Sync Channel (WebSocket)
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(syncChannelColor)
+                .frame(width: 8, height: 8)
+            
+            Text("Sync:")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Text(syncChannelText)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(syncChannelColor)
+        }
+    }
     
     private var syncChannelColor: Color {
         switch appState.webSocketService.connectionState {
@@ -277,14 +296,10 @@ struct ConnectionStatusBar: View {
     }
     
     private var syncChannelText: String {
-        if appState.webSocketService.syncStatus == .syncing {
-            return "Syncing..."
-        }
-        
         switch appState.webSocketService.connectionState {
         case .connected: return "✓"
-        case .connecting: return "Connecting..."
-        case .disconnected: return "Disconnected"
+        case .connecting: return "..."
+        case .disconnected: return "✗"
         }
     }
 }
