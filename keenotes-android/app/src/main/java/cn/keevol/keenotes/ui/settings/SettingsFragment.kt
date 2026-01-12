@@ -144,26 +144,7 @@ class SettingsFragment : Fragment() {
         binding.statusText.text = "Saving..."
         binding.statusText.setTextColor(requireContext().getColor(R.color.text_secondary))
         
-        // Branch 1: Start navigation timer immediately (independent of save logic)
-        // Use Handler for Android 10 compatibility and UI thread safety
-        val mainHandler = Handler(Looper.getMainLooper())
-        mainHandler.postDelayed({
-            DebugLogger.log("Settings", "Navigation timer fired, isAdded=$isAdded")
-            if (isAdded && activity != null && _binding != null) {
-                try {
-                    DebugLogger.log("Settings", "Navigating to noteFragment via bottom nav")
-                    val bottomNav = activity?.findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNavigation)
-                    bottomNav?.selectedItemId = R.id.noteFragment
-                    DebugLogger.log("Settings", "Navigation complete")
-                } catch (e: Exception) {
-                    DebugLogger.error("Settings", "Navigation failed", e)
-                }
-            } else {
-                DebugLogger.log("Settings", "Skipped navigation: fragment not attached")
-            }
-        }, 500)
-        
-        // Branch 2: Save settings and connect WebSocket in background
+        // Save settings and connect WebSocket in background
         lifecycleScope.launch(Dispatchers.IO) {
             DebugLogger.log("Settings", "Background save started")
             
@@ -194,13 +175,19 @@ class SettingsFragment : Fragment() {
                     "Settings saved ✓"
                 }
                 
-                // Update UI on main thread
-                withContext(Dispatchers.Main) {
-                    if (_binding != null && context != null) {
-                        context?.let { ctx ->
-                            binding.statusText.setTextColor(ctx.getColor(R.color.success))
+                DebugLogger.log("Settings", "About to update UI")
+                
+                // Update UI on main thread - use Handler instead of withContext
+                Handler(Looper.getMainLooper()).post {
+                    DebugLogger.log("Settings", "Handler.post executing, _binding=${_binding != null}")
+                    try {
+                        if (_binding != null) {
+                            binding.statusText.setTextColor(binding.root.context.getColor(R.color.success))
                             binding.statusText.text = msg
+                            DebugLogger.log("Settings", "UI updated successfully")
                         }
+                    } catch (e: Exception) {
+                        DebugLogger.error("Settings", "UI update failed", e)
                     }
                 }
                 
@@ -218,11 +205,6 @@ class SettingsFragment : Fragment() {
                     
                     if (endpoint.isNotBlank() && token.isNotBlank()) {
                         app.webSocketService.connect()
-                        withContext(Dispatchers.Main) {
-                            if (_binding != null && context != null) {
-                                binding.statusText.text = "$msg (Reconnected)"
-                            }
-                        }
                     }
                     
                 } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
@@ -238,12 +220,14 @@ class SettingsFragment : Fragment() {
                 
             } catch (e: Exception) {
                 DebugLogger.error("Settings", "Save failed", e)
-                withContext(Dispatchers.Main) {
-                    if (_binding != null && context != null) {
-                        context?.let { ctx ->
+                Handler(Looper.getMainLooper()).post {
+                    try {
+                        if (_binding != null) {
                             binding.statusText.text = "Save failed: ${e.message}"
-                            binding.statusText.setTextColor(ctx.getColor(R.color.error))
+                            binding.statusText.setTextColor(binding.root.context.getColor(R.color.error))
                         }
+                    } catch (ex: Exception) {
+                        DebugLogger.error("Settings", "Error UI update failed", ex)
                     }
                 }
             }
