@@ -178,17 +178,22 @@ class SettingsFragment : Fragment() {
                 DebugLogger.log("Settings", "About to update UI")
                 
                 // Update UI on main thread - use Handler instead of withContext
-                Handler(Looper.getMainLooper()).post {
-                    DebugLogger.log("Settings", "Handler.post executing, _binding=${_binding != null}")
-                    try {
-                        if (_binding != null) {
-                            binding.statusText.setTextColor(binding.root.context.getColor(R.color.success))
-                            binding.statusText.text = msg
-                            DebugLogger.log("Settings", "UI updated successfully")
+                try {
+                    Handler(Looper.getMainLooper()).post {
+                        DebugLogger.log("Settings", "Handler.post executing, _binding=${_binding != null}")
+                        try {
+                            if (_binding != null) {
+                                binding.statusText.setTextColor(binding.root.context.getColor(R.color.success))
+                                binding.statusText.text = msg
+                                DebugLogger.log("Settings", "UI updated successfully")
+                            }
+                        } catch (e: Exception) {
+                            DebugLogger.error("Settings", "UI update failed", e)
                         }
-                    } catch (e: Exception) {
-                        DebugLogger.error("Settings", "UI update failed", e)
                     }
+                    DebugLogger.log("Settings", "Handler.post scheduled")
+                } catch (e: Exception) {
+                    DebugLogger.error("Settings", "Handler.post scheduling failed", e)
                 }
                 
                 // Handle WebSocket connection based on configuration state
