@@ -23,4 +23,11 @@
     <style name="BottomNavTextInactive" parent="TextAppearance.AppCompat.Caption">
         <item name="android:textSize">11sp</item>
     </style>
+
+    <!-- Custom BottomNavigationView style to override icon tint -->
+    <style name="Widget.KeeNotes.BottomNavigationView" parent="Widget.Material3.BottomNavigationView">
+        <item name="itemIconTint">@color/bottom_nav_item_color</item>
+        <item name="itemTextColor">@color/bottom_nav_item_color</item>
+        <item name="itemRippleColor">@android:color/transparent</item>
+    </style>
 </resources>
