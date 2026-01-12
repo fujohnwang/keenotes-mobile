@@ -155,25 +155,6 @@
         android:visibility="gone"
         android:elevation="4dp" />
 
-    <!-- Loading -->
-    <TextView
-        android:id="@+id/loadingText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:text="Loading notes..."
-        android:textColor="@color/text_secondary"
-        android:visibility="gone" />
-
-    <!-- Empty state -->
-    <TextView
-        android:id="@+id/emptyText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:textColor="@color/text_secondary"
-        android:visibility="gone" />
-
     <!-- Notes list -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/notesRecyclerView"
