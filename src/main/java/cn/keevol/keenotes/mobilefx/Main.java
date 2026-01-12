@@ -85,44 +85,15 @@ public class Main extends Application {
     }
 
     /**
-     * 更新服务状态UI
+     * 更新服务状态UI - 状态现在由各组件自己管理
+     * NoteInputPanel 管理 Send Channel
+     * NotesDisplayPanel 管理 Sync Channel 和 Sync Indicator
      */
     private void updateServiceStatusUI(String status, String message) {
-        Platform.runLater(() -> {
-            SettingsService settings = SettingsService.getInstance();
-            boolean isConfigured = !settings.getEndpointUrl().isEmpty() && !settings.getToken().isEmpty();
-            
-            SidebarView sidebar = mainView.getSidebar();
-            
-            // Update Send Channel status
-            if (!isConfigured) {
-                sidebar.updateStatus("sendChannelStatus", "Send Channel: Not Configured", false);
-            } else {
-                sidebar.updateStatus("sendChannelStatus", "Send Channel: ✓", true);
-            }
-            
-            // Update Sync Channel status
-            switch (status.toLowerCase()) {
-                case "websocket_connected":
-                    sidebar.updateStatus("syncChannelStatus", "Sync Channel: ✓", true);
-                    break;
-                case "websocket_disconnected":
-                case "not_configured":
-                case "connect_error":
-                case "websocket_error":
-                    sidebar.updateStatus("syncChannelStatus", "Sync Channel: Disconnected", false);
-                    break;
-                case "reinitializing":
-                    sidebar.updateStatus("syncChannelStatus", "Sync Channel: Connecting...", false);
-                    break;
-                case "syncing":
-                    sidebar.updateStatus("syncChannelStatus", "Sync Channel: Syncing...", true);
-                    break;
-                case "sync_complete":
-                    sidebar.updateStatus("syncChannelStatus", "Sync Channel: ✓", true);
-                    break;
-            }
-        });
+        // Status is now managed by individual components:
+        // - NoteInputPanel handles Send Channel status
+        // - NotesDisplayPanel handles Sync Channel and Sync Indicator
+        // This method is kept for compatibility but does nothing
     }
 
     @Override
