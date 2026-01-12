@@ -50,28 +50,30 @@ class MainActivity : AppCompatActivity() {
     private fun reduceIconLabelSpacing() {
         val menuView = binding.bottomNavigation.getChildAt(0) as? android.view.ViewGroup ?: return
         for (i in 0 until menuView.childCount) {
-            val itemView = menuView.getChildAt(i)
-            // Find the labels (small and large) and reduce their top margin
-            try {
-                val smallLabelField = itemView.javaClass.getDeclaredField("smallLabel")
-                smallLabelField.isAccessible = true
-                val smallLabel = smallLabelField.get(itemView) as? android.widget.TextView
-                smallLabel?.let {
-                    val params = it.layoutParams as? android.view.ViewGroup.MarginLayoutParams
-                    params?.topMargin = 0
-                    it.layoutParams = params
+            val itemView = menuView.getChildAt(i) as? android.view.ViewGroup ?: continue
+            
+            // Traverse all children to find TextViews and ImageViews
+            adjustItemViewSpacing(itemView)
+        }
+    }
+    
+    private fun adjustItemViewSpacing(viewGroup: android.view.ViewGroup) {
+        for (i in 0 until viewGroup.childCount) {
+            val child = viewGroup.getChildAt(i)
+            
+            when (child) {
+                is android.widget.TextView -> {
+                    // Reduce top margin of labels
+                    val params = child.layoutParams
+                    if (params is android.view.ViewGroup.MarginLayoutParams) {
+                        params.topMargin = -4  // Negative margin to pull text closer to icon
+                        child.layoutParams = params
+                    }
                 }
-                
-                val largeLabelField = itemView.javaClass.getDeclaredField("largeLabel")
-                largeLabelField.isAccessible = true
-                val largeLabel = largeLabelField.get(itemView) as? android.widget.TextView
-                largeLabel?.let {
-                    val params = it.layoutParams as? android.view.ViewGroup.MarginLayoutParams
-                    params?.topMargin = 0
-                    it.layoutParams = params
+                is android.view.ViewGroup -> {
+                    // Recursively check nested ViewGroups
+                    adjustItemViewSpacing(child)
                 }
-            } catch (e: Exception) {
-                // Ignore if reflection fails
             }
         }
     }
