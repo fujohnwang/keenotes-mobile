@@ -40,6 +40,40 @@ class MainActivity : AppCompatActivity() {
         )
         binding.bottomNavigation.itemIconTintList = iconTint
         binding.bottomNavigation.itemTextColor = iconTint
+        
+        // Reduce icon-label spacing by adjusting label margins
+        binding.bottomNavigation.post {
+            reduceIconLabelSpacing()
+        }
+    }
+    
+    private fun reduceIconLabelSpacing() {
+        val menuView = binding.bottomNavigation.getChildAt(0) as? android.view.ViewGroup ?: return
+        for (i in 0 until menuView.childCount) {
+            val itemView = menuView.getChildAt(i)
+            // Find the labels (small and large) and reduce their top margin
+            try {
+                val smallLabelField = itemView.javaClass.getDeclaredField("smallLabel")
+                smallLabelField.isAccessible = true
+                val smallLabel = smallLabelField.get(itemView) as? android.widget.TextView
+                smallLabel?.let {
+                    val params = it.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+                    params?.topMargin = 0
+                    it.layoutParams = params
+                }
+                
+                val largeLabelField = itemView.javaClass.getDeclaredField("largeLabel")
+                largeLabelField.isAccessible = true
+                val largeLabel = largeLabelField.get(itemView) as? android.widget.TextView
+                largeLabel?.let {
+                    val params = it.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+                    params?.topMargin = 0
+                    it.layoutParams = params
+                }
+            } catch (e: Exception) {
+                // Ignore if reflection fails
+            }
+        }
     }
     
     /**
