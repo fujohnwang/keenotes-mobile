@@ -175,9 +175,14 @@ class WebSocketService(
                 
                 DebugLogger.log("WebSocket", "About to create WebSocket")
                 
-                // Create WebSocket
-                webSocket = client.newWebSocket(request, createWebSocketListener())
-                DebugLogger.log("WebSocket", "WebSocket created successfully")
+                // Create WebSocket with try-catch
+                try {
+                    webSocket = client.newWebSocket(request, createWebSocketListener())
+                    DebugLogger.log("WebSocket", "WebSocket created successfully")
+                } catch (e: Exception) {
+                    DebugLogger.error("WebSocket", "newWebSocket() threw exception", e)
+                    throw e
+                }
                 
             } catch (e: Exception) {
                 DebugLogger.error("WebSocket", "Connection error", e)
@@ -213,43 +218,66 @@ class WebSocketService(
     private fun createWebSocketListener() = object : WebSocketListener() {
         
         override fun onOpen(ws: WebSocket, response: Response) {
-            Log.i(TAG, "WebSocket onOpen called, response code: ${response.code}")
-            isConnecting = false
-            webSocket = ws  // Store the WebSocket reference
-            _connectionState.value = ConnectionState.CONNECTED
-            
-            // Send handshake (matching JavaFX)
-            Log.i(TAG, "About to send handshake...")
-            sendHandshake()
-            Log.i(TAG, "Handshake sent, waiting for server response...")
+            try {
+                DebugLogger.log("WebSocket", "onOpen START")
+                Log.i(TAG, "WebSocket onOpen called, response code: ${response.code}")
+                isConnecting = false
+                webSocket = ws  // Store the WebSocket reference
+                DebugLogger.log("WebSocket", "onOpen: webSocket assigned")
+                _connectionState.value = ConnectionState.CONNECTED
+                DebugLogger.log("WebSocket", "onOpen: state set to CONNECTED")
+                
+                // Send handshake (matching JavaFX)
+                DebugLogger.log("WebSocket", "onOpen: about to send handshake...")
+                sendHandshake()
+                DebugLogger.log("WebSocket", "onOpen: handshake sent")
+            } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "onOpen EXCEPTION", e)
+            }
         }
         
         override fun onMessage(ws: WebSocket, text: String) {
-            Log.i(TAG, "onMessage received, length=${text.length}")
-            // Use single-threaded dispatcher to maintain message order
-            // This avoids blocking OkHttp's callback thread while ensuring sequential processing
-            scope.launch(messageDispatcher) {
-                handleMessage(text)
+            try {
+                DebugLogger.log("WebSocket", "onMessage received, length=${text.length}")
+                // Use single-threaded dispatcher to maintain message order
+                scope.launch(messageDispatcher) {
+                    handleMessage(text)
+                }
+            } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "onMessage EXCEPTION", e)
             }
         }
         
         override fun onClosing(ws: WebSocket, code: Int, reason: String) {
-            Log.i(TAG, "WebSocket closing: $code $reason")
-            ws.close(1000, null)
+            try {
+                DebugLogger.log("WebSocket", "onClosing: $code $reason")
+                ws.close(1000, null)
+            } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "onClosing EXCEPTION", e)
+            }
         }
         
         override fun onClosed(ws: WebSocket, code: Int, reason: String) {
-            Log.i(TAG, "WebSocket closed: $code $reason")
-            isConnecting = false
-            _connectionState.value = ConnectionState.DISCONNECTED
-            scheduleReconnect()
+            try {
+                DebugLogger.log("WebSocket", "onClosed: $code $reason")
+                isConnecting = false
+                _connectionState.value = ConnectionState.DISCONNECTED
+                scheduleReconnect()
+            } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "onClosed EXCEPTION", e)
+            }
         }
         
         override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
-            Log.e(TAG, "WebSocket failure: ${t.message}", t)
-            isConnecting = false
-            _connectionState.value = ConnectionState.DISCONNECTED
-            scheduleReconnect()
+            try {
+                DebugLogger.error("WebSocket", "onFailure: ${t.message}", t)
+                Log.e(TAG, "WebSocket failure: ${t.message}", t)
+                isConnecting = false
+                _connectionState.value = ConnectionState.DISCONNECTED
+                scheduleReconnect()
+            } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "onFailure handler EXCEPTION", e)
+            }
         }
     }
     
