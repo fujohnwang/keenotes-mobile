@@ -20,7 +20,9 @@ public class SettingsService {
     private static final String KEY_REVIEW_DAYS = "review.days";
     private static final String KEY_ENCRYPTION_PASSWORD = "encryption.password";
     private static final String KEY_COPY_TO_CLIPBOARD = "copy.to.clipboard.on.post";
+    private static final String KEY_SEARCH_SHORTCUT = "shortcut.search";
     private static final int DEFAULT_REVIEW_DAYS = 7;
+    private static final String DEFAULT_SEARCH_SHORTCUT = "Alt+Shift+S";
 
     private static SettingsService instance;
     private final Properties properties;
@@ -141,5 +143,13 @@ public class SettingsService {
     
     public void setCopyToClipboardOnPost(boolean enabled) {
         properties.setProperty(KEY_COPY_TO_CLIPBOARD, String.valueOf(enabled));
+    }
+    
+    public String getSearchShortcut() {
+        return properties.getProperty(KEY_SEARCH_SHORTCUT, DEFAULT_SEARCH_SHORTCUT);
+    }
+    
+    public void setSearchShortcut(String shortcut) {
+        properties.setProperty(KEY_SEARCH_SHORTCUT, shortcut);
     }
 }

@@ -20,6 +20,7 @@ public class SettingsView extends BorderPane {
     private final SettingsService settings;
     private final Runnable onBack;
     private final ToggleSwitch copyToClipboardToggle;
+    private final TextField searchShortcutField;
 
     public SettingsView(Runnable onBack) {
         this.onBack = onBack;
@@ -89,8 +90,24 @@ public class SettingsView extends BorderPane {
         toggleRow.setAlignment(Pos.CENTER_LEFT);
         toggleRow.setPadding(new Insets(4, 0, 4, 0)); // Add vertical padding
         
+        // Search shortcut configuration
+        Label shortcutLabel = new Label("Search shortcut");
+        shortcutLabel.getStyleClass().add("field-label");
+        
+        searchShortcutField = new TextField();
+        searchShortcutField.setPromptText("Alt+Shift+S");
+        searchShortcutField.getStyleClass().add("input-field");
+        searchShortcutField.setPrefWidth(150);
+        searchShortcutField.setMaxWidth(150);
+        
+        Label shortcutHint = new Label("Format: Alt+Shift+S, Ctrl+Shift+F, etc.");
+        shortcutHint.getStyleClass().add("field-hint");
+        
+        HBox shortcutRow = new HBox(12, shortcutLabel, searchShortcutField);
+        shortcutRow.setAlignment(Pos.CENTER_LEFT);
+        
         // Preferences container with proper spacing
-        VBox preferencesSection = new VBox(8, preferencesLabel, toggleRow);
+        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, shortcutRow, shortcutHint);
         preferencesSection.setPadding(new Insets(8, 0, 8, 0)); // Add top/bottom padding
 
         // Debug entry (hidden by default) - removed for desktop version
@@ -161,6 +178,7 @@ public class SettingsView extends BorderPane {
         encryptionPasswordField.setText(savedPassword);
         encryptionPasswordConfirmField.setText(savedPassword);
         copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
+        searchShortcutField.setText(settings.getSearchShortcut());
     }
 
     private void saveSettings() {
@@ -199,6 +217,11 @@ public class SettingsView extends BorderPane {
         settings.setEndpointUrl(newEndpoint);
         settings.setToken(newToken);
         settings.setEncryptionPassword(newPassword);
+        // Save search shortcut
+        String shortcut = searchShortcutField.getText().trim();
+        if (!shortcut.isEmpty()) {
+            settings.setSearchShortcut(shortcut);
+        }
         // copyToClipboard is auto-saved on checkbox change
         settings.save();
 

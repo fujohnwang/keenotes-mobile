@@ -1,6 +1,9 @@
 package cn.keevol.keenotes.mobilefx;
 
 import javafx.geometry.Insets;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -34,6 +37,9 @@ public class DesktopMainView extends BorderPane {
         // Setup layout
         setupLayout();
         
+        // Setup keyboard shortcuts
+        setupKeyboardShortcuts();
+        
         // Initialize with Note mode
         switchToMode(ViewMode.NOTE);
     }
@@ -50,10 +56,87 @@ public class DesktopMainView extends BorderPane {
     }
     
     /**
+     * Setup keyboard shortcuts
+     */
+    private void setupKeyboardShortcuts() {
+        // Register key event handler on the scene when it becomes available
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                newScene.setOnKeyPressed(event -> {
+                    KeyCodeCombination searchShortcut = parseShortcut(
+                        SettingsService.getInstance().getSearchShortcut()
+                    );
+                    
+                    if (searchShortcut != null && searchShortcut.match(event)) {
+                        event.consume();
+                        switchToSearchAndFocus();
+                    }
+                });
+            }
+        });
+    }
+    
+    /**
+     * Parse shortcut string to KeyCodeCombination
+     * Format: "Alt+Shift+S", "Ctrl+Shift+F", etc.
+     */
+    private KeyCodeCombination parseShortcut(String shortcut) {
+        if (shortcut == null || shortcut.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            String[] parts = shortcut.split("\\+");
+            if (parts.length < 2) {
+                return null;
+            }
+            
+            // Last part is the key
+            String keyPart = parts[parts.length - 1].trim().toUpperCase();
+            KeyCode keyCode = KeyCode.valueOf(keyPart);
+            
+            // Parse modifiers
+            KeyCombination.Modifier[] modifiers = new KeyCombination.Modifier[parts.length - 1];
+            for (int i = 0; i < parts.length - 1; i++) {
+                String mod = parts[i].trim().toLowerCase();
+                modifiers[i] = switch (mod) {
+                    case "alt" -> KeyCombination.ALT_DOWN;
+                    case "ctrl", "control" -> KeyCombination.CONTROL_DOWN;
+                    case "shift" -> KeyCombination.SHIFT_DOWN;
+                    case "meta", "cmd", "command" -> KeyCombination.META_DOWN;
+                    default -> null;
+                };
+                if (modifiers[i] == null) {
+                    return null;
+                }
+            }
+            
+            return new KeyCodeCombination(keyCode, modifiers);
+        } catch (Exception e) {
+            System.err.println("[DesktopMainView] Failed to parse shortcut: " + shortcut + " - " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Switch to search mode and focus on search input
+     */
+    public void switchToSearchAndFocus() {
+        switchToMode(ViewMode.SEARCH);
+        // Request focus on search input after mode switch
+        javafx.application.Platform.runLater(() -> {
+            mainContent.focusSearchInput();
+        });
+    }
+    
+    /**
      * Handle navigation button clicks
      */
     private void onNavigationChanged(ViewMode mode) {
-        if (currentMode != mode) {
+        if (mode == ViewMode.SEARCH) {
+            // Always focus search input when switching to search mode
+            switchToSearchAndFocus();
+        } else if (currentMode != mode) {
             switchToMode(mode);
         }
     }
