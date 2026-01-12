@@ -4,10 +4,8 @@ import SwiftUI
 struct ReviewView: View {
     @EnvironmentObject var appState: AppState
     @State private var notes: [Note] = []
-    @State private var searchText = ""
     @State private var isLoading = false
     @State private var selectedPeriod = 0  // 0: 7 days, 1: 30 days, 2: 90 days, 3: All
-    @State private var searchTask: Task<Void, Never>?
     
     private let periods = ["7 days", "30 days", "90 days", "All"]
     private let periodDays = [7, 30, 90, 0]  // 0 means all
@@ -16,12 +14,6 @@ struct ReviewView: View {
         NavigationView {
             ZStack {
                 VStack(spacing: 0) {
-                    // Search bar (moved to top)
-                    SearchBar(text: $searchText)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        .padding(.bottom, 4)
-                    
                     // Period selector
                     Picker("Period", selection: $selectedPeriod) {
                         ForEach(0..<periods.count, id: \.self) { index in
@@ -30,7 +22,8 @@ struct ReviewView: View {
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal)
-                    .padding(.vertical, 8)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
                     
                     // Header row: Notes count (left) + Sync Channel status (right)
                     HStack {
@@ -71,7 +64,7 @@ struct ReviewView: View {
                             Image(systemName: "doc.text")
                                 .font(.system(size: 48))
                                 .foregroundColor(.gray)
-                            Text(searchText.isEmpty ? "No notes yet" : "No results found")
+                            Text("No notes yet")
                                 .foregroundColor(.gray)
                         }
                         Spacer()
@@ -125,15 +118,6 @@ struct ReviewView: View {
         .onChange(of: selectedPeriod) { _ in
             Task { await loadNotes() }
         }
-        .onChange(of: searchText) { _ in
-            // Debounce search - cancel previous task and start new one
-            searchTask?.cancel()
-            searchTask = Task {
-                try? await Task.sleep(nanoseconds: 500_000_000)  // 500ms debounce
-                guard !Task.isCancelled else { return }
-                await loadNotes()
-            }
-        }
     }
     
     private func loadNotes() async {
@@ -141,15 +125,8 @@ struct ReviewView: View {
         defer { isLoading = false }
         
         do {
-            let loadedNotes: [Note]
-            
-            if searchText.isEmpty {
-                // Load by period
-                loadedNotes = try await appState.databaseService.getNotesByPeriod(days: periodDays[selectedPeriod])
-            } else {
-                // Search
-                loadedNotes = try await appState.databaseService.searchNotes(query: searchText)
-            }
+            // Load by period
+            let loadedNotes = try await appState.databaseService.getNotesByPeriod(days: periodDays[selectedPeriod])
             
             print("[ReviewView] Loaded \(loadedNotes.count) notes from database")
             await MainActor.run {
@@ -184,48 +161,16 @@ struct ReviewView: View {
         let count = notes.count
         let periodInfo: String
         
-        if searchText.isEmpty {
-            // Show period info only when not searching
-            switch selectedPeriod {
-            case 0: periodInfo = " - Last 7 days"
-            case 1: periodInfo = " - Last 30 days"
-            case 2: periodInfo = " - Last 90 days"
-            case 3: periodInfo = " - All"
-            default: periodInfo = ""
-            }
-        } else {
-            // When searching, show search indicator
-            periodInfo = " - Search results"
+        // Show period info
+        switch selectedPeriod {
+        case 0: periodInfo = " - Last 7 days"
+        case 1: periodInfo = " - Last 30 days"
+        case 2: periodInfo = " - Last 90 days"
+        case 3: periodInfo = " - All"
+        default: periodInfo = ""
         }
         
         return "\(count) note(s)\(periodInfo)"
-    }
-}
-
-/// Search bar component
-struct SearchBar: View {
-    @Binding var text: String
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.gray)
-            
-            TextField("Search notes...", text: $text)
-                .textFieldStyle(.plain)
-            
-            if !text.isEmpty {
-                Button(action: {
-                    text = ""
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.gray)
-                }
-            }
-        }
-        .padding(10)
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
     }
 }
 
