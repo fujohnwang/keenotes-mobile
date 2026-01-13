@@ -40,7 +40,7 @@ public class NoteInputPanel extends VBox {
         
         getStyleClass().add("note-input-panel");
         setSpacing(0); // Remove internal spacing
-        setPadding(new Insets(16, 16, 1, 16)); // Minimal bottom padding (reduced from 2 to 1)
+        setPadding(new Insets(16, 16, 16, 16)); // Uniform padding on all sides
         
         // Create the unified input container
         inputContainer = new StackPane();

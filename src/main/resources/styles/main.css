@@ -843,6 +843,11 @@
     -fx-background-color: transparent;
 }
 
+/* Fixed header container (stays at top, doesn't scroll) */
+.notes-display-panel > .fixed-header {
+    -fx-background-color: -fx-background;
+}
+
 .notes-container {
     -fx-background-color: transparent;
 }
