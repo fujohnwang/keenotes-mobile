@@ -29,6 +29,7 @@ public class NotesDisplayPanel extends VBox {
     private final VBox notesContainer;
     private final ScrollPane scrollPane;
     private final Label statusLabel;
+    private final VBox fixedHeaderContainer; // Fixed header container (not scrollable)
     private HBox headerRow; // Header row with count + sync indicator + sync channel
     private Label countLabel;
     private PauseTransition dotsAnimation;
@@ -61,9 +62,16 @@ public class NotesDisplayPanel extends VBox {
         getStyleClass().add("notes-display-panel");
         setSpacing(0);
         
-        // Notes container (includes header row and note cards)
+        // Fixed header container (stays at top, doesn't scroll)
+        fixedHeaderContainer = new VBox();
+        fixedHeaderContainer.getStyleClass().add("fixed-header");
+        fixedHeaderContainer.setPadding(new Insets(0, 16, 0, 16));
+        fixedHeaderContainer.setVisible(false);
+        fixedHeaderContainer.setManaged(false);
+        
+        // Notes container (only contains note cards, no header)
         notesContainer = new VBox(12);
-        notesContainer.setPadding(new Insets(0, 16, 16, 16));
+        notesContainer.setPadding(new Insets(8, 16, 16, 16));
         notesContainer.getStyleClass().add("notes-container");
         
         // Scroll pane
@@ -92,7 +100,7 @@ public class NotesDisplayPanel extends VBox {
         statusLabel.setVisible(false);
         statusLabel.setManaged(false);
         
-        getChildren().addAll(scrollPane, statusLabel);
+        getChildren().addAll(fixedHeaderContainer, scrollPane, statusLabel);
         
         // Setup WebSocket listener for sync status
         setupSyncStatusListener();
@@ -149,7 +157,7 @@ public class NotesDisplayPanel extends VBox {
     private HBox createHeaderRow(String countText) {
         headerRow = new HBox(12);
         headerRow.setAlignment(Pos.CENTER_LEFT);
-        headerRow.setPadding(new Insets(0, 0, 8, 0));
+        headerRow.setPadding(new Insets(8, 0, 0, 0));
         
         // Count label (left)
         countLabel = new Label(countText);
@@ -184,6 +192,12 @@ public class NotesDisplayPanel extends VBox {
         syncChannelBox.setAlignment(Pos.CENTER_RIGHT);
         
         headerRow.getChildren().addAll(countLabel, syncIndicatorBox, spacer, syncChannelBox);
+        
+        // Add to fixed header container and make it visible
+        fixedHeaderContainer.getChildren().clear();
+        fixedHeaderContainer.getChildren().add(headerRow);
+        fixedHeaderContainer.setVisible(true);
+        fixedHeaderContainer.setManaged(true);
         
         return headerRow;
     }
@@ -279,13 +293,12 @@ public class NotesDisplayPanel extends VBox {
         this.allNotes.clear();
         displayedCount = 0;
         
-        // Create header row with total count
+        // Create header row with total count (will be added to fixed header container)
         String countText = totalCount + " note(s)";
         if (periodInfo != null && !periodInfo.isEmpty()) {
             countText += " - " + periodInfo;
         }
-        HBox header = createHeaderRow(countText);
-        notesContainer.getChildren().add(header);
+        createHeaderRow(countText);
         
         // Load initial batch from database
         loadInitialNotesFromDb();
@@ -373,13 +386,12 @@ public class NotesDisplayPanel extends VBox {
         allNotes = new ArrayList<>(notes);
         displayedCount = 0;
         
-        // Create header row with count + sync indicator + sync channel
+        // Create header row with count + sync indicator + sync channel (will be added to fixed header container)
         String countText = notes.size() + " note(s)";
         if (periodInfo != null && !periodInfo.isEmpty()) {
             countText += " - " + periodInfo;
         }
-        HBox header = createHeaderRow(countText);
-        notesContainer.getChildren().add(header);
+        createHeaderRow(countText);
         
         // Load initial batch
         loadInitialNotes();
@@ -566,9 +578,8 @@ public class NotesDisplayPanel extends VBox {
         card.setScaleY(0.8);
         card.setTranslateY(-30); // Start above
         
-        // Insert after header row (index 1) or at beginning if no header
-        int insertIndex = (headerRow != null && notesContainer.getChildren().contains(headerRow)) ? 1 : 0;
-        notesContainer.getChildren().add(insertIndex, card);
+        // Insert at beginning of notes container (no header row inside anymore)
+        notesContainer.getChildren().add(0, card);
         
         // Scroll to top to show the new card
         scrollPane.setVvalue(0);
@@ -612,6 +623,8 @@ public class NotesDisplayPanel extends VBox {
      */
     public void showLoading(String message) {
         notesContainer.getChildren().clear();
+        fixedHeaderContainer.setVisible(false);
+        fixedHeaderContainer.setManaged(false);
         headerRow = null;
         countLabel = null;
         
@@ -631,6 +644,8 @@ public class NotesDisplayPanel extends VBox {
     public void showEmptyState(String message) {
         stopDotsAnimation();
         notesContainer.getChildren().clear();
+        fixedHeaderContainer.setVisible(false);
+        fixedHeaderContainer.setManaged(false);
         headerRow = null;
         countLabel = null;
         
@@ -648,6 +663,8 @@ public class NotesDisplayPanel extends VBox {
     public void showError(String message) {
         stopDotsAnimation();
         notesContainer.getChildren().clear();
+        fixedHeaderContainer.setVisible(false);
+        fixedHeaderContainer.setManaged(false);
         headerRow = null;
         countLabel = null;
         
@@ -667,6 +684,8 @@ public class NotesDisplayPanel extends VBox {
     public void clear() {
         stopDotsAnimation();
         notesContainer.getChildren().clear();
+        fixedHeaderContainer.setVisible(false);
+        fixedHeaderContainer.setManaged(false);
         headerRow = null;
         countLabel = null;
         statusLabel.setVisible(false);

@@ -368,11 +368,9 @@ public class MainContentArea extends StackPane {
         VBox panel = new VBox(1); // Minimal spacing between components (reduced from 2 to 1)
         panel.getStyleClass().add("mode-panel");
         
-        // Create input panel with fixed height
+        // Create input panel (height auto-fits content)
         noteInputPanel = new NoteInputPanel(this::handleNoteSend);
-        noteInputPanel.setMinHeight(250);
-        noteInputPanel.setMaxHeight(250);
-        noteInputPanel.setPrefHeight(250);
+        // Remove fixed height constraints - let it size based on content
         
         // Create notes display panel (will grow to fill remaining space)
         notesDisplayPanel = new NotesDisplayPanel();
