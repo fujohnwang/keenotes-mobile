@@ -38,7 +38,7 @@ public class OverviewCard extends HBox {
         totalNotesValue = new Label("0");
         totalNotesValue.getStyleClass().add("overview-value");
         
-        Label totalNotesLabel = new Label("Total Notes");
+        Label totalNotesLabel = new Label("Notes (7 days)");
         totalNotesLabel.getStyleClass().add("overview-label");
         
         totalNotesBox.getChildren().addAll(totalNotesValue, totalNotesLabel);
