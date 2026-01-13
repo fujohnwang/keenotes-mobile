@@ -139,7 +139,7 @@
                 android:layout_marginTop="24dp"
                 android:text="@string/settings_save"
                 android:textColor="@color/background"
-                android:backgroundTint="@color/primary"
+                android:backgroundTint="@color/btn_save_background"
                 app:cornerRadius="8dp" />
 
             <!-- Status Text -->

@@ -15,6 +15,8 @@ import cn.keevol.keenotes.databinding.FragmentSettingsBinding
 import cn.keevol.keenotes.ui.MainActivity
 import cn.keevol.keenotes.util.DebugLogger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,6 +30,12 @@ class SettingsFragment : Fragment() {
     private var copyrightTapCount = 0
     private var lastTapTime = 0L
     
+    // StateFlows for reactive binding
+    private val endpointFlow = MutableStateFlow("")
+    private val tokenFlow = MutableStateFlow("")
+    private val passwordFlow = MutableStateFlow("")
+    private val confirmPasswordFlow = MutableStateFlow("")
+    
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -40,10 +48,49 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
+        setupSaveButtonBinding()
         setupCopyToClipboardToggle()
         setupSaveButton()
         setupCopyrightEasterEgg()
         loadSettings()
+    }
+    
+    private var textWatcher: android.text.TextWatcher? = null
+    
+    private fun setupSaveButtonBinding() {
+        // Setup TextWatchers to update StateFlows
+        binding.endpointInput.addTextChangedListener(createTextWatcher { endpointFlow.value = it })
+        binding.tokenInput.addTextChangedListener(createTextWatcher { tokenFlow.value = it })
+        binding.passwordInput.addTextChangedListener(createTextWatcher { passwordFlow.value = it })
+        binding.passwordConfirmInput.addTextChangedListener(createTextWatcher { confirmPasswordFlow.value = it })
+        
+        // Reactive binding: combine all StateFlows to determine button enabled state
+        lifecycleScope.launch {
+            combine(
+                endpointFlow,
+                tokenFlow,
+                passwordFlow,
+                confirmPasswordFlow
+            ) { endpoint, token, password, confirmPassword ->
+                endpoint.trim().isNotEmpty() &&
+                token.trim().isNotEmpty() &&
+                password.trim().isNotEmpty() &&
+                confirmPassword.trim().isNotEmpty() &&
+                password == confirmPassword
+            }.collect { isEnabled ->
+                binding.btnSave.isEnabled = isEnabled
+            }
+        }
+    }
+    
+    private fun createTextWatcher(onTextChanged: (String) -> Unit): android.text.TextWatcher {
+        return object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                onTextChanged(s?.toString() ?: "")
+            }
+        }
     }
     
     private fun setupCopyToClipboardToggle() {
@@ -126,12 +173,17 @@ class SettingsFragment : Fragment() {
         val app = requireActivity().application as KeeNotesApp
         
         lifecycleScope.launch {
-            binding.endpointInput.setText(app.settingsRepository.endpointUrl.first())
-            binding.tokenInput.setText(app.settingsRepository.token.first())
+            val endpoint = app.settingsRepository.endpointUrl.first()
+            val token = app.settingsRepository.token.first()
             val password = app.settingsRepository.encryptionPassword.first()
-            binding.passwordInput.setText(password)
-            binding.passwordConfirmInput.setText(password)
-            // copyToClipboardSwitch is loaded in setupCopyToClipboardToggle()
+            
+            // Update UI on main thread
+            withContext(Dispatchers.Main) {
+                binding.endpointInput.setText(endpoint)
+                binding.tokenInput.setText(token)
+                binding.passwordInput.setText(password)
+                binding.passwordConfirmInput.setText(password)
+            }
         }
     }
     

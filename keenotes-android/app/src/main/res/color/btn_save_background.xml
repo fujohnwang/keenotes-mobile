@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Disabled state: gray/muted color -->
+    <item android:state_enabled="false" android:color="#4D8B949E" />
+    <!-- Enabled state: primary cyan color -->
+    <item android:state_enabled="true" android:color="@color/primary" />
+    <!-- Default -->
+    <item android:color="@color/primary" />
+</selector>
