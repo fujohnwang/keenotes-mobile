@@ -2,18 +2,16 @@ package cn.keevol.keenotes.ui.settings
 
 import android.content.Context
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentSettingsBinding
+import cn.keevol.keenotes.ui.MainActivity
 import cn.keevol.keenotes.util.DebugLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -144,9 +142,9 @@ class SettingsFragment : Fragment() {
         binding.statusText.text = "Saving..."
         binding.statusText.setTextColor(requireContext().getColor(R.color.text_secondary))
         
-        // Save settings and connect WebSocket in background
+        // BRANCH 1: Background save + WebSocket (completely async, no Fragment dependency)
         lifecycleScope.launch(Dispatchers.IO) {
-            DebugLogger.log("Settings", "Background save started")
+            DebugLogger.log("Settings", "Branch 1: Background save started")
             
             try {
                 // Get old settings to detect changes
@@ -175,30 +173,23 @@ class SettingsFragment : Fragment() {
                     "Settings saved ✓"
                 }
                 
-                DebugLogger.log("Settings", "About to update UI")
-                
-                // Update UI on main thread - use Handler instead of withContext
-                try {
-                    Handler(Looper.getMainLooper()).post {
-                        DebugLogger.log("Settings", "Handler.post executing, _binding=${_binding != null}")
+                // Update UI safely - check lifecycle
+                withContext(Dispatchers.Main) {
+                    DebugLogger.log("Settings", "Updating UI, isAdded=$isAdded, _binding=${_binding != null}")
+                    if (isAdded && _binding != null && activity != null) {
                         try {
-                            if (_binding != null) {
-                                binding.statusText.setTextColor(binding.root.context.getColor(R.color.success))
-                                binding.statusText.text = msg
-                                DebugLogger.log("Settings", "UI updated successfully")
-                            }
+                            binding.statusText.setTextColor(requireContext().getColor(R.color.success))
+                            binding.statusText.text = msg
+                            DebugLogger.log("Settings", "UI updated successfully")
                         } catch (e: Exception) {
                             DebugLogger.error("Settings", "UI update failed", e)
                         }
                     }
-                    DebugLogger.log("Settings", "Handler.post scheduled")
-                } catch (e: Exception) {
-                    DebugLogger.error("Settings", "Handler.post scheduling failed", e)
                 }
                 
                 // Handle WebSocket connection based on configuration state
                 if (configurationChanged && wasConfigured) {
-                    DebugLogger.log("Settings", "Branch: configurationChanged && wasConfigured")
+                    DebugLogger.log("Settings", "WebSocket: Reconfiguration detected")
                     
                     app.webSocketService.disconnect()
                     app.webSocketService.resetState()
@@ -213,32 +204,47 @@ class SettingsFragment : Fragment() {
                     }
                     
                 } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
-                    DebugLogger.log("Settings", "Branch: First time configuration")
+                    DebugLogger.log("Settings", "WebSocket: First time configuration")
                     app.webSocketService.connect()
-                    DebugLogger.log("Settings", "webSocketService.connect() called")
                     
                 } else {
-                    DebugLogger.log("Settings", "Branch: No critical configuration change")
+                    DebugLogger.log("Settings", "WebSocket: No action needed")
                 }
                 
-                DebugLogger.log("Settings", "Background save completed")
+                DebugLogger.log("Settings", "Branch 1: Completed")
                 
             } catch (e: Exception) {
-                DebugLogger.error("Settings", "Save failed", e)
-                Handler(Looper.getMainLooper()).post {
-                    try {
-                        if (_binding != null) {
+                DebugLogger.error("Settings", "Branch 1: Save failed", e)
+                withContext(Dispatchers.Main) {
+                    if (isAdded && _binding != null && activity != null) {
+                        try {
                             binding.statusText.text = "Save failed: ${e.message}"
-                            binding.statusText.setTextColor(binding.root.context.getColor(R.color.error))
+                            binding.statusText.setTextColor(requireContext().getColor(R.color.error))
+                        } catch (ex: Exception) {
+                            DebugLogger.error("Settings", "Error UI update failed", ex)
                         }
-                    } catch (ex: Exception) {
-                        DebugLogger.error("Settings", "Error UI update failed", ex)
                     }
                 }
             }
         }
         
-        DebugLogger.log("Settings", "saveSettings() returning")
+        // BRANCH 2: Delayed navigation (UI thread safe, independent of Branch 1)
+        view?.postDelayed({
+            DebugLogger.log("Settings", "Branch 2: Navigation delay completed")
+            if (isAdded && activity != null) {
+                try {
+                    DebugLogger.log("Settings", "Branch 2: Navigating to Note")
+                    (activity as? MainActivity)?.navigateToNote()
+                    DebugLogger.log("Settings", "Branch 2: Navigation triggered")
+                } catch (e: Exception) {
+                    DebugLogger.error("Settings", "Branch 2: Navigation failed", e)
+                }
+            } else {
+                DebugLogger.log("Settings", "Branch 2: Fragment not attached, skipping navigation")
+            }
+        }, 500)
+        
+        DebugLogger.log("Settings", "saveSettings() returning (both branches started)")
     }
     
     override fun onDestroyView() {
