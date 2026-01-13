@@ -131,6 +131,26 @@
                 android:textColor="@color/warning"
                 android:textSize="12sp" />
 
+            <!-- Save Button -->
+            <Button
+                android:id="@+id/btnSave"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="24dp"
+                android:text="@string/settings_save"
+                android:textColor="@color/background"
+                android:backgroundTint="@color/primary"
+                app:cornerRadius="8dp" />
+
+            <!-- Status Text -->
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary" />
+
             <!-- Preferences Section -->
             <TextView
                 android:layout_width="wrap_content"
@@ -170,26 +190,6 @@
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:padding="12dp" />
-
-            <!-- Save Button -->
-            <Button
-                android:id="@+id/btnSave"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="24dp"
-                android:text="@string/settings_save"
-                android:textColor="@color/background"
-                android:backgroundTint="@color/primary"
-                app:cornerRadius="8dp" />
-
-            <!-- Status Text -->
-            <TextView
-                android:id="@+id/statusText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:textSize="14sp"
-                android:textColor="@color/text_secondary" />
 
             <!-- Debug Section (hidden by default) -->
             <LinearLayout

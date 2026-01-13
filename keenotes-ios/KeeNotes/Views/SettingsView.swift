@@ -47,25 +47,6 @@ struct SettingsView: View {
                         .textInputAutocapitalization(.never)
                 }
                 
-                // Preferences
-                Section(header: Text("Preferences")) {
-                    Toggle("Copy to clipboard on post success", isOn: Binding(
-                        get: { appState.settingsService.copyToClipboardOnPost },
-                        set: { appState.settingsService.copyToClipboardOnPost = $0 }
-                    ))
-                    
-                    Toggle("Show Overview Card", isOn: Binding(
-                        get: { appState.settingsService.showOverviewCard },
-                        set: { appState.settingsService.showOverviewCard = $0 }
-                    ))
-                    
-                    Toggle("Auto-focus input on launch", isOn: Binding(
-                        get: { appState.settingsService.autoFocusInputOnLaunch },
-                        set: { appState.settingsService.autoFocusInputOnLaunch = $0 }
-                    ))
-                }
-                .font(.body)
-                
                 // Save button
                 Section {
                     Button(action: saveSettings) {
@@ -85,6 +66,25 @@ struct SettingsView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
+                
+                // Preferences
+                Section(header: Text("Preferences")) {
+                    Toggle("Copy to clipboard on post success", isOn: Binding(
+                        get: { appState.settingsService.copyToClipboardOnPost },
+                        set: { appState.settingsService.copyToClipboardOnPost = $0 }
+                    ))
+                    
+                    Toggle("Show Overview Card", isOn: Binding(
+                        get: { appState.settingsService.showOverviewCard },
+                        set: { appState.settingsService.showOverviewCard = $0 }
+                    ))
+                    
+                    Toggle("Auto-focus input on launch", isOn: Binding(
+                        get: { appState.settingsService.autoFocusInputOnLaunch },
+                        set: { appState.settingsService.autoFocusInputOnLaunch = $0 }
+                    ))
+                }
+                .font(.body)
                 
                 // Debug section (hidden by default)
                 if showDebugSection {
