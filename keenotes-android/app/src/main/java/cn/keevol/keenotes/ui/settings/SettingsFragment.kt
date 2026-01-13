@@ -98,7 +98,12 @@ class SettingsFragment : Fragment() {
         }
         
         binding.btnDebug.setOnClickListener {
-            findNavController().navigate(R.id.action_settings_to_debug)
+            // Navigate to debug logs fragment
+            try {
+                androidx.navigation.fragment.findNavController(this).navigate(R.id.action_settings_to_debug)
+            } catch (e: Exception) {
+                DebugLogger.error("Settings", "Failed to navigate to debug", e)
+            }
         }
     }
     
