@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentSettingsBinding
@@ -100,7 +101,7 @@ class SettingsFragment : Fragment() {
         binding.btnDebug.setOnClickListener {
             // Navigate to debug logs fragment
             try {
-                androidx.navigation.fragment.findNavController(this).navigate(R.id.action_settings_to_debug)
+                findNavController().navigate(R.id.action_settings_to_debug)
             } catch (e: Exception) {
                 DebugLogger.error("Settings", "Failed to navigate to debug", e)
             }
