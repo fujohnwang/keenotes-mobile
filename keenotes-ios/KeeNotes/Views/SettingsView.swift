@@ -58,6 +58,11 @@ struct SettingsView: View {
                         get: { appState.settingsService.showOverviewCard },
                         set: { appState.settingsService.showOverviewCard = $0 }
                     ))
+                    
+                    Toggle("Auto-focus input on launch", isOn: Binding(
+                        get: { appState.settingsService.autoFocusInputOnLaunch },
+                        set: { appState.settingsService.autoFocusInputOnLaunch = $0 }
+                    ))
                 }
                 .font(.body)
                 

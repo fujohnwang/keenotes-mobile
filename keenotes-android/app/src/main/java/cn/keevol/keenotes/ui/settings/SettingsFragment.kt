@@ -53,6 +53,7 @@ class SettingsFragment : Fragment() {
         lifecycleScope.launch {
             binding.copyToClipboardSwitch.isChecked = app.settingsRepository.copyToClipboardOnPost.first()
             binding.showOverviewCardSwitch.isChecked = app.settingsRepository.showOverviewCard.first()
+            binding.autoFocusInputSwitch.isChecked = app.settingsRepository.autoFocusInputOnLaunch.first()
         }
         
         // Auto-save on toggle change
@@ -65,6 +66,12 @@ class SettingsFragment : Fragment() {
         binding.showOverviewCardSwitch.setOnCheckedChangeListener { _, isChecked ->
             lifecycleScope.launch {
                 app.settingsRepository.setShowOverviewCard(isChecked)
+            }
+        }
+        
+        binding.autoFocusInputSwitch.setOnCheckedChangeListener { _, isChecked ->
+            lifecycleScope.launch {
+                app.settingsRepository.setAutoFocusInputOnLaunch(isChecked)
             }
         }
     }

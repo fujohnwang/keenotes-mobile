@@ -17,6 +17,7 @@ import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentNoteBinding
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class NoteFragment : Fragment() {
@@ -41,6 +42,27 @@ class NoteFragment : Fragment() {
         setupNoteInput()
         setupSendButton()
         setupSendChannelStatus()
+        setupAutoFocusInput()
+    }
+    
+    private fun setupAutoFocusInput() {
+        val app = requireActivity().application as KeeNotesApp
+        
+        // Check if auto-focus is enabled and focus input
+        viewLifecycleOwner.lifecycleScope.launch {
+            val autoFocus = app.settingsRepository.autoFocusInputOnLaunch.first()
+            if (autoFocus && _binding != null) {
+                // Post to ensure view is fully laid out
+                binding.noteInput.post {
+                    if (_binding != null && isAdded) {
+                        binding.noteInput.requestFocus()
+                        // Show keyboard
+                        val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                        imm.showSoftInput(binding.noteInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                    }
+                }
+            }
+        }
     }
     
     private fun setupOverviewCard() {
