@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		1522A18793715A66AF3C5B1E /* encoding.c in Sources */ = {isa = PBXBuildFile; fileRef = CD8A13501AA7A7CAB9DD2D6B /* encoding.c */; };
 		185B386682B6638BD824635B /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516619C5BAA926CB01F4B456 /* DatabaseService.swift */; };
+		1FFF7BD4F1D6ED72F2E2FA18 /* OverviewCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FC4DD3D4698E0F2A59FF2 /* OverviewCardView.swift */; };
 		2FAF71FD90FB24A293D9C1DC /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = 599C37F5BE3DA3E0B0E48AD9 /* core.c */; };
 		34FEEF16981E07FC6FB35260 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBFDFFD9FC62E4A40312B79 /* SearchView.swift */; };
 		382B7B75B8E85659AAED35AD /* SettingsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC56614EF00CDBBE7B740F99 /* SettingsService.swift */; };
@@ -47,6 +48,7 @@
 		599C37F5BE3DA3E0B0E48AD9 /* core.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = core.c; sourceTree = "<group>"; };
 		6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		6D467341E90F4D144FCEC974 /* argon2.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = argon2.c; sourceTree = "<group>"; };
+		764FC4DD3D4698E0F2A59FF2 /* OverviewCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewCardView.swift; sourceTree = "<group>"; };
 		76A65FB003A8C97D156D2E71 /* core.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = core.h; sourceTree = "<group>"; };
 		87901956656FA3E18B94F424 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
 		8E07C8BA817350735F9023F6 /* blamka-round-opt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blamka-round-opt.h"; sourceTree = "<group>"; };
@@ -92,6 +94,7 @@
 				E71854385AA7C1EECC7F20F2 /* DebugView.swift */,
 				A9040A9739D8D0416CE13A31 /* MainTabView.swift */,
 				BC48816DBEEFEE56707E5302 /* NoteView.swift */,
+				764FC4DD3D4698E0F2A59FF2 /* OverviewCardView.swift */,
 				87901956656FA3E18B94F424 /* ReviewView.swift */,
 				4DBFDFFD9FC62E4A40312B79 /* SearchView.swift */,
 				6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */,
@@ -266,6 +269,7 @@
 				E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */,
 				6D81FA454D6E54D241F31894 /* Note.swift in Sources */,
 				E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */,
+				1FFF7BD4F1D6ED72F2E2FA18 /* OverviewCardView.swift in Sources */,
 				9E1AA8C7DADD4E82A4D437BC /* ReviewView.swift in Sources */,
 				34FEEF16981E07FC6FB35260 /* SearchView.swift in Sources */,
 				382B7B75B8E85659AAED35AD /* SettingsService.swift in Sources */,

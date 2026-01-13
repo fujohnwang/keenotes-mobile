@@ -38,7 +38,7 @@ public class OverviewCard extends HBox {
         totalNotesValue = new Label("0");
         totalNotesValue.getStyleClass().add("overview-value");
         
-        Label totalNotesLabel = new Label("Notes (7 days)");
+        Label totalNotesLabel = new Label("Total Notes");
         totalNotesLabel.getStyleClass().add("overview-label");
         
         totalNotesBox.getChildren().addAll(totalNotesValue, totalNotesLabel);
@@ -76,12 +76,46 @@ public class OverviewCard extends HBox {
         daysUsingProperty.addListener((obs, oldVal, newVal) -> 
             daysUsingValue.setText(String.valueOf(newVal.intValue())));
         
-        // Start update thread
-        startUpdateThread();
+        // Initialize data binding
+        initializeDataBinding();
     }
     
     /**
-     * Update total notes count
+     * Initialize reactive data binding
+     */
+    private void initializeDataBinding() {
+        new Thread(() -> {
+            try {
+                // Wait for ServiceManager to be ready
+                ServiceManager serviceManager = ServiceManager.getInstance();
+                while (serviceManager.getLocalCacheState() != ServiceManager.InitializationState.READY) {
+                    Thread.sleep(100);
+                }
+                
+                LocalCacheService cache = serviceManager.getLocalCacheService();
+                
+                // Bind to note count property
+                Platform.runLater(() -> {
+                    totalNotesProperty.bind(cache.noteCountProperty());
+                });
+                
+                // Initialize first note date if needed
+                if (cache.getLocalNoteCount() > 0) {
+                    SettingsService settings = SettingsService.getInstance();
+                    if (settings.getFirstNoteDate() == null) {
+                        initializeFirstNoteDate();
+                    } else {
+                        updateDaysUsing();
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[OverviewCard] Failed to initialize data binding: " + e.getMessage());
+            }
+        }, "OverviewCardInit").start();
+    }
+    
+    /**
+     * Update total notes count (called when note count property changes)
      */
     public void updateTotalNotes(int count) {
         Platform.runLater(() -> totalNotesProperty.set(count));
@@ -141,32 +175,5 @@ public class OverviewCard extends HBox {
                 System.err.println("[OverviewCard] Failed to initialize first note date: " + e.getMessage());
             }
         }, "InitFirstNoteDate").start();
-    }
-    
-    /**
-     * Start background thread to update note count and days using
-     */
-    private void startUpdateThread() {
-        Thread updateThread = new Thread(() -> {
-            while (true) {
-                try {
-                    Thread.sleep(5000); // Update every 5 seconds
-                    
-                    ServiceManager serviceManager = ServiceManager.getInstance();
-                    if (serviceManager.getLocalCacheState() == ServiceManager.InitializationState.READY) {
-                        LocalCacheService cache = serviceManager.getLocalCacheService();
-                        int count = cache.getLocalNoteCount();
-                        updateTotalNotes(count);
-                        updateDaysUsing();
-                    }
-                } catch (InterruptedException e) {
-                    break;
-                } catch (Exception e) {
-                    // Continue on error
-                }
-            }
-        }, "OverviewCardUpdate");
-        updateThread.setDaemon(true);
-        updateThread.start();
     }
 }

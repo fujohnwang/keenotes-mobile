@@ -345,8 +345,8 @@ class WebSocketService: NSObject, ObservableObject {
                 content = try cryptoService.decryptWithPassword(encryptedContent, password: password)
                 print("[WS] Decrypted note \(id) successfully")
             } catch {
-                print("[WS] Failed to decrypt note \(id): \(error)")
-                content = "[Decryption failed: \(error.localizedDescription)]"
+                print("[WS] Failed to decrypt note \(id): \(error), storing encrypted content")
+                content = encryptedContent
             }
         } else {
             print("[WS] No encryption password, using raw content for note \(id)")

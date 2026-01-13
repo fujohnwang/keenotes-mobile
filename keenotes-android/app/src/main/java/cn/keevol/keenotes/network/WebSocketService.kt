@@ -503,9 +503,9 @@ class WebSocketService(
                     Log.i(TAG, "Decrypted note $id successfully, length=${decrypted.length}")
                     decrypted
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to decrypt note $id: ${e.message}", e)
+                    Log.e(TAG, "Failed to decrypt note $id: ${e.message}, storing encrypted content", e)
                     e.printStackTrace()
-                    "[Decryption failed: ${e.message}]"
+                    encryptedContent
                 }
             } else {
                 Log.w(TAG, "No encryption password, using raw content for note $id")

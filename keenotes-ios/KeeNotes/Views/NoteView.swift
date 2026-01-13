@@ -10,16 +10,17 @@ struct NoteView: View {
     @State private var errorMessage = ""
     @State private var isPosting = false
     @FocusState private var isTextFieldFocused: Bool
+    @State private var keyboardVisible = false
     
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Overview Card (conditionally shown)
-                if appState.settingsService.showOverviewCard {
+                // Overview Card (conditionally shown - hide when keyboard is visible)
+                if appState.settingsService.showOverviewCard && !keyboardVisible {
                     OverviewCardView()
                         .environmentObject(appState)
-                        .padding(.horizontal)
-                        .padding(.top, 16)
+                        .padding(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 
                 // Main content
@@ -104,6 +105,12 @@ struct NoteView: View {
             }
             .navigationTitle("KeeNotes")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                setupKeyboardObservers()
+            }
+            .onDisappear {
+                removeKeyboardObservers()
+            }
             .toolbar {
                 // Search button (right)
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -232,6 +239,33 @@ struct NoteView: View {
                 }
             }
         }
+    }
+    
+    private func setupKeyboardObservers() {
+        NotificationCenter.default.addObserver(
+            forName: UIResponder.keyboardWillShowNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            withAnimation(.easeOut(duration: 0.25)) {
+                keyboardVisible = true
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIResponder.keyboardWillHideNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            withAnimation(.easeOut(duration: 0.25)) {
+                keyboardVisible = false
+            }
+        }
+    }
+    
+    private func removeKeyboardObservers() {
+        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
     }
 }
 
