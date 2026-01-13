@@ -20,6 +20,7 @@ public class SettingsView extends BorderPane {
     private final SettingsService settings;
     private final Runnable onBack;
     private final ToggleSwitch copyToClipboardToggle;
+    private final ToggleSwitch showOverviewCardToggle;
     private final TextField searchShortcutField;
 
     public SettingsView(Runnable onBack) {
@@ -90,6 +91,20 @@ public class SettingsView extends BorderPane {
         toggleRow.setAlignment(Pos.CENTER_LEFT);
         toggleRow.setPadding(new Insets(4, 0, 4, 0)); // Add vertical padding
         
+        // Show Overview Card toggle
+        showOverviewCardToggle = new ToggleSwitch();
+        showOverviewCardToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            settings.setShowOverviewCard(newVal);
+            settings.save();
+        });
+        
+        Label overviewCardLabel = new Label("Show Overview Card");
+        overviewCardLabel.getStyleClass().add("field-label");
+        
+        HBox overviewCardRow = new HBox(12, overviewCardLabel, showOverviewCardToggle);
+        overviewCardRow.setAlignment(Pos.CENTER_LEFT);
+        overviewCardRow.setPadding(new Insets(4, 0, 4, 0));
+        
         // Search shortcut configuration
         Label shortcutLabel = new Label("Search shortcut");
         shortcutLabel.getStyleClass().add("field-label");
@@ -107,7 +122,7 @@ public class SettingsView extends BorderPane {
         shortcutRow.setAlignment(Pos.CENTER_LEFT);
         
         // Preferences container with proper spacing
-        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, shortcutRow, shortcutHint);
+        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, shortcutRow, shortcutHint);
         preferencesSection.setPadding(new Insets(8, 0, 8, 0)); // Add top/bottom padding
 
         // Debug entry (hidden by default) - removed for desktop version
@@ -178,6 +193,7 @@ public class SettingsView extends BorderPane {
         encryptionPasswordField.setText(savedPassword);
         encryptionPasswordConfirmField.setText(savedPassword);
         copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
+        showOverviewCardToggle.setSelected(settings.getShowOverviewCard());
         searchShortcutField.setText(settings.getSearchShortcut());
     }
 

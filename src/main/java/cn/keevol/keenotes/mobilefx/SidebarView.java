@@ -40,6 +40,15 @@ public class SidebarView extends VBox {
         // Logo area with icon and text
         HBox logoArea = createLogoArea();
         
+        // Overview Card (conditionally shown)
+        OverviewCard overviewCard = new OverviewCard();
+        overviewCard.setMaxWidth(Double.MAX_VALUE);
+        
+        // Bind visibility to settings
+        SettingsService settings = SettingsService.getInstance();
+        overviewCard.setVisible(settings.getShowOverviewCard());
+        overviewCard.setManaged(settings.getShowOverviewCard());
+        
         // Navigation buttons with PNG icons
         noteButton = new NavigationButton("Note", createNoteIcon(), true);
         noteButton.setOnAction(e -> onNavigationChanged.accept(DesktopMainView.ViewMode.NOTE));
@@ -68,6 +77,7 @@ public class SidebarView extends VBox {
         // Add all components (no status area)
         getChildren().addAll(
             logoArea,
+            overviewCard,
             navigationGroup,
             spacer
         );

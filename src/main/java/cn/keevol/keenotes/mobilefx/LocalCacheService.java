@@ -477,6 +477,22 @@ public class LocalCacheService {
         }
         return 0;
     }
+    
+    public String getOldestNoteDate() {
+        ensureInitialized();
+        String sql = "SELECT MIN(created_at) FROM notes_cache";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            if (rs.next()) {
+                return rs.getString(1);
+            }
+        } catch (SQLException e) {
+            // Get oldest note date failed
+        }
+        return null;
+    }
 
     public void close() {
         try {

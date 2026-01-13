@@ -37,9 +37,62 @@ class NoteFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         
         setupToolbar()
+        setupOverviewCard()
         setupNoteInput()
         setupSendButton()
         setupSendChannelStatus()
+    }
+    
+    private fun setupOverviewCard() {
+        val app = requireActivity().application as KeeNotesApp
+        
+        // Observe showOverviewCard setting
+        lifecycleScope.launch {
+            app.settingsRepository.showOverviewCard.collectLatest { show ->
+                binding.overviewCardInclude.root.visibility = if (show) View.VISIBLE else View.GONE
+            }
+        }
+        
+        // Observe note count
+        lifecycleScope.launch {
+            app.database.noteDao().getNoteCountFlow().collectLatest { count ->
+                binding.overviewCardInclude.totalNotesValue.text = count.toString()
+                
+                // Initialize first note date if needed
+                if (count > 0) {
+                    val firstDate = app.settingsRepository.getFirstNoteDate()
+                    if (firstDate == null) {
+                        val oldestDate = app.database.noteDao().getOldestNoteDate()
+                        if (oldestDate != null) {
+                            app.settingsRepository.setFirstNoteDate(oldestDate)
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Observe first note date and calculate days
+        lifecycleScope.launch {
+            app.settingsRepository.firstNoteDate.collectLatest { firstDate ->
+                if (firstDate != null) {
+                    val days = calculateDaysUsing(firstDate)
+                    binding.overviewCardInclude.daysUsingValue.text = days.toString()
+                } else {
+                    binding.overviewCardInclude.daysUsingValue.text = "0"
+                }
+            }
+        }
+    }
+    
+    private fun calculateDaysUsing(firstDateStr: String): Int {
+        return try {
+            val formatter = java.time.format.DateTimeFormatter.ISO_DATE_TIME
+            val firstDate = java.time.LocalDateTime.parse(firstDateStr, formatter).toLocalDate()
+            val today = java.time.LocalDate.now()
+            java.time.temporal.ChronoUnit.DAYS.between(firstDate, today).toInt() + 1
+        } catch (e: Exception) {
+            0
+        }
     }
     
     private fun setupToolbar() {

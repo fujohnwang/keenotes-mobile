@@ -21,6 +21,8 @@ public class SettingsService {
     private static final String KEY_ENCRYPTION_PASSWORD = "encryption.password";
     private static final String KEY_COPY_TO_CLIPBOARD = "copy.to.clipboard.on.post";
     private static final String KEY_SEARCH_SHORTCUT = "shortcut.search";
+    private static final String KEY_SHOW_OVERVIEW_CARD = "show.overview.card";
+    private static final String KEY_FIRST_NOTE_DATE = "first.note.date";
     private static final int DEFAULT_REVIEW_DAYS = 7;
     private static final String DEFAULT_SEARCH_SHORTCUT = "Alt+Shift+S";
 
@@ -151,5 +153,25 @@ public class SettingsService {
     
     public void setSearchShortcut(String shortcut) {
         properties.setProperty(KEY_SEARCH_SHORTCUT, shortcut);
+    }
+    
+    public boolean getShowOverviewCard() {
+        return Boolean.parseBoolean(properties.getProperty(KEY_SHOW_OVERVIEW_CARD, "true"));
+    }
+    
+    public void setShowOverviewCard(boolean enabled) {
+        properties.setProperty(KEY_SHOW_OVERVIEW_CARD, String.valueOf(enabled));
+    }
+    
+    public String getFirstNoteDate() {
+        return properties.getProperty(KEY_FIRST_NOTE_DATE);
+    }
+    
+    public void setFirstNoteDate(String date) {
+        if (date == null || date.isEmpty()) {
+            properties.remove(KEY_FIRST_NOTE_DATE);
+        } else {
+            properties.setProperty(KEY_FIRST_NOTE_DATE, date);
+        }
     }
 }

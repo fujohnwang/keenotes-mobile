@@ -25,6 +25,12 @@ interface NoteDao {
     @Query("SELECT COUNT(*) FROM notes")
     suspend fun getNoteCount(): Int
     
+    @Query("SELECT COUNT(*) FROM notes")
+    fun getNoteCountFlow(): Flow<Int>
+    
+    @Query("SELECT MIN(createdAt) FROM notes")
+    suspend fun getOldestNoteDate(): String?
+    
     @Query("SELECT MAX(id) FROM notes")
     suspend fun getMaxId(): Long?
     

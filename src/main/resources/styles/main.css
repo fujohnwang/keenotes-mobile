@@ -1050,3 +1050,30 @@
     -fx-pref-height: 36px;
     -fx-max-height: 36px;
 }
+
+/* Overview Card */
+.overview-card {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-background-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 2);
+}
+
+.overview-section {
+    -fx-spacing: 8px;
+}
+
+.overview-value {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-primary;
+}
+
+.overview-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.overview-divider {
+    -fx-background-color: -fx-text-secondary;
+    -fx-opacity: 0.2;
+}
