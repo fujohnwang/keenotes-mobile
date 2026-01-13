@@ -96,6 +96,9 @@ class NoteFragment : Fragment() {
     }
     
     private fun updateSendChannelStatus(configured: Boolean) {
+        // Check if view is still attached
+        if (_binding == null || !isAdded) return
+        
         val (text, color) = if (!configured) {
             "Not Configured" to requireContext().getColor(R.color.warning)
         } else {
