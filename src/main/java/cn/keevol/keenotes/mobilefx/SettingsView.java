@@ -120,9 +120,11 @@ public class SettingsView extends BorderPane {
 
         VBox footer = new VBox(4, copyrightLabel, websiteLabel);
         footer.setAlignment(Pos.CENTER);
+        footer.setPadding(new Insets(12, 0, 12, 0));
+        footer.getStyleClass().add("footer-fixed");
 
         // Encryption hint
-        Label encryptionHint = new Label("Leave both empty to disable E2E encryption");
+        Label encryptionHint = new Label("You MUST set password to enable E2E encryption");
         encryptionHint.getStyleClass().add("field-hint");
 
         // Preferences section
@@ -200,7 +202,6 @@ public class SettingsView extends BorderPane {
                 saveButtonRow,
                 statusRow,
                 preferencesSection,
-                footer,
                 debugSection
         );
         form.setPadding(new Insets(24));
@@ -210,6 +211,9 @@ public class SettingsView extends BorderPane {
         scrollPane.setFitToWidth(true);
         scrollPane.getStyleClass().add("content-scroll");
         setCenter(scrollPane);
+        
+        // Set footer at bottom (fixed position)
+        setBottom(footer);
 
         loadSettings();
     }
