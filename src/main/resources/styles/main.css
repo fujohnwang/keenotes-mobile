@@ -697,7 +697,8 @@
 
 /* Sidebar */
 .sidebar {
-    -fx-background-color: -fx-surface;
+    /* Subtle gradient background for depth */
+    -fx-background-color: linear-gradient(to bottom, #161B22, #0D1117);
     -fx-border-color: -fx-border;
     -fx-border-width: 0 1 0 0;
 }
@@ -735,19 +736,21 @@
 }
 
 .navigation-group {
-    -fx-padding: 8 0;
+    -fx-padding: 12 0;
 }
 
+/* Floating pill-style navigation buttons */
 .navigation-button {
     -fx-background-color: transparent;
-    -fx-text-fill: -fx-text-primary;
-    -fx-background-radius: 8px;
+    -fx-text-fill: #8B949E; /* Muted gray for unselected */
+    -fx-background-radius: 10px;
     -fx-cursor: hand;
     -fx-padding: 0;
 }
 
 .navigation-button:hover {
-    -fx-background-color: rgba(0, 212, 255, 0.1);
+    -fx-background-color: rgba(0, 212, 255, 0.12);
+    -fx-text-fill: -fx-text-primary;
 }
 
 /* Review Periods Panel */
@@ -757,15 +760,16 @@
 
 .period-button {
     -fx-background-color: transparent;
-    -fx-text-fill: -fx-text-secondary;
-    -fx-background-radius: 6px;
-    -fx-padding: 8 12;
+    -fx-text-fill: #8B949E; /* Muted gray */
+    -fx-background-radius: 8px;
+    -fx-padding: 8 16;
     -fx-cursor: hand;
     -fx-font-size: 13px;
 }
 
 .period-button:hover {
-    -fx-background-color: rgba(0, 212, 255, 0.1);
+    -fx-background-color: rgba(0, 212, 255, 0.12);
+    -fx-text-fill: -fx-text-primary;
 }
 
 /* Main Content Area */
@@ -1051,11 +1055,14 @@
     -fx-max-height: 36px;
 }
 
-/* Overview Card */
+/* Overview Card - Weakened background */
 .overview-card {
-    -fx-background-color: -fx-surface-elevated;
+    -fx-background-color: rgba(33, 38, 45, 0.3); /* Low opacity background */
     -fx-background-radius: 12px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 2);
+    -fx-border-color: rgba(48, 54, 61, 0.5); /* Subtle border */
+    -fx-border-width: 1;
+    -fx-border-radius: 12px;
+    /* Removed heavy shadow for cleaner look */
 }
 
 .overview-section {
@@ -1063,17 +1070,17 @@
 }
 
 .overview-value {
-    -fx-font-size: 28px;
+    -fx-font-size: 26px; /* Slightly smaller */
     -fx-font-weight: bold;
-    -fx-text-fill: -fx-primary;
+    -fx-text-fill: rgba(34, 211, 238, 0.9); /* Slightly muted cyan */
 }
 
 .overview-label {
-    -fx-font-size: 12px;
-    -fx-text-fill: -fx-text-secondary;
+    -fx-font-size: 11px; /* Slightly smaller */
+    -fx-text-fill: rgba(139, 148, 158, 0.8); /* More muted */
 }
 
 .overview-divider {
     -fx-background-color: -fx-text-secondary;
-    -fx-opacity: 0.2;
+    -fx-opacity: 0.15; /* More subtle divider */
 }
