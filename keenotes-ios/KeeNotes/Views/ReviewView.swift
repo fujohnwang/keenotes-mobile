@@ -5,10 +5,14 @@ struct ReviewView: View {
     @EnvironmentObject var appState: AppState
     @State private var notes: [Note] = []
     @State private var isLoading = false
+    @State private var isLoadingMore = false
     @State private var selectedPeriod = 0  // 0: 7 days, 1: 30 days, 2: 90 days, 3: All
+    @State private var totalCount = 0
+    @State private var hasMoreData = true
     
     private let periods = ["7 days", "30 days", "90 days", "All"]
     private let periodDays = [7, 30, 90, 0]  // 0 means all
+    private let pageSize = 20
     
     var body: some View {
         NavigationView {
@@ -75,6 +79,27 @@ struct ReviewView: View {
                                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                     .listRowSeparator(.hidden)
                                     .listRowBackground(Color.clear)
+                                    .onAppear {
+                                        // Load more when approaching the end
+                                        if note.id == notes.last?.id && hasMoreData && !isLoadingMore {
+                                            Task {
+                                                await loadMoreNotes()
+                                            }
+                                        }
+                                    }
+                            }
+                            
+                            // Loading indicator at bottom
+                            if isLoadingMore {
+                                HStack {
+                                    Spacer()
+                                    ProgressView()
+                                        .padding()
+                                    Spacer()
+                                }
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
                             }
                         }
                         .listStyle(.plain)
@@ -122,18 +147,51 @@ struct ReviewView: View {
     
     private func loadNotes() async {
         isLoading = true
+        hasMoreData = true
         defer { isLoading = false }
         
         do {
-            // Load by period
-            let loadedNotes = try await appState.databaseService.getNotesByPeriod(days: periodDays[selectedPeriod])
+            // Get total count
+            totalCount = try await appState.databaseService.getNotesCountByPeriod(days: periodDays[selectedPeriod])
             
-            print("[ReviewView] Loaded \(loadedNotes.count) notes from database")
+            // Load first page
+            let loadedNotes = try await appState.databaseService.getNotesByPeriodPaged(
+                days: periodDays[selectedPeriod],
+                limit: pageSize,
+                offset: 0
+            )
+            
+            print("[ReviewView] Loaded \(loadedNotes.count) of \(totalCount) notes from database")
             await MainActor.run {
                 notes = loadedNotes
+                hasMoreData = notes.count < totalCount
             }
         } catch {
             print("[ReviewView] Failed to load notes: \(error)")
+        }
+    }
+    
+    private func loadMoreNotes() async {
+        guard !isLoadingMore && hasMoreData else { return }
+        
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        
+        do {
+            let loadedNotes = try await appState.databaseService.getNotesByPeriodPaged(
+                days: periodDays[selectedPeriod],
+                limit: pageSize,
+                offset: notes.count
+            )
+            
+            print("[ReviewView] Loaded \(loadedNotes.count) more notes (total: \(notes.count + loadedNotes.count)/\(totalCount))")
+            
+            await MainActor.run {
+                notes.append(contentsOf: loadedNotes)
+                hasMoreData = notes.count < totalCount
+            }
+        } catch {
+            print("[ReviewView] Failed to load more notes: \(error)")
         }
     }
     
@@ -158,7 +216,7 @@ struct ReviewView: View {
     // MARK: - Notes Count Text
     
     private var notesCountText: String {
-        let count = notes.count
+        let count = totalCount > 0 ? totalCount : notes.count
         let periodInfo: String
         
         // Show period info

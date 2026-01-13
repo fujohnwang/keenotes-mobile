@@ -226,7 +226,7 @@ public class MainContentArea extends StackPane {
                     
                     System.out.println("[MainContentArea] Loading notes for " + days + " days");
                     
-                    var notes = localCache.getNotesForReview(days);
+                    int totalCount = localCache.getNotesCountForReview(days);
                     
                     // Format period info for display
                     String periodInfo = switch (period) {
@@ -237,13 +237,13 @@ public class MainContentArea extends StackPane {
                         default -> "Last 7 days";
                     };
                     
-                    System.out.println("[MainContentArea] Period info: " + periodInfo + ", notes count: " + notes.size());
+                    System.out.println("[MainContentArea] Period info: " + periodInfo + ", notes count: " + totalCount);
                     
                     Platform.runLater(() -> {
-                        if (notes.isEmpty()) {
+                        if (totalCount == 0) {
                             reviewNotesPanel.showEmptyState("No notes found for " + period);
                         } else {
-                            reviewNotesPanel.displayNotes(notes, periodInfo);
+                            reviewNotesPanel.displayNotesWithPagination(totalCount, localCache, days, periodInfo);
                         }
                     });
                 } else if (state == ServiceManager.InitializationState.INITIALIZING) {
@@ -429,6 +429,7 @@ public class MainContentArea extends StackPane {
     
     /**
      * Check for new notes and add them incrementally with animation
+     * Only checks the most recent notes (not all notes)
      */
     private void checkAndAddNewNotes() {
         new Thread(() -> {
@@ -438,11 +439,13 @@ public class MainContentArea extends StackPane {
                 
                 if (state == ServiceManager.InitializationState.READY) {
                     localCache = serviceManager.getLocalCacheService();
-                    var allNotes = localCache.getNotesForReview(7); // Last 7 days
+                    
+                    // Only check the most recent 10 notes (not all notes)
+                    var recentNotes = localCache.getNotesPaged(0, 10);
                     
                     // Find new notes (not in displayedNoteIds)
                     java.util.List<LocalCacheService.NoteData> newNotes = new java.util.ArrayList<>();
-                    for (var note : allNotes) {
+                    for (var note : recentNotes) {
                         if (!displayedNoteIds.contains(note.id)) {
                             newNotes.add(note);
                         }
@@ -515,21 +518,24 @@ public class MainContentArea extends StackPane {
                     return;
                 }
                 
-                var notes = localCache.getNotesForReview(7);
+                int totalCount = localCache.getLocalNoteCount();
                 
                 // Track displayed note IDs for incremental updates
                 displayedNoteIds.clear();
-                for (var note : notes) {
-                    displayedNoteIds.add(note.id);
-                }
                 
                 Platform.runLater(() -> {
-                    if (notes.isEmpty()) {
-                        notesDisplayPanel.showEmptyState("No recent notes (last 7 days)");
+                    if (totalCount == 0) {
+                        notesDisplayPanel.showEmptyState("No notes found");
                     } else {
-                        notesDisplayPanel.displayNotes(notes);
+                        notesDisplayPanel.displayNotesWithPagination(totalCount, localCache, 0, null, 
+                            (notes) -> {
+                                // Callback: track loaded note IDs
+                                for (var note : notes) {
+                                    displayedNoteIds.add(note.id);
+                                }
+                            });
                     }
-                    System.out.println("[MainContentArea] Note list loaded with " + notes.size() + " notes");
+                    System.out.println("[MainContentArea] Note list loaded with " + totalCount + " total notes");
                 });
             } catch (Exception e) {
                 e.printStackTrace();

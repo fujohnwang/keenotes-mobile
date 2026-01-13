@@ -1,6 +1,8 @@
 package cn.keevol.keenotes.mobilefx;
 
 import com.gluonhq.attach.storage.StorageService;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -32,11 +34,18 @@ public class LocalCacheService {
     
     // 用于追踪初始化步骤
     private volatile String initStep = "not started";
+    
+    // Reactive property for note count
+    private final IntegerProperty noteCountProperty = new SimpleIntegerProperty(0);
 
     private LocalCacheService() {
         this.cryptoService = new CryptoService();
         this.isAndroid = detectAndroid();
         this.dbPathString = resolveDbPath();
+    }
+    
+    public IntegerProperty noteCountProperty() {
+        return noteCountProperty;
     }
     
     private boolean detectAndroid() {
@@ -63,6 +72,8 @@ public class LocalCacheService {
         if (!initialized) {
             initDatabase();
             initialized = true;
+            // Initialize note count property
+            refreshNoteCount();
         }
     }
 
@@ -327,6 +338,9 @@ public class LocalCacheService {
             pstmt.executeBatch();
             connection.commit();
             connection.setAutoCommit(true);
+            
+            // Update note count property
+            refreshNoteCount();
         }
     }
 
@@ -341,6 +355,21 @@ public class LocalCacheService {
             pstmt.setString(4, note.createdAt);
             pstmt.setString(5, note.encryptedContent);
             pstmt.executeUpdate();
+            
+            // Update note count property
+            refreshNoteCount();
+        }
+    }
+    
+    /**
+     * Refresh note count property from database
+     */
+    private void refreshNoteCount() {
+        try {
+            int count = getLocalNoteCount();
+            javafx.application.Platform.runLater(() -> noteCountProperty.set(count));
+        } catch (Exception e) {
+            // Ignore errors
         }
     }
 
@@ -474,6 +503,92 @@ public class LocalCacheService {
             }
         } catch (SQLException e) {
             // Get note count failed
+        }
+        return 0;
+    }
+
+    /**
+     * Get notes with pagination for lazy loading
+     * @param offset Starting position (0-based)
+     * @param limit Number of notes to fetch
+     * @return List of notes
+     */
+    public List<NoteData> getNotesPaged(int offset, int limit) {
+        ensureInitialized();
+        List<NoteData> results = new ArrayList<>();
+        String sql = "SELECT id, content, channel, created_at FROM notes_cache ORDER BY created_at DESC LIMIT ? OFFSET ?";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, limit);
+            pstmt.setInt(2, offset);
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                results.add(new NoteData(
+                    rs.getLong("id"),
+                    rs.getString("content"),
+                    rs.getString("channel"),
+                    rs.getString("created_at"),
+                    null
+                ));
+            }
+        } catch (SQLException e) {
+            // Get paged notes failed
+        }
+        return results;
+    }
+
+    /**
+     * Get notes for review with pagination
+     * @param days Number of days to look back
+     * @param offset Starting position (0-based)
+     * @param limit Number of notes to fetch
+     * @return List of notes
+     */
+    public List<NoteData> getNotesForReviewPaged(int days, int offset, int limit) {
+        ensureInitialized();
+        List<NoteData> results = new ArrayList<>();
+        String sql = "SELECT id, content, channel, created_at FROM notes_cache WHERE created_at >= datetime('now', '-' || ? || ' days') ORDER BY created_at DESC LIMIT ? OFFSET ?";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, days);
+            pstmt.setInt(2, limit);
+            pstmt.setInt(3, offset);
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                results.add(new NoteData(
+                    rs.getLong("id"),
+                    rs.getString("content"),
+                    rs.getString("channel"),
+                    rs.getString("created_at"),
+                    null
+                ));
+            }
+        } catch (SQLException e) {
+            // Get paged review notes failed
+        }
+        return results;
+    }
+
+    /**
+     * Get count of notes for review period
+     * @param days Number of days to look back
+     * @return Count of notes
+     */
+    public int getNotesCountForReview(int days) {
+        ensureInitialized();
+        String sql = "SELECT COUNT(*) FROM notes_cache WHERE created_at >= datetime('now', '-' || ? || ' days')";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, days);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            // Get review notes count failed
         }
         return 0;
     }

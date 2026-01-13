@@ -27,8 +27,12 @@ class ReviewFragment : Fragment() {
     private var currentPeriod = "7 days"
     private var notesJob: Job? = null
     private var dotsAnimationJob: Job? = null
-    private var previousNotesCount = 0
-    private var previousFirstNoteId: Long? = null
+    
+    // Pagination state
+    private val loadedNotes = mutableListOf<cn.keevol.keenotes.data.entity.Note>()
+    private var isLoadingMore = false
+    private var hasMoreData = true
+    private val pageSize = 20
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -45,7 +49,7 @@ class ReviewFragment : Fragment() {
         setupPeriodSelector()
         setupRecyclerView()
         setupSyncChannelStatus()
-        observeNotes(currentPeriod)
+        loadInitialNotes()
     }
     
     private fun setupPeriodSelector() {
@@ -61,10 +65,10 @@ class ReviewFragment : Fragment() {
                     R.id.periodAll -> "All"
                     else -> "7 days"
                 }
-                // Reset tracking when period changes
-                previousNotesCount = 0
-                previousFirstNoteId = null
-                observeNotes(currentPeriod)
+                // Reset and reload
+                loadedNotes.clear()
+                hasMoreData = true
+                loadInitialNotes()
             }
         }
     }
@@ -73,13 +77,25 @@ class ReviewFragment : Fragment() {
         binding.notesRecyclerView.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = notesAdapter
-            // Enable item animations (default animator should handle insertions)
-            itemAnimator?.apply {
-                addDuration = 300
-                changeDuration = 300
-                moveDuration = 300
-                removeDuration = 300
-            }
+            
+            // Add scroll listener for pagination
+            addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+                    
+                    val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+                    val visibleItemCount = layoutManager.childCount
+                    val totalItemCount = layoutManager.itemCount
+                    val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
+                    
+                    // Load more when scrolled to bottom
+                    if (!isLoadingMore && hasMoreData && dy > 0) {
+                        if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 5) {
+                            loadMoreNotes()
+                        }
+                    }
+                }
+            })
         }
     }
     
@@ -87,11 +103,102 @@ class ReviewFragment : Fragment() {
         val app = requireActivity().application as KeeNotesApp
         
         // Observe WebSocket connection state
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             app.webSocketService.connectionState.collectLatest { state ->
-                updateSyncChannelStatus(state)
+                if (_binding != null) {
+                    updateSyncChannelStatus(state)
+                }
             }
         }
+        
+        // Observe sync state for syncing indicator
+        viewLifecycleOwner.lifecycleScope.launch {
+            app.webSocketService.syncState.collectLatest { syncState ->
+                if (_binding != null) {
+                    updateSyncingIndicator(syncState)
+                    // Reload when sync completes
+                    if (syncState == WebSocketService.SyncState.COMPLETED) {
+                        loadedNotes.clear()
+                        hasMoreData = true
+                        loadInitialNotes()
+                    }
+                }
+            }
+        }
+    }
+    
+    private fun loadInitialNotes() {
+        val app = requireActivity().application as KeeNotesApp
+        val days = getDaysForPeriod(currentPeriod)
+        val since = getSinceDate(days)
+        
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                // Get total count
+                val totalCount = app.database.noteDao().getNotesCountForReview(since)
+                
+                // Load first page
+                val notes = app.database.noteDao().getNotesForReviewPaged(since, pageSize, 0)
+                
+                loadedNotes.clear()
+                loadedNotes.addAll(notes)
+                hasMoreData = loadedNotes.size < totalCount
+                
+                if (loadedNotes.isEmpty()) {
+                    binding.notesRecyclerView.visibility = View.GONE
+                } else {
+                    binding.notesRecyclerView.visibility = View.VISIBLE
+                    notesAdapter.submitList(loadedNotes.toList())
+                }
+                
+                updateCountText(totalCount, currentPeriod)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    private fun loadMoreNotes() {
+        if (isLoadingMore || !hasMoreData) return
+        
+        isLoadingMore = true
+        val app = requireActivity().application as KeeNotesApp
+        val days = getDaysForPeriod(currentPeriod)
+        val since = getSinceDate(days)
+        
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val notes = app.database.noteDao().getNotesForReviewPaged(
+                    since, 
+                    pageSize, 
+                    loadedNotes.size
+                )
+                
+                if (notes.isEmpty()) {
+                    hasMoreData = false
+                } else {
+                    loadedNotes.addAll(notes)
+                    notesAdapter.submitList(loadedNotes.toList())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                isLoadingMore = false
+            }
+        }
+    }
+    
+    private fun getDaysForPeriod(period: String): Int {
+        return when (period) {
+            "30 days" -> 30
+            "90 days" -> 90
+            "All" -> 3650
+            else -> 7
+        }
+    }
+    
+    private fun getSinceDate(days: Int): String {
+        return Instant.now().minus(days.toLong(), ChronoUnit.DAYS).toString()
     }
     
     private fun updateSyncChannelStatus(state: WebSocketService.ConnectionState) {
@@ -113,6 +220,8 @@ class ReviewFragment : Fragment() {
     }
     
     private fun updateSyncingIndicator(syncState: WebSocketService.SyncState) {
+        if (_binding == null || !isAdded) return
+        
         when (syncState) {
             WebSocketService.SyncState.SYNCING -> {
                 startDotsAnimation()

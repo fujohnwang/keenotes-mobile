@@ -50,6 +50,13 @@ public class NotesDisplayPanel extends VBox {
     private static final int LOAD_MORE_COUNT = 10;
     private boolean isLoadingMore = false;
     
+    // True pagination support (load from database on demand)
+    private boolean useTruePagination = false;
+    private int totalNoteCount = 0;
+    private LocalCacheService localCache = null;
+    private int reviewDays = 0; // For review pagination
+    private java.util.function.Consumer<java.util.List<LocalCacheService.NoteData>> noteLoadCallback = null;
+    
     public NotesDisplayPanel() {
         getStyleClass().add("notes-display-panel");
         setSpacing(0);
@@ -67,8 +74,15 @@ public class NotesDisplayPanel extends VBox {
         
         // Listen to scroll position for lazy loading
         scrollPane.vvalueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal.doubleValue() >= 0.9 && !isLoadingMore && displayedCount < allNotes.size()) {
-                loadMoreNotes();
+            if (newVal.doubleValue() >= 0.9 && !isLoadingMore) {
+                // Check if there's more data based on pagination mode
+                boolean hasMore = useTruePagination 
+                    ? (displayedCount < totalNoteCount) 
+                    : (displayedCount < allNotes.size());
+                
+                if (hasMore) {
+                    loadMoreNotes();
+                }
             }
         });
         
@@ -215,6 +229,119 @@ public class NotesDisplayPanel extends VBox {
     }
     
     /**
+     * Display notes with true pagination (load from database on demand)
+     * @param totalCount Total number of notes in database
+     * @param localCache LocalCacheService instance for loading more data
+     */
+    public void displayNotesWithPagination(int totalCount, LocalCacheService localCache) {
+        displayNotesWithPagination(totalCount, localCache, 0, null, null);
+    }
+
+    /**
+     * Display notes with true pagination for review mode
+     * @param totalCount Total number of notes for the period
+     * @param localCache LocalCacheService instance for loading more data
+     * @param days Number of days for review (0 for all notes)
+     * @param periodInfo Period information to display
+     */
+    public void displayNotesWithPagination(int totalCount, LocalCacheService localCache, int days, String periodInfo) {
+        displayNotesWithPagination(totalCount, localCache, days, periodInfo, null);
+    }
+    
+    /**
+     * Display notes with true pagination
+     * @param totalCount Total number of notes
+     * @param localCache LocalCacheService instance
+     * @param days Number of days for review (0 for all notes)
+     * @param periodInfo Period information to display
+     * @param noteLoadCallback Callback when notes are loaded (for tracking displayed IDs)
+     */
+    public void displayNotesWithPagination(int totalCount, LocalCacheService localCache, int days, String periodInfo, 
+                                          java.util.function.Consumer<java.util.List<LocalCacheService.NoteData>> noteLoadCallback) {
+        stopDotsAnimation();
+        notesContainer.getChildren().clear();
+        statusLabel.setVisible(false);
+        statusLabel.setManaged(false);
+        
+        if (totalCount == 0) {
+            showEmptyState("No notes found");
+            useTruePagination = false;
+            displayedCount = 0;
+            return;
+        }
+        
+        // Enable true pagination mode
+        useTruePagination = true;
+        this.totalNoteCount = totalCount;
+        this.localCache = localCache;
+        this.reviewDays = days;
+        this.noteLoadCallback = noteLoadCallback;
+        this.allNotes.clear();
+        displayedCount = 0;
+        
+        // Create header row with total count
+        String countText = totalCount + " note(s)";
+        if (periodInfo != null && !periodInfo.isEmpty()) {
+            countText += " - " + periodInfo;
+        }
+        HBox header = createHeaderRow(countText);
+        notesContainer.getChildren().add(header);
+        
+        // Load initial batch from database
+        loadInitialNotesFromDb();
+    }
+    
+    /**
+     * Load initial batch of notes from database
+     */
+    private void loadInitialNotesFromDb() {
+        new Thread(() -> {
+            try {
+                List<LocalCacheService.NoteData> notes;
+                if (reviewDays > 0) {
+                    notes = localCache.getNotesForReviewPaged(reviewDays, 0, INITIAL_LOAD_COUNT);
+                } else {
+                    notes = localCache.getNotesPaged(0, INITIAL_LOAD_COUNT);
+                }
+                
+                // Notify callback
+                if (noteLoadCallback != null) {
+                    noteLoadCallback.accept(notes);
+                }
+                
+                Platform.runLater(() -> {
+                    // Add all cards
+                    for (LocalCacheService.NoteData note : notes) {
+                        NoteCardView card = new NoteCardView(note);
+                        notesContainer.getChildren().add(card);
+                    }
+                    
+                    displayedCount = notes.size();
+                    
+                    // Add "loading more" indicator if there are more notes
+                    if (displayedCount < totalNoteCount) {
+                        Label loadMoreHint = new Label("Scroll down to load more...");
+                        loadMoreHint.getStyleClass().add("field-hint");
+                        loadMoreHint.setStyle("-fx-padding: 16 0 0 0;");
+                        notesContainer.getChildren().add(loadMoreHint);
+                    }
+                    
+                    // Fade in the entire container
+                    notesContainer.setOpacity(0);
+                    javafx.animation.FadeTransition fadeIn = new javafx.animation.FadeTransition(
+                        javafx.util.Duration.millis(300), notesContainer
+                    );
+                    fadeIn.setFromValue(0);
+                    fadeIn.setToValue(1);
+                    fadeIn.play();
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> showError("Error loading notes: " + e.getMessage()));
+            }
+        }, "LoadInitialNotes").start();
+    }
+    
+    /**
      * Display a list of notes with fade-in animation and lazy loading
      */
     public void displayNotes(List<LocalCacheService.NoteData> notes) {
@@ -231,6 +358,9 @@ public class NotesDisplayPanel extends VBox {
         notesContainer.getChildren().clear();
         statusLabel.setVisible(false);
         statusLabel.setManaged(false);
+        
+        // Disable true pagination mode
+        useTruePagination = false;
         
         if (notes == null || notes.isEmpty()) {
             showEmptyState("No notes found");
@@ -293,8 +423,19 @@ public class NotesDisplayPanel extends VBox {
      * Load more notes when scrolling to bottom
      */
     private void loadMoreNotes() {
-        if (isLoadingMore || displayedCount >= allNotes.size()) {
+        if (isLoadingMore) {
             return;
+        }
+        
+        // Check if we should load more based on pagination mode
+        if (useTruePagination) {
+            if (displayedCount >= totalNoteCount) {
+                return;
+            }
+        } else {
+            if (displayedCount >= allNotes.size()) {
+                return;
+            }
         }
         
         isLoadingMore = true;
@@ -307,6 +448,64 @@ public class NotesDisplayPanel extends VBox {
             }
         }
         
+        if (useTruePagination) {
+            // Load from database
+            loadMoreNotesFromDb();
+        } else {
+            // Load from memory
+            loadMoreNotesFromMemory();
+        }
+    }
+    
+    /**
+     * Load more notes from database (true pagination)
+     */
+    private void loadMoreNotesFromDb() {
+        new Thread(() -> {
+            try {
+                List<LocalCacheService.NoteData> notes;
+                if (reviewDays > 0) {
+                    notes = localCache.getNotesForReviewPaged(reviewDays, displayedCount, LOAD_MORE_COUNT);
+                } else {
+                    notes = localCache.getNotesPaged(displayedCount, LOAD_MORE_COUNT);
+                }
+                
+                // Notify callback
+                if (noteLoadCallback != null) {
+                    noteLoadCallback.accept(notes);
+                }
+                
+                Platform.runLater(() -> {
+                    // Add new cards
+                    for (LocalCacheService.NoteData note : notes) {
+                        NoteCardView card = new NoteCardView(note);
+                        notesContainer.getChildren().add(card);
+                    }
+                    
+                    displayedCount += notes.size();
+                    
+                    // Add hint again if there are still more notes
+                    if (displayedCount < totalNoteCount) {
+                        Label loadMoreHint = new Label("Scroll down to load more...");
+                        loadMoreHint.getStyleClass().add("field-hint");
+                        loadMoreHint.setStyle("-fx-padding: 16 0 0 0;");
+                        notesContainer.getChildren().add(loadMoreHint);
+                    }
+                    
+                    isLoadingMore = false;
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    isLoadingMore = false;
+                });
+            }
+        }, "LoadMoreNotes").start();
+    }
+    
+    /**
+     * Load more notes from memory (old behavior for Review/Search)
+     */
+    private void loadMoreNotesFromMemory() {
         // Calculate how many to load
         int startIndex = displayedCount;
         int endIndex = Math.min(startIndex + LOAD_MORE_COUNT, allNotes.size());
@@ -338,21 +537,25 @@ public class NotesDisplayPanel extends VBox {
     public void addNoteAtTop(LocalCacheService.NoteData note) {
         stopDotsAnimation();
         
+        // Update count label and total count if in pagination mode
+        if (useTruePagination) {
+            totalNoteCount++;
+        }
+        
         // Update count label if exists
         if (countLabel != null) {
             String currentText = countLabel.getText();
-            try {
-                int count = Integer.parseInt(currentText.split(" ")[0]) + 1;
-                String newText = count + " note(s)";
-                // Preserve period info if present
-                if (currentText.contains(" - ")) {
-                    newText += currentText.substring(currentText.indexOf(" - "));
-                }
-                countLabel.setText(newText);
-            } catch (NumberFormatException e) {
-                // Ignore parsing errors
+            int count = useTruePagination ? totalNoteCount : (displayedCount + 1);
+            String newText = count + " note(s)";
+            // Preserve period info if present
+            if (currentText.contains(" - ")) {
+                newText += currentText.substring(currentText.indexOf(" - "));
             }
+            countLabel.setText(newText);
         }
+        
+        // Increment displayed count
+        displayedCount++;
         
         // Create new card
         NoteCardView card = new NoteCardView(note);

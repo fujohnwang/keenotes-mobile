@@ -56,9 +56,46 @@ public class SettingsView extends BorderPane {
         saveButton.setMaxWidth(Double.MAX_VALUE);
         saveButton.setOnAction(e -> saveSettings());
 
+        // Debug section (hidden by default) - DEFINE FIRST before using in easter egg
+        VBox debugSection = new VBox(12);
+        debugSection.setVisible(false);
+        debugSection.setManaged(false);
+        debugSection.setAlignment(Pos.CENTER);
+        
+        Label debugLabel = new Label("Debug Tools");
+        debugLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: -fx-text-primary;");
+        
+        Button clearDataButton = new Button("Clear Local Notes & Reset Sync");
+        clearDataButton.getStyleClass().addAll("action-button");
+        clearDataButton.setMaxWidth(Double.MAX_VALUE);
+        clearDataButton.setOnAction(e -> clearLocalData());
+        
+        debugSection.getChildren().addAll(debugLabel, clearDataButton);
+
         // Copyright footer
         Label copyrightLabel = new Label("©2025 王福强(Fuqiang Wang)  All Rights Reserved");
         copyrightLabel.getStyleClass().add("copyright-label");
+        
+        // Easter egg: click 7 times to show debug section
+        final int[] clickCount = {0};
+        final long[] lastClickTime = {0};
+        copyrightLabel.setOnMouseClicked(e -> {
+            long now = System.currentTimeMillis();
+            if (now - lastClickTime[0] > 1000) {
+                clickCount[0] = 0;
+            }
+            lastClickTime[0] = now;
+            clickCount[0]++;
+            
+            if (clickCount[0] >= 7 && !debugSection.isVisible()) {
+                debugSection.setVisible(true);
+                debugSection.setManaged(true);
+                statusLabel.setText("Debug mode enabled!");
+                statusLabel.getStyleClass().removeAll("error", "success");
+                statusLabel.getStyleClass().add("success");
+            }
+        });
+        copyrightLabel.setStyle("-fx-cursor: hand;");
 
         Label websiteLabel = new Label("https://keenotes.afoo.me");
         websiteLabel.getStyleClass().add("copyright-link");
@@ -135,7 +172,8 @@ public class SettingsView extends BorderPane {
                 preferencesSection,
                 saveButton,
                 statusLabel,
-                footer
+                footer,
+                debugSection
         );
         form.setPadding(new Insets(24));
         form.setAlignment(Pos.TOP_CENTER);
@@ -317,5 +355,45 @@ public class SettingsView extends BorderPane {
             delay.setOnFinished(e -> onBack.run());
             delay.play();
         }
+    }
+    
+    private void clearLocalData() {
+        statusLabel.setText("Clearing local data...");
+        statusLabel.getStyleClass().removeAll("error", "success");
+        statusLabel.getStyleClass().add("success");
+        
+        new Thread(() -> {
+            try {
+                ServiceManager serviceManager = ServiceManager.getInstance();
+                LocalCacheService cache = serviceManager.getLocalCacheService();
+                
+                // Clear all local notes and reset sync state
+                cache.clearAllData();
+                
+                javafx.application.Platform.runLater(() -> {
+                    statusLabel.setText("✓ Local data cleared! Reconnecting...");
+                    statusLabel.getStyleClass().removeAll("error", "success");
+                    statusLabel.getStyleClass().add("success");
+                });
+                
+                // Reconnect WebSocket to trigger fresh sync
+                Thread.sleep(500);
+                WebSocketClientService webSocketService = serviceManager.getWebSocketService();
+                webSocketService.disconnect();
+                Thread.sleep(500);
+                webSocketService.connect();
+                
+                javafx.application.Platform.runLater(() -> {
+                    statusLabel.setText("✓ Data cleared and reconnected!");
+                });
+                
+            } catch (Exception e) {
+                javafx.application.Platform.runLater(() -> {
+                    statusLabel.setText("✗ Failed to clear data: " + e.getMessage());
+                    statusLabel.getStyleClass().removeAll("error", "success");
+                    statusLabel.getStyleClass().add("error");
+                });
+            }
+        }, "ClearLocalData").start();
     }
 }

@@ -142,6 +142,59 @@ class DatabaseService: ObservableObject {
         }
     }
     
+    func getNotesByPeriodPaged(days: Int, limit: Int, offset: Int) async throws -> [Note] {
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        
+        if days <= 0 {
+            // "All" - paginated
+            return try await dbQueue.read { db in
+                try Note
+                    .order(Note.Columns.createdAt.desc)
+                    .limit(limit, offset: offset)
+                    .fetchAll(db)
+            }
+        }
+        
+        // Calculate cutoff date
+        let calendar = Calendar.current
+        let cutoffDate = calendar.date(byAdding: .day, value: -days, to: Date())!
+        let formatter = ISO8601DateFormatter()
+        let cutoffString = formatter.string(from: cutoffDate)
+        
+        return try await dbQueue.read { db in
+            try Note
+                .filter(Note.Columns.createdAt >= cutoffString)
+                .order(Note.Columns.createdAt.desc)
+                .limit(limit, offset: offset)
+                .fetchAll(db)
+        }
+    }
+    
+    func getNotesCountByPeriod(days: Int) async throws -> Int {
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        
+        if days <= 0 {
+            // "All"
+            return try await getNoteCount()
+        }
+        
+        // Calculate cutoff date
+        let calendar = Calendar.current
+        let cutoffDate = calendar.date(byAdding: .day, value: -days, to: Date())!
+        let formatter = ISO8601DateFormatter()
+        let cutoffString = formatter.string(from: cutoffDate)
+        
+        return try await dbQueue.read { db in
+            try Note
+                .filter(Note.Columns.createdAt >= cutoffString)
+                .fetchCount(db)
+        }
+    }
+    
     func searchNotes(query: String) async throws -> [Note] {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
