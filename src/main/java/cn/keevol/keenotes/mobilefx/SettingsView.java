@@ -21,7 +21,7 @@ public class SettingsView extends BorderPane {
     private final Runnable onBack;
     private final ToggleSwitch copyToClipboardToggle;
     private final ToggleSwitch showOverviewCardToggle;
-    private final TextField searchShortcutField;
+    private final KeyCaptureField searchShortcutField;
 
     public SettingsView(Runnable onBack) {
         this.onBack = onBack;
@@ -55,6 +55,24 @@ public class SettingsView extends BorderPane {
         saveButton.getStyleClass().addAll("action-button", "primary");
         saveButton.setMaxWidth(Double.MAX_VALUE);
         saveButton.setOnAction(e -> saveSettings());
+        
+        // Create save button row with same layout as input fields
+        Label saveButtonSpacer = new Label();
+        saveButtonSpacer.setMinWidth(180);
+        saveButtonSpacer.setMaxWidth(180);
+        
+        HBox.setHgrow(saveButton, Priority.ALWAYS);
+        
+        HBox saveButtonRow = new HBox(16, saveButtonSpacer, saveButton);
+        saveButtonRow.setAlignment(Pos.CENTER_LEFT);
+        
+        // Status label row with same layout
+        Label statusSpacer = new Label();
+        statusSpacer.setMinWidth(180);
+        statusSpacer.setMaxWidth(180);
+        
+        HBox statusRow = new HBox(16, statusSpacer, statusLabel);
+        statusRow.setAlignment(Pos.CENTER_LEFT);
 
         // Debug section (hidden by default) - DEFINE FIRST before using in easter egg
         VBox debugSection = new VBox(12);
@@ -122,11 +140,12 @@ public class SettingsView extends BorderPane {
         
         Label toggleLabel = new Label("Copy to clipboard on post success");
         toggleLabel.getStyleClass().add("field-label");
+        toggleLabel.setMinWidth(180);
+        toggleLabel.setMaxWidth(180);
+        toggleLabel.setAlignment(Pos.CENTER_RIGHT);
         
-        // HBox with CENTER_LEFT alignment to vertically center toggle with label
-        HBox toggleRow = new HBox(12, toggleLabel, copyToClipboardToggle);
+        HBox toggleRow = new HBox(16, toggleLabel, copyToClipboardToggle);
         toggleRow.setAlignment(Pos.CENTER_LEFT);
-        toggleRow.setPadding(new Insets(4, 0, 4, 0)); // Add vertical padding
         
         // Show Overview Card toggle
         showOverviewCardToggle = new ToggleSwitch();
@@ -137,29 +156,33 @@ public class SettingsView extends BorderPane {
         
         Label overviewCardLabel = new Label("Show Overview Card");
         overviewCardLabel.getStyleClass().add("field-label");
+        overviewCardLabel.setMinWidth(180);
+        overviewCardLabel.setMaxWidth(180);
+        overviewCardLabel.setAlignment(Pos.CENTER_RIGHT);
         
-        HBox overviewCardRow = new HBox(12, overviewCardLabel, showOverviewCardToggle);
+        HBox overviewCardRow = new HBox(16, overviewCardLabel, showOverviewCardToggle);
         overviewCardRow.setAlignment(Pos.CENTER_LEFT);
-        overviewCardRow.setPadding(new Insets(4, 0, 4, 0));
         
         // Search shortcut configuration
         Label shortcutLabel = new Label("Search shortcut");
         shortcutLabel.getStyleClass().add("field-label");
+        shortcutLabel.setMinWidth(180);
+        shortcutLabel.setMaxWidth(180);
+        shortcutLabel.setAlignment(Pos.CENTER_RIGHT);
         
-        searchShortcutField = new TextField();
-        searchShortcutField.setPromptText("Alt+Shift+S");
-        searchShortcutField.getStyleClass().add("input-field");
-        searchShortcutField.setPrefWidth(150);
-        searchShortcutField.setMaxWidth(150);
+        searchShortcutField = new KeyCaptureField();
         
-        Label shortcutHint = new Label("Format: Alt+Shift+S, Ctrl+Shift+F, etc.");
+        Label shortcutHint = new Label("Click the field and press your desired key combination (e.g., Ctrl+Shift+F)");
         shortcutHint.getStyleClass().add("field-hint");
         
-        HBox shortcutRow = new HBox(12, shortcutLabel, searchShortcutField);
+        VBox shortcutFieldWithHint = new VBox(6, searchShortcutField, shortcutHint);
+        HBox.setHgrow(shortcutFieldWithHint, Priority.ALWAYS);
+        
+        HBox shortcutRow = new HBox(16, shortcutLabel, shortcutFieldWithHint);
         shortcutRow.setAlignment(Pos.CENTER_LEFT);
         
         // Preferences container with proper spacing
-        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, shortcutRow, shortcutHint);
+        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, shortcutRow);
         preferencesSection.setPadding(new Insets(8, 0, 8, 0)); // Add top/bottom padding
 
         // Debug entry (hidden by default) - removed for desktop version
@@ -169,9 +192,9 @@ public class SettingsView extends BorderPane {
                 createFieldGroup("Token", tokenField),
                 createFieldGroup("Encryption Password", encryptionPasswordField),
                 createFieldGroupWithHint("Confirm Password", encryptionPasswordConfirmField, encryptionHint),
+                saveButtonRow,
+                statusRow,
                 preferencesSection,
-                saveButton,
-                statusLabel,
                 footer,
                 debugSection
         );
@@ -213,14 +236,38 @@ public class SettingsView extends BorderPane {
     private VBox createFieldGroup(String labelText, Control field) {
         Label label = new Label(labelText);
         label.getStyleClass().add("field-label");
-        VBox group = new VBox(6, label, field);
+        label.setMinWidth(180);
+        label.setMaxWidth(180);
+        label.setAlignment(Pos.CENTER_RIGHT);
+        
+        // Make field grow to fill available space
+        HBox.setHgrow(field, Priority.ALWAYS);
+        field.setMaxWidth(Double.MAX_VALUE);
+        
+        HBox row = new HBox(16, label, field);
+        row.setAlignment(Pos.CENTER_LEFT);
+        
+        VBox group = new VBox(row);
         return group;
     }
 
     private VBox createFieldGroupWithHint(String labelText, Control field, Label hint) {
         Label label = new Label(labelText);
         label.getStyleClass().add("field-label");
-        VBox group = new VBox(6, label, field, hint);
+        label.setMinWidth(180);
+        label.setMaxWidth(180);
+        label.setAlignment(Pos.CENTER_RIGHT);
+        
+        // Make field grow to fill available space
+        field.setMaxWidth(Double.MAX_VALUE);
+        
+        VBox fieldWithHint = new VBox(6, field, hint);
+        HBox.setHgrow(fieldWithHint, Priority.ALWAYS);
+        
+        HBox row = new HBox(16, label, fieldWithHint);
+        row.setAlignment(Pos.CENTER_LEFT);
+        
+        VBox group = new VBox(row);
         return group;
     }
 
@@ -232,7 +279,7 @@ public class SettingsView extends BorderPane {
         encryptionPasswordConfirmField.setText(savedPassword);
         copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
         showOverviewCardToggle.setSelected(settings.getShowOverviewCard());
-        searchShortcutField.setText(settings.getSearchShortcut());
+        searchShortcutField.setShortcut(settings.getSearchShortcut());
     }
 
     private void saveSettings() {
@@ -272,7 +319,7 @@ public class SettingsView extends BorderPane {
         settings.setToken(newToken);
         settings.setEncryptionPassword(newPassword);
         // Save search shortcut
-        String shortcut = searchShortcutField.getText().trim();
+        String shortcut = searchShortcutField.getShortcut();
         if (!shortcut.isEmpty()) {
             settings.setSearchShortcut(shortcut);
         }
