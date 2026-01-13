@@ -21,6 +21,7 @@ class SettingsRepository(private val context: Context) {
         private val KEY_COPY_TO_CLIPBOARD = stringPreferencesKey("copy_to_clipboard_on_post")
         private val KEY_SHOW_OVERVIEW_CARD = stringPreferencesKey("show_overview_card")
         private val KEY_FIRST_NOTE_DATE = stringPreferencesKey("first_note_date")
+        private val KEY_AUTO_FOCUS_INPUT = stringPreferencesKey("auto_focus_input_on_launch")
     }
     
     val endpointUrl: Flow<String> = context.dataStore.data.map { it[KEY_ENDPOINT] ?: "" }
@@ -29,6 +30,7 @@ class SettingsRepository(private val context: Context) {
     val copyToClipboardOnPost: Flow<Boolean> = context.dataStore.data.map { it[KEY_COPY_TO_CLIPBOARD]?.toBoolean() ?: false }
     val showOverviewCard: Flow<Boolean> = context.dataStore.data.map { it[KEY_SHOW_OVERVIEW_CARD]?.toBoolean() ?: true }
     val firstNoteDate: Flow<String?> = context.dataStore.data.map { it[KEY_FIRST_NOTE_DATE] }
+    val autoFocusInputOnLaunch: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_FOCUS_INPUT]?.toBoolean() ?: true }
     
     val isConfigured: Flow<Boolean> = context.dataStore.data.map { prefs ->
         !prefs[KEY_ENDPOINT].isNullOrBlank() && !prefs[KEY_TOKEN].isNullOrBlank()
@@ -63,6 +65,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun setFirstNoteDate(date: String) {
         context.dataStore.edit { prefs ->
             prefs[KEY_FIRST_NOTE_DATE] = date
+        }
+    }
+    
+    suspend fun setAutoFocusInputOnLaunch(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_AUTO_FOCUS_INPUT] = enabled.toString()
         }
     }
     

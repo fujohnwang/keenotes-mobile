@@ -13,6 +13,7 @@ class SettingsService: ObservableObject {
         static let copyToClipboardOnPost = "copy_to_clipboard_on_post"
         static let showOverviewCard = "show_overview_card"
         static let firstNoteDate = "first_note_date"
+        static let autoFocusInputOnLaunch = "auto_focus_input_on_launch"
     }
     
     @Published var endpointUrl: String {
@@ -43,6 +44,12 @@ class SettingsService: ObservableObject {
         }
     }
     
+    @Published var autoFocusInputOnLaunch: Bool {
+        didSet {
+            defaults.set(autoFocusInputOnLaunch, forKey: Keys.autoFocusInputOnLaunch)
+        }
+    }
+    
     var firstNoteDate: String? {
         get { defaults.string(forKey: Keys.firstNoteDate) }
         set { 
@@ -65,6 +72,7 @@ class SettingsService: ObservableObject {
         
         self.copyToClipboardOnPost = defaults.bool(forKey: Keys.copyToClipboardOnPost)
         self.showOverviewCard = defaults.object(forKey: Keys.showOverviewCard) == nil ? true : defaults.bool(forKey: Keys.showOverviewCard)
+        self.autoFocusInputOnLaunch = defaults.object(forKey: Keys.autoFocusInputOnLaunch) == nil ? true : defaults.bool(forKey: Keys.autoFocusInputOnLaunch)
     }
     
     var isConfigured: Bool {

@@ -161,6 +161,16 @@
                 android:textSize="14sp"
                 android:padding="12dp" />
 
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/autoFocusInputSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Auto-focus input on launch"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:padding="12dp" />
+
             <!-- Save Button -->
             <Button
                 android:id="@+id/btnSave"

@@ -107,6 +107,13 @@ struct NoteView: View {
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 setupKeyboardObservers()
+                // Auto-focus input if enabled
+                if appState.settingsService.autoFocusInputOnLaunch {
+                    // Delay slightly to ensure view is fully loaded
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        isTextFieldFocused = true
+                    }
+                }
             }
             .onDisappear {
                 removeKeyboardObservers()
