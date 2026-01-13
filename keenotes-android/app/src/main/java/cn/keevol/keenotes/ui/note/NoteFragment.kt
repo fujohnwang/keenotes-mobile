@@ -1,4 +1,4 @@
-我package cn.keevol.keenotes.ui.note
+package cn.keevol.keenotes.ui.note
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -25,6 +25,8 @@ class NoteFragment : Fragment() {
     private var _binding: FragmentNoteBinding? = null
     private val binding get() = _binding!!
     
+    private var shouldShowOverviewCard = false // Track if overview card should be shown
+    
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -43,6 +45,30 @@ class NoteFragment : Fragment() {
         setupSendButton()
         setupSendChannelStatus()
         setupAutoFocusInput()
+        setupKeyboardListener()
+    }
+    
+    private fun setupKeyboardListener() {
+        // Listen for keyboard visibility changes using layout changes
+        binding.root.viewTreeObserver.addOnGlobalLayoutListener {
+            if (_binding == null || !isAdded) return@addOnGlobalLayoutListener
+            
+            val rect = android.graphics.Rect()
+            binding.root.getWindowVisibleDisplayFrame(rect)
+            val screenHeight = binding.root.rootView.height
+            val keypadHeight = screenHeight - rect.bottom
+            
+            // If keyboard height is more than 15% of screen height, consider it visible
+            val isKeyboardVisible = keypadHeight > screenHeight * 0.15
+            
+            // Update overview card visibility based on keyboard state
+            if (shouldShowOverviewCard) {
+                val newVisibility = if (isKeyboardVisible) View.GONE else View.VISIBLE
+                if (binding.overviewCardInclude.root.visibility != newVisibility) {
+                    binding.overviewCardInclude.root.visibility = newVisibility
+                }
+            }
+        }
     }
     
     private fun setupAutoFocusInput() {
@@ -72,6 +98,8 @@ class NoteFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             app.settingsRepository.showOverviewCard.collectLatest { show ->
                 if (_binding != null) {
+                    shouldShowOverviewCard = show
+                    // Show/hide based on setting (keyboard listener will handle dynamic hiding)
                     binding.overviewCardInclude.root.visibility = if (show) View.VISIBLE else View.GONE
                 }
             }
@@ -204,12 +232,17 @@ class NoteFragment : Fragment() {
         binding.sendProgress.visibility = View.VISIBLE
         binding.sendText.text = "Sending..."
         
+        // Start rotation animation
+        val rotateAnimation = android.view.animation.AnimationUtils.loadAnimation(requireContext(), cn.keevol.keenotes.R.anim.rotate_spinner)
+        binding.sendProgress.startAnimation(rotateAnimation)
+        
         viewLifecycleOwner.lifecycleScope.launch {
             val result = app.apiService.postNote(content)
             
             // Check if view still exists before updating UI
             if (_binding != null) {
-                // Restore button state
+                // Stop animation and restore button state
+                binding.sendProgress.clearAnimation()
                 binding.sendProgress.visibility = View.GONE
                 binding.sendIcon.visibility = View.VISIBLE
                 binding.sendText.text = "Send"
@@ -222,16 +255,23 @@ class NoteFragment : Fragment() {
                         clipboard.setPrimaryClip(clip)
                     }
                     
-                    // Show echo
-                    binding.echoCard.visibility = View.VISIBLE
-                    binding.echoContent.text = result.echoContent
-                    
-                    // Clear input
+                    // Clear input on success
                     binding.noteInput.text?.clear()
+                    
+                    // Clear focus to restore overview card if enabled
+                    binding.noteInput.clearFocus()
+                    
+                    // Hide keyboard
+                    val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                    imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
                 } else {
-                    // Show error (could add a toast or snackbar here)
-                    binding.echoCard.visibility = View.VISIBLE
-                    binding.echoContent.text = "Error: ${result.message}"
+                    // Show error in button temporarily
+                    binding.sendText.text = "Failed"
+                    binding.btnSend.postDelayed({
+                        if (_binding != null) {
+                            binding.sendText.text = "Send"
+                        }
+                    }, 2000)
                 }
                 
                 updateSendButtonState(binding.noteInput.text?.isNotBlank() == true)
