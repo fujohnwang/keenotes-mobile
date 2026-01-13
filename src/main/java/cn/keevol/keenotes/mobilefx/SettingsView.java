@@ -58,8 +58,8 @@ public class SettingsView extends BorderPane {
         
         // Create save button row with same layout as input fields
         Label saveButtonSpacer = new Label();
-        saveButtonSpacer.setMinWidth(180);
-        saveButtonSpacer.setMaxWidth(180);
+        saveButtonSpacer.setMinWidth(259);
+        saveButtonSpacer.setMaxWidth(259);
         
         HBox.setHgrow(saveButton, Priority.ALWAYS);
         
@@ -68,8 +68,8 @@ public class SettingsView extends BorderPane {
         
         // Status label row with same layout
         Label statusSpacer = new Label();
-        statusSpacer.setMinWidth(180);
-        statusSpacer.setMaxWidth(180);
+        statusSpacer.setMinWidth(259);
+        statusSpacer.setMaxWidth(259);
         
         HBox statusRow = new HBox(16, statusSpacer, statusLabel);
         statusRow.setAlignment(Pos.CENTER_LEFT);
@@ -140,8 +140,8 @@ public class SettingsView extends BorderPane {
         
         Label toggleLabel = new Label("Copy to clipboard on post success");
         toggleLabel.getStyleClass().add("field-label");
-        toggleLabel.setMinWidth(180);
-        toggleLabel.setMaxWidth(180);
+        toggleLabel.setMinWidth(259);
+        toggleLabel.setMaxWidth(259);
         toggleLabel.setAlignment(Pos.CENTER_RIGHT);
         
         HBox toggleRow = new HBox(16, toggleLabel, copyToClipboardToggle);
@@ -156,8 +156,8 @@ public class SettingsView extends BorderPane {
         
         Label overviewCardLabel = new Label("Show Overview Card");
         overviewCardLabel.getStyleClass().add("field-label");
-        overviewCardLabel.setMinWidth(180);
-        overviewCardLabel.setMaxWidth(180);
+        overviewCardLabel.setMinWidth(259);
+        overviewCardLabel.setMaxWidth(259);
         overviewCardLabel.setAlignment(Pos.CENTER_RIGHT);
         
         HBox overviewCardRow = new HBox(16, overviewCardLabel, showOverviewCardToggle);
@@ -166,8 +166,6 @@ public class SettingsView extends BorderPane {
         // Search shortcut configuration
         Label shortcutLabel = new Label("Search shortcut");
         shortcutLabel.getStyleClass().add("field-label");
-        shortcutLabel.setMinWidth(180);
-        shortcutLabel.setMaxWidth(180);
         shortcutLabel.setAlignment(Pos.CENTER_RIGHT);
         
         searchShortcutField = new KeyCaptureField();
@@ -178,8 +176,15 @@ public class SettingsView extends BorderPane {
         VBox shortcutFieldWithHint = new VBox(6, searchShortcutField, shortcutHint);
         HBox.setHgrow(shortcutFieldWithHint, Priority.ALWAYS);
         
-        HBox shortcutRow = new HBox(16, shortcutLabel, shortcutFieldWithHint);
-        shortcutRow.setAlignment(Pos.CENTER_LEFT);
+        // Wrap label in VBox with top padding to align with field
+        VBox shortcutLabelWrapper = new VBox(shortcutLabel);
+        shortcutLabelWrapper.setAlignment(Pos.TOP_RIGHT);
+        shortcutLabelWrapper.setPadding(new Insets(8, 0, 0, 0)); // Align with field's vertical center
+        shortcutLabelWrapper.setMinWidth(259);
+        shortcutLabelWrapper.setMaxWidth(259);
+        
+        HBox shortcutRow = new HBox(16, shortcutLabelWrapper, shortcutFieldWithHint);
+        shortcutRow.setAlignment(Pos.TOP_LEFT);
         
         // Preferences container with proper spacing
         VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, shortcutRow);
@@ -236,8 +241,8 @@ public class SettingsView extends BorderPane {
     private VBox createFieldGroup(String labelText, Control field) {
         Label label = new Label(labelText);
         label.getStyleClass().add("field-label");
-        label.setMinWidth(180);
-        label.setMaxWidth(180);
+        label.setMinWidth(259);
+        label.setMaxWidth(259);
         label.setAlignment(Pos.CENTER_RIGHT);
         
         // Make field grow to fill available space
@@ -254,8 +259,8 @@ public class SettingsView extends BorderPane {
     private VBox createFieldGroupWithHint(String labelText, Control field, Label hint) {
         Label label = new Label(labelText);
         label.getStyleClass().add("field-label");
-        label.setMinWidth(180);
-        label.setMaxWidth(180);
+        label.setMinWidth(259);
+        label.setMaxWidth(259);
         label.setAlignment(Pos.CENTER_RIGHT);
         
         // Make field grow to fill available space
@@ -264,8 +269,18 @@ public class SettingsView extends BorderPane {
         VBox fieldWithHint = new VBox(6, field, hint);
         HBox.setHgrow(fieldWithHint, Priority.ALWAYS);
         
-        HBox row = new HBox(16, label, fieldWithHint);
-        row.setAlignment(Pos.CENTER_LEFT);
+        // Align label with the field (first child), not the whole VBox
+        HBox row = new HBox(16);
+        row.setAlignment(Pos.TOP_LEFT);
+        
+        // Wrap label in VBox with top padding to align with field
+        VBox labelWrapper = new VBox(label);
+        labelWrapper.setAlignment(Pos.TOP_RIGHT);
+        labelWrapper.setPadding(new Insets(8, 0, 0, 0)); // Align with field's vertical center
+        labelWrapper.setMinWidth(259);
+        labelWrapper.setMaxWidth(259);
+        
+        row.getChildren().addAll(labelWrapper, fieldWithHint);
         
         VBox group = new VBox(row);
         return group;
