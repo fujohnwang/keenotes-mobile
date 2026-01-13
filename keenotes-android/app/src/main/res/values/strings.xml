@@ -21,4 +21,7 @@
     <string name="review_period_all">All</string>
     <string name="copyright">©2025 王福强(Fuqiang Wang) All Rights Reserved</string>
     <string name="website">https://keenotes.afoo.me</string>
+    <string name="overview_total_notes">Total Notes</string>
+    <string name="overview_days_using">Days Using</string>
+    <string name="overview_show_card">Show Overview Card</string>
 </resources>

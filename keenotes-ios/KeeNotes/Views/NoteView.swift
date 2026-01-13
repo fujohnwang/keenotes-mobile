@@ -14,6 +14,14 @@ struct NoteView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
+                // Overview Card (conditionally shown)
+                if appState.settingsService.showOverviewCard {
+                    OverviewCardView()
+                        .environmentObject(appState)
+                        .padding(.horizontal)
+                        .padding(.top, 16)
+                }
+                
                 // Main content
                 VStack(spacing: 16) {
                     // Unified input container with embedded Send Channel and Send button

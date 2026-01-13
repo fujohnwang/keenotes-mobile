@@ -3,7 +3,7 @@ import GRDB
 
 /// SQLite database service using GRDB
 class DatabaseService: ObservableObject {
-    private var dbQueue: DatabaseQueue?
+    var dbQueue: DatabaseQueue?
     
     @Published var noteCount: Int = 0
     

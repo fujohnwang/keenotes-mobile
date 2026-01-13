@@ -41,6 +41,11 @@
             android:orientation="vertical"
             android:padding="16dp">
 
+            <!-- Overview Card -->
+            <include
+                android:id="@+id/overviewCardInclude"
+                layout="@layout/view_overview_card" />
+
             <!-- Unified input container with embedded design -->
             <FrameLayout
                 android:layout_width="match_parent"

@@ -52,12 +52,19 @@ class SettingsFragment : Fragment() {
         // Load initial state
         lifecycleScope.launch {
             binding.copyToClipboardSwitch.isChecked = app.settingsRepository.copyToClipboardOnPost.first()
+            binding.showOverviewCardSwitch.isChecked = app.settingsRepository.showOverviewCard.first()
         }
         
         // Auto-save on toggle change
         binding.copyToClipboardSwitch.setOnCheckedChangeListener { _, isChecked ->
             lifecycleScope.launch {
                 app.settingsRepository.setCopyToClipboardOnPost(isChecked)
+            }
+        }
+        
+        binding.showOverviewCardSwitch.setOnCheckedChangeListener { _, isChecked ->
+            lifecycleScope.launch {
+                app.settingsRepository.setShowOverviewCard(isChecked)
             }
         }
     }

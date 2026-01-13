@@ -53,6 +53,11 @@ struct SettingsView: View {
                         get: { appState.settingsService.copyToClipboardOnPost },
                         set: { appState.settingsService.copyToClipboardOnPost = $0 }
                     ))
+                    
+                    Toggle("Show Overview Card", isOn: Binding(
+                        get: { appState.settingsService.showOverviewCard },
+                        set: { appState.settingsService.showOverviewCard = $0 }
+                    ))
                 }
                 .font(.body)
                 
