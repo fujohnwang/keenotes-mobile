@@ -49,6 +49,9 @@ public class SidebarView extends VBox {
         overviewCard.visibleProperty().bind(settings.showOverviewCardProperty());
         overviewCard.managedProperty().bind(settings.showOverviewCardProperty());
         
+        // Add more spacing between logo and overview card
+        VBox.setMargin(overviewCard, new Insets(8, 0, 0, 0));
+        
         // Navigation buttons with PNG icons
         noteButton = new NavigationButton("Note", createNoteIcon(), true);
         noteButton.setOnAction(e -> onNavigationChanged.accept(DesktopMainView.ViewMode.NOTE));
@@ -67,8 +70,11 @@ public class SidebarView extends VBox {
         settingsButton = new NavigationButton("Settings", createSettingsIcon(), false);
         settingsButton.setOnAction(e -> onNavigationChanged.accept(DesktopMainView.ViewMode.SETTINGS));
         
-        VBox navigationGroup = new VBox(8, noteButton, searchButton, reviewButton, reviewPeriodsPanel, settingsButton);
+        VBox navigationGroup = new VBox(6, noteButton, searchButton, reviewButton, reviewPeriodsPanel, settingsButton);
         navigationGroup.getStyleClass().add("navigation-group");
+        
+        // Add top margin to navigation group for breathing room
+        VBox.setMargin(navigationGroup, new Insets(12, 0, 0, 0));
         
         // Spacer (no status area at bottom anymore)
         Region spacer = new Region();
@@ -87,9 +93,9 @@ public class SidebarView extends VBox {
      * Create logo area with icon and bold text
      */
     private HBox createLogoArea() {
-        HBox logoArea = new HBox(8);
+        HBox logoArea = new HBox(10); // Increased spacing
         logoArea.setAlignment(Pos.CENTER_LEFT);
-        logoArea.setPadding(new Insets(0, 0, 8, 0));
+        logoArea.setPadding(new Insets(0, 0, 16, 0)); // Increased bottom padding
         
         // Load KeeNotes icon from resources
         try {
@@ -97,8 +103,8 @@ public class SidebarView extends VBox {
                 getClass().getResourceAsStream("/icons/app-icon.png")
             );
             javafx.scene.image.ImageView iconView = new javafx.scene.image.ImageView(iconImage);
-            iconView.setFitWidth(28);
-            iconView.setFitHeight(28);
+            iconView.setFitWidth(32); // Slightly larger icon
+            iconView.setFitHeight(32);
             iconView.setPreserveRatio(true);
             
             Label logoText = new Label("KeeNotes");
