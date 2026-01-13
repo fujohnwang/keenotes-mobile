@@ -48,14 +48,14 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_note"
-                android:contentDescription="@string/note" />
+                android:contentDescription="Note" />
 
             <TextView
                 android:id="@+id/tabNoteText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="@string/note"
+                android:text="Note"
                 android:textSize="11sp"
                 android:textColor="@color/text_secondary" />
 
@@ -80,14 +80,14 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_review"
-                android:contentDescription="@string/review" />
+                android:contentDescription="Review" />
 
             <TextView
                 android:id="@+id/tabReviewText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="@string/review"
+                android:text="Review"
                 android:textSize="11sp"
                 android:textColor="@color/text_secondary" />
 
@@ -112,14 +112,14 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_settings"
-                android:contentDescription="@string/settings" />
+                android:contentDescription="Settings" />
 
             <TextView
                 android:id="@+id/tabSettingsText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="@string/settings"
+                android:text="Settings"
                 android:textSize="11sp"
                 android:textColor="@color/text_secondary" />
 
