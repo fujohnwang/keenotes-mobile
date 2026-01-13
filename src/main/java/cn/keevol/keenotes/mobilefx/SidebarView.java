@@ -7,6 +7,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 
 import java.util.function.Consumer;
 
@@ -52,14 +53,11 @@ public class SidebarView extends VBox {
         // Add more spacing between logo and overview card
         VBox.setMargin(overviewCard, new Insets(8, 0, 0, 0));
         
-        // Navigation buttons with PNG icons
-        noteButton = new NavigationButton("Note", createNoteIcon(), true);
+        // Navigation buttons with line art icons
+        noteButton = new NavigationButton("Take Note", createNoteIcon(), true);
         noteButton.setOnAction(e -> onNavigationChanged.accept(DesktopMainView.ViewMode.NOTE));
         
-        searchButton = new NavigationButton("Search", createSearchIcon(), false);
-        searchButton.setOnAction(e -> onNavigationChanged.accept(DesktopMainView.ViewMode.SEARCH));
-        
-        reviewButton = new NavigationButton("Review", createReviewIcon(), false);
+        reviewButton = new NavigationButton("Review Notes", createReviewIcon(), false);
         reviewButton.setOnAction(e -> toggleReviewPanel());
         
         // Review periods panel (initially hidden, placed right after Review button)
@@ -67,10 +65,13 @@ public class SidebarView extends VBox {
         reviewPeriodsPanel.setVisible(false);
         reviewPeriodsPanel.setManaged(false);
         
+        searchButton = new NavigationButton("Search Notes", createSearchIcon(), false);
+        searchButton.setOnAction(e -> onNavigationChanged.accept(DesktopMainView.ViewMode.SEARCH));
+        
         settingsButton = new NavigationButton("Settings", createSettingsIcon(), false);
         settingsButton.setOnAction(e -> onNavigationChanged.accept(DesktopMainView.ViewMode.SETTINGS));
         
-        VBox navigationGroup = new VBox(6, noteButton, searchButton, reviewButton, reviewPeriodsPanel, settingsButton);
+        VBox navigationGroup = new VBox(6, noteButton, reviewButton, reviewPeriodsPanel, searchButton, settingsButton);
         navigationGroup.getStyleClass().add("navigation-group");
         
         // Add top margin to navigation group for breathing room
@@ -123,53 +124,55 @@ public class SidebarView extends VBox {
     }
     
     /**
-     * Create note icon from PNG
+     * Create note icon - simple pen/pencil line art
      */
     private javafx.scene.Node createNoteIcon() {
-        return createIconFromResource("/icons/take_note.png");
+        javafx.scene.shape.SVGPath icon = new javafx.scene.shape.SVGPath();
+        // Pen/pencil icon - simple line art
+        icon.setContent("M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z");
+        icon.setFill(Color.web("#8B949E"));
+        icon.setScaleX(0.7);
+        icon.setScaleY(0.7);
+        return icon;
     }
     
     /**
-     * Create search icon from PNG
-     */
-    private javafx.scene.Node createSearchIcon() {
-        return createIconFromResource("/icons/search.png");
-    }
-    
-    /**
-     * Create review icon from PNG
+     * Create review icon - simple clock/history line art
      */
     private javafx.scene.Node createReviewIcon() {
-        return createIconFromResource("/icons/review.png");
+        javafx.scene.shape.SVGPath icon = new javafx.scene.shape.SVGPath();
+        // Clock/history icon - simple line art
+        icon.setContent("M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z");
+        icon.setFill(Color.web("#8B949E"));
+        icon.setScaleX(0.7);
+        icon.setScaleY(0.7);
+        return icon;
     }
     
     /**
-     * Create settings icon from PNG
+     * Create search icon - simple magnifying glass line art
+     */
+    private javafx.scene.Node createSearchIcon() {
+        javafx.scene.shape.SVGPath icon = new javafx.scene.shape.SVGPath();
+        // Magnifying glass icon - simple line art
+        icon.setContent("M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z");
+        icon.setFill(Color.web("#8B949E"));
+        icon.setScaleX(0.7);
+        icon.setScaleY(0.7);
+        return icon;
+    }
+    
+    /**
+     * Create settings icon - simple gear line art
      */
     private javafx.scene.Node createSettingsIcon() {
-        return createIconFromResource("/icons/settings.png");
-    }
-    
-    /**
-     * Helper method to create ImageView from resource path
-     */
-    private javafx.scene.Node createIconFromResource(String resourcePath) {
-        try {
-            javafx.scene.image.Image image = new javafx.scene.image.Image(
-                getClass().getResourceAsStream(resourcePath)
-            );
-            javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView(image);
-            imageView.setFitWidth(20);
-            imageView.setFitHeight(20);
-            imageView.setPreserveRatio(true);
-            return imageView;
-        } catch (Exception e) {
-            System.err.println("Could not load icon: " + resourcePath + " - " + e.getMessage());
-            // Fallback to empty region
-            Region placeholder = new Region();
-            placeholder.setPrefSize(20, 20);
-            return placeholder;
-        }
+        javafx.scene.shape.SVGPath icon = new javafx.scene.shape.SVGPath();
+        // Gear icon - simple line art
+        icon.setContent("M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z");
+        icon.setFill(Color.web("#8B949E"));
+        icon.setScaleX(0.7);
+        icon.setScaleY(0.7);
+        return icon;
     }
     
     /**
