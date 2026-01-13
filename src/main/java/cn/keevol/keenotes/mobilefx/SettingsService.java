@@ -1,6 +1,8 @@
 package cn.keevol.keenotes.mobilefx;
 
 import com.gluonhq.attach.storage.StorageService;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -29,11 +31,16 @@ public class SettingsService {
     private static SettingsService instance;
     private final Properties properties;
     private final Path settingsPath;
+    
+    // JavaFX Property for reactive binding
+    private final BooleanProperty showOverviewCardProperty = new SimpleBooleanProperty(true);
 
     private SettingsService() {
         properties = new Properties();
         settingsPath = resolveSettingsPath();
         loadSettings();
+        // Initialize property from loaded settings
+        showOverviewCardProperty.set(getShowOverviewCard());
     }
 
     public static synchronized SettingsService getInstance() {
@@ -161,6 +168,11 @@ public class SettingsService {
     
     public void setShowOverviewCard(boolean enabled) {
         properties.setProperty(KEY_SHOW_OVERVIEW_CARD, String.valueOf(enabled));
+        showOverviewCardProperty.set(enabled);
+    }
+    
+    public BooleanProperty showOverviewCardProperty() {
+        return showOverviewCardProperty;
     }
     
     public String getFirstNoteDate() {

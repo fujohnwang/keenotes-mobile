@@ -46,39 +46,45 @@ class NoteFragment : Fragment() {
     private fun setupOverviewCard() {
         val app = requireActivity().application as KeeNotesApp
         
-        // Observe showOverviewCard setting
-        lifecycleScope.launch {
+        // Observe showOverviewCard setting - use viewLifecycleOwner to auto-cancel when view is destroyed
+        viewLifecycleOwner.lifecycleScope.launch {
             app.settingsRepository.showOverviewCard.collectLatest { show ->
-                binding.overviewCardInclude.root.visibility = if (show) View.VISIBLE else View.GONE
+                if (_binding != null) {
+                    binding.overviewCardInclude.root.visibility = if (show) View.VISIBLE else View.GONE
+                }
             }
         }
         
-        // Observe note count
-        lifecycleScope.launch {
+        // Observe note count - use viewLifecycleOwner to auto-cancel when view is destroyed
+        viewLifecycleOwner.lifecycleScope.launch {
             app.database.noteDao().getNoteCountFlow().collectLatest { count ->
-                binding.overviewCardInclude.totalNotesValue.text = count.toString()
-                
-                // Initialize first note date if needed
-                if (count > 0) {
-                    val firstDate = app.settingsRepository.getFirstNoteDate()
-                    if (firstDate == null) {
-                        val oldestDate = app.database.noteDao().getOldestNoteDate()
-                        if (oldestDate != null) {
-                            app.settingsRepository.setFirstNoteDate(oldestDate)
+                if (_binding != null) {
+                    binding.overviewCardInclude.totalNotesValue.text = count.toString()
+                    
+                    // Initialize first note date if needed
+                    if (count > 0) {
+                        val firstDate = app.settingsRepository.getFirstNoteDate()
+                        if (firstDate == null) {
+                            val oldestDate = app.database.noteDao().getOldestNoteDate()
+                            if (oldestDate != null) {
+                                app.settingsRepository.setFirstNoteDate(oldestDate)
+                            }
                         }
                     }
                 }
             }
         }
         
-        // Observe first note date and calculate days
-        lifecycleScope.launch {
+        // Observe first note date and calculate days - use viewLifecycleOwner to auto-cancel when view is destroyed
+        viewLifecycleOwner.lifecycleScope.launch {
             app.settingsRepository.firstNoteDate.collectLatest { firstDate ->
-                if (firstDate != null) {
-                    val days = calculateDaysUsing(firstDate)
-                    binding.overviewCardInclude.daysUsingValue.text = days.toString()
-                } else {
-                    binding.overviewCardInclude.daysUsingValue.text = "0"
+                if (_binding != null) {
+                    if (firstDate != null) {
+                        val days = calculateDaysUsing(firstDate)
+                        binding.overviewCardInclude.daysUsingValue.text = days.toString()
+                    } else {
+                        binding.overviewCardInclude.daysUsingValue.text = "0"
+                    }
                 }
             }
         }
@@ -140,10 +146,12 @@ class NoteFragment : Fragment() {
     private fun setupSendChannelStatus() {
         val app = requireActivity().application as KeeNotesApp
         
-        // Observe settings changes for send channel status
-        lifecycleScope.launch {
+        // Observe settings changes for send channel status - use viewLifecycleOwner
+        viewLifecycleOwner.lifecycleScope.launch {
             app.settingsRepository.isConfigured.collectLatest { configured ->
-                updateSendChannelStatus(configured)
+                if (_binding != null) {
+                    updateSendChannelStatus(configured)
+                }
             }
         }
     }
@@ -174,35 +182,38 @@ class NoteFragment : Fragment() {
         binding.sendProgress.visibility = View.VISIBLE
         binding.sendText.text = "Sending..."
         
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val result = app.apiService.postNote(content)
             
-            // Restore button state
-            binding.sendProgress.visibility = View.GONE
-            binding.sendIcon.visibility = View.VISIBLE
-            binding.sendText.text = "Send"
-            
-            if (result.success) {
-                // Copy to clipboard if enabled
-                if (app.settingsRepository.getCopyToClipboardOnPost()) {
-                    val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    val clip = android.content.ClipData.newPlainText("note", content)
-                    clipboard.setPrimaryClip(clip)
+            // Check if view still exists before updating UI
+            if (_binding != null) {
+                // Restore button state
+                binding.sendProgress.visibility = View.GONE
+                binding.sendIcon.visibility = View.VISIBLE
+                binding.sendText.text = "Send"
+                
+                if (result.success) {
+                    // Copy to clipboard if enabled
+                    if (app.settingsRepository.getCopyToClipboardOnPost()) {
+                        val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("note", content)
+                        clipboard.setPrimaryClip(clip)
+                    }
+                    
+                    // Show echo
+                    binding.echoCard.visibility = View.VISIBLE
+                    binding.echoContent.text = result.echoContent
+                    
+                    // Clear input
+                    binding.noteInput.text?.clear()
+                } else {
+                    // Show error (could add a toast or snackbar here)
+                    binding.echoCard.visibility = View.VISIBLE
+                    binding.echoContent.text = "Error: ${result.message}"
                 }
                 
-                // Show echo
-                binding.echoCard.visibility = View.VISIBLE
-                binding.echoContent.text = result.echoContent
-                
-                // Clear input
-                binding.noteInput.text?.clear()
-            } else {
-                // Show error (could add a toast or snackbar here)
-                binding.echoCard.visibility = View.VISIBLE
-                binding.echoContent.text = "Error: ${result.message}"
+                updateSendButtonState(binding.noteInput.text?.isNotBlank() == true)
             }
-            
-            updateSendButtonState(binding.noteInput.text?.isNotBlank() == true)
         }
     }
     

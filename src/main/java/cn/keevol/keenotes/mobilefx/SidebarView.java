@@ -44,10 +44,10 @@ public class SidebarView extends VBox {
         OverviewCard overviewCard = new OverviewCard();
         overviewCard.setMaxWidth(Double.MAX_VALUE);
         
-        // Bind visibility to settings
+        // Bind visibility to settings property (reactive)
         SettingsService settings = SettingsService.getInstance();
-        overviewCard.setVisible(settings.getShowOverviewCard());
-        overviewCard.setManaged(settings.getShowOverviewCard());
+        overviewCard.visibleProperty().bind(settings.showOverviewCardProperty());
+        overviewCard.managedProperty().bind(settings.showOverviewCardProperty());
         
         // Navigation buttons with PNG icons
         noteButton = new NavigationButton("Note", createNoteIcon(), true);
