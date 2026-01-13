@@ -95,6 +95,9 @@ class ReviewFragment : Fragment() {
     }
     
     private fun updateSyncChannelStatus(state: WebSocketService.ConnectionState) {
+        // Check if view is still attached
+        if (_binding == null || !isAdded) return
+        
         val (text, color) = when (state) {
             WebSocketService.ConnectionState.CONNECTED -> 
                 "✓" to requireContext().getColor(R.color.success)
