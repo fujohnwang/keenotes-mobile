@@ -234,70 +234,7 @@ class ReviewFragment : Fragment() {
         }
     }
     
-    /**
-     * Observe notes from database using Flow - auto-updates when data changes
-     * Simplified logic: primarily rely on notes data, use syncState only for syncing indicator
-     */
-    private fun observeNotes(period: String) {
-        val app = requireActivity().application as KeeNotesApp
-        
-        // Cancel previous observation
-        notesJob?.cancel()
-        
-        val days = when (period) {
-            "30 days" -> 30
-            "90 days" -> 90
-            "All" -> 3650
-            else -> 7
-        }
-        
-        val since = Instant.now().minus(days.toLong(), ChronoUnit.DAYS).toString()
-        
-        notesJob = lifecycleScope.launch {
-            // Combine notes flow with sync state flow
-            combine(
-                app.database.noteDao().getNotesForReviewFlow(since),
-                app.webSocketService.syncState
-            ) { notes, syncState ->
-                Pair(notes, syncState)
-            }.collect { (notes, syncState) ->
-                // Update syncing indicator in header
-                updateSyncingIndicator(syncState)
-                
-                if (notes.isEmpty()) {
-                    // Hide notes list when empty
-                    binding.notesRecyclerView.visibility = View.GONE
-                    updateCountText(0, period)
-                    previousNotesCount = 0
-                    previousFirstNoteId = null
-                } else {
-                    // Show notes list
-                    binding.notesRecyclerView.visibility = View.VISIBLE
-                    updateCountText(notes.size, period)
-                    
-                    // Check if new notes arrived at the top
-                    val hasNewNotes = notes.isNotEmpty() && (
-                        notes.size > previousNotesCount || 
-                        (previousFirstNoteId != null && notes.first().id != previousFirstNoteId)
-                    )
-                    
-                    // Submit list - DiffUtil will handle incremental updates automatically
-                    // Only new/changed items will be updated, not the entire list
-                    notesAdapter.submitList(notes.toMutableList()) {
-                        // Callback after list is submitted and animations are complete
-                        if (hasNewNotes && previousNotesCount > 0) {
-                            // Scroll to top to show new notes
-                            binding.notesRecyclerView.scrollToPosition(0)
-                        }
-                    }
-                    
-                    // Update tracking variables
-                    previousNotesCount = notes.size
-                    previousFirstNoteId = notes.firstOrNull()?.id
-                }
-            }
-        }
-    }
+
     
     private fun updateCountText(count: Int, period: String) {
         val periodInfo = when (period) {
