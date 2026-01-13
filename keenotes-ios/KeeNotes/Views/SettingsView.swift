@@ -12,6 +12,15 @@ struct SettingsView: View {
     @State private var statusMessage = ""
     @State private var isSuccess = true
     
+    // Computed property for Save button enabled state
+    private var isSaveEnabled: Bool {
+        let e = endpointUrl.trimmingCharacters(in: .whitespaces)
+        let t = token.trimmingCharacters(in: .whitespaces)
+        let p = password.trimmingCharacters(in: .whitespaces)
+        let c = confirmPassword.trimmingCharacters(in: .whitespaces)
+        return !e.isEmpty && !t.isEmpty && !p.isEmpty && !c.isEmpty && password == confirmPassword
+    }
+    
     // Easter egg state
     @State private var copyrightTapCount = 0
     @State private var lastTapTime: Date = .distantPast
@@ -57,6 +66,7 @@ struct SettingsView: View {
                             Spacer()
                         }
                     }
+                    .disabled(!isSaveEnabled)
                     
                     // Status message
                     if !statusMessage.isEmpty {
@@ -122,10 +132,13 @@ struct SettingsView: View {
     }
     
     private func loadSettings() {
-        endpointUrl = appState.settingsService.endpointUrl
-        token = appState.settingsService.token
-        password = appState.settingsService.encryptionPassword
-        confirmPassword = appState.settingsService.encryptionPassword
+        // Ensure we're on the main thread when accessing @Published properties
+        DispatchQueue.main.async {
+            endpointUrl = appState.settingsService.endpointUrl
+            token = appState.settingsService.token
+            password = appState.settingsService.encryptionPassword
+            confirmPassword = appState.settingsService.encryptionPassword
+        }
     }
     
     private func saveSettings() {

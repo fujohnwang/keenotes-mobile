@@ -1,6 +1,7 @@
 package cn.keevol.keenotes.mobilefx;
 
 import javafx.animation.PauseTransition;
+import javafx.beans.binding.Bindings;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -55,6 +56,31 @@ public class SettingsView extends BorderPane {
         saveButton.getStyleClass().addAll("action-button", "primary");
         saveButton.setMaxWidth(Double.MAX_VALUE);
         saveButton.setOnAction(e -> saveSettings());
+        
+        // Reactive binding: disable Save button if any field is empty or passwords don't match
+        saveButton.disableProperty().bind(
+            Bindings.createBooleanBinding(() -> {
+                String endpoint = endpointField.getText();
+                String token = tokenField.getText();
+                String password = encryptionPasswordField.getText();
+                String confirmPassword = encryptionPasswordConfirmField.getText();
+                
+                // Check if any field is empty
+                if (endpoint == null || endpoint.trim().isEmpty() ||
+                    token == null || token.trim().isEmpty() ||
+                    password == null || password.trim().isEmpty() ||
+                    confirmPassword == null || confirmPassword.trim().isEmpty()) {
+                    return true;
+                }
+                
+                // Check if passwords match
+                return !password.equals(confirmPassword);
+            },
+            endpointField.textProperty(),
+            tokenField.textProperty(),
+            encryptionPasswordField.textProperty(),
+            encryptionPasswordConfirmField.textProperty())
+        );
         
         // Create save button row with same layout as input fields
         Label saveButtonSpacer = new Label();
