@@ -79,11 +79,11 @@ public class KeyCaptureField extends HBox {
     private void stopRecording(boolean save) {
         isRecording = false;
         if (!save) {
-            // Restore previous shortcut display
+            // Restore previous shortcut display with user-friendly format
             if (currentShortcut.isEmpty()) {
                 displayLabel.setText("Click to set");
             } else {
-                displayLabel.setText(currentShortcut);
+                displayLabel.setText(formatShortcutForDisplay(currentShortcut));
             }
         }
         pressedKeys.clear();

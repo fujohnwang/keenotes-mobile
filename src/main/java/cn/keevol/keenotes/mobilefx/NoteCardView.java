@@ -17,6 +17,8 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
 import javafx.util.Duration;
 
 /**
@@ -45,6 +47,13 @@ public class NoteCardView extends StackPane {
         // Listen to font size changes
         settings.noteFontSizeProperty().addListener((obs, oldSize, newSize) -> {
             javafx.application.Platform.runLater(() -> updateFontSize(newSize.intValue()));
+        });
+        
+        // Listen to width changes to recalculate height
+        widthProperty().addListener((obs, oldWidth, newWidth) -> {
+            if (newWidth.doubleValue() > 0) {
+                javafx.application.Platform.runLater(this::adjustTextAreaHeight);
+            }
         });
         
         // Main content container
@@ -90,14 +99,25 @@ public class NoteCardView extends StackPane {
             "-fx-cursor: hand;"
         );
         
-        // Auto-resize height based on content
-        contentArea.setPrefRowCount(1);
+        // Disable scrollbars completely
+        contentArea.setScrollTop(0);
+        contentArea.setScrollLeft(0);
+        
+        // Let TextArea compute its own height based on content
         contentArea.setMinHeight(30);
         contentArea.setPrefHeight(USE_COMPUTED_SIZE);
+        contentArea.setMaxHeight(Double.MAX_VALUE);
         
         // Calculate and set height based on content
-        adjustTextAreaHeight();
-        contentArea.textProperty().addListener((obs, oldVal, newVal) -> adjustTextAreaHeight());
+        // Delay initial calculation to ensure proper layout
+        javafx.application.Platform.runLater(() -> {
+            adjustTextAreaHeight();
+            // Hide scrollbars after layout
+            hideScrollBars();
+        });
+        contentArea.textProperty().addListener((obs, oldVal, newVal) -> {
+            adjustTextAreaHeight();
+        });
         
         // Custom context menu for copy
         ContextMenu contextMenu = new ContextMenu();
@@ -172,32 +192,70 @@ public class NoteCardView extends StackPane {
     }
     
     /**
+     * Hide scrollbars from TextArea
+     */
+    private void hideScrollBars() {
+        javafx.application.Platform.runLater(() -> {
+            javafx.scene.Node scrollPane = contentArea.lookup(".scroll-pane");
+            if (scrollPane != null) {
+                scrollPane.setStyle("-fx-background-color: transparent;");
+            }
+            javafx.scene.Node vbar = contentArea.lookup(".scroll-bar:vertical");
+            javafx.scene.Node hbar = contentArea.lookup(".scroll-bar:horizontal");
+            if (vbar != null) {
+                vbar.setVisible(false);
+                vbar.setManaged(false);
+            }
+            if (hbar != null) {
+                hbar.setVisible(false);
+                hbar.setManaged(false);
+            }
+        });
+    }
+    
+    /**
      * Adjust TextArea height based on content and font size
+     * Uses Text node for accurate height calculation with proper wrapping
      */
     private void adjustTextAreaHeight() {
-        // Estimate line count based on content
         String text = contentArea.getText();
-        int lineCount = text.split("\n", -1).length;
-        
-        // Get current font size for calculations
-        int fontSize = settings.getNoteFontSize();
-        // Estimate chars per line based on font size (larger font = fewer chars per line)
-        int charsPerLine = Math.max(30, 80 - (fontSize - 14) * 3);
-        
-        // Also consider wrapped lines
-        int estimatedWrappedLines = 0;
-        for (String line : text.split("\n", -1)) {
-            estimatedWrappedLines += Math.max(1, (int) Math.ceil((double) line.length() / charsPerLine));
+        if (text == null || text.isEmpty()) {
+            contentArea.setPrefHeight(30);
+            contentArea.setMinHeight(30);
+            return;
         }
         
-        int totalLines = Math.max(lineCount, estimatedWrappedLines);
-        // Line height scales with font size (roughly 1.4x font size)
-        double lineHeight = fontSize * 1.4;
-        double padding = 16;
-        double height = Math.max(30, totalLines * lineHeight + padding);
+        int fontSize = settings.getNoteFontSize();
+        
+        // Use Text node to calculate actual required height
+        Text textNode = new Text(text);
+        textNode.setFont(Font.font(fontSize));
+        
+        // Get the actual width available for text
+        double availableWidth = 500; // Default estimate
+        if (getWidth() > 0) {
+            // Card padding (16*2) + content box padding (16*2) = 64
+            availableWidth = getWidth() - 64;
+        }
+        textNode.setWrappingWidth(availableWidth);
+        
+        // Get the actual bounds of the text
+        double textHeight = textNode.getLayoutBounds().getHeight();
+        
+        // Add generous padding to ensure all content is visible
+        // TextArea has internal padding that we need to account for
+        double padding = 50;
+        double height = Math.max(30, textHeight + padding);
         
         contentArea.setPrefHeight(height);
-        contentArea.setMaxHeight(Double.MAX_VALUE); // Allow unlimited height
+        contentArea.setMinHeight(height);
+        contentArea.setMaxHeight(Double.MAX_VALUE);
+        
+        // Force layout update
+        contentArea.layout();
+        
+        // Re-hide scrollbars after height change
+        hideScrollBars();
     }
     
     /**
@@ -212,6 +270,8 @@ public class NoteCardView extends StackPane {
             content.putString(selected);
             clipboard.setContent(content);
             showCopiedPopup();
+            // Deselect text after copy
+            contentArea.deselect();
         } else {
             // Copy all
             handleCopy();
@@ -226,6 +286,8 @@ public class NoteCardView extends StackPane {
         clipboard.setContent(content);
         
         showCopiedPopup();
+        // Deselect text after copy
+        contentArea.deselect();
     }
     
     private void showCopiedPopup() {
