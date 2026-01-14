@@ -15,14 +15,14 @@
         android:layout_height="16dp"
         android:src="@drawable/ic_check"
         android:contentDescription="@string/copied"
-        android:tint="@android:color/white" />
+        android:tint="#333333" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:text="@string/copied"
-        android:textColor="@android:color/white"
+        android:textColor="#333333"
         android:textSize="14sp" />
 
 </LinearLayout>
