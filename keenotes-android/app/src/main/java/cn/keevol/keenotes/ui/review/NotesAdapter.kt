@@ -58,50 +58,77 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
             binding.contentText.text = note.content
             
             // Setup interactions
-            setupCardClick()
-            setupTextViewInteraction()
+            setupInteractions()
         }
         
         /**
-         * CardView click - copy entire content (handles clicks outside TextView)
+         * Unified action: ripple + copy + notify
          */
-        private fun setupCardClick() {
-            binding.root.setOnClickListener {
-                copyToClipboard(currentNote?.content ?: "")
+        private fun performCopyAction() {
+            val content = currentNote?.content ?: return
+            val context = binding.root.context
+            val cardView = binding.root
+            
+            // 1. Trigger ripple (card click will handle this naturally)
+            cardView.isPressed = true
+            cardView.postDelayed({ cardView.isPressed = false }, 100)
+            
+            // 2. Copy to clipboard
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("note", content)
+            clipboard.setPrimaryClip(clip)
+            
+            // 3. Show toast notification
+            val inflater = LayoutInflater.from(context)
+            val layout = inflater.inflate(R.layout.toast_copied, null)
+            Toast(context).apply {
+                duration = Toast.LENGTH_SHORT
+                view = layout
+                setGravity(Gravity.CENTER, 0, 0)
+                show()
             }
         }
         
         /**
-         * TextView interaction:
-         * - Forward touch events to CardView for ripple effect
-         * - Click: copy entire content
-         * - Long press on text: system handles text selection (textIsSelectable=true)
-         * - Long press on non-text: copy entire content
+         * Setup all interactions:
+         * - Any click/tap: performCopyAction()
+         * - Long press on text: system text selection
+         * - Long press on non-text: performCopyAction()
          */
-        private fun setupTextViewInteraction() {
+        private fun setupInteractions() {
             val textView = binding.contentText
             val cardView = binding.root
             
-            // Track if we're in text selection mode
+            // Track touch state
+            var lastTouchX = 0f
+            var lastTouchY = 0f
+            var touchDownTime = 0L
             var isInSelectionMode = false
             
-            // Forward touch events to CardView for ripple
+            // CardView click - copy action
+            cardView.setOnClickListener {
+                performCopyAction()
+            }
+            
+            // TextView touch - handle all touch events here
             textView.setOnTouchListener { v, event ->
                 val tv = v as TextView
                 
-                // Calculate position relative to CardView for ripple hotspot
-                val location = IntArray(2)
-                tv.getLocationInWindow(location)
-                val cardLocation = IntArray(2)
-                cardView.getLocationInWindow(cardLocation)
-                
-                val relativeX = event.x + location[0] - cardLocation[0]
-                val relativeY = event.y + location[1] - cardLocation[1]
-                
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
+                        lastTouchX = event.x
+                        lastTouchY = event.y
+                        touchDownTime = System.currentTimeMillis()
                         isInSelectionMode = false
-                        // Set ripple hotspot and pressed state
+                        
+                        // Set ripple hotspot
+                        val location = IntArray(2)
+                        tv.getLocationInWindow(location)
+                        val cardLocation = IntArray(2)
+                        cardView.getLocationInWindow(cardLocation)
+                        val relativeX = event.x + location[0] - cardLocation[0]
+                        val relativeY = event.y + location[1] - cardLocation[1]
+                        
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                             cardView.foreground?.setHotspot(relativeX, relativeY)
                         }
@@ -112,13 +139,22 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
                         // Check if text selection has started
                         if (tv.hasSelection()) {
                             isInSelectionMode = true
-                            // Cancel ripple when selecting text
                             cardView.isPressed = false
                         }
                     }
                     
                     MotionEvent.ACTION_UP -> {
                         cardView.isPressed = false
+                        
+                        val touchDuration = System.currentTimeMillis() - touchDownTime
+                        val isQuickTap = touchDuration < 500 // Less than 500ms is a tap
+                        
+                        // If it's a quick tap and not in selection mode, perform copy
+                        if (isQuickTap && !isInSelectionMode && !tv.hasSelection()) {
+                            performCopyAction()
+                            // Return true to consume the event and prevent onClick from firing twice
+                            return@setOnTouchListener true
+                        }
                     }
                     
                     MotionEvent.ACTION_CANCEL -> {
@@ -126,53 +162,52 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
                     }
                 }
                 
-                // Don't consume - let TextView handle for text selection
-                false
+                false // Let TextView handle for text selection
             }
             
-            // Click on TextView - copy entire content
+            // TextView click - backup for cases where onTouchListener doesn't catch it
             textView.setOnClickListener {
-                copyToClipboard(currentNote?.content ?: "")
+                // Only perform if not already handled by onTouchListener
+                if (!textView.hasSelection()) {
+                    performCopyAction()
+                }
             }
             
-            // Long press on TextView
+            // TextView long press - only allow text selection if on text
             textView.setOnLongClickListener { v ->
                 val tv = v as TextView
-                val layout = tv.layout
-                
-                if (layout == null || tv.text.isNullOrEmpty()) {
-                    copyToClipboard(currentNote?.content ?: "")
-                    return@setOnLongClickListener true
+                val layout = tv.layout ?: return@setOnLongClickListener run {
+                    performCopyAction()
+                    true
                 }
                 
-                // Get last touch position (we need to check if it's on text)
-                // Since textIsSelectable=true, system will handle text selection
-                // We only need to handle long press on non-text areas
-                
-                // Let system handle - it will start text selection if on text
-                // If not on text, the selection won't start and we can copy
-                
-                // Return false to let system handle text selection
-                false
+                if (isPointOnText(tv, layout, lastTouchX, lastTouchY)) {
+                    // On text - let system handle text selection
+                    false
+                } else {
+                    // Not on text - copy action
+                    performCopyAction()
+                    true
+                }
             }
         }
         
-        private fun copyToClipboard(content: String) {
-            val context = binding.root.context
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("note", content)
-            clipboard.setPrimaryClip(clip)
+        /**
+         * Check if touch point is on actual text content
+         */
+        private fun isPointOnText(textView: TextView, layout: Layout, x: Float, y: Float): Boolean {
+            val textX = x - textView.paddingLeft
+            val textY = y - textView.paddingTop
             
-            // Show custom capsule toast
-            val inflater = LayoutInflater.from(context)
-            val layout = inflater.inflate(R.layout.toast_copied, null)
+            if (textX < 0 || textY < 0) return false
             
-            Toast(context).apply {
-                duration = Toast.LENGTH_SHORT
-                view = layout
-                setGravity(Gravity.CENTER, 0, 0)
-                show()
-            }
+            val line = layout.getLineForVertical(textY.toInt())
+            if (line < 0 || line >= layout.lineCount) return false
+            
+            val lineLeft = layout.getLineLeft(line)
+            val lineRight = layout.getLineRight(line)
+            
+            return textX >= lineLeft && textX <= lineRight
         }
     }
     
