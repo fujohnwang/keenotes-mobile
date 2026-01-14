@@ -125,6 +125,18 @@ class ReviewFragment : Fragment() {
                 }
             }
         }
+        
+        // Observe note count changes for realtime updates
+        var previousCount = 0
+        viewLifecycleOwner.lifecycleScope.launch {
+            app.database.noteDao().getNoteCountFlow().collectLatest { count ->
+                if (_binding != null && previousCount > 0 && count > previousCount) {
+                    // New notes arrived - load and add them at top
+                    loadNewNotesAtTop(previousCount, count)
+                }
+                previousCount = count
+            }
+        }
     }
     
     private fun loadInitialNotes() {
@@ -152,6 +164,45 @@ class ReviewFragment : Fragment() {
                 }
                 
                 updateCountText(totalCount, currentPeriod)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    private fun loadNewNotesAtTop(previousCount: Int, newCount: Int) {
+        val app = requireActivity().application as KeeNotesApp
+        val days = getDaysForPeriod(currentPeriod)
+        val since = getSinceDate(days)
+        
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                // Calculate how many new notes
+                val newNotesCount = newCount - previousCount
+                
+                // Load the newest notes (they should be at the top)
+                val newNotes = app.database.noteDao().getNotesForReviewPaged(since, newNotesCount, 0)
+                
+                if (newNotes.isNotEmpty()) {
+                    // Filter out notes that are already in the list
+                    val existingIds = loadedNotes.map { it.id }.toSet()
+                    val trulyNewNotes = newNotes.filter { it.id !in existingIds }
+                    
+                    if (trulyNewNotes.isNotEmpty()) {
+                        // Add new notes at the beginning
+                        loadedNotes.addAll(0, trulyNewNotes)
+                        
+                        // Update adapter
+                        notesAdapter.submitList(loadedNotes.toList()) {
+                            // Scroll to top to show new notes
+                            binding.notesRecyclerView.scrollToPosition(0)
+                        }
+                        
+                        // Update count
+                        val totalCount = app.database.noteDao().getNotesCountForReview(since)
+                        updateCountText(totalCount, currentPeriod)
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

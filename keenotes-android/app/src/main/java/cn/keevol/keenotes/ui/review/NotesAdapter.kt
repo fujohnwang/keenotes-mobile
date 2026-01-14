@@ -3,14 +3,16 @@ package cn.keevol.keenotes.ui.review
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.ItemNoteBinding
-import com.google.android.material.snackbar.Snackbar
 
 class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCallback()) {
     
@@ -64,8 +66,16 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
             val clip = ClipData.newPlainText("note", content)
             clipboard.setPrimaryClip(clip)
             
-            // Show Snackbar (Android standard way)
-            Snackbar.make(binding.root, "✓ Copied to clipboard", Snackbar.LENGTH_SHORT).show()
+            // Show custom capsule toast (iOS-style)
+            val inflater = LayoutInflater.from(context)
+            val layout = inflater.inflate(R.layout.toast_copied, null)
+            
+            Toast(context).apply {
+                duration = Toast.LENGTH_SHORT
+                view = layout
+                setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, 100)
+                show()
+            }
         }
     }
     
