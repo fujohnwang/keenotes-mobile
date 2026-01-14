@@ -24,7 +24,7 @@ public class KeyCaptureField extends HBox {
     
     public KeyCaptureField() {
         getStyleClass().add("key-capture-field");
-        setAlignment(Pos.CENTER_LEFT);
+        setAlignment(Pos.CENTER);
         setPadding(new Insets(8, 12, 8, 12));
         setPrefWidth(200);
         setMaxWidth(200);
@@ -32,6 +32,7 @@ public class KeyCaptureField extends HBox {
         displayLabel = new Label("Click to set");
         displayLabel.getStyleClass().add("key-capture-label");
         displayLabel.setMaxWidth(Double.MAX_VALUE);
+        displayLabel.setAlignment(Pos.CENTER);
         HBox.setHgrow(displayLabel, Priority.ALWAYS);
         
         getChildren().add(displayLabel);

@@ -23,6 +23,7 @@ public class SettingsView extends BorderPane {
     private final ToggleSwitch copyToClipboardToggle;
     private final ToggleSwitch showOverviewCardToggle;
     private final KeyCaptureField searchShortcutField;
+    private final KeyCaptureField sendShortcutField;
 
     public SettingsView(Runnable onBack) {
         this.onBack = onBack;
@@ -214,8 +215,31 @@ public class SettingsView extends BorderPane {
         HBox shortcutRow = new HBox(16, shortcutLabelWrapper, shortcutFieldWithHint);
         shortcutRow.setAlignment(Pos.TOP_LEFT);
         
+        // Send shortcut configuration
+        Label sendShortcutLabel = new Label("Send shortcut");
+        sendShortcutLabel.getStyleClass().add("field-label");
+        sendShortcutLabel.setAlignment(Pos.CENTER_RIGHT);
+        
+        sendShortcutField = new KeyCaptureField();
+        
+        Label sendShortcutHint = new Label("Click the field and press your desired key combination (e.g., Alt+Enter)");
+        sendShortcutHint.getStyleClass().add("field-hint");
+        
+        VBox sendShortcutFieldWithHint = new VBox(6, sendShortcutField, sendShortcutHint);
+        HBox.setHgrow(sendShortcutFieldWithHint, Priority.ALWAYS);
+        
+        // Wrap label in VBox with top padding to align with field
+        VBox sendShortcutLabelWrapper = new VBox(sendShortcutLabel);
+        sendShortcutLabelWrapper.setAlignment(Pos.TOP_RIGHT);
+        sendShortcutLabelWrapper.setPadding(new Insets(8, 0, 0, 0)); // Align with field's vertical center
+        sendShortcutLabelWrapper.setMinWidth(259);
+        sendShortcutLabelWrapper.setMaxWidth(259);
+        
+        HBox sendShortcutRow = new HBox(16, sendShortcutLabelWrapper, sendShortcutFieldWithHint);
+        sendShortcutRow.setAlignment(Pos.TOP_LEFT);
+        
         // Preferences container with proper spacing
-        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, shortcutRow);
+        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, shortcutRow, sendShortcutRow);
         preferencesSection.setPadding(new Insets(8, 0, 8, 0)); // Add top/bottom padding
 
         // Debug entry (hidden by default) - removed for desktop version
@@ -325,6 +349,7 @@ public class SettingsView extends BorderPane {
         copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
         showOverviewCardToggle.setSelected(settings.getShowOverviewCard());
         searchShortcutField.setShortcut(settings.getSearchShortcut());
+        sendShortcutField.setShortcut(settings.getSendShortcut());
     }
 
     private void saveSettings() {
@@ -367,6 +392,11 @@ public class SettingsView extends BorderPane {
         String shortcut = searchShortcutField.getShortcut();
         if (!shortcut.isEmpty()) {
             settings.setSearchShortcut(shortcut);
+        }
+        // Save send shortcut
+        String sendShortcut = sendShortcutField.getShortcut();
+        if (!sendShortcut.isEmpty()) {
+            settings.setSendShortcut(sendShortcut);
         }
         // copyToClipboard is auto-saved on checkbox change
         settings.save();

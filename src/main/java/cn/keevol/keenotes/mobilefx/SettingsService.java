@@ -23,10 +23,12 @@ public class SettingsService {
     private static final String KEY_ENCRYPTION_PASSWORD = "encryption.password";
     private static final String KEY_COPY_TO_CLIPBOARD = "copy.to.clipboard.on.post";
     private static final String KEY_SEARCH_SHORTCUT = "shortcut.search";
+    private static final String KEY_SEND_SHORTCUT = "shortcut.send";
     private static final String KEY_SHOW_OVERVIEW_CARD = "show.overview.card";
     private static final String KEY_FIRST_NOTE_DATE = "first.note.date";
     private static final int DEFAULT_REVIEW_DAYS = 7;
     private static final String DEFAULT_SEARCH_SHORTCUT = "Alt+Shift+S";
+    private static final String DEFAULT_SEND_SHORTCUT = "Alt+Enter";
 
     private static SettingsService instance;
     private final Properties properties;
@@ -160,6 +162,14 @@ public class SettingsService {
     
     public void setSearchShortcut(String shortcut) {
         properties.setProperty(KEY_SEARCH_SHORTCUT, shortcut);
+    }
+    
+    public String getSendShortcut() {
+        return properties.getProperty(KEY_SEND_SHORTCUT, DEFAULT_SEND_SHORTCUT);
+    }
+    
+    public void setSendShortcut(String shortcut) {
+        properties.setProperty(KEY_SEND_SHORTCUT, shortcut);
     }
     
     public boolean getShowOverviewCard() {
