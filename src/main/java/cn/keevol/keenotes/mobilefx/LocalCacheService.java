@@ -1,6 +1,7 @@
 package cn.keevol.keenotes.mobilefx;
 
 import com.gluonhq.attach.storage.StorageService;
+import javafx.application.Platform;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 
@@ -11,6 +12,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 本地缓存服务，管理客户端的SQLite数据库
@@ -37,6 +39,64 @@ public class LocalCacheService {
     
     // Reactive property for note count
     private final IntegerProperty noteCountProperty = new SimpleIntegerProperty(0);
+    
+    // Data change listeners
+    private final List<NoteChangeListener> changeListeners = new CopyOnWriteArrayList<>();
+    
+    /**
+     * Listener interface for note data changes
+     */
+    public interface NoteChangeListener {
+        /**
+         * Called when a single note is inserted (realtime update)
+         */
+        void onNoteInserted(NoteData note);
+        
+        /**
+         * Called when multiple notes are inserted (batch sync)
+         */
+        void onNotesInserted(List<NoteData> notes);
+    }
+    
+    /**
+     * Add a listener for note data changes
+     */
+    public void addChangeListener(NoteChangeListener listener) {
+        changeListeners.add(listener);
+    }
+    
+    /**
+     * Remove a listener
+     */
+    public void removeChangeListener(NoteChangeListener listener) {
+        changeListeners.remove(listener);
+    }
+    
+    /**
+     * Notify listeners of single note insertion
+     */
+    private void notifyNoteInserted(NoteData note) {
+        for (NoteChangeListener listener : changeListeners) {
+            try {
+                listener.onNoteInserted(note);
+            } catch (Exception e) {
+                // Ignore listener errors
+            }
+        }
+    }
+    
+    /**
+     * Notify listeners of batch note insertion
+     */
+    private void notifyNotesInserted(List<NoteData> notes) {
+        for (NoteChangeListener listener : changeListeners) {
+            try {
+                listener.onNotesInserted(notes);
+            } catch (Exception e) {
+                // Ignore listener errors
+            }
+        }
+    }
 
     private LocalCacheService() {
         this.cryptoService = new CryptoService();
@@ -341,6 +401,9 @@ public class LocalCacheService {
             
             // Update note count property
             refreshNoteCount();
+            
+            // Notify listeners of batch insertion (on JavaFX thread)
+            Platform.runLater(() -> notifyNotesInserted(notes));
         }
     }
 
@@ -358,6 +421,9 @@ public class LocalCacheService {
             
             // Update note count property
             refreshNoteCount();
+            
+            // Notify listeners of single note insertion (on JavaFX thread)
+            Platform.runLater(() -> notifyNoteInserted(note));
         }
     }
     
@@ -633,6 +699,9 @@ public class LocalCacheService {
         try (Statement stmt = connection.createStatement()) {
             stmt.executeUpdate("DELETE FROM notes_cache");
             stmt.executeUpdate("UPDATE sync_state SET last_sync_id = -1, last_sync_time = NULL WHERE id = 1");
+            
+            // Update note count property to 0
+            refreshNoteCount();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to clear cache data", e);
         }

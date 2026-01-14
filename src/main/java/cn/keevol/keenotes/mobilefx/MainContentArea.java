@@ -42,8 +42,11 @@ public class MainContentArea extends StackPane {
     // Current visible panel
     private VBox currentPanel;
     
-    // Track displayed notes in Note mode to detect new ones
-    private java.util.Set<Long> displayedNoteIds = new java.util.HashSet<>();
+    // Track displayed notes in Note mode to detect new ones (thread-safe)
+    private final java.util.Set<Long> displayedNoteIds = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    
+    // Flag to prevent duplicate listener registration
+    private boolean localCacheListenerRegistered = false;
     
     public MainContentArea() {
         getStyleClass().add("main-content-area");
@@ -53,7 +56,8 @@ public class MainContentArea extends StackPane {
         this.apiService = ServiceManager.getInstance().getApiService();
         this.webSocketService = ServiceManager.getInstance().getWebSocketService();
         
-        // Listen to WebSocket events for incremental updates
+        // Listen to WebSocket events for sync status display only
+        // Note: UI updates are now driven by LocalCacheService change listeners
         webSocketService.addListener(new WebSocketClientService.SyncListener() {
             @Override
             public void onConnectionStatus(boolean connected) {
@@ -67,29 +71,20 @@ public class MainContentArea extends StackPane {
             
             @Override
             public void onSyncComplete(int total, long lastSyncId) {
-                // Check for new notes (only if Note mode is visible)
+                // Sync complete - UI will be updated via LocalCacheService listener
+                // Only reload if this is initial sync (displayedNoteIds is empty)
                 Platform.runLater(() -> {
-                    if (currentPanel == noteModePanel) {
-                        System.out.println("[MainContentArea] Sync complete, checking for new notes");
-                        // If displayedNoteIds is empty, this is initial load after sync
-                        if (displayedNoteIds.isEmpty()) {
-                            loadRecentNotes();
-                        } else {
-                            checkAndAddNewNotes();
-                        }
+                    if (currentPanel == noteModePanel && displayedNoteIds.isEmpty()) {
+                        System.out.println("[MainContentArea] Initial sync complete, loading notes");
+                        loadRecentNotes();
                     }
                 });
             }
             
             @Override
             public void onRealtimeUpdate(long id, String content) {
-                // Handle realtime updates (only if Note mode is visible)
-                Platform.runLater(() -> {
-                    if (currentPanel == noteModePanel) {
-                        System.out.println("[MainContentArea] Realtime update for note " + id);
-                        checkAndAddNewNotes();
-                    }
-                });
+                // Realtime update - UI will be updated via LocalCacheService listener
+                // No action needed here
             }
             
             @Override
@@ -102,6 +97,9 @@ public class MainContentArea extends StackPane {
         ServiceManager.getInstance().addListener((status, message) -> {
             if ("local_cache_ready".equals(status)) {
                 Platform.runLater(() -> {
+                    // Register LocalCacheService change listener
+                    registerLocalCacheListener();
+                    
                     // If Note mode is visible and no notes displayed yet, load them
                     if (currentPanel == noteModePanel && displayedNoteIds.isEmpty()) {
                         System.out.println("[MainContentArea] Cache ready, loading notes");
@@ -112,6 +110,89 @@ public class MainContentArea extends StackPane {
         });
         
         setupPanels();
+    }
+    
+    /**
+     * Register listener for LocalCacheService data changes
+     * This is the central point for handling all note data updates
+     */
+    private void registerLocalCacheListener() {
+        if (localCacheListenerRegistered) {
+            return;
+        }
+        
+        ServiceManager serviceManager = ServiceManager.getInstance();
+        if (serviceManager.getLocalCacheState() != ServiceManager.InitializationState.READY) {
+            return;
+        }
+        
+        localCache = serviceManager.getLocalCacheService();
+        if (localCache == null) {
+            return;
+        }
+        
+        localCache.addChangeListener(new LocalCacheService.NoteChangeListener() {
+            @Override
+            public void onNoteInserted(LocalCacheService.NoteData note) {
+                // Single note inserted (realtime update)
+                // This is already on JavaFX thread (Platform.runLater in LocalCacheService)
+                handleNewNoteFromDb(note);
+            }
+            
+            @Override
+            public void onNotesInserted(java.util.List<LocalCacheService.NoteData> notes) {
+                // Batch notes inserted (sync complete)
+                // This is already on JavaFX thread (Platform.runLater in LocalCacheService)
+                handleBatchNotesFromDb(notes);
+            }
+        });
+        
+        localCacheListenerRegistered = true;
+        System.out.println("[MainContentArea] LocalCacheService change listener registered");
+    }
+    
+    /**
+     * Handle a single new note from database change notification
+     */
+    private void handleNewNoteFromDb(LocalCacheService.NoteData note) {
+        // Only update UI if Note mode is visible
+        if (currentPanel != noteModePanel) {
+            System.out.println("[MainContentArea] Note mode not visible, skipping UI update for note " + note.id);
+            return;
+        }
+        
+        // Check if already displayed (avoid duplicates)
+        if (displayedNoteIds.contains(note.id)) {
+            System.out.println("[MainContentArea] Note " + note.id + " already displayed, skipping");
+            return;
+        }
+        
+        System.out.println("[MainContentArea] Adding new note " + note.id + " to UI with animation");
+        
+        // Clear empty state if this is the first note
+        if (displayedNoteIds.isEmpty()) {
+            notesDisplayPanel.clearEmptyState();
+        }
+        
+        notesDisplayPanel.addNoteAtTop(note);
+        displayedNoteIds.add(note.id);
+    }
+    
+    /**
+     * Handle batch notes from database change notification
+     * For batch sync (>1 notes), reload the list instead of adding one by one
+     */
+    private void handleBatchNotesFromDb(java.util.List<LocalCacheService.NoteData> notes) {
+        // Only update UI if Note mode is visible
+        if (currentPanel != noteModePanel) {
+            System.out.println("[MainContentArea] Note mode not visible, skipping batch UI update");
+            return;
+        }
+        
+        System.out.println("[MainContentArea] Batch sync completed with " + notes.size() + " notes, reloading list");
+        
+        // For batch sync, reload the entire list to avoid memory issues and ensure correct order
+        loadRecentNotes();
     }
     
     private void setupPanels() {
@@ -426,55 +507,6 @@ public class MainContentArea extends StackPane {
     }
     
     /**
-     * Check for new notes and add them incrementally with animation
-     * Only checks the most recent notes (not all notes)
-     */
-    private void checkAndAddNewNotes() {
-        new Thread(() -> {
-            try {
-                ServiceManager serviceManager = ServiceManager.getInstance();
-                ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
-                
-                if (state == ServiceManager.InitializationState.READY) {
-                    localCache = serviceManager.getLocalCacheService();
-                    
-                    // Only check the most recent 10 notes (not all notes)
-                    var recentNotes = localCache.getNotesPaged(0, 10);
-                    
-                    // Find new notes (not in displayedNoteIds)
-                    java.util.List<LocalCacheService.NoteData> newNotes = new java.util.ArrayList<>();
-                    for (var note : recentNotes) {
-                        if (!displayedNoteIds.contains(note.id)) {
-                            newNotes.add(note);
-                        }
-                    }
-                    
-                    if (!newNotes.isEmpty()) {
-                        System.out.println("[MainContentArea] Found " + newNotes.size() + " new notes");
-                        
-                        // Sort by timestamp (newest first)
-                        newNotes.sort((a, b) -> b.createdAt.compareTo(a.createdAt));
-                        
-                        // Add new notes sequentially with animation (single thread, no race condition)
-                        for (LocalCacheService.NoteData note : newNotes) {
-                            Platform.runLater(() -> {
-                                notesDisplayPanel.addNoteAtTop(note);
-                                displayedNoteIds.add(note.id);
-                            });
-                            
-                            // Small delay between each note for visual effect
-                            Thread.sleep(150);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("[MainContentArea] Error checking for new notes: " + e.getMessage());
-                e.printStackTrace();
-            }
-        }).start();
-    }
-    
-    /**
      * Get desktop channel name based on platform
      * Format: desktop-{os} (e.g., desktop-mac, desktop-win, desktop-linux)
      */
@@ -516,6 +548,9 @@ public class MainContentArea extends StackPane {
                     return;
                 }
                 
+                // Register change listener if not already registered
+                Platform.runLater(this::registerLocalCacheListener);
+                
                 int totalCount = localCache.getLocalNoteCount();
                 
                 // Track displayed note IDs for incremental updates
@@ -533,7 +568,7 @@ public class MainContentArea extends StackPane {
                                 }
                             });
                     }
-                    System.out.println("[MainContentArea] Note list loaded with " + totalCount + " total notes");
+                    System.out.println("[MainContentArea] Note list loaded with " + totalCount + " total notes, tracking " + displayedNoteIds.size() + " IDs");
                 });
             } catch (Exception e) {
                 e.printStackTrace();
