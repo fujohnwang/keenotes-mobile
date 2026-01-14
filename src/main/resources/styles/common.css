@@ -508,6 +508,40 @@
     -fx-pref-height: 800px;
 }
 
+/* Note Content Area - Disable scrollbars */
+.note-content-area {
+    -fx-background-color: transparent;
+}
+
+.note-content-area .scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.note-content-area .scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.note-content-area .scroll-pane .scroll-bar:vertical,
+.note-content-area .scroll-pane .scroll-bar:horizontal {
+    -fx-opacity: 0;
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+}
+
+.note-content-area .scroll-bar:vertical .thumb,
+.note-content-area .scroll-bar:horizontal .thumb {
+    -fx-background-color: transparent;
+}
+
+.note-content-area .scroll-bar:vertical .track,
+.note-content-area .scroll-bar:horizontal .track {
+    -fx-background-color: transparent;
+}
+
+.note-content-area .content {
+    -fx-background-color: transparent;
+}
+
 /* Period Toggle Buttons (Segmented Control) */
 .period-toggle-button {
     -fx-font-size: 13px;
