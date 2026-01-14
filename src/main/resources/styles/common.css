@@ -408,7 +408,7 @@
 
 .unified-note-input {
     -fx-background-radius: 12px;
-    -fx-padding: 12 60 12 12;
+    -fx-padding: 12 12 12 12;
     -fx-font-size: 15px;
     -fx-border-width: 0;
 }
@@ -416,6 +416,38 @@
 .unified-note-input:focused {
     -fx-border-width: 0;
     -fx-effect: none;
+}
+
+/* Disable scrollbars for unified-note-input */
+.unified-note-input .scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .scroll-pane .scroll-bar:vertical,
+.unified-note-input .scroll-pane .scroll-bar:horizontal {
+    -fx-opacity: 0;
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-max-width: 0;
+    -fx-max-height: 0;
+}
+
+.unified-note-input .scroll-bar:vertical .thumb,
+.unified-note-input .scroll-bar:horizontal .thumb {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .scroll-bar:vertical .track,
+.unified-note-input .scroll-bar:horizontal .track {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .content {
+    -fx-background-color: transparent;
 }
 
 /* Unified Send Button (embedded in input) */
