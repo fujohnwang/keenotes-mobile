@@ -39,7 +39,7 @@
 
         </LinearLayout>
 
-        <!-- Full content (always visible, long press to select text) -->
+        <!-- Full content (text selection handled by system) -->
         <TextView
             android:id="@+id/contentText"
             android:layout_width="match_parent"
