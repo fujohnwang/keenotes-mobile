@@ -11,6 +11,8 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.SVGPath;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
 import javafx.util.Duration;
 
 import java.util.function.Consumer;
@@ -24,8 +26,9 @@ public class NoteInputPanel extends VBox {
     private final TextArea noteInput;
     private final Button sendButton;
     private final Label statusLabel;
-    private final StackPane inputContainer;
+    private final VBox inputContainer;
     private final Consumer<String> onSendNote;
+    private final Text textMeasure; // For auto-expand height calculation
     
     // Send channel status
     private final Circle sendChannelIndicator;
@@ -47,18 +50,62 @@ public class NoteInputPanel extends VBox {
             javafx.application.Platform.runLater(this::updateThemeColors);
         });
         
-        // Create the unified input container
-        inputContainer = new StackPane();
+        // Create the unified input container (VBox for flat layout)
+        inputContainer = new VBox();
         inputContainer.getStyleClass().add("unified-input-container");
-        inputContainer.setMinHeight(150);
-        inputContainer.setMaxHeight(150);
-        inputContainer.setPrefHeight(150);
+        // Remove fixed height constraints to allow auto-expansion
         
-        // Note input area
+        // Note input area (auto-expanding)
         noteInput = new TextArea();
         noteInput.setPromptText("Write your note here...\nAll content will be encrypted before leaving your device.");
         noteInput.getStyleClass().add("unified-note-input");
         noteInput.setWrapText(true);
+        noteInput.setMinHeight(100);
+        noteInput.setPrefHeight(100);
+        noteInput.setMaxHeight(Double.MAX_VALUE); // Allow unlimited expansion
+        noteInput.setMaxWidth(Double.MAX_VALUE); // Allow full width
+        
+        // Disable scrollbars via style
+        noteInput.setStyle(noteInput.getStyle() + 
+            "-fx-background-color: transparent; " +
+            "-fx-control-inner-background: transparent;");
+        
+        // Listen to layout changes to hide scrollbars
+        noteInput.layoutBoundsProperty().addListener((obs, oldVal, newVal) -> {
+            hideScrollBars();
+        });
+        
+        // Create hidden Text node for accurate height measurement
+        textMeasure = new Text();
+        textMeasure.setFont(Font.font("MiSans", 15)); // Match TextArea font
+        textMeasure.setWrappingWidth(500); // Will be updated based on actual width
+        textMeasure.textProperty().bind(noteInput.textProperty());
+        
+        // Bind TextArea height to Text measurement
+        textMeasure.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
+            double textHeight = newBounds.getHeight();
+            double padding = 30; // Account for TextArea internal padding
+            double minHeight = 100;
+            double maxHeight = 400; // Limit max height
+            double height = Math.max(minHeight, Math.min(maxHeight, textHeight + padding));
+            noteInput.setPrefHeight(height);
+            noteInput.setMinHeight(height);
+        });
+        
+        // Update wrapping width when TextArea width changes (more accurate)
+        noteInput.widthProperty().addListener((obs, oldWidth, newWidth) -> {
+            if (newWidth.doubleValue() > 24) { // Account for TextArea padding
+                textMeasure.setWrappingWidth(newWidth.doubleValue() - 24);
+            }
+        });
+        
+        // Initial setup and hide scrollbars
+        javafx.application.Platform.runLater(() -> {
+            if (noteInput.getWidth() > 24) {
+                textMeasure.setWrappingWidth(noteInput.getWidth() - 24);
+            }
+            hideScrollBars();
+        });
         
         // Add keyboard shortcut handler for Send
         noteInput.setOnKeyPressed(event -> {
@@ -90,11 +137,7 @@ public class NoteInputPanel extends VBox {
         sendButton.setOnAction(e -> handleSend());
         sendButton.disableProperty().bind(noteInput.textProperty().isEmpty());
         
-        // Position send button in bottom-right corner
-        StackPane.setAlignment(sendButton, Pos.BOTTOM_RIGHT);
-        StackPane.setMargin(sendButton, new Insets(0, 8, 8, 0));
-        
-        // Send Channel status (bottom-left corner)
+        // Send Channel status indicator
         sendChannelIndicator = new Circle(4);
         sendChannelIndicator.setFill(Color.web("#3FB950")); // Green by default
         
@@ -105,29 +148,57 @@ public class NoteInputPanel extends VBox {
         sendChannelBox.setAlignment(Pos.CENTER_LEFT);
         sendChannelBox.getStyleClass().add("send-channel-status");
         
-        StackPane.setAlignment(sendChannelBox, Pos.BOTTOM_LEFT);
-        StackPane.setMargin(sendChannelBox, new Insets(0, 0, 8, 12)); // Same bottom margin as send button
+        // Spacer to push send button to the right
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
         
-        // Status label (centered in input container for send status)
+        // Status label (for send status messages)
         statusLabel = new Label();
         statusLabel.getStyleClass().add("unified-status-label");
         statusLabel.setWrapText(true);
         statusLabel.setVisible(false);
         statusLabel.setMaxWidth(300);
         
-        // Position status label in center
-        StackPane.setAlignment(statusLabel, Pos.CENTER);
+        // Bottom control bar (flat layout)
+        HBox controlBar = new HBox(12);
+        controlBar.setAlignment(Pos.CENTER);
+        controlBar.setPadding(new Insets(8, 12, 8, 12));
+        controlBar.getChildren().addAll(sendChannelBox, spacer, statusLabel, sendButton);
         
-        inputContainer.getChildren().addAll(noteInput, statusLabel, sendChannelBox, sendButton);
+        // Assemble container
+        VBox.setVgrow(noteInput, Priority.ALWAYS);
+        HBox.setHgrow(noteInput, Priority.ALWAYS); // Allow TextArea to expand horizontally
+        inputContainer.getChildren().addAll(noteInput, controlBar);
         
         getChildren().add(inputContainer);
-        VBox.setVgrow(inputContainer, Priority.NEVER);
+        // Allow container to grow with content
+        VBox.setVgrow(inputContainer, Priority.ALWAYS);
         
         // Listen to API service status (simplified - check periodically or on action)
         setupSendChannelListener();
         
         // Initialize theme colors
         updateThemeColors();
+    }
+    
+    /**
+     * Hide scrollbars from TextArea
+     */
+    private void hideScrollBars() {
+        javafx.scene.Node scrollPane = noteInput.lookup(".scroll-pane");
+        if (scrollPane != null) {
+            scrollPane.setStyle("-fx-background-color: transparent;");
+        }
+        javafx.scene.Node vbar = noteInput.lookup(".scroll-bar:vertical");
+        javafx.scene.Node hbar = noteInput.lookup(".scroll-bar:horizontal");
+        if (vbar != null) {
+            vbar.setVisible(false);
+            vbar.setManaged(false);
+        }
+        if (hbar != null) {
+            hbar.setVisible(false);
+            hbar.setManaged(false);
+        }
     }
     
     /**
