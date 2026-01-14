@@ -35,6 +35,11 @@ public class NoteCardView extends StackPane {
         
         getStyleClass().add("search-result-card");
         
+        // Listen to theme changes
+        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+            javafx.application.Platform.runLater(this::updateThemeColors);
+        });
+        
         // Main content container
         VBox contentBox = new VBox(8);
         contentBox.setPadding(new Insets(16));
@@ -52,7 +57,10 @@ public class NoteCardView extends StackPane {
             : "default";
         Label channelLabel = new Label("• " + channelText);
         channelLabel.getStyleClass().add("note-channel");
-        channelLabel.setStyle("-fx-text-fill: #8B949E; -fx-font-size: 12px;");
+        
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String secondaryColor = isDark ? "#8B949E" : "#57606A";
+        channelLabel.setStyle("-fx-text-fill: " + secondaryColor + "; -fx-font-size: 12px;");
         
         headerRow.getChildren().addAll(dateLabel, channelLabel);
         
@@ -61,10 +69,12 @@ public class NoteCardView extends StackPane {
         contentArea.setEditable(false);
         contentArea.setWrapText(true);
         contentArea.getStyleClass().add("note-content-area");
+        
+        String textColor = isDark ? "#E6EDF3" : "#24292F";
         contentArea.setStyle(
             "-fx-control-inner-background: transparent; " +
             "-fx-background-color: transparent; " +
-            "-fx-text-fill: #E6EDF3; " +
+            "-fx-text-fill: " + textColor + "; " +
             "-fx-font-size: 14px; " +
             "-fx-border-width: 0; " +
             "-fx-focus-color: transparent; " +
@@ -114,9 +124,13 @@ public class NoteCardView extends StackPane {
         // Copied popup (positioned at top-right)
         copiedPopup = new Label("✓ Copied");
         copiedPopup.getStyleClass().add("copied-popup");
+        
+        boolean isDarkPopup = ThemeService.getInstance().isDarkTheme();
+        String primaryColor = isDarkPopup ? "#00D4FF" : "#0969DA";
+        String popupBg = isDarkPopup ? "rgba(0, 212, 255, 0.2)" : "rgba(9, 105, 218, 0.2)";
         copiedPopup.setStyle(
-            "-fx-background-color: rgba(0, 212, 255, 0.2); " +
-            "-fx-text-fill: #00D4FF; " +
+            "-fx-background-color: " + popupBg + "; " +
+            "-fx-text-fill: " + primaryColor + "; " +
             "-fx-padding: 4 8; " +
             "-fx-background-radius: 4; " +
             "-fx-font-size: 11px;"
@@ -226,5 +240,52 @@ public class NoteCardView extends StackPane {
     
     public LocalCacheService.NoteData getNoteData() {
         return noteData;
+    }
+    
+    /**
+     * Update colors based on current theme
+     */
+    private void updateThemeColors() {
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String secondaryColor = isDark ? "#8B949E" : "#57606A";
+        String textColor = isDark ? "#E6EDF3" : "#24292F";
+        String primaryColor = isDark ? "#00D4FF" : "#0969DA";
+        String popupBg = isDark ? "rgba(0, 212, 255, 0.2)" : "rgba(9, 105, 218, 0.2)";
+        
+        // Update channel label color
+        if (getChildren().size() > 0 && getChildren().get(0) instanceof VBox) {
+            VBox contentBox = (VBox) getChildren().get(0);
+            if (contentBox.getChildren().size() > 0 && contentBox.getChildren().get(0) instanceof HBox) {
+                HBox headerRow = (HBox) contentBox.getChildren().get(0);
+                if (headerRow.getChildren().size() > 1) {
+                    javafx.scene.Node channelNode = headerRow.getChildren().get(1);
+                    if (channelNode instanceof Label) {
+                        ((Label) channelNode).setStyle("-fx-text-fill: " + secondaryColor + "; -fx-font-size: 12px;");
+                    }
+                }
+            }
+        }
+        
+        // Update content area text color
+        contentArea.setStyle(
+            "-fx-control-inner-background: transparent; " +
+            "-fx-background-color: transparent; " +
+            "-fx-text-fill: " + textColor + "; " +
+            "-fx-font-size: 14px; " +
+            "-fx-border-width: 0; " +
+            "-fx-focus-color: transparent; " +
+            "-fx-faint-focus-color: transparent; " +
+            "-fx-cursor: hand;"
+        );
+        
+        // Update copied popup colors
+        copiedPopup.setStyle(
+            "-fx-background-color: " + popupBg + "; " +
+            "-fx-text-fill: " + primaryColor + "; " +
+            "-fx-padding: 4 8; " +
+            "-fx-background-radius: 4; " +
+            "-fx-font-size: 11px; " +
+            "-fx-font-weight: bold;"
+        );
     }
 }

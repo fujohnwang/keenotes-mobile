@@ -62,6 +62,11 @@ public class NotesDisplayPanel extends VBox {
         getStyleClass().add("notes-display-panel");
         setSpacing(0);
         
+        // Listen to theme changes
+        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+            Platform.runLater(this::updateThemeColors);
+        });
+        
         // Fixed header container (stays at top, doesn't scroll)
         fixedHeaderContainer = new VBox();
         fixedHeaderContainer.getStyleClass().add("fixed-header");
@@ -210,14 +215,31 @@ public class NotesDisplayPanel extends VBox {
             return;
         }
         
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String successColor = isDark ? "#3FB950" : "#1A7F37";
+        String errorColor = isDark ? "#F85149" : "#CF222E";
+        
         if (connected) {
-            syncChannelIndicator.setFill(Color.web("#3FB950")); // Green
+            syncChannelIndicator.setFill(Color.web(successColor));
             syncChannelLabel.setText("Sync Channel: ✓");
-            syncChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #3FB950;");
+            syncChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + successColor + ";");
         } else {
-            syncChannelIndicator.setFill(Color.web("#F85149")); // Red
+            syncChannelIndicator.setFill(Color.web(errorColor));
             syncChannelLabel.setText("Sync Channel: ✗");
-            syncChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #F85149;");
+            syncChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + errorColor + ";");
+        }
+    }
+    
+    /**
+     * Update colors based on current theme
+     */
+    private void updateThemeColors() {
+        // Re-apply sync channel status with new theme colors
+        if (syncChannelIndicator != null && syncChannelLabel != null) {
+            // Determine current connection status from indicator color
+            Color currentColor = (Color) syncChannelIndicator.getFill();
+            boolean isConnected = currentColor.equals(Color.web("#3FB950")) || currentColor.equals(Color.web("#1A7F37"));
+            updateSyncChannelStatus(isConnected);
         }
     }
     

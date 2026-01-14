@@ -26,9 +26,11 @@ public class SettingsService {
     private static final String KEY_SEND_SHORTCUT = "shortcut.send";
     private static final String KEY_SHOW_OVERVIEW_CARD = "show.overview.card";
     private static final String KEY_FIRST_NOTE_DATE = "first.note.date";
+    private static final String KEY_THEME = "ui.theme";
     private static final int DEFAULT_REVIEW_DAYS = 7;
     private static final String DEFAULT_SEARCH_SHORTCUT = "Alt+Shift+S";
     private static final String DEFAULT_SEND_SHORTCUT = "Alt+Enter";
+    private static final String DEFAULT_THEME = "dark";
 
     private static SettingsService instance;
     private final Properties properties;
@@ -170,6 +172,14 @@ public class SettingsService {
     
     public void setSendShortcut(String shortcut) {
         properties.setProperty(KEY_SEND_SHORTCUT, shortcut);
+    }
+    
+    public String getTheme() {
+        return properties.getProperty(KEY_THEME, DEFAULT_THEME);
+    }
+    
+    public void setTheme(String theme) {
+        properties.setProperty(KEY_THEME, theme);
     }
     
     public boolean getShowOverviewCard() {

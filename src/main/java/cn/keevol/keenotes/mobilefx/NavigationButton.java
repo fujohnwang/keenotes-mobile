@@ -16,6 +16,7 @@ public class NavigationButton extends Button {
     private final Node iconNode;
     private final String text;
     private boolean selected;
+    private Label textLabel; // Store reference for theme updates
     
     public NavigationButton(String text, Node iconNode, boolean selected) {
         this.text = text;
@@ -24,14 +25,23 @@ public class NavigationButton extends Button {
         
         setupButton();
         updateStyle();
+        
+        // Listen to theme changes
+        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+            javafx.application.Platform.runLater(this::updateStyle);
+        });
     }
     
     private void setupButton() {
+        // Get theme colors
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String mutedColor = isDark ? "#8B949E" : "#57606A";
+        
         // Style the icon (for PNG ImageView, we'll handle opacity via CSS)
         if (iconNode != null) {
             if (iconNode instanceof javafx.scene.shape.SVGPath) {
                 javafx.scene.shape.SVGPath svgIcon = (javafx.scene.shape.SVGPath) iconNode;
-                svgIcon.setFill(Color.web("#8B949E")); // Default gray
+                svgIcon.setFill(Color.web(mutedColor)); // Default gray
                 svgIcon.setScaleX(0.8);
                 svgIcon.setScaleY(0.8);
             } else if (iconNode instanceof javafx.scene.image.ImageView) {
@@ -40,8 +50,8 @@ public class NavigationButton extends Button {
             }
         }
         
-        Label textLabel = new Label(text);
-        textLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #8B949E;"); // Muted gray by default
+        textLabel = new Label(text);
+        textLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: " + mutedColor + ";"); // Muted gray by default
         
         HBox content;
         if (iconNode != null) {
@@ -64,29 +74,35 @@ public class NavigationButton extends Button {
         // Hover effect
         setOnMouseEntered(e -> {
             if (!selected) {
+                boolean isDarkHover = ThemeService.getInstance().isDarkTheme();
+                String hoverColor = isDarkHover ? "#E6EDF3" : "#24292F";
+                
                 if (iconNode != null) {
                     if (iconNode instanceof javafx.scene.shape.SVGPath) {
-                        ((javafx.scene.shape.SVGPath) iconNode).setFill(Color.web("#E6EDF3"));
+                        ((javafx.scene.shape.SVGPath) iconNode).setFill(Color.web(hoverColor));
                     } else if (iconNode instanceof javafx.scene.image.ImageView) {
                         iconNode.setOpacity(1.0);
                     }
                 }
                 // Update text color on hover
-                textLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #E6EDF3;");
+                textLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: " + hoverColor + ";");
             }
         });
         
         setOnMouseExited(e -> {
             if (!selected) {
+                boolean isDarkExit = ThemeService.getInstance().isDarkTheme();
+                String mutedColorExit = isDarkExit ? "#8B949E" : "#57606A";
+                
                 if (iconNode != null) {
                     if (iconNode instanceof javafx.scene.shape.SVGPath) {
-                        ((javafx.scene.shape.SVGPath) iconNode).setFill(Color.web("#8B949E"));
+                        ((javafx.scene.shape.SVGPath) iconNode).setFill(Color.web(mutedColorExit));
                     } else if (iconNode instanceof javafx.scene.image.ImageView) {
                         iconNode.setOpacity(0.6);
                     }
                 }
                 // Restore muted text color
-                textLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #8B949E;");
+                textLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: " + mutedColorExit + ";");
             }
         });
     }
@@ -103,29 +119,28 @@ public class NavigationButton extends Button {
      * Update button style based on selected state
      */
     private void updateStyle() {
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String primaryColor = isDark ? "#22D3EE" : "#0969DA";
+        String mutedColor = isDark ? "#8B949E" : "#57606A";
+        String accentBg = isDark ? "rgba(6, 182, 212, 0.15)" : "rgba(9, 105, 218, 0.08)";
+        
         if (selected) {
             // Floating pill style: rounded background with low opacity, no left border
-            setStyle("-fx-background-color: rgba(6, 182, 212, 0.15); " +
+            setStyle("-fx-background-color: " + accentBg + "; " +
                    "-fx-background-radius: 10px;");
             
             // Update icon color/opacity (if icon exists)
             if (iconNode != null) {
                 if (iconNode instanceof javafx.scene.shape.SVGPath) {
-                    ((javafx.scene.shape.SVGPath) iconNode).setFill(Color.web("#22D3EE")); // Bright cyan
+                    ((javafx.scene.shape.SVGPath) iconNode).setFill(Color.web(primaryColor));
                 } else if (iconNode instanceof javafx.scene.image.ImageView) {
                     iconNode.setOpacity(1.0);
                 }
             }
             
-            // Update text color to bright cyan
-            if (getGraphic() instanceof HBox) {
-                HBox content = (HBox) getGraphic();
-                for (javafx.scene.Node child : content.getChildren()) {
-                    if (child instanceof Label) {
-                        Label textLabel = (Label) child;
-                        textLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #22D3EE; -fx-font-weight: 600;");
-                    }
-                }
+            // Update text color to primary
+            if (textLabel != null) {
+                textLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: " + primaryColor + "; -fx-font-weight: 600;");
             }
         } else {
             setStyle("");
@@ -133,21 +148,15 @@ public class NavigationButton extends Button {
             // Reset icon color/opacity (if icon exists)
             if (iconNode != null) {
                 if (iconNode instanceof javafx.scene.shape.SVGPath) {
-                    ((javafx.scene.shape.SVGPath) iconNode).setFill(Color.web("#8B949E"));
+                    ((javafx.scene.shape.SVGPath) iconNode).setFill(Color.web(mutedColor));
                 } else if (iconNode instanceof javafx.scene.image.ImageView) {
                     iconNode.setOpacity(0.6);
                 }
             }
             
-            // Reset text color to muted gray
-            if (getGraphic() instanceof HBox) {
-                HBox content = (HBox) getGraphic();
-                for (javafx.scene.Node child : content.getChildren()) {
-                    if (child instanceof Label) {
-                        Label textLabel = (Label) child;
-                        textLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #8B949E;");
-                    }
-                }
+            // Reset text color to muted
+            if (textLabel != null) {
+                textLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: " + mutedColor + ";");
             }
         }
     }

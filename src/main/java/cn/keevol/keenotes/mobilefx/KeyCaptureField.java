@@ -29,6 +29,11 @@ public class KeyCaptureField extends HBox {
         setPrefWidth(200);
         setMaxWidth(200);
         
+        // Listen to theme changes
+        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+            javafx.application.Platform.runLater(this::updateStyle);
+        });
+        
         displayLabel = new Label("Click to set");
         displayLabel.getStyleClass().add("key-capture-label");
         displayLabel.setMaxWidth(Double.MAX_VALUE);
@@ -204,21 +209,28 @@ public class KeyCaptureField extends HBox {
      * Update visual style based on recording state
      */
     private void updateStyle() {
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String primaryColor = isDark ? "#00D4FF" : "#0969DA";
+        String surfaceColor = isDark ? "#161B22" : "#F6F8FA";
+        String borderColor = isDark ? "#30363D" : "#D0D7DE";
+        String textColor = isDark ? "#E6EDF3" : "#24292F";
+        String accentBg = isDark ? "rgba(0, 212, 255, 0.15)" : "rgba(9, 105, 218, 0.15)";
+        
         if (isRecording) {
-            setStyle("-fx-background-color: rgba(0, 212, 255, 0.15); " +
-                    "-fx-border-color: #00D4FF; " +
+            setStyle("-fx-background-color: " + accentBg + "; " +
+                    "-fx-border-color: " + primaryColor + "; " +
                     "-fx-border-width: 2; " +
                     "-fx-border-radius: 8; " +
                     "-fx-background-radius: 8;");
-            displayLabel.setStyle("-fx-text-fill: #00D4FF; -fx-font-weight: bold;");
+            displayLabel.setStyle("-fx-text-fill: " + primaryColor + "; -fx-font-weight: bold;");
         } else {
-            setStyle("-fx-background-color: #161B22; " +
-                    "-fx-border-color: #30363D; " +
+            setStyle("-fx-background-color: " + surfaceColor + "; " +
+                    "-fx-border-color: " + borderColor + "; " +
                     "-fx-border-width: 1; " +
                     "-fx-border-radius: 8; " +
                     "-fx-background-radius: 8; " +
                     "-fx-cursor: hand;");
-            displayLabel.setStyle("-fx-text-fill: #E6EDF3;");
+            displayLabel.setStyle("-fx-text-fill: " + textColor + ";");
         }
     }
     
