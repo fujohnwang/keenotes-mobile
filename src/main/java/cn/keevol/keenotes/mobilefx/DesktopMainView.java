@@ -63,13 +63,30 @@ public class DesktopMainView extends BorderPane {
         sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
                 newScene.setOnKeyPressed(event -> {
-                    KeyCodeCombination searchShortcut = parseShortcut(
-                        SettingsService.getInstance().getSearchShortcut()
-                    );
+                    SettingsService settings = SettingsService.getInstance();
                     
+                    // Search shortcut
+                    KeyCodeCombination searchShortcut = parseShortcut(settings.getSearchShortcut());
                     if (searchShortcut != null && searchShortcut.match(event)) {
                         event.consume();
                         switchToSearchAndFocus();
+                        return;
+                    }
+                    
+                    // Zoom in shortcut (CMD+= or CMD++)
+                    KeyCodeCombination zoomInShortcut = parseShortcut(settings.getZoomInShortcut());
+                    if (zoomInShortcut != null && zoomInShortcut.match(event)) {
+                        event.consume();
+                        settings.zoomIn();
+                        return;
+                    }
+                    
+                    // Zoom out shortcut (CMD+-)
+                    KeyCodeCombination zoomOutShortcut = parseShortcut(settings.getZoomOutShortcut());
+                    if (zoomOutShortcut != null && zoomOutShortcut.match(event)) {
+                        event.consume();
+                        settings.zoomOut();
+                        return;
                     }
                 });
             }
