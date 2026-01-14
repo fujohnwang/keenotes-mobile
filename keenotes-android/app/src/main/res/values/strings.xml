@@ -24,4 +24,5 @@
     <string name="overview_total_notes">Total Notes</string>
     <string name="overview_days_using">Days Using</string>
     <string name="overview_show_card">Show Overview Card</string>
+    <string name="copied">Copied</string>
 </resources>
