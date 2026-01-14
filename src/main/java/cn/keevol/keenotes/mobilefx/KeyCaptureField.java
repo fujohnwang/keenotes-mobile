@@ -239,7 +239,7 @@ public class KeyCaptureField extends HBox {
      */
     public void setShortcut(String shortcut) {
         this.currentShortcut = shortcut;
-        displayLabel.setText(shortcut.isEmpty() ? "Click to set" : shortcut);
+        displayLabel.setText(shortcut.isEmpty() ? "Click to set" : formatShortcutForDisplay(shortcut));
     }
     
     /**
@@ -247,5 +247,70 @@ public class KeyCaptureField extends HBox {
      */
     public String getShortcut() {
         return currentShortcut;
+    }
+    
+    /**
+     * Format shortcut string for user-friendly display
+     * e.g., "Meta+EQUALS" -> "⌘ + =" on macOS, "Ctrl + =" on Windows/Linux
+     */
+    private String formatShortcutForDisplay(String shortcut) {
+        if (shortcut == null || shortcut.isEmpty()) {
+            return shortcut;
+        }
+        
+        boolean isMac = System.getProperty("os.name", "").toLowerCase().contains("mac");
+        
+        String result = shortcut;
+        
+        // Replace modifier keys with symbols
+        if (isMac) {
+            result = result.replace("Meta+", "⌘ + ");
+            result = result.replace("Ctrl+", "⌃ + ");
+            result = result.replace("Alt+", "⌥ + ");
+            result = result.replace("Shift+", "⇧ + ");
+        } else {
+            result = result.replace("Meta+", "Win + ");
+            result = result.replace("Ctrl+", "Ctrl + ");
+            result = result.replace("Alt+", "Alt + ");
+            result = result.replace("Shift+", "Shift + ");
+        }
+        
+        // Replace key names with symbols
+        result = result.replace("EQUALS", "=");
+        result = result.replace("Equals", "=");
+        result = result.replace("MINUS", "-");
+        result = result.replace("Minus", "-");
+        result = result.replace("PLUS", "+");
+        result = result.replace("Plus", "+");
+        result = result.replace("SLASH", "/");
+        result = result.replace("Slash", "/");
+        result = result.replace("BACKSLASH", "\\");
+        result = result.replace("Backslash", "\\");
+        result = result.replace("COMMA", ",");
+        result = result.replace("Comma", ",");
+        result = result.replace("PERIOD", ".");
+        result = result.replace("Period", ".");
+        result = result.replace("SEMICOLON", ";");
+        result = result.replace("Semicolon", ";");
+        result = result.replace("QUOTE", "'");
+        result = result.replace("Quote", "'");
+        result = result.replace("OPEN_BRACKET", "[");
+        result = result.replace("Open Bracket", "[");
+        result = result.replace("CLOSE_BRACKET", "]");
+        result = result.replace("Close Bracket", "]");
+        result = result.replace("BACK_QUOTE", "`");
+        result = result.replace("Back Quote", "`");
+        result = result.replace("ENTER", "↵");
+        result = result.replace("Enter", "↵");
+        result = result.replace("SPACE", "Space");
+        result = result.replace("TAB", "Tab");
+        result = result.replace("ESCAPE", "Esc");
+        result = result.replace("Escape", "Esc");
+        result = result.replace("DELETE", "Del");
+        result = result.replace("Delete", "Del");
+        result = result.replace("BACK_SPACE", "⌫");
+        result = result.replace("Backspace", "⌫");
+        
+        return result;
     }
 }

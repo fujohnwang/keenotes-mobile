@@ -29,15 +29,22 @@ public class NoteCardView extends StackPane {
     private final LocalCacheService.NoteData noteData;
     private final Label copiedPopup;
     private final TextArea contentArea;
+    private final SettingsService settings;
     
     public NoteCardView(LocalCacheService.NoteData noteData) {
         this.noteData = noteData;
+        this.settings = SettingsService.getInstance();
         
         getStyleClass().add("search-result-card");
         
         // Listen to theme changes
         ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
             javafx.application.Platform.runLater(this::updateThemeColors);
+        });
+        
+        // Listen to font size changes
+        settings.noteFontSizeProperty().addListener((obs, oldSize, newSize) -> {
+            javafx.application.Platform.runLater(() -> updateFontSize(newSize.intValue()));
         });
         
         // Main content container
@@ -71,11 +78,12 @@ public class NoteCardView extends StackPane {
         contentArea.getStyleClass().add("note-content-area");
         
         String textColor = isDark ? "#E6EDF3" : "#24292F";
+        int fontSize = settings.getNoteFontSize();
         contentArea.setStyle(
             "-fx-control-inner-background: transparent; " +
             "-fx-background-color: transparent; " +
             "-fx-text-fill: " + textColor + "; " +
-            "-fx-font-size: 14px; " +
+            "-fx-font-size: " + fontSize + "px; " +
             "-fx-border-width: 0; " +
             "-fx-focus-color: transparent; " +
             "-fx-faint-focus-color: transparent; " +
@@ -164,26 +172,32 @@ public class NoteCardView extends StackPane {
     }
     
     /**
-     * Adjust TextArea height based on content
+     * Adjust TextArea height based on content and font size
      */
     private void adjustTextAreaHeight() {
         // Estimate line count based on content
         String text = contentArea.getText();
         int lineCount = text.split("\n", -1).length;
         
-        // Also consider wrapped lines (rough estimate: 80 chars per line)
+        // Get current font size for calculations
+        int fontSize = settings.getNoteFontSize();
+        // Estimate chars per line based on font size (larger font = fewer chars per line)
+        int charsPerLine = Math.max(30, 80 - (fontSize - 14) * 3);
+        
+        // Also consider wrapped lines
         int estimatedWrappedLines = 0;
         for (String line : text.split("\n", -1)) {
-            estimatedWrappedLines += Math.max(1, (int) Math.ceil(line.length() / 60.0));
+            estimatedWrappedLines += Math.max(1, (int) Math.ceil((double) line.length() / charsPerLine));
         }
         
         int totalLines = Math.max(lineCount, estimatedWrappedLines);
-        double lineHeight = 20; // Approximate line height
+        // Line height scales with font size (roughly 1.4x font size)
+        double lineHeight = fontSize * 1.4;
         double padding = 16;
         double height = Math.max(30, totalLines * lineHeight + padding);
         
         contentArea.setPrefHeight(height);
-        contentArea.setMaxHeight(height);
+        contentArea.setMaxHeight(Double.MAX_VALUE); // Allow unlimited height
     }
     
     /**
@@ -267,11 +281,12 @@ public class NoteCardView extends StackPane {
         }
         
         // Update content area text color
+        int fontSize = settings.getNoteFontSize();
         contentArea.setStyle(
             "-fx-control-inner-background: transparent; " +
             "-fx-background-color: transparent; " +
             "-fx-text-fill: " + textColor + "; " +
-            "-fx-font-size: 14px; " +
+            "-fx-font-size: " + fontSize + "px; " +
             "-fx-border-width: 0; " +
             "-fx-focus-color: transparent; " +
             "-fx-faint-focus-color: transparent; " +
@@ -287,5 +302,25 @@ public class NoteCardView extends StackPane {
             "-fx-font-size: 11px; " +
             "-fx-font-weight: bold;"
         );
+    }
+    
+    /**
+     * Update font size for content area
+     */
+    private void updateFontSize(int fontSize) {
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String textColor = isDark ? "#E6EDF3" : "#24292F";
+        contentArea.setStyle(
+            "-fx-control-inner-background: transparent; " +
+            "-fx-background-color: transparent; " +
+            "-fx-text-fill: " + textColor + "; " +
+            "-fx-font-size: " + fontSize + "px; " +
+            "-fx-border-width: 0; " +
+            "-fx-focus-color: transparent; " +
+            "-fx-faint-focus-color: transparent; " +
+            "-fx-cursor: hand;"
+        );
+        // Recalculate height after font size change
+        adjustTextAreaHeight();
     }
 }

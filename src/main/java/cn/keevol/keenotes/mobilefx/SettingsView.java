@@ -25,6 +25,8 @@ public class SettingsView extends BorderPane {
     private final ToggleSwitch themeToggle;
     private final KeyCaptureField searchShortcutField;
     private final KeyCaptureField sendShortcutField;
+    private final KeyCaptureField zoomInShortcutField;
+    private final KeyCaptureField zoomOutShortcutField;
 
     public SettingsView(Runnable onBack) {
         this.onBack = onBack;
@@ -255,8 +257,52 @@ public class SettingsView extends BorderPane {
         HBox sendShortcutRow = new HBox(16, sendShortcutLabelWrapper, sendShortcutFieldWithHint);
         sendShortcutRow.setAlignment(Pos.TOP_LEFT);
         
+        // Zoom in shortcut configuration
+        Label zoomInShortcutLabel = new Label("Zoom in shortcut");
+        zoomInShortcutLabel.getStyleClass().add("field-label");
+        zoomInShortcutLabel.setAlignment(Pos.CENTER_RIGHT);
+        
+        zoomInShortcutField = new KeyCaptureField();
+        
+        Label zoomInShortcutHint = new Label("Increase Note Card font size (e.g., Meta+EQUALS)");
+        zoomInShortcutHint.getStyleClass().add("field-hint");
+        
+        VBox zoomInShortcutFieldWithHint = new VBox(6, zoomInShortcutField, zoomInShortcutHint);
+        HBox.setHgrow(zoomInShortcutFieldWithHint, Priority.ALWAYS);
+        
+        VBox zoomInShortcutLabelWrapper = new VBox(zoomInShortcutLabel);
+        zoomInShortcutLabelWrapper.setAlignment(Pos.TOP_RIGHT);
+        zoomInShortcutLabelWrapper.setPadding(new Insets(8, 0, 0, 0));
+        zoomInShortcutLabelWrapper.setMinWidth(259);
+        zoomInShortcutLabelWrapper.setMaxWidth(259);
+        
+        HBox zoomInShortcutRow = new HBox(16, zoomInShortcutLabelWrapper, zoomInShortcutFieldWithHint);
+        zoomInShortcutRow.setAlignment(Pos.TOP_LEFT);
+        
+        // Zoom out shortcut configuration
+        Label zoomOutShortcutLabel = new Label("Zoom out shortcut");
+        zoomOutShortcutLabel.getStyleClass().add("field-label");
+        zoomOutShortcutLabel.setAlignment(Pos.CENTER_RIGHT);
+        
+        zoomOutShortcutField = new KeyCaptureField();
+        
+        Label zoomOutShortcutHint = new Label("Decrease Note Card font size (e.g., Meta+MINUS)");
+        zoomOutShortcutHint.getStyleClass().add("field-hint");
+        
+        VBox zoomOutShortcutFieldWithHint = new VBox(6, zoomOutShortcutField, zoomOutShortcutHint);
+        HBox.setHgrow(zoomOutShortcutFieldWithHint, Priority.ALWAYS);
+        
+        VBox zoomOutShortcutLabelWrapper = new VBox(zoomOutShortcutLabel);
+        zoomOutShortcutLabelWrapper.setAlignment(Pos.TOP_RIGHT);
+        zoomOutShortcutLabelWrapper.setPadding(new Insets(8, 0, 0, 0));
+        zoomOutShortcutLabelWrapper.setMinWidth(259);
+        zoomOutShortcutLabelWrapper.setMaxWidth(259);
+        
+        HBox zoomOutShortcutRow = new HBox(16, zoomOutShortcutLabelWrapper, zoomOutShortcutFieldWithHint);
+        zoomOutShortcutRow.setAlignment(Pos.TOP_LEFT);
+        
         // Preferences container with proper spacing
-        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, themeRow, shortcutRow, sendShortcutRow);
+        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, themeRow, shortcutRow, sendShortcutRow, zoomInShortcutRow, zoomOutShortcutRow);
         preferencesSection.setPadding(new Insets(8, 0, 8, 0)); // Add top/bottom padding
 
         // Debug entry (hidden by default) - removed for desktop version
@@ -368,6 +414,8 @@ public class SettingsView extends BorderPane {
         themeToggle.setSelected(ThemeService.getInstance().getCurrentTheme() == ThemeService.Theme.LIGHT);
         searchShortcutField.setShortcut(settings.getSearchShortcut());
         sendShortcutField.setShortcut(settings.getSendShortcut());
+        zoomInShortcutField.setShortcut(settings.getZoomInShortcut());
+        zoomOutShortcutField.setShortcut(settings.getZoomOutShortcut());
     }
 
     private void saveSettings() {
@@ -415,6 +463,15 @@ public class SettingsView extends BorderPane {
         String sendShortcut = sendShortcutField.getShortcut();
         if (!sendShortcut.isEmpty()) {
             settings.setSendShortcut(sendShortcut);
+        }
+        // Save zoom shortcuts
+        String zoomInShortcut = zoomInShortcutField.getShortcut();
+        if (!zoomInShortcut.isEmpty()) {
+            settings.setZoomInShortcut(zoomInShortcut);
+        }
+        String zoomOutShortcut = zoomOutShortcutField.getShortcut();
+        if (!zoomOutShortcut.isEmpty()) {
+            settings.setZoomOutShortcut(zoomOutShortcut);
         }
         // copyToClipboard is auto-saved on checkbox change
         settings.save();
