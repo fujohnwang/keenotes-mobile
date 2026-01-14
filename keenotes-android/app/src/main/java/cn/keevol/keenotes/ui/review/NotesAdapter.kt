@@ -73,7 +73,7 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
             Toast(context).apply {
                 duration = Toast.LENGTH_SHORT
                 view = layout
-                setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, 100)
+                setGravity(Gravity.CENTER, 0, 0)
                 show()
             }
         }
