@@ -21,6 +21,11 @@ public class ReviewPeriodsPanel extends VBox {
         setPadding(new Insets(8, 0, 8, 12));
         setSpacing(6);
         
+        // Listen to theme changes
+        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+            javafx.application.Platform.runLater(this::updateThemeColors);
+        });
+        
         setupButtons();
     }
     
@@ -46,7 +51,9 @@ public class ReviewPeriodsPanel extends VBox {
         // Hover effect
         button.setOnMouseEntered(e -> {
             if (button != selectedButton) {
-                button.setStyle("-fx-background-color: rgba(0, 212, 255, 0.1);");
+                boolean isDark = ThemeService.getInstance().isDarkTheme();
+                String hoverBg = isDark ? "rgba(0, 212, 255, 0.1)" : "rgba(9, 105, 218, 0.08)";
+                button.setStyle("-fx-background-color: " + hoverBg + ";");
             }
         });
         
@@ -67,7 +74,26 @@ public class ReviewPeriodsPanel extends VBox {
         
         // Select new
         selectedButton = button;
-        button.setStyle("-fx-background-color: rgba(0, 212, 255, 0.15); " +
-                       "-fx-text-fill: #00D4FF;");
+        updateButtonStyle(button, true);
+    }
+    
+    private void updateButtonStyle(Button button, boolean selected) {
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String primaryColor = isDark ? "#00D4FF" : "#0969DA";
+        String accentBg = isDark ? "rgba(0, 212, 255, 0.15)" : "rgba(9, 105, 218, 0.1)";
+        
+        if (selected) {
+            button.setStyle("-fx-background-color: " + accentBg + "; " +
+                           "-fx-text-fill: " + primaryColor + ";");
+        } else {
+            button.setStyle("");
+        }
+    }
+    
+    private void updateThemeColors() {
+        // Re-apply selected button style with new theme colors
+        if (selectedButton != null) {
+            updateButtonStyle(selectedButton, true);
+        }
     }
 }

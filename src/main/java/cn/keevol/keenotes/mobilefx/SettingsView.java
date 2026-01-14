@@ -22,6 +22,7 @@ public class SettingsView extends BorderPane {
     private final Runnable onBack;
     private final ToggleSwitch copyToClipboardToggle;
     private final ToggleSwitch showOverviewCardToggle;
+    private final ToggleSwitch themeToggle;
     private final KeyCaptureField searchShortcutField;
     private final KeyCaptureField sendShortcutField;
 
@@ -192,6 +193,22 @@ public class SettingsView extends BorderPane {
         HBox overviewCardRow = new HBox(16, overviewCardLabel, showOverviewCardToggle);
         overviewCardRow.setAlignment(Pos.CENTER_LEFT);
         
+        // Theme toggle
+        themeToggle = new ToggleSwitch();
+        themeToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            ThemeService.Theme theme = newVal ? ThemeService.Theme.LIGHT : ThemeService.Theme.DARK;
+            ThemeService.getInstance().setTheme(theme);
+        });
+        
+        Label themeLabel = new Label("Light Theme");
+        themeLabel.getStyleClass().add("field-label");
+        themeLabel.setMinWidth(259);
+        themeLabel.setMaxWidth(259);
+        themeLabel.setAlignment(Pos.CENTER_RIGHT);
+        
+        HBox themeRow = new HBox(16, themeLabel, themeToggle);
+        themeRow.setAlignment(Pos.CENTER_LEFT);
+        
         // Search shortcut configuration
         Label shortcutLabel = new Label("Search shortcut");
         shortcutLabel.getStyleClass().add("field-label");
@@ -239,7 +256,7 @@ public class SettingsView extends BorderPane {
         sendShortcutRow.setAlignment(Pos.TOP_LEFT);
         
         // Preferences container with proper spacing
-        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, shortcutRow, sendShortcutRow);
+        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, themeRow, shortcutRow, sendShortcutRow);
         preferencesSection.setPadding(new Insets(8, 0, 8, 0)); // Add top/bottom padding
 
         // Debug entry (hidden by default) - removed for desktop version
@@ -348,6 +365,7 @@ public class SettingsView extends BorderPane {
         encryptionPasswordConfirmField.setText(savedPassword);
         copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
         showOverviewCardToggle.setSelected(settings.getShowOverviewCard());
+        themeToggle.setSelected(ThemeService.getInstance().getCurrentTheme() == ThemeService.Theme.LIGHT);
         searchShortcutField.setShortcut(settings.getSearchShortcut());
         sendShortcutField.setShortcut(settings.getSendShortcut());
     }

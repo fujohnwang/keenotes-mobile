@@ -42,6 +42,11 @@ public class NoteInputPanel extends VBox {
         setSpacing(0); // Remove internal spacing
         setPadding(new Insets(16, 16, 16, 16)); // Uniform padding on all sides
         
+        // Listen to theme changes
+        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+            javafx.application.Platform.runLater(this::updateThemeColors);
+        });
+        
         // Create the unified input container
         inputContainer = new StackPane();
         inputContainer.getStyleClass().add("unified-input-container");
@@ -120,6 +125,9 @@ public class NoteInputPanel extends VBox {
         
         // Listen to API service status (simplified - check periodically or on action)
         setupSendChannelListener();
+        
+        // Initialize theme colors
+        updateThemeColors();
     }
     
     /**
@@ -136,16 +144,29 @@ public class NoteInputPanel extends VBox {
      */
     public void updateSendChannelStatus(boolean connected) {
         javafx.application.Platform.runLater(() -> {
+            boolean isDark = ThemeService.getInstance().isDarkTheme();
+            String successColor = isDark ? "#3FB950" : "#1A7F37";
+            String errorColor = isDark ? "#F85149" : "#CF222E";
+            
             if (connected) {
-                sendChannelIndicator.setFill(Color.web("#3FB950")); // Green
+                sendChannelIndicator.setFill(Color.web(successColor));
                 sendChannelLabel.setText("Send Channel: ✓");
-                sendChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #3FB950;");
+                sendChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + successColor + ";");
             } else {
-                sendChannelIndicator.setFill(Color.web("#F85149")); // Red
+                sendChannelIndicator.setFill(Color.web(errorColor));
                 sendChannelLabel.setText("Send Channel: ✗");
-                sendChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #F85149;");
+                sendChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + errorColor + ";");
             }
         });
+    }
+    
+    /**
+     * Update colors based on current theme
+     */
+    private void updateThemeColors() {
+        // Re-apply current connection status with new theme colors
+        boolean isConnected = SettingsService.getInstance().isConfigured();
+        updateSendChannelStatus(isConnected);
     }
     
     private void handleSend() {

@@ -1,0 +1,545 @@
+/* Common Layout Styles - Shared between Dark and Light themes */
+/* Only layout-related properties (size, padding, margin, radius, etc.) */
+
+/* Font: custom font loaded in Main.java, with Android/iOS system font fallbacks */
+.root {
+    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'Source Han Sans CN', 'Droid Sans Fallback', 'PingFang SC', 'Heiti SC', 'Microsoft YaHei', sans-serif;
+}
+
+* {
+    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'Source Han Sans CN', 'Droid Sans Fallback', 'PingFang SC', 'Heiti SC', 'Microsoft YaHei', sans-serif;
+}
+
+.label, .text, .button, .text-field, .text-area {
+    -fx-font-family: 'MiSans', 'Noto Sans CJK SC', 'Source Han Sans CN', 'Droid Sans Fallback', 'PingFang SC', 'Heiti SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* Header */
+.header {
+    -fx-border-width: 0 0 1 0;
+    -fx-min-height: 56px;
+    -fx-pref-height: 56px;
+}
+
+.header-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+}
+
+/* Search field */
+.search-field {
+    -fx-background-radius: 20px;
+    -fx-border-radius: 20px;
+    -fx-padding: 8 32 8 16;
+    -fx-font-size: 14px;
+}
+
+.clear-search-btn {
+    -fx-font-size: 14px;
+    -fx-padding: 4 8;
+    -fx-cursor: hand;
+}
+
+/* Search results */
+.search-loading, .no-results {
+    -fx-font-size: 14px;
+    -fx-padding: 8;
+}
+
+.search-result-card {
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-cursor: hand;
+}
+
+.search-result-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+
+.search-result-snippet {
+    -fx-font-size: 13px;
+    -fx-padding: 4 0 0 28;
+}
+
+.search-result-preview {
+    -fx-font-size: 14px;
+}
+
+.search-pane-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+}
+
+.back-button {
+    -fx-font-size: 14px;
+    -fx-cursor: hand;
+    -fx-padding: 4 8;
+}
+
+.search-count {
+    -fx-font-size: 12px;
+    -fx-padding: 0 0 8 0;
+}
+
+.copied-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.expand-icon {
+    -fx-font-size: 12px;
+    -fx-min-width: 16px;
+}
+
+.search-result-content {
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+}
+
+.search-result-content-text {
+    -fx-font-size: 13px;
+}
+
+.copy-button {
+    -fx-font-size: 13px;
+    -fx-padding: 8 16;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-cursor: hand;
+}
+
+.load-more-button {
+    -fx-font-size: 14px;
+    -fx-padding: 12 16;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-cursor: hand;
+}
+
+/* Copyright footer */
+.copyright-label {
+    -fx-font-size: 12px;
+}
+
+.copyright-link {
+    -fx-font-size: 12px;
+}
+
+.header-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+.header-button {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 50%;
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-max-width: 36px;
+    -fx-max-height: 36px;
+    -fx-cursor: hand;
+}
+
+.header-button-text {
+    -fx-font-size: 18px;
+    -fx-cursor: hand;
+    -fx-padding: 4 8;
+}
+
+/* Icon button (gear) */
+.icon-button {
+    -fx-font-size: 28px;
+    -fx-cursor: hand;
+    -fx-padding: 4;
+}
+
+/* Icon button with label (icon + text) */
+.icon-button-with-label {
+    -fx-cursor: hand;
+    -fx-padding: 2 8;
+}
+
+.icon-button-label {
+    -fx-font-size: 10px;
+}
+
+/* Note input */
+.note-input {
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-padding: 12;
+    -fx-font-size: 16px;
+    -fx-pref-height: 200px;
+}
+
+/* Form fields */
+.input-field {
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-padding: 12;
+    -fx-font-size: 16px;
+}
+
+.field-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+/* Action buttons */
+.action-button {
+    -fx-background-radius: 12px;
+    -fx-padding: 14 24;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.action-button:disabled {
+    -fx-opacity: 0.6;
+}
+
+/* Status label */
+.status-label {
+    -fx-font-size: 14px;
+}
+
+/* Note cards and echo */
+.note-card {
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+}
+
+.echo-title {
+    -fx-font-size: 12px;
+}
+
+.echo-content {
+    -fx-font-size: 14px;
+}
+
+/* Bottom navigation */
+.bottom-nav {
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 8 0;
+    -fx-min-height: 56px;
+}
+
+.nav-button {
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+}
+
+/* Scrollbar styling */
+.scroll-bar .thumb {
+    -fx-background-radius: 4px;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-pref-height: 0;
+    -fx-pref-width: 0;
+}
+
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow {
+    -fx-shape: "";
+    -fx-pref-height: 0;
+    -fx-pref-width: 0;
+}
+
+/* Bottom Tab Bar */
+.bottom-tab-bar {
+    -fx-border-width: 1 0 0 0;
+    -fx-min-height: 50px;
+    -fx-pref-height: 50px;
+}
+
+.tab-button {
+    -fx-font-size: 14px;
+    -fx-padding: 12 0;
+    -fx-cursor: hand;
+    -fx-border-width: 0;
+    -fx-background-radius: 0;
+}
+
+.tab-button.active {
+    -fx-font-weight: bold;
+    -fx-border-width: 2 0 0 0;
+}
+
+/* Review View */
+.days-input {
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-padding: 8;
+    -fx-font-size: 14px;
+    -fx-alignment: center;
+}
+
+.days-label {
+    -fx-font-size: 14px;
+}
+
+.refresh-button {
+    -fx-font-size: 14px;
+    -fx-padding: 8 16;
+    -fx-background-radius: 8px;
+    -fx-cursor: hand;
+}
+
+.note-date {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+/* Field hint */
+.field-hint {
+    -fx-font-size: 11px;
+    -fx-font-style: italic;
+}
+
+/* Review Period Select (ComboBox) */
+.period-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.review-period-select {
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-padding: 8 12;
+    -fx-font-size: 14px;
+    -fx-cursor: hand;
+}
+
+.review-period-select .list-view {
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.review-period-select .list-cell {
+    -fx-padding: 8 12;
+}
+
+.review-period-select .list-cell:selected {
+    -fx-font-weight: bold;
+}
+
+/* Error display styles for initialization failures */
+.error-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.error-detail {
+    -fx-font-size: 12px;
+    -fx-wrap-text: true;
+}
+
+/* Status Footer */
+.status-footer {
+    -fx-border-width: 1 0 0 0;
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+}
+
+.status-footer .status-label {
+    -fx-font-size: 12px;
+}
+
+/* Review Button in Header */
+.review-button {
+    -fx-font-size: 14px;
+    -fx-cursor: hand;
+    -fx-padding: 4 8;
+}
+
+.review-button.active {
+    -fx-font-weight: bold;
+}
+
+/* Sidebar */
+.sidebar {
+    -fx-border-width: 0 1 0 0;
+}
+
+.sidebar-logo-text {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+/* Sidebar Status Area */
+.sidebar-status-area .status-label {
+    -fx-font-size: 11px;
+}
+
+.navigation-group {
+    -fx-padding: 12 0;
+}
+
+/* Floating pill-style navigation buttons */
+.navigation-button {
+    -fx-background-radius: 10px;
+    -fx-cursor: hand;
+    -fx-padding: 0;
+}
+
+/* Review Periods Panel */
+.period-button {
+    -fx-background-radius: 8px;
+    -fx-padding: 8 16;
+    -fx-cursor: hand;
+    -fx-font-size: 13px;
+}
+
+.mode-separator {
+    -fx-padding: 0;
+    -fx-pref-height: 1px;
+}
+
+/* Unified Input Container (Modern Design) */
+.unified-input-container {
+    -fx-background-radius: 12px;
+    -fx-border-width: 1;
+    -fx-border-radius: 12px;
+}
+
+.unified-note-input {
+    -fx-background-radius: 12px;
+    -fx-padding: 12 60 12 12;
+    -fx-font-size: 15px;
+    -fx-border-width: 0;
+}
+
+.unified-note-input:focused {
+    -fx-border-width: 0;
+    -fx-effect: none;
+}
+
+/* Unified Send Button (embedded in input) */
+.unified-send-button {
+    -fx-background-radius: 20px;
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+    -fx-padding: 0 16 0 12;
+    -fx-cursor: hand;
+    -fx-border-width: 0;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-graphic-text-gap: 6;
+}
+
+.unified-send-button:disabled {
+    -fx-opacity: 0.5;
+}
+
+.unified-send-button .send-icon {
+    -fx-stroke: none;
+    -fx-scale-x: 0.7;
+    -fx-scale-y: 0.7;
+}
+
+/* Unified Status Label (embedded in input container) */
+.unified-status-label {
+    -fx-font-size: 12px;
+    -fx-padding: 6 0;
+}
+
+/* Send Channel Status (in input panel) */
+.send-channel-status {
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+    -fx-max-height: 36px;
+}
+
+/* Overview Card */
+.overview-card {
+    -fx-background-radius: 12px;
+    -fx-border-width: 1;
+    -fx-border-radius: 12px;
+}
+
+.overview-section {
+    -fx-spacing: 8px;
+}
+
+.overview-value {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+}
+
+.overview-label {
+    -fx-font-size: 11px;
+}
+
+/* Context Menu (Right-click Menu) */
+.context-menu {
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1px;
+    -fx-padding: 4px;
+}
+
+.context-menu .menu-item {
+    -fx-background-radius: 6px;
+    -fx-padding: 8px 16px;
+    -fx-cursor: hand;
+}
+
+.context-menu .menu-item .label {
+    -fx-font-size: 13px;
+}
+
+.context-menu .separator {
+    -fx-padding: 4px 8px;
+}
+
+.context-menu .separator .line {
+    -fx-border-width: 1px 0 0 0;
+}
+
+/* Desktop Window Size */
+.desktop-main-view {
+    -fx-min-width: 800px;
+    -fx-min-height: 600px;
+    -fx-pref-width: 1200px;
+    -fx-pref-height: 800px;
+}
+
+/* Period Toggle Buttons (Segmented Control) */
+.period-toggle-button {
+    -fx-font-size: 13px;
+    -fx-padding: 10 16;
+    -fx-border-width: 1;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-cursor: hand;
+}
+
+.period-toggle-button:selected {
+    -fx-font-weight: bold;
+}
+
+.period-toggle-button:first-child {
+    -fx-background-radius: 8 0 0 8;
+    -fx-border-radius: 8 0 0 8;
+}
+
+.period-toggle-button:last-child {
+    -fx-background-radius: 0 8 8 0;
+    -fx-border-radius: 0 8 8 0;
+}
+
+.period-toggle-button:nth-child(n+2) {
+    -fx-border-width: 1 1 1 0;
+}
+
+.status-footer-bar {
+    -fx-border-width: 1 0 0 0;
+}
+
+.status-footer-bar .status-label {
+    -fx-font-size: 12px;
+}

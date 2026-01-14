@@ -29,7 +29,14 @@ public class Main extends Application {
 
         // Scene size for desktop
         Scene scene = new Scene(mainView, 1200, 800);
-        scene.getStylesheets().add(getClass().getResource("/styles/main.css").toExternalForm());
+        
+        // Load theme CSS
+        loadThemeCSS(scene);
+        
+        // Listen for theme changes
+        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+            Platform.runLater(() -> loadThemeCSS(scene));
+        });
 
         stage.setTitle("KeeNotes");
         stage.setScene(scene);
@@ -130,6 +137,23 @@ public class Main extends Application {
             e.printStackTrace();
         }
         System.err.println("Failed to load custom font");
+    }
+    
+    /**
+     * Load theme CSS files based on current theme setting
+     */
+    private void loadThemeCSS(Scene scene) {
+        scene.getStylesheets().clear();
+        
+        // Always load common.css first (layout styles)
+        scene.getStylesheets().add(getClass().getResource("/styles/common.css").toExternalForm());
+        
+        // Load theme-specific CSS
+        ThemeService.Theme theme = ThemeService.getInstance().getCurrentTheme();
+        String themeFile = theme == ThemeService.Theme.LIGHT ? "light.css" : "dark.css";
+        scene.getStylesheets().add(getClass().getResource("/styles/" + themeFile).toExternalForm());
+        
+        System.out.println("[Main] Loaded theme: " + theme + " (" + themeFile + ")");
     }
 
     public static void main(String[] args) {
