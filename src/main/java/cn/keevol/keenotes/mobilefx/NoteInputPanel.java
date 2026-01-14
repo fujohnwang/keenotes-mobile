@@ -55,6 +55,17 @@ public class NoteInputPanel extends VBox {
         noteInput.getStyleClass().add("unified-note-input");
         noteInput.setWrapText(true);
         
+        // Add keyboard shortcut handler for Send
+        noteInput.setOnKeyPressed(event -> {
+            String sendShortcut = SettingsService.getInstance().getSendShortcut();
+            if (matchesShortcut(event, sendShortcut)) {
+                event.consume(); // Prevent default behavior (like newline)
+                if (!noteInput.getText().trim().isEmpty()) {
+                    handleSend();
+                }
+            }
+        });
+        
         // Send button with icon (embedded in bottom-right corner)
         sendButton = new Button("Send");
         sendButton.getStyleClass().addAll("unified-send-button");
@@ -236,5 +247,42 @@ public class NoteInputPanel extends VBox {
      */
     public void requestInputFocus() {
         noteInput.requestFocus();
+    }
+    
+    /**
+     * Check if KeyEvent matches the shortcut string (e.g., "Alt+Enter", "Ctrl+Shift+S")
+     */
+    private boolean matchesShortcut(javafx.scene.input.KeyEvent event, String shortcut) {
+        if (shortcut == null || shortcut.isEmpty()) {
+            return false;
+        }
+        
+        String[] parts = shortcut.split("\\+");
+        boolean ctrlRequired = false;
+        boolean altRequired = false;
+        boolean shiftRequired = false;
+        String mainKey = "";
+        
+        for (String part : parts) {
+            String normalized = part.trim();
+            if (normalized.equalsIgnoreCase("Ctrl") || normalized.equalsIgnoreCase("Control")) {
+                ctrlRequired = true;
+            } else if (normalized.equalsIgnoreCase("Alt")) {
+                altRequired = true;
+            } else if (normalized.equalsIgnoreCase("Shift")) {
+                shiftRequired = true;
+            } else {
+                mainKey = normalized;
+            }
+        }
+        
+        // Check modifiers match
+        if (event.isControlDown() != ctrlRequired) return false;
+        if (event.isAltDown() != altRequired) return false;
+        if (event.isShiftDown() != shiftRequired) return false;
+        
+        // Check main key matches
+        String eventKeyName = event.getCode().getName();
+        return eventKeyName.equalsIgnoreCase(mainKey);
     }
 }
