@@ -161,24 +161,25 @@ public class NotesDisplayPanel extends VBox {
      */
     private HBox createHeaderRow(String countText) {
         headerRow = new HBox(12);
-        headerRow.setAlignment(Pos.CENTER_LEFT);
-        headerRow.setPadding(new Insets(8, 0, 0, 0));
+        headerRow.setAlignment(Pos.CENTER); // Vertical center alignment for all children
+        headerRow.setPadding(new Insets(8, 0, 12, 0)); // Add bottom padding for spacing from cards
         
         // Count label (left)
         countLabel = new Label(countText);
         countLabel.getStyleClass().add("search-count");
+        countLabel.setStyle("-fx-font-size: 12px;"); // Consistent font size
         
         // Sync indicator (transient, next to count)
         syncSpinner = new ProgressIndicator();
-        syncSpinner.setMaxSize(14, 14);
-        syncSpinner.setPrefSize(14, 14);
+        syncSpinner.setMaxSize(12, 12);
+        syncSpinner.setPrefSize(12, 12);
         syncSpinner.setStyle("-fx-progress-color: #00D4FF;");
         
         syncStatusLabel = new Label("Syncing...");
-        syncStatusLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #8B949E;");
+        syncStatusLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #8B949E;");
         
         syncIndicatorBox = new HBox(4, syncSpinner, syncStatusLabel);
-        syncIndicatorBox.setAlignment(Pos.CENTER_LEFT);
+        syncIndicatorBox.setAlignment(Pos.CENTER);
         syncIndicatorBox.setVisible(false);
         syncIndicatorBox.setManaged(false);
         
@@ -191,10 +192,10 @@ public class NotesDisplayPanel extends VBox {
         syncChannelIndicator.setFill(Color.web("#3FB950")); // Green by default
         
         syncChannelLabel = new Label("Sync Channel: ✓");
-        syncChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #3FB950;");
+        syncChannelLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #3FB950;");
         
         HBox syncChannelBox = new HBox(6, syncChannelIndicator, syncChannelLabel);
-        syncChannelBox.setAlignment(Pos.CENTER_RIGHT);
+        syncChannelBox.setAlignment(Pos.CENTER);
         
         headerRow.getChildren().addAll(countLabel, syncIndicatorBox, spacer, syncChannelBox);
         
@@ -222,11 +223,11 @@ public class NotesDisplayPanel extends VBox {
         if (connected) {
             syncChannelIndicator.setFill(Color.web(successColor));
             syncChannelLabel.setText("Sync Channel: ✓");
-            syncChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + successColor + ";");
+            syncChannelLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + successColor + ";");
         } else {
             syncChannelIndicator.setFill(Color.web(errorColor));
             syncChannelLabel.setText("Sync Channel: ✗");
-            syncChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + errorColor + ";");
+            syncChannelLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + errorColor + ";");
         }
     }
     
@@ -571,6 +572,10 @@ public class NotesDisplayPanel extends VBox {
     public void addNoteAtTop(LocalCacheService.NoteData note) {
         stopDotsAnimation();
         
+        // Remove "scroll down to load more" hint if exists (not needed for dynamic updates)
+        notesContainer.getChildren().removeIf(node -> 
+            node instanceof Label && ((Label) node).getText().contains("Scroll down"));
+        
         // Update count label and total count if in pagination mode
         if (useTruePagination) {
             totalNoteCount++;
@@ -666,17 +671,26 @@ public class NotesDisplayPanel extends VBox {
     public void showEmptyState(String message) {
         stopDotsAnimation();
         notesContainer.getChildren().clear();
-        fixedHeaderContainer.setVisible(false);
-        fixedHeaderContainer.setManaged(false);
-        headerRow = null;
-        countLabel = null;
         
-        Label emptyLabel = new Label(message);
-        emptyLabel.getStyleClass().add("no-results");
-        notesContainer.getChildren().add(emptyLabel);
+        // Create header with sync indicator (spinner + sync channel on same row)
+        createHeaderRow("");
+        // Hide count label but keep header row visible for sync indicator
+        if (countLabel != null) {
+            countLabel.setText(message); // Use count label position for empty message
+        }
         
         statusLabel.setVisible(false);
         statusLabel.setManaged(false);
+    }
+    
+    /**
+     * Clear empty state (called when first note is added dynamically)
+     */
+    public void clearEmptyState() {
+        // Header already exists, just need to update count label
+        if (countLabel != null) {
+            countLabel.setText("0 note(s)");
+        }
     }
     
     /**

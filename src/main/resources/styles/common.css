@@ -79,7 +79,7 @@
 
 .search-count {
     -fx-font-size: 12px;
-    -fx-padding: 0 0 8 0;
+    -fx-padding: 0;
 }
 
 .copied-label {
