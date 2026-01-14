@@ -32,6 +32,7 @@ public class NoteCardView extends StackPane {
     private final Label copiedPopup;
     private final TextArea contentArea;
     private final SettingsService settings;
+    private final Text textMeasure; // Hidden text node for measuring height
     
     public NoteCardView(LocalCacheService.NoteData noteData) {
         this.noteData = noteData;
@@ -47,13 +48,6 @@ public class NoteCardView extends StackPane {
         // Listen to font size changes
         settings.noteFontSizeProperty().addListener((obs, oldSize, newSize) -> {
             javafx.application.Platform.runLater(() -> updateFontSize(newSize.intValue()));
-        });
-        
-        // Listen to width changes to recalculate height
-        widthProperty().addListener((obs, oldWidth, newWidth) -> {
-            if (newWidth.doubleValue() > 0) {
-                javafx.application.Platform.runLater(this::adjustTextAreaHeight);
-            }
         });
         
         // Main content container
@@ -103,20 +97,38 @@ public class NoteCardView extends StackPane {
         contentArea.setScrollTop(0);
         contentArea.setScrollLeft(0);
         
-        // Let TextArea compute its own height based on content
-        contentArea.setMinHeight(30);
-        contentArea.setPrefHeight(USE_COMPUTED_SIZE);
-        contentArea.setMaxHeight(Double.MAX_VALUE);
+        // Create hidden Text node for accurate height measurement
+        textMeasure = new Text();
+        textMeasure.setFont(Font.font("MiSans", fontSize)); // Use same font family
+        textMeasure.setWrappingWidth(500); // Will be updated based on actual width
+        textMeasure.textProperty().bind(contentArea.textProperty());
         
-        // Calculate and set height based on content
-        // Delay initial calculation to ensure proper layout
-        javafx.application.Platform.runLater(() -> {
-            adjustTextAreaHeight();
-            // Hide scrollbars after layout
-            hideScrollBars();
+        // Bind TextArea height to Text measurement
+        textMeasure.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
+            double textHeight = newBounds.getHeight();
+            double padding = 20; // Minimal padding
+            double height = Math.max(30, textHeight + padding);
+            contentArea.setPrefHeight(height);
+            contentArea.setMinHeight(height);
+            // Re-hide scrollbars after height change
+            javafx.application.Platform.runLater(this::hideScrollBars);
         });
-        contentArea.textProperty().addListener((obs, oldVal, newVal) -> {
-            adjustTextAreaHeight();
+        
+        // Update wrapping width when card width changes
+        widthProperty().addListener((obs, oldWidth, newWidth) -> {
+            if (newWidth.doubleValue() > 64) { // Ensure we have valid width
+                // Card padding (16*2) + content box padding (16*2) = 64
+                double wrappingWidth = newWidth.doubleValue() - 64;
+                textMeasure.setWrappingWidth(wrappingWidth);
+            }
+        });
+        
+        // Initial wrapping width setup after layout
+        javafx.application.Platform.runLater(() -> {
+            if (getWidth() > 64) {
+                textMeasure.setWrappingWidth(getWidth() - 64);
+            }
+            hideScrollBars();
         });
         
         // Custom context menu for copy
@@ -195,67 +207,20 @@ public class NoteCardView extends StackPane {
      * Hide scrollbars from TextArea
      */
     private void hideScrollBars() {
-        javafx.application.Platform.runLater(() -> {
-            javafx.scene.Node scrollPane = contentArea.lookup(".scroll-pane");
-            if (scrollPane != null) {
-                scrollPane.setStyle("-fx-background-color: transparent;");
-            }
-            javafx.scene.Node vbar = contentArea.lookup(".scroll-bar:vertical");
-            javafx.scene.Node hbar = contentArea.lookup(".scroll-bar:horizontal");
-            if (vbar != null) {
-                vbar.setVisible(false);
-                vbar.setManaged(false);
-            }
-            if (hbar != null) {
-                hbar.setVisible(false);
-                hbar.setManaged(false);
-            }
-        });
-    }
-    
-    /**
-     * Adjust TextArea height based on content and font size
-     * Uses Text node for accurate height calculation with proper wrapping
-     */
-    private void adjustTextAreaHeight() {
-        String text = contentArea.getText();
-        if (text == null || text.isEmpty()) {
-            contentArea.setPrefHeight(30);
-            contentArea.setMinHeight(30);
-            return;
+        javafx.scene.Node scrollPane = contentArea.lookup(".scroll-pane");
+        if (scrollPane != null) {
+            scrollPane.setStyle("-fx-background-color: transparent;");
         }
-        
-        int fontSize = settings.getNoteFontSize();
-        
-        // Use Text node to calculate actual required height
-        Text textNode = new Text(text);
-        textNode.setFont(Font.font(fontSize));
-        
-        // Get the actual width available for text
-        double availableWidth = 500; // Default estimate
-        if (getWidth() > 0) {
-            // Card padding (16*2) + content box padding (16*2) = 64
-            availableWidth = getWidth() - 64;
+        javafx.scene.Node vbar = contentArea.lookup(".scroll-bar:vertical");
+        javafx.scene.Node hbar = contentArea.lookup(".scroll-bar:horizontal");
+        if (vbar != null) {
+            vbar.setVisible(false);
+            vbar.setManaged(false);
         }
-        textNode.setWrappingWidth(availableWidth);
-        
-        // Get the actual bounds of the text
-        double textHeight = textNode.getLayoutBounds().getHeight();
-        
-        // Add generous padding to ensure all content is visible
-        // TextArea has internal padding that we need to account for
-        double padding = 50;
-        double height = Math.max(30, textHeight + padding);
-        
-        contentArea.setPrefHeight(height);
-        contentArea.setMinHeight(height);
-        contentArea.setMaxHeight(Double.MAX_VALUE);
-        
-        // Force layout update
-        contentArea.layout();
-        
-        // Re-hide scrollbars after height change
-        hideScrollBars();
+        if (hbar != null) {
+            hbar.setVisible(false);
+            hbar.setManaged(false);
+        }
     }
     
     /**
@@ -382,7 +347,7 @@ public class NoteCardView extends StackPane {
             "-fx-faint-focus-color: transparent; " +
             "-fx-cursor: hand;"
         );
-        // Recalculate height after font size change
-        adjustTextAreaHeight();
+        // Update text measure font
+        textMeasure.setFont(Font.font("MiSans", fontSize));
     }
 }
