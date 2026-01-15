@@ -194,11 +194,10 @@ jobs:
           # Rename DMG to include platform suffix
           mv dist/KeeNotes-${{ steps.version.outputs.app_version }}.dmg dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
           
-          # Verify code signature
+          # Verify code signature (basic check only, spctl will fail before notarization)
           echo "Verifying code signature..."
           hdiutil attach dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg -nobrowse -mountpoint /Volumes/KeeNotes
           codesign -vvv --deep --strict /Volumes/KeeNotes/KeeNotes.app
-          spctl -a -vvv -t install /Volumes/KeeNotes/KeeNotes.app
           hdiutil detach /Volumes/KeeNotes
 
       # Notarize DMG
@@ -234,6 +233,12 @@ jobs:
             
             # Verify stapling
             xcrun stapler validate dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
+            
+            # Final verification with spctl (should pass now after notarization)
+            echo "Verifying Gatekeeper acceptance..."
+            hdiutil attach dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg -nobrowse -mountpoint /Volumes/KeeNotes
+            spctl -a -vvv -t install /Volumes/KeeNotes/KeeNotes.app
+            hdiutil detach /Volumes/KeeNotes
             
             echo "notarized=true" >> $GITHUB_OUTPUT
           else
@@ -313,6 +318,10 @@ jobs:
             
             # Verify stapling
             xcrun stapler validate dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
+            
+            # Final verification with spctl
+            echo "Verifying Gatekeeper acceptance..."
+            spctl -a -vvv -t install dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
             
             echo "notarized=true" >> $GITHUB_OUTPUT
           else
