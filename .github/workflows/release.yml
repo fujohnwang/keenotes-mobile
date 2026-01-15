@@ -197,11 +197,44 @@ jobs:
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
-          echo "Finding and signing all native libraries (.dylib, .jnilib, .so)..."
+          echo "Finding and signing all native libraries..."
           
           APP_PATH="dist/KeeNotes.app"
           
-          # Find all native libraries and sign them with hardened runtime and timestamp
+          # Find all JAR files that might contain native libraries
+          echo "Processing JAR files for embedded native libraries..."
+          find "$APP_PATH" -name "*.jar" | while read -r jar; do
+            echo "Checking JAR: $jar"
+            
+            # Create temp directory for this JAR
+            TEMP_DIR=$(mktemp -d)
+            
+            # Extract JAR
+            unzip -q "$jar" -d "$TEMP_DIR" 2>/dev/null || continue
+            
+            # Find and sign native libraries inside the JAR
+            FOUND_LIBS=false
+            find "$TEMP_DIR" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "*.so" \) | while read -r lib; do
+              FOUND_LIBS=true
+              echo "  Signing embedded library: $(basename $lib)"
+              codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
+                --timestamp \
+                --options runtime \
+                "$lib" 2>&1 || echo "  Warning: Failed to sign $lib"
+            done
+            
+            # If we found and signed libraries, repack the JAR
+            if [ "$FOUND_LIBS" = true ]; then
+              echo "  Repacking JAR with signed libraries..."
+              (cd "$TEMP_DIR" && zip -qr "$jar" . )
+            fi
+            
+            # Cleanup
+            rm -rf "$TEMP_DIR"
+          done
+          
+          # Sign all standalone native libraries (not in JARs)
+          echo "Signing standalone native libraries..."
           find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "*.so" \) | while read -r lib; do
             echo "Signing: $lib"
             codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
