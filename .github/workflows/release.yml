@@ -170,16 +170,17 @@ jobs:
           security find-identity -v -p codesigning $KEYCHAIN_PATH
           security find-identity -v -p basic $KEYCHAIN_PATH
 
-      - name: Create Signed macOS DMG
+      - name: Create Signed macOS App Bundle
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
+          # First create the .app bundle with jpackage (with signing)
           jpackage \
             --input target \
             --name "KeeNotes" \
             --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
             --main-class org.springframework.boot.loader.launch.JarLauncher \
-            --type dmg \
+            --type app-image \
             --app-version ${{ steps.version.outputs.app_version }} \
             --vendor "Keevol" \
             --icon "src/main/resources/icons/keenotes.icns" \
@@ -190,15 +191,52 @@ jobs:
             --mac-sign \
             --mac-signing-key-user-name "$MACOS_SIGNING_IDENTITY" \
             --dest dist
+
+      # Deep sign all native libraries inside the app bundle
+      - name: Deep Sign Native Libraries
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          echo "Finding and signing all native libraries (.dylib, .jnilib, .so)..."
+          
+          APP_PATH="dist/KeeNotes.app"
+          
+          # Find all native libraries and sign them with hardened runtime and timestamp
+          find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "*.so" \) | while read -r lib; do
+            echo "Signing: $lib"
+            codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
+              --timestamp \
+              --options runtime \
+              --entitlements /dev/null \
+              "$lib" || echo "Warning: Failed to sign $lib"
+          done
+          
+          # Re-sign the entire app bundle with deep option
+          echo "Re-signing entire app bundle..."
+          codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
+            --timestamp \
+            --options runtime \
+            --deep \
+            --entitlements /dev/null \
+            "$APP_PATH"
+          
+          # Verify the signature
+          echo "Verifying app signature..."
+          codesign -vvv --deep --strict "$APP_PATH"
+
+      - name: Create Signed macOS DMG
+        run: |
+          # Create DMG from the signed app bundle
+          echo "Creating DMG..."
+          hdiutil create -volname "KeeNotes" \
+            -srcfolder dist/KeeNotes.app \
+            -ov -format UDZO \
+            dist/KeeNotes-temp.dmg
           
           # Rename DMG to include platform suffix
-          mv dist/KeeNotes-${{ steps.version.outputs.app_version }}.dmg dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
+          mv dist/KeeNotes-temp.dmg dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
           
-          # Verify code signature (basic check only, spctl will fail before notarization)
-          echo "Verifying code signature..."
-          hdiutil attach dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg -nobrowse -mountpoint /Volumes/KeeNotes
-          codesign -vvv --deep --strict /Volumes/KeeNotes/KeeNotes.app
-          hdiutil detach /Volumes/KeeNotes
+          echo "DMG created successfully"
 
       # Notarize DMG
       - name: Notarize DMG
@@ -261,19 +299,15 @@ jobs:
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
+          # Create PKG from the already signed app bundle
           jpackage \
-            --input target \
+            --app-image dist/KeeNotes.app \
             --name "KeeNotes" \
-            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
-            --main-class org.springframework.boot.loader.launch.JarLauncher \
             --type pkg \
             --app-version ${{ steps.version.outputs.app_version }} \
             --vendor "Keevol" \
-            --icon "src/main/resources/icons/keenotes.icns" \
             --mac-package-identifier "cn.keevol.keenotes" \
             --mac-package-name "KeeNotes" \
-            --java-options "-Xmx512m" \
-            --java-options "-Xdock:name=KeeNotes" \
             --mac-sign \
             --mac-signing-key-user-name "$MACOS_SIGNING_IDENTITY" \
             --dest dist
