@@ -241,16 +241,20 @@ jobs:
               process_jar "$nested_jar" $((depth + 1))
             done < <(find "$temp_dir" -type f -name "*.jar" -print0)
             
-            # Update JAR with signed libraries (preserves JAR structure)
+            # Rebuild JAR with signed libraries (using jar command to preserve structure)
             if [ ${#signed_libs[@]} -gt 0 ]; then
-              echo "${indent}  ↻ Updating JAR with ${#signed_libs[@]} signed libraries..."
+              echo "${indent}  ↻ Rebuilding JAR with ${#signed_libs[@]} signed libraries..."
               
-              # Update each signed file in the JAR (preserves original JAR structure)
-              (cd "$temp_dir" && for lib in "${signed_libs[@]}"; do
-                zip -q "$jar" "$lib"
-              done)
+              # Backup original JAR
+              mv "$jar" "$jar.bak"
               
-              echo "${indent}  ✓ Updated"
+              # Create new JAR from temp directory (preserves structure)
+              (cd "$temp_dir" && jar cf "$jar" .)
+              
+              # Remove backup
+              rm "$jar.bak"
+              
+              echo "${indent}  ✓ Rebuilt"
             fi
             
             # Cleanup
