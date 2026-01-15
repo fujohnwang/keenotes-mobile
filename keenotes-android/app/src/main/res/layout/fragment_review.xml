@@ -94,15 +94,32 @@
                 android:textSize="12sp" />
 
             <!-- Syncing status (shown when syncing) -->
-            <TextView
-                android:id="@+id/syncingText"
+            <LinearLayout
+                android:id="@+id/syncingContainer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:text="Syncing..."
-                android:textColor="@color/warning"
-                android:textSize="11sp"
-                android:visibility="gone" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/syncingSpinner"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:src="@drawable/ic_spinner"
+                    app:tint="@color/warning" />
+
+                <TextView
+                    android:id="@+id/syncingText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="Syncing..."
+                    android:textColor="@color/warning"
+                    android:textSize="11sp" />
+
+            </LinearLayout>
 
             <Space
                 android:layout_width="0dp"

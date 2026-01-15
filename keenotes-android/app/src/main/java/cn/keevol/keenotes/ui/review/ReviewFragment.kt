@@ -275,12 +275,19 @@ class ReviewFragment : Fragment() {
         
         when (syncState) {
             WebSocketService.SyncState.SYNCING -> {
-                startDotsAnimation()
-                binding.syncingText.visibility = View.VISIBLE
+                binding.syncingContainer.visibility = View.VISIBLE
+                binding.syncingText.text = "Syncing..."
+                // Start rotation animation for spinner
+                val rotateAnimation = android.view.animation.AnimationUtils.loadAnimation(
+                    requireContext(), 
+                    R.anim.rotate_spinner
+                )
+                binding.syncingSpinner.startAnimation(rotateAnimation)
             }
             else -> {
-                stopDotsAnimation()
-                binding.syncingText.visibility = View.GONE
+                binding.syncingContainer.visibility = View.GONE
+                // Stop animation
+                binding.syncingSpinner.clearAnimation()
             }
         }
     }
