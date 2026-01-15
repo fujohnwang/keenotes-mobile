@@ -174,7 +174,14 @@ jobs:
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
-          # First create the .app bundle with jpackage (with signing)
+          # Determine the native library architecture based on build target
+          if [ "${{ matrix.arch }}" = "mac-aarch64" ]; then
+            SQLITE_ARCH="aarch64"
+          else
+            SQLITE_ARCH="x86_64"
+          fi
+          
+          # First create the .app bundle with jpackage (without signing first)
           jpackage \
             --input target \
             --name "KeeNotes" \
@@ -188,108 +195,90 @@ jobs:
             --mac-package-name "KeeNotes" \
             --java-options "-Xmx512m" \
             --java-options "-Xdock:name=KeeNotes" \
-            --mac-sign \
-            --mac-signing-key-user-name "$MACOS_SIGNING_IDENTITY" \
+            --java-options "-Dorg.sqlite.lib.path=\$APPDIR/../Frameworks" \
             --dest dist
-
-      # Deep sign all native libraries inside the app bundle
-      - name: Deep Sign Native Libraries
-        env:
-          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-        run: |
-          echo "=== Deep Signing Native Libraries ==="
           
           APP_PATH="dist/KeeNotes.app"
+          FRAMEWORKS_DIR="$APP_PATH/Contents/Frameworks"
           
-          # Function to process a JAR file
-          process_jar() {
-            local jar="$1"
-            local depth="$2"
-            local indent="$(printf '%*s' $((depth * 2)) '')"
+          # Create Frameworks directory
+          mkdir -p "$FRAMEWORKS_DIR"
+          
+          echo "=== Extracting Native Libraries to Frameworks ==="
+          
+          # Find and extract sqlite-jdbc native library
+          MAIN_JAR="$APP_PATH/Contents/app/keenotes-mobile-1.0.0-SNAPSHOT.jar"
+          TEMP_DIR=$(mktemp -d)
+          
+          # Extract the main JAR
+          unzip -q "$MAIN_JAR" -d "$TEMP_DIR"
+          
+          # Find sqlite-jdbc JAR inside BOOT-INF/lib
+          SQLITE_JAR=$(find "$TEMP_DIR/BOOT-INF/lib" -name "sqlite-jdbc-*.jar" | head -1)
+          
+          if [ -n "$SQLITE_JAR" ]; then
+            echo "Found SQLite JDBC JAR: $(basename $SQLITE_JAR)"
             
-            echo "${indent}Processing JAR: $(basename "$jar")"
+            # Extract sqlite-jdbc JAR
+            SQLITE_TEMP=$(mktemp -d)
+            unzip -q "$SQLITE_JAR" -d "$SQLITE_TEMP"
             
-            # Create temp directory
-            local temp_dir=$(mktemp -d)
-            local signed_libs=()
+            # Copy macOS native libraries to Frameworks
+            NATIVE_PATH="$SQLITE_TEMP/org/sqlite/native/Mac"
             
-            # Extract JAR
-            if ! unzip -q "$jar" -d "$temp_dir" 2>/dev/null; then
-              echo "${indent}  ⚠ Failed to extract JAR"
-              rm -rf "$temp_dir"
-              return 1
+            if [ -d "$NATIVE_PATH/$SQLITE_ARCH" ]; then
+              echo "Copying native library for $SQLITE_ARCH..."
+              cp "$NATIVE_PATH/$SQLITE_ARCH/libsqlitejdbc.dylib" "$FRAMEWORKS_DIR/"
+              echo "  ✓ Copied libsqlitejdbc.dylib"
             fi
             
-            # Sign native libraries in this JAR
-            while IFS= read -r -d '' lib; do
-              local rel_path="${lib#$temp_dir/}"
-              echo "${indent}  → Signing: $rel_path"
-              
-              if codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
+            # Also copy the other architecture for universal support
+            if [ "$SQLITE_ARCH" = "aarch64" ] && [ -d "$NATIVE_PATH/x86_64" ]; then
+              cp "$NATIVE_PATH/x86_64/libsqlitejdbc.dylib" "$FRAMEWORKS_DIR/libsqlitejdbc_x86_64.dylib"
+              echo "  ✓ Copied libsqlitejdbc_x86_64.dylib (for Rosetta)"
+            elif [ "$SQLITE_ARCH" = "x86_64" ] && [ -d "$NATIVE_PATH/aarch64" ]; then
+              cp "$NATIVE_PATH/aarch64/libsqlitejdbc.dylib" "$FRAMEWORKS_DIR/libsqlitejdbc_aarch64.dylib"
+              echo "  ✓ Copied libsqlitejdbc_aarch64.dylib"
+            fi
+            
+            rm -rf "$SQLITE_TEMP"
+          else
+            echo "⚠ SQLite JDBC JAR not found"
+          fi
+          
+          rm -rf "$TEMP_DIR"
+          
+          echo ""
+          echo "=== Signing Native Libraries in Frameworks ==="
+          
+          # Sign all native libraries in Frameworks directory
+          for lib in "$FRAMEWORKS_DIR"/*.dylib; do
+            if [ -f "$lib" ]; then
+              echo "Signing: $(basename $lib)"
+              codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
                 --timestamp \
                 --options runtime \
-                "$lib" 2>&1; then
-                echo "${indent}    ✓ Signed"
-                signed_libs+=("$rel_path")
-              else
-                echo "${indent}    ✗ Failed"
-              fi
-            done < <(find "$temp_dir" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "*.so" \) -print0)
-            
-            # Recursively process nested JARs
-            while IFS= read -r -d '' nested_jar; do
-              process_jar "$nested_jar" $((depth + 1))
-            done < <(find "$temp_dir" -type f -name "*.jar" -print0)
-            
-            # Rebuild JAR with signed libraries (using jar command to preserve structure)
-            if [ ${#signed_libs[@]} -gt 0 ]; then
-              echo "${indent}  ↻ Rebuilding JAR with ${#signed_libs[@]} signed libraries..."
-              
-              # Backup original JAR
-              mv "$jar" "$jar.bak"
-              
-              # Create new JAR from temp directory (preserves structure)
-              (cd "$temp_dir" && jar cf "$jar" .)
-              
-              # Remove backup
-              rm "$jar.bak"
-              
-              echo "${indent}  ✓ Rebuilt"
+                "$lib"
+              echo "  ✓ Signed"
             fi
-            
-            # Cleanup
-            rm -rf "$temp_dir"
-          }
+          done
           
-          # Process all JAR files
           echo ""
-          echo "Step 1: Processing JAR files..."
-          while IFS= read -r -d '' jar; do
-            process_jar "$jar" 0
-          done < <(find "$APP_PATH" -type f -name "*.jar" -print0)
+          echo "=== Signing Standalone Native Libraries ==="
           
-          # Sign standalone native libraries
-          echo ""
-          echo "Step 2: Signing standalone native libraries..."
-          standalone_count=0
-          while IFS= read -r -d '' lib; do
-            echo "  → Signing: $(basename "$lib")"
-            if codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
+          # Sign all other native libraries in the app bundle (runtime, JavaFX, etc.)
+          find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.jnilib" \) ! -path "*/Frameworks/*" | while read -r lib; do
+            echo "Signing: $lib"
+            codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
               --timestamp \
               --options runtime \
-              "$lib" 2>&1; then
-              echo "    ✓ Signed"
-              standalone_count=$((standalone_count + 1))
-            else
-              echo "    ✗ Failed"
-            fi
-          done < <(find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "*.so" \) -print0)
+              "$lib" 2>&1 || echo "  ⚠ Warning: Failed to sign"
+          done
           
-          echo "  Total standalone libraries signed: $standalone_count"
-          
-          # Re-sign the entire app bundle
           echo ""
-          echo "Step 3: Re-signing entire app bundle..."
+          echo "=== Signing Entire App Bundle ==="
+          
+          # Sign the entire app bundle
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
             --timestamp \
             --options runtime \
@@ -298,11 +287,12 @@ jobs:
           
           # Verify the signature
           echo ""
-          echo "Step 4: Verifying app signature..."
+          echo "=== Verifying Signature ==="
           codesign -vvv --deep --strict "$APP_PATH"
           
           echo ""
-          echo "=== Deep Signing Complete ==="
+          echo "=== App Bundle Ready ==="
+          ls -la "$FRAMEWORKS_DIR/"
 
       - name: Create Signed macOS DMG
         run: |
