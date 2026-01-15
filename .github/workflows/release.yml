@@ -306,6 +306,9 @@ jobs:
 
       - name: Create Signed macOS DMG
         run: |
+          # Wait a moment to ensure all file handles are closed
+          sleep 2
+          
           # Create DMG from the signed app bundle
           echo "Creating DMG..."
           hdiutil create -volname "KeeNotes" \
