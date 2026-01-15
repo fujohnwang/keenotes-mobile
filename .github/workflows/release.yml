@@ -248,11 +248,17 @@ jobs:
           
           # Rebuild main JAR without macOS natives in sqlite-jdbc
           echo "Rebuilding main JAR..."
-          rm "$MAIN_JAR"
+          MAIN_JAR_BACKUP="$MAIN_JAR.bak"
+          mv "$MAIN_JAR" "$MAIN_JAR_BACKUP"
           (cd "$TEMP_DIR" && jar cf "$MAIN_JAR" .)
+          rm "$MAIN_JAR_BACKUP"
           echo "  ✓ Rebuilt main JAR"
           
           rm -rf "$TEMP_DIR"
+          
+          # Force close any open file handles
+          sync
+          sleep 1
           
           echo ""
           echo "=== Signing Native Libraries in Frameworks ==="
@@ -306,7 +312,8 @@ jobs:
 
       - name: Create Signed macOS DMG
         run: |
-          # Wait a moment to ensure all file handles are closed
+          # Ensure all file operations are complete
+          sync
           sleep 2
           
           # Create DMG from the signed app bundle
