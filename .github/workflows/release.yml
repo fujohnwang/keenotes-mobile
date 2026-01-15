@@ -207,8 +207,7 @@ jobs:
             codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
               --timestamp \
               --options runtime \
-              --entitlements /dev/null \
-              "$lib" || echo "Warning: Failed to sign $lib"
+              "$lib" 2>&1 || echo "Warning: Failed to sign $lib"
           done
           
           # Re-sign the entire app bundle with deep option
@@ -217,7 +216,6 @@ jobs:
             --timestamp \
             --options runtime \
             --deep \
-            --entitlements /dev/null \
             "$APP_PATH"
           
           # Verify the signature
