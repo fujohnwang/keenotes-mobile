@@ -197,54 +197,95 @@ jobs:
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
-          echo "Finding and signing all native libraries..."
+          echo "=== Deep Signing Native Libraries ==="
           
           APP_PATH="dist/KeeNotes.app"
           
-          # Find all JAR files that might contain native libraries
-          echo "Processing JAR files for embedded native libraries..."
-          find "$APP_PATH" -name "*.jar" | while read -r jar; do
-            echo "Checking JAR: $jar"
+          # Function to process a JAR file
+          process_jar() {
+            local jar="$1"
+            local depth="$2"
+            local indent="$(printf '%*s' $((depth * 2)) '')"
             
-            # Create temp directory for this JAR
-            TEMP_DIR=$(mktemp -d)
+            echo "${indent}Processing JAR: $(basename "$jar")"
+            
+            # Create temp directory
+            local temp_dir=$(mktemp -d)
+            local signed_libs=()
             
             # Extract JAR
-            unzip -q "$jar" -d "$TEMP_DIR" 2>/dev/null || continue
+            if ! unzip -q "$jar" -d "$temp_dir" 2>/dev/null; then
+              echo "${indent}  ⚠ Failed to extract JAR"
+              rm -rf "$temp_dir"
+              return 1
+            fi
             
-            # Find and sign native libraries inside the JAR
-            FOUND_LIBS=false
-            find "$TEMP_DIR" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "*.so" \) | while read -r lib; do
-              FOUND_LIBS=true
-              echo "  Signing embedded library: $(basename $lib)"
-              codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
+            # Sign native libraries in this JAR
+            while IFS= read -r -d '' lib; do
+              local rel_path="${lib#$temp_dir/}"
+              echo "${indent}  → Signing: $rel_path"
+              
+              if codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
                 --timestamp \
                 --options runtime \
-                "$lib" 2>&1 || echo "  Warning: Failed to sign $lib"
-            done
+                "$lib" 2>&1; then
+                echo "${indent}    ✓ Signed"
+                signed_libs+=("$rel_path")
+              else
+                echo "${indent}    ✗ Failed"
+              fi
+            done < <(find "$temp_dir" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "*.so" \) -print0)
             
-            # If we found and signed libraries, repack the JAR
-            if [ "$FOUND_LIBS" = true ]; then
-              echo "  Repacking JAR with signed libraries..."
-              (cd "$TEMP_DIR" && zip -qr "$jar" . )
+            # Recursively process nested JARs
+            while IFS= read -r -d '' nested_jar; do
+              process_jar "$nested_jar" $((depth + 1))
+            done < <(find "$temp_dir" -type f -name "*.jar" -print0)
+            
+            # Update JAR with signed libraries (preserves JAR structure)
+            if [ ${#signed_libs[@]} -gt 0 ]; then
+              echo "${indent}  ↻ Updating JAR with ${#signed_libs[@]} signed libraries..."
+              
+              # Update each signed file in the JAR (preserves original JAR structure)
+              (cd "$temp_dir" && for lib in "${signed_libs[@]}"; do
+                zip -q "$jar" "$lib"
+              done)
+              
+              echo "${indent}  ✓ Updated"
             fi
             
             # Cleanup
-            rm -rf "$TEMP_DIR"
-          done
+            rm -rf "$temp_dir"
+          }
           
-          # Sign all standalone native libraries (not in JARs)
-          echo "Signing standalone native libraries..."
-          find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "*.so" \) | while read -r lib; do
-            echo "Signing: $lib"
-            codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
+          # Process all JAR files
+          echo ""
+          echo "Step 1: Processing JAR files..."
+          while IFS= read -r -d '' jar; do
+            process_jar "$jar" 0
+          done < <(find "$APP_PATH" -type f -name "*.jar" -print0)
+          
+          # Sign standalone native libraries
+          echo ""
+          echo "Step 2: Signing standalone native libraries..."
+          local standalone_count=0
+          while IFS= read -r -d '' lib; do
+            echo "  → Signing: $(basename "$lib")"
+            if codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
               --timestamp \
               --options runtime \
-              "$lib" 2>&1 || echo "Warning: Failed to sign $lib"
-          done
+              "$lib" 2>&1; then
+              echo "    ✓ Signed"
+              standalone_count=$((standalone_count + 1))
+            else
+              echo "    ✗ Failed"
+            fi
+          done < <(find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "*.so" \) -print0)
           
-          # Re-sign the entire app bundle with deep option
-          echo "Re-signing entire app bundle..."
+          echo "  Total standalone libraries signed: $standalone_count"
+          
+          # Re-sign the entire app bundle
+          echo ""
+          echo "Step 3: Re-signing entire app bundle..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
             --timestamp \
             --options runtime \
@@ -252,8 +293,12 @@ jobs:
             "$APP_PATH"
           
           # Verify the signature
-          echo "Verifying app signature..."
+          echo ""
+          echo "Step 4: Verifying app signature..."
           codesign -vvv --deep --strict "$APP_PATH"
+          
+          echo ""
+          echo "=== Deep Signing Complete ==="
 
       - name: Create Signed macOS DMG
         run: |
