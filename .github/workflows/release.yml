@@ -232,19 +232,25 @@ jobs:
               echo "  ✓ Copied libsqlitejdbc.dylib"
             fi
             
-            # Also copy the other architecture for universal support
-            if [ "$SQLITE_ARCH" = "aarch64" ] && [ -d "$NATIVE_PATH/x86_64" ]; then
-              cp "$NATIVE_PATH/x86_64/libsqlitejdbc.dylib" "$FRAMEWORKS_DIR/libsqlitejdbc_x86_64.dylib"
-              echo "  ✓ Copied libsqlitejdbc_x86_64.dylib (for Rosetta)"
-            elif [ "$SQLITE_ARCH" = "x86_64" ] && [ -d "$NATIVE_PATH/aarch64" ]; then
-              cp "$NATIVE_PATH/aarch64/libsqlitejdbc.dylib" "$FRAMEWORKS_DIR/libsqlitejdbc_aarch64.dylib"
-              echo "  ✓ Copied libsqlitejdbc_aarch64.dylib"
-            fi
+            # Remove macOS native libraries from sqlite-jdbc JAR to avoid notarization issues
+            echo "Removing macOS native libraries from sqlite-jdbc JAR..."
+            rm -rf "$SQLITE_TEMP/org/sqlite/native/Mac"
+            
+            # Rebuild sqlite-jdbc JAR without macOS natives
+            SQLITE_JAR_NAME=$(basename "$SQLITE_JAR")
+            (cd "$SQLITE_TEMP" && jar cf "$TEMP_DIR/BOOT-INF/lib/$SQLITE_JAR_NAME" .)
+            echo "  ✓ Rebuilt sqlite-jdbc JAR without macOS natives"
             
             rm -rf "$SQLITE_TEMP"
           else
             echo "⚠ SQLite JDBC JAR not found"
           fi
+          
+          # Rebuild main JAR without macOS natives in sqlite-jdbc
+          echo "Rebuilding main JAR..."
+          rm "$MAIN_JAR"
+          (cd "$TEMP_DIR" && jar cf "$MAIN_JAR" .)
+          echo "  ✓ Rebuilt main JAR"
           
           rm -rf "$TEMP_DIR"
           
@@ -264,15 +270,19 @@ jobs:
           done
           
           echo ""
-          echo "=== Signing Standalone Native Libraries ==="
+          echo "=== Signing All Binaries in App Bundle ==="
           
-          # Sign all other native libraries in the app bundle (runtime, JavaFX, etc.)
-          find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.jnilib" \) ! -path "*/Frameworks/*" | while read -r lib; do
-            echo "Signing: $lib"
-            codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
-              --timestamp \
-              --options runtime \
-              "$lib" 2>&1 || echo "  ⚠ Warning: Failed to sign"
+          # Sign all executables and native libraries in the app bundle
+          # This includes jspawnhelper and other runtime binaries
+          find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "jspawnhelper" -o -perm +111 \) ! -path "*/Frameworks/*" | while read -r binary; do
+            # Check if it's a Mach-O binary
+            if file "$binary" | grep -q "Mach-O"; then
+              echo "Signing: $binary"
+              codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
+                --timestamp \
+                --options runtime \
+                "$binary" 2>&1 || echo "  ⚠ Warning: Failed to sign"
+            fi
           done
           
           echo ""
