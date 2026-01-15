@@ -129,7 +129,50 @@ jobs:
       - name: Build JAR for ${{ matrix.arch }}
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=${{ matrix.arch }}"
 
-      - name: Create macOS DMG
+      # Import signing certificates
+      - name: Import Code Signing Certificates
+        id: import-certs
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          MACOS_INSTALLER_CERTIFICATE: ${{ secrets.MACOS_INSTALLER_CERTIFICATE }}
+          MACOS_INSTALLER_CERTIFICATE_PWD: ${{ secrets.MACOS_INSTALLER_CERTIFICATE_PWD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          # Import application signing certificate (Developer ID Application)
+          echo "$MACOS_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 \
+            -k $KEYCHAIN_PATH \
+            -P "$MACOS_CERTIFICATE_PWD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          
+          # Import installer signing certificate (Developer ID Installer)
+          echo "$MACOS_INSTALLER_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/installer_certificate.p12
+          security import $RUNNER_TEMP/installer_certificate.p12 \
+            -k $KEYCHAIN_PATH \
+            -P "$MACOS_INSTALLER_CERTIFICATE_PWD" \
+            -T /usr/bin/productsign \
+            -T /usr/bin/security
+          
+          # Set keychain as default and allow codesign to access it
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          # Verify certificates
+          echo "Available signing identities:"
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
+          security find-identity -v -p basic $KEYCHAIN_PATH
+
+      - name: Create Signed macOS DMG
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           jpackage \
             --input target \
@@ -144,9 +187,183 @@ jobs:
             --mac-package-name "KeeNotes" \
             --java-options "-Xmx512m" \
             --java-options "-Xdock:name=KeeNotes" \
+            --mac-sign \
+            --mac-signing-key-user-name "$MACOS_SIGNING_IDENTITY" \
             --dest dist
+          
           # Rename DMG to include platform suffix
           mv dist/KeeNotes-${{ steps.version.outputs.app_version }}.dmg dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
+          
+          # Verify code signature
+          echo "Verifying code signature..."
+          hdiutil attach dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg -nobrowse -mountpoint /Volumes/KeeNotes
+          codesign -vvv --deep --strict /Volumes/KeeNotes/KeeNotes.app
+          spctl -a -vvv -t install /Volumes/KeeNotes/KeeNotes.app
+          hdiutil detach /Volumes/KeeNotes
+
+      # Notarize DMG
+      - name: Notarize DMG
+        id: notarize-dmg
+        env:
+          APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PWD }}
+          APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+        run: |
+          echo "Submitting DMG for notarization..."
+          
+          # Submit for notarization
+          SUBMISSION_OUTPUT=$(xcrun notarytool submit dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 30m \
+            --output-format json)
+          
+          echo "$SUBMISSION_OUTPUT"
+          
+          # Check if notarization was successful
+          STATUS=$(echo "$SUBMISSION_OUTPUT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+          
+          if [ "$STATUS" = "Accepted" ]; then
+            echo "✅ Notarization successful!"
+            
+            # Staple the notarization ticket to the DMG
+            echo "Stapling notarization ticket..."
+            xcrun stapler staple dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
+            
+            # Verify stapling
+            xcrun stapler validate dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
+            
+            echo "notarized=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Notarization failed with status: $STATUS"
+            
+            # Get submission ID for debugging
+            SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+            if [ -n "$SUBMISSION_ID" ]; then
+              echo "Fetching notarization log..."
+              xcrun notarytool log "$SUBMISSION_ID" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID"
+            fi
+            
+            exit 1
+          fi
+
+      - name: Create Signed macOS PKG
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          jpackage \
+            --input target \
+            --name "KeeNotes" \
+            --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
+            --main-class org.springframework.boot.loader.launch.JarLauncher \
+            --type pkg \
+            --app-version ${{ steps.version.outputs.app_version }} \
+            --vendor "Keevol" \
+            --icon "src/main/resources/icons/keenotes.icns" \
+            --mac-package-identifier "cn.keevol.keenotes" \
+            --mac-package-name "KeeNotes" \
+            --java-options "-Xmx512m" \
+            --java-options "-Xdock:name=KeeNotes" \
+            --mac-sign \
+            --mac-signing-key-user-name "$MACOS_SIGNING_IDENTITY" \
+            --dest dist
+          
+          # Rename PKG to include platform suffix
+          mv dist/KeeNotes-${{ steps.version.outputs.app_version }}.pkg dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
+          
+          # Verify PKG signature
+          echo "Verifying PKG signature..."
+          pkgutil --check-signature dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
+
+      # Notarize PKG
+      - name: Notarize PKG
+        id: notarize-pkg
+        env:
+          APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PWD }}
+          APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+        run: |
+          echo "Submitting PKG for notarization..."
+          
+          # Submit for notarization
+          SUBMISSION_OUTPUT=$(xcrun notarytool submit dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 30m \
+            --output-format json)
+          
+          echo "$SUBMISSION_OUTPUT"
+          
+          # Check if notarization was successful
+          STATUS=$(echo "$SUBMISSION_OUTPUT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+          
+          if [ "$STATUS" = "Accepted" ]; then
+            echo "✅ Notarization successful!"
+            
+            # Staple the notarization ticket to the PKG
+            echo "Stapling notarization ticket..."
+            xcrun stapler staple dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
+            
+            # Verify stapling
+            xcrun stapler validate dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
+            
+            echo "notarized=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Notarization failed with status: $STATUS"
+            
+            # Get submission ID for debugging
+            SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+            if [ -n "$SUBMISSION_ID" ]; then
+              echo "Fetching notarization log..."
+              xcrun notarytool log "$SUBMISSION_ID" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID"
+            fi
+            
+            exit 1
+          fi
+
+      # Generate build summary
+      - name: Generate Build Summary
+        if: always()
+        env:
+          DMG_NOTARIZED: ${{ steps.notarize-dmg.outputs.notarized }}
+          PKG_NOTARIZED: ${{ steps.notarize-pkg.outputs.notarized }}
+        run: |
+          echo "## macOS Release Build Summary (${{ matrix.name-suffix }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Signing | ✅ Enabled |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$DMG_NOTARIZED" = "true" ]; then
+            echo "| DMG Notarization | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| DMG Notarization | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "$PKG_NOTARIZED" = "true" ]; then
+            echo "| PKG Notarization | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| PKG Notarization | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # Cleanup keychain
+      - name: Cleanup Keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security delete-keychain $KEYCHAIN_PATH || true
+          rm -f $RUNNER_TEMP/certificate.p12 || true
+          rm -f $RUNNER_TEMP/installer_certificate.p12 || true
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
