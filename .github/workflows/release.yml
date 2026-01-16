@@ -174,14 +174,32 @@ jobs:
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
-          # Determine the native library architecture based on build target
+          # ==========================================
+          # 1. 准备 Entitlements (必须!)
+          # ==========================================
+          cat > entitlements.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>com.apple.security.cs.allow-jit</key>
+              <true/>
+              <key>com.apple.security.cs.disable-library-validation</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
+          # ==========================================
+          # 2. 生成 App Image
+          # ==========================================
           if [ "${{ matrix.arch }}" = "mac-aarch64" ]; then
             SQLITE_ARCH="aarch64"
           else
             SQLITE_ARCH="x86_64"
           fi
           
-          # First create the .app bundle with jpackage (without signing first)
+          # 注意：这里我们使用 $APPDIR/../Frameworks，这非常正确
           jpackage \
             --input target \
             --name "KeeNotes" \
@@ -200,133 +218,106 @@ jobs:
           
           APP_PATH="dist/KeeNotes.app"
           FRAMEWORKS_DIR="$APP_PATH/Contents/Frameworks"
-          
-          # Create Frameworks directory
           mkdir -p "$FRAMEWORKS_DIR"
           
-          echo "=== Extracting Native Libraries to Frameworks ==="
+          echo "=== Extracting Native Libraries ==="
           
-          # Find and extract sqlite-jdbc native library
+          # 找到主 Jar 包
           MAIN_JAR="$APP_PATH/Contents/app/keenotes-mobile-1.0.0-SNAPSHOT.jar"
-          TEMP_DIR=$(mktemp -d)
           
-          # Extract the main JAR
-          unzip -q "$MAIN_JAR" -d "$TEMP_DIR"
+          # 优化：不解压 Main Jar，直接从里面提取 sqlite jar
+          # 1. 提取内部的 sqlite jar 到临时文件
+          unzip -p "$MAIN_JAR" "BOOT-INF/lib/sqlite-jdbc-*.jar" > sqlite-temp.jar
           
-          # Find sqlite-jdbc JAR inside BOOT-INF/lib
-          SQLITE_JAR=$(find "$TEMP_DIR/BOOT-INF/lib" -name "sqlite-jdbc-*.jar" | head -1)
+          # 2. 从临时 sqlite jar 中提取 dylib
+          # 注意路径：sqlite jar 内部结构通常是 org/sqlite/native/Mac/...
+          unzip -p sqlite-temp.jar "org/sqlite/native/Mac/$SQLITE_ARCH/libsqlitejdbc.dylib" > "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
           
-          if [ -n "$SQLITE_JAR" ]; then
-            echo "Found SQLite JDBC JAR: $(basename $SQLITE_JAR)"
-            
-            # Extract sqlite-jdbc JAR
-            SQLITE_TEMP=$(mktemp -d)
-            unzip -q "$SQLITE_JAR" -d "$SQLITE_TEMP"
-            
-            # Copy macOS native libraries to Frameworks
-            NATIVE_PATH="$SQLITE_TEMP/org/sqlite/native/Mac"
-            
-            if [ -d "$NATIVE_PATH/$SQLITE_ARCH" ]; then
-              echo "Copying native library for $SQLITE_ARCH..."
-              cp "$NATIVE_PATH/$SQLITE_ARCH/libsqlitejdbc.dylib" "$FRAMEWORKS_DIR/"
-              echo "  ✓ Copied libsqlitejdbc.dylib"
-            fi
-            
-            # Remove macOS native libraries from sqlite-jdbc JAR to avoid notarization issues
-            echo "Removing macOS native libraries from sqlite-jdbc JAR..."
-            rm -rf "$SQLITE_TEMP/org/sqlite/native/Mac"
-            
-            # Rebuild sqlite-jdbc JAR without macOS natives
-            SQLITE_JAR_NAME=$(basename "$SQLITE_JAR")
-            (cd "$SQLITE_TEMP" && jar cf "$TEMP_DIR/BOOT-INF/lib/$SQLITE_JAR_NAME" .)
-            echo "  ✓ Rebuilt sqlite-jdbc JAR without macOS natives"
-            
-            rm -rf "$SQLITE_TEMP"
+          if [ -f "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
+             echo "  ✓ Extracted libsqlitejdbc.dylib to Frameworks"
+          
+             # 3. 关键优化：使用 zip -d 直接从 Jar 中删除文件，避免重打包破坏 Spring Boot 结构
+             # 先删除临时 sqlite jar 里的 native 文件夹
+             zip -d sqlite-temp.jar "org/sqlite/native/Mac/*"
+          
+             # 4. 将修改后的 sqlite jar 更新回 Main Jar
+             # 需要先确定 Main Jar 里 sqlite 的具体路径名
+             SQLITE_PATH_IN_MAIN=$(unzip -l "$MAIN_JAR" | grep "sqlite-jdbc-.*\.jar" | awk '{print $4}')
+          
+             # 这是一个比较 tricky 的操作，因为 zip 命令更新嵌套 jar 比较麻烦。
+             # 回退到解压 Main Jar 方案，但使用 zip -0 (store) 以防破坏 Spring Boot 性能，
+             # 或者为了安全起见，我们只解压 Main Jar，替换里面的文件，再用 jar u (update) 更新
+          
+             # --- 采用稳健的 Update 方案 ---
+             TEMP_WORK=$(mktemp -d)
+             mkdir -p "$TEMP_WORK/BOOT-INF/lib"
+             cp sqlite-temp.jar "$TEMP_WORK/$SQLITE_PATH_IN_MAIN"
+          
+             # 使用 jar uf 更新主 Jar (仅更新变动的文件，保留其他结构)
+             # 需要 jar 命令可用 (JDK 环境)
+             (cd "$TEMP_WORK" && jar uf "$MAIN_JAR" "$SQLITE_PATH_IN_MAIN")
+          
+             echo "  ✓ Updated Main JAR (stripped natives)"
+             rm -rf "$TEMP_WORK" sqlite-temp.jar
           else
-            echo "⚠ SQLite JDBC JAR not found"
+             echo "⚠ Warning: SQLite dylib not found in jar!"
           fi
           
-          # Rebuild main JAR without macOS natives in sqlite-jdbc
-          echo "Rebuilding main JAR..."
-          MAIN_JAR_BACKUP="$MAIN_JAR.bak"
-          mv "$MAIN_JAR" "$MAIN_JAR_BACKUP"
-          (cd "$TEMP_DIR" && jar cf "$MAIN_JAR" .)
-          rm "$MAIN_JAR_BACKUP"
-          echo "  ✓ Rebuilt main JAR"
+          # ==========================================
+          # 3. 签名流程
+          # ==========================================
           
-          rm -rf "$TEMP_DIR"
+          echo "=== Signing Binaries ==="
           
-          # Force close any open file handles
-          sync
-          sleep 1
+          # 1. 签名 Frameworks (刚才提取出来的)
+          codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
           
-          echo ""
-          echo "=== Signing Native Libraries in Frameworks ==="
-          
-          # Sign all native libraries in Frameworks directory
-          for lib in "$FRAMEWORKS_DIR"/*.dylib; do
-            if [ -f "$lib" ]; then
-              echo "Signing: $(basename $lib)"
-              codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
-                --timestamp \
-                --options runtime \
-                "$lib"
-              echo "  ✓ Signed"
-            fi
+          # 2. 签名 App 内的所有 .dylib 和 .jnilib (JRE 自带的)
+          # 注意：排除刚才签过的 Frameworks 目录，防止重复
+          find "$APP_PATH/Contents" -name "*.dylib" -o -name "*.jnilib" | while read lib; do
+             if [[ "$lib" != *"/Frameworks/"* ]]; then
+                 codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
+             fi
           done
           
-          echo ""
-          echo "=== Signing All Binaries in App Bundle ==="
-          
-          # Sign all executables and native libraries in the app bundle
-          # This includes jspawnhelper and other runtime binaries
-          find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.jnilib" -o -name "jspawnhelper" -o -perm +111 \) ! -path "*/Frameworks/*" | while read -r binary; do
-            # Check if it's a Mach-O binary
-            if file "$binary" | grep -q "Mach-O"; then
-              echo "Signing: $binary"
-              codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
-                --timestamp \
-                --options runtime \
-                "$binary" 2>&1 || echo "  ⚠ Warning: Failed to sign"
-            fi
+          # 3. 签名 JRE 的可执行文件 (jspawnhelper, java 等)
+          find "$APP_PATH/Contents/runtime" -type f -perm +111 | while read exe; do
+             if file "$exe" | grep -q "Mach-O"; then
+                # 可执行文件也需要 entitlements 吗？通常 helper 不需要，主程序需要。
+                # 给 JRE 里的 java 加上 entitlements 比较稳妥，防止它自己启动子进程受限
+                codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$exe"
+             fi
           done
           
-          echo ""
-          echo "=== Signing Entire App Bundle ==="
+          # 4. 签名主启动器 (Contents/MacOS/KeeNotes)
+          # 这是最重要的！必须带上 Entitlements
+          echo "Signing Main Executable..."
+          codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH/Contents/MacOS/KeeNotes"
           
-          # Sign the entire app bundle
-          codesign --force --sign "$MACOS_SIGNING_IDENTITY" \
-            --timestamp \
-            --options runtime \
-            --deep \
-            "$APP_PATH"
+          # 5. 签名整个 App Bundle (这一步通常不需要 entitlements 参数，因为 components 已经签好了)
+          # 但为了保险，保持一致
+          echo "Signing App Bundle..."
+          codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH"
           
-          # Verify the signature
-          echo ""
-          echo "=== Verifying Signature ==="
+          # 验证
           codesign -vvv --deep --strict "$APP_PATH"
-          
-          echo ""
-          echo "=== App Bundle Ready ==="
-          ls -la "$FRAMEWORKS_DIR/"
 
       - name: Create Signed macOS DMG
         run: |
-          # Ensure all file operations are complete
-          sync
-          sleep 2
+          VOLNAME="KeeNotes"
+          DMG_TEMP="dist/KeeNotes-temp.dmg"
+          DMG_FINAL="dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg"
           
-          # Create DMG from the signed app bundle
-          echo "Creating DMG..."
-          hdiutil create -volname "KeeNotes" \
-            -srcfolder dist/KeeNotes.app \
-            -ov -format UDZO \
-            dist/KeeNotes-temp.dmg
+          hdiutil create -volname "$VOLNAME" -srcfolder dist/KeeNotes.app -ov -format UDZO "$DMG_TEMP"
           
-          # Rename DMG to include platform suffix
-          mv dist/KeeNotes-temp.dmg dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
+          # === 新增：签名 DMG ===
+          echo "Signing DMG..."
+          codesign --force --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --timestamp "$DMG_TEMP"
           
-          echo "DMG created successfully"
+          mv "$DMG_TEMP" "$DMG_FINAL"
+          
+          # 验证 DMG 签名
+          codesign -vvv "$DMG_FINAL"
 
       # Notarize DMG
       - name: Notarize DMG
