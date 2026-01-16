@@ -387,7 +387,7 @@ jobs:
 
       - name: Create Signed macOS PKG
         env:
-          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          MACOS_INSTALLER_IDENTITY: ${{ secrets.MACOS_INSTALLER_IDENTITY }}
         run: |
           # Create PKG from the already signed app bundle
           jpackage \
@@ -399,7 +399,7 @@ jobs:
             --mac-package-identifier "cn.keevol.keenotes" \
             --mac-package-name "KeeNotes" \
             --mac-sign \
-            --mac-signing-key-user-name "$MACOS_SIGNING_IDENTITY" \
+            --mac-signing-key-user-name "$MACOS_INSTALLER_IDENTITY" \
             --dest dist
           
           # Rename PKG to include platform suffix
