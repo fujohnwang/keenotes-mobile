@@ -276,14 +276,23 @@ jobs:
           # 1. 签名 Frameworks (刚才提取出来的)
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
           
-          # 2. 签名 App 内的所有 .dylib 和 .jnilib (JRE 自带的)
-          # 【修复点】：添加 -type f 参数，且用括号包裹名字匹配，确保只签实体文件，跳过软链接
+          # 2. 签名 App 内的所有 .dylib 和 .jnilib
           find "$APP_PATH/Contents" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
-             # 排除刚才已经签过的 Frameworks 目录，防止重复报错
-             if [[ "$lib" != *"/Frameworks/"* ]]; then
-                 echo "Signing lib: $(basename $lib)"
-                 codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
+             
+             # 排除 1: 之前签过的 Frameworks
+             if [[ "$lib" == *"/Frameworks/"* ]]; then
+                 continue
              fi
+             
+             # 排除 2: 【关键修复】显式跳过 MacOS 目录下的 libjli.dylib
+             # 我们只需要签 Home/lib/libjli.dylib，不需要签 MacOS/libjli.dylib
+             if [[ "$lib" == *"/Contents/MacOS/libjli.dylib" ]]; then
+                 echo "  ⚠️ Skipping libjli wrapper in MacOS dir: $(basename $lib)"
+                 continue
+             fi
+
+             echo "Signing lib: $(basename $lib)"
+             codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
           done
           
           # 3. 签名 JRE 的可执行文件 (jspawnhelper, java 等)
