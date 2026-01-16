@@ -199,7 +199,8 @@ jobs:
             SQLITE_ARCH="x86_64"
           fi
           
-          # 注意：这里我们使用 $APPDIR/../Frameworks，这非常正确
+          # jpackage 命令
+          # -Dorg.sqlite.lib.path 告诉 SQLite 优先去 Frameworks 找库
           jpackage \
             --input target \
             --name "KeeNotes" \
@@ -220,83 +221,56 @@ jobs:
           FRAMEWORKS_DIR="$APP_PATH/Contents/Frameworks"
           mkdir -p "$FRAMEWORKS_DIR"
           
-          echo "=== Extracting Native Libraries ==="
+          # ==========================================
+          # 3. 提取 Native Libraries (只提取，不修改 Jar)
+          # ==========================================
+          echo "=== Extracting Native Libraries to Frameworks ==="
           
-          # 1. 获取主 Jar 的【绝对路径】，避免后续 cd 导致找不到文件
-          # 使用 $(pwd) 拼接当前工作目录
-          MAIN_JAR="$(pwd)/$APP_PATH/Contents/app/keenotes-mobile-1.0.0-SNAPSHOT.jar"
+          MAIN_JAR="$APP_PATH/Contents/app/keenotes-mobile-1.0.0-SNAPSHOT.jar"
           
-          echo "Target Main JAR: $MAIN_JAR"
-          
-          # 2. 提取 sqlite jar 到临时文件 (直接在当前目录操作，不 cd)
+          # 使用 unzip 管道提取，不解压整个 Jar，保证 Main Jar 完好无损
+          # 1. 从 Main Jar 提取 sqlite jar 到 stdout -> 写入 temp jar
           unzip -p "$MAIN_JAR" "BOOT-INF/lib/sqlite-jdbc-*.jar" > sqlite-temp.jar
           
-          # 3. 提取 dylib
-          unzip -p sqlite-temp.jar "org/sqlite/native/Mac/$SQLITE_ARCH/libsqlitejdbc.dylib" > "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
-          
-          if [ -f "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
-             echo "  ✓ Extracted libsqlitejdbc.dylib to Frameworks"
+          if [ -s sqlite-temp.jar ]; then
+             echo "Found SQLite JDBC jar, extracting dylib..."
+             # 2. 从 temp jar 提取 dylib 到 Frameworks
+             unzip -p sqlite-temp.jar "org/sqlite/native/Mac/$SQLITE_ARCH/libsqlitejdbc.dylib" > "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
              
-             # 4. 从临时 sqlite jar 中删除 native 文件夹
-             zip -d sqlite-temp.jar "org/sqlite/native/Mac/*"
-             
-             # 5. 获取 sqlite 在 Main Jar 中的具体路径 (例如 BOOT-INF/lib/sqlite-jdbc-3.46.0.0.jar)
-             SQLITE_PATH_IN_MAIN=$(unzip -l "$MAIN_JAR" | grep "sqlite-jdbc-.*\.jar" | awk '{print $4}')
-             
-             echo "Updating $SQLITE_PATH_IN_MAIN inside Main Jar..."
-             
-             # --- 修复核心：构造正确的目录结构进行更新 ---
-             TEMP_WORK=$(mktemp -d)
-             
-             # 在临时目录中重建 BOOT-INF/lib/xxx.jar 的目录结构
-             # dirname 获取路径目录 (BOOT-INF/lib)
-             DIR_STRUCTURE=$(dirname "$SQLITE_PATH_IN_MAIN")
-             mkdir -p "$TEMP_WORK/$DIR_STRUCTURE"
-             
-             # 将剥离了 native 的 jar 移动到临时目录对应的位置
-             mv sqlite-temp.jar "$TEMP_WORK/$SQLITE_PATH_IN_MAIN"
-             
-             # 进入临时目录，使用 jar uf 更新主 Jar
-             # 因为 MAIN_JAR 已经是绝对路径了，所以这里不会报错
-             (cd "$TEMP_WORK" && jar uf "$MAIN_JAR" "$SQLITE_PATH_IN_MAIN")
-             
-             echo "  ✓ Updated Main JAR (stripped natives)"
-             rm -rf "$TEMP_WORK"
+             if [ -s "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
+                echo "  ✓ Extracted libsqlitejdbc.dylib to Frameworks"
+             else
+                echo "  ⚠ Failed to extract dylib from sqlite jar"
+             fi
+             rm sqlite-temp.jar
           else
-             echo "⚠ Warning: SQLite dylib not found in jar!"
-             # 如果提取失败，清理临时文件
-             rm -f sqlite-temp.jar
+             echo "  ⚠ SQLite JDBC jar not found in BOOT-INF/lib"
           fi
-          
+
           # ==========================================
-          # 3. 签名流程
+          # 4. 签名流程
           # ==========================================
-          
           echo "=== Signing Binaries ==="
           
-          # 0. 【关键修复】重构 libjli.dylib
-          # jpackage 可能会生成硬链接或物理拷贝，导致签名冲突。
-          # 我们强制将其改为软链接，确保只签名一次。
+          # [关键步骤] 修复 libjli.dylib 结构，防止 Notarization 失败
           JLI_REAL="$APP_PATH/Contents/runtime/Contents/Home/lib/libjli.dylib"
           JLI_LINK="$APP_PATH/Contents/runtime/Contents/MacOS/libjli.dylib"
           
           if [ -f "$JLI_LINK" ]; then
             echo "Fixing libjli.dylib structure..."
-            # 删除 MacOS 下的物理文件/硬链接
             rm "$JLI_LINK"
-            # 创建指向 Home/lib 的相对路径软链接
-            # 注意：从 Contents/MacOS 跳转到 Contents/Home/lib 需要 ../Home/lib
             ln -s "../Home/lib/libjli.dylib" "$JLI_LINK"
             echo "  ✓ Replaced MacOS/libjli.dylib with symlink"
           fi
           
-          # 1. 签名 Frameworks (之前提取的 sqlite)
-          codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
+          # 1. 签名 Frameworks (刚才提取出来的 sqlite)
+          if [ -f "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
+             codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
+          fi
           
-          # 2. 签名 App 内的所有 .dylib 和 .jnilib
-          # 因为上面把 libjli 改成了软链接，-type f 会自动忽略它，只签 Home/lib 下的真身
+          # 2. 签名 App 内的所有 .dylib 和 .jnilib (JRE 自带的)
+          # 使用 -type f 忽略我们刚才建立的软链接
           find "$APP_PATH/Contents" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
-             # 排除 Frameworks 防止重复
              if [[ "$lib" != *"/Frameworks/"* ]]; then
                  echo "Signing lib: $(basename $lib)"
                  codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
@@ -315,7 +289,7 @@ jobs:
           echo "Signing Main Executable..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH/Contents/MacOS/KeeNotes"
           
-          # 5. 签名整个 App Bundle (不要加 --deep)
+          # 5. 签名整个 App Bundle (不加 --deep)
           echo "Signing App Bundle..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH"
           
@@ -328,15 +302,14 @@ jobs:
           DMG_TEMP="dist/KeeNotes-temp.dmg"
           DMG_FINAL="dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg"
           
+          # 创建 DMG
           hdiutil create -volname "$VOLNAME" -srcfolder dist/KeeNotes.app -ov -format UDZO "$DMG_TEMP"
           
-          # === 新增：签名 DMG ===
+          # 签名 DMG (Notarization 需要)
           echo "Signing DMG..."
           codesign --force --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --timestamp "$DMG_TEMP"
           
           mv "$DMG_TEMP" "$DMG_FINAL"
-          
-          # 验证 DMG 签名
           codesign -vvv "$DMG_FINAL"
 
       # Notarize DMG
