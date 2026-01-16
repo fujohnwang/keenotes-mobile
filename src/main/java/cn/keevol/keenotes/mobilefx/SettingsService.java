@@ -1,6 +1,10 @@
 package cn.keevol.keenotes.mobilefx;
 
 import com.gluonhq.attach.storage.StorageService;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleIntegerProperty;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -20,16 +24,40 @@ public class SettingsService {
     private static final String KEY_REVIEW_DAYS = "review.days";
     private static final String KEY_ENCRYPTION_PASSWORD = "encryption.password";
     private static final String KEY_COPY_TO_CLIPBOARD = "copy.to.clipboard.on.post";
+    private static final String KEY_SEARCH_SHORTCUT = "shortcut.search";
+    private static final String KEY_SEND_SHORTCUT = "shortcut.send";
+    private static final String KEY_SHOW_OVERVIEW_CARD = "show.overview.card";
+    private static final String KEY_FIRST_NOTE_DATE = "first.note.date";
+    private static final String KEY_THEME = "ui.theme";
+    private static final String KEY_NOTE_FONT_SIZE = "note.font.size";
+    private static final String KEY_ZOOM_IN_SHORTCUT = "shortcut.zoom.in";
+    private static final String KEY_ZOOM_OUT_SHORTCUT = "shortcut.zoom.out";
     private static final int DEFAULT_REVIEW_DAYS = 7;
+    private static final String DEFAULT_SEARCH_SHORTCUT = "Alt+Shift+S";
+    private static final String DEFAULT_SEND_SHORTCUT = "Alt+Enter";
+    private static final String DEFAULT_THEME = "dark";
+    private static final int DEFAULT_NOTE_FONT_SIZE = 14;
+    private static final int MIN_NOTE_FONT_SIZE = 10;
+    private static final int MAX_NOTE_FONT_SIZE = 24;
+    private static final int FONT_SIZE_STEP = 2;
+    private static final String DEFAULT_ZOOM_IN_SHORTCUT = "Meta+EQUALS";
+    private static final String DEFAULT_ZOOM_OUT_SHORTCUT = "Meta+MINUS";
 
     private static SettingsService instance;
     private final Properties properties;
     private final Path settingsPath;
+    
+    // JavaFX Property for reactive binding
+    private final BooleanProperty showOverviewCardProperty = new SimpleBooleanProperty(true);
+    private final IntegerProperty noteFontSizeProperty = new SimpleIntegerProperty(DEFAULT_NOTE_FONT_SIZE);
 
     private SettingsService() {
         properties = new Properties();
         settingsPath = resolveSettingsPath();
         loadSettings();
+        // Initialize property from loaded settings
+        showOverviewCardProperty.set(getShowOverviewCard());
+        noteFontSizeProperty.set(getNoteFontSize());
     }
 
     public static synchronized SettingsService getInstance() {
@@ -141,5 +169,107 @@ public class SettingsService {
     
     public void setCopyToClipboardOnPost(boolean enabled) {
         properties.setProperty(KEY_COPY_TO_CLIPBOARD, String.valueOf(enabled));
+    }
+    
+    public String getSearchShortcut() {
+        return properties.getProperty(KEY_SEARCH_SHORTCUT, DEFAULT_SEARCH_SHORTCUT);
+    }
+    
+    public void setSearchShortcut(String shortcut) {
+        properties.setProperty(KEY_SEARCH_SHORTCUT, shortcut);
+    }
+    
+    public String getSendShortcut() {
+        return properties.getProperty(KEY_SEND_SHORTCUT, DEFAULT_SEND_SHORTCUT);
+    }
+    
+    public void setSendShortcut(String shortcut) {
+        properties.setProperty(KEY_SEND_SHORTCUT, shortcut);
+    }
+    
+    public String getTheme() {
+        return properties.getProperty(KEY_THEME, DEFAULT_THEME);
+    }
+    
+    public void setTheme(String theme) {
+        properties.setProperty(KEY_THEME, theme);
+    }
+    
+    public boolean getShowOverviewCard() {
+        return Boolean.parseBoolean(properties.getProperty(KEY_SHOW_OVERVIEW_CARD, "true"));
+    }
+    
+    public void setShowOverviewCard(boolean enabled) {
+        properties.setProperty(KEY_SHOW_OVERVIEW_CARD, String.valueOf(enabled));
+        showOverviewCardProperty.set(enabled);
+    }
+    
+    public BooleanProperty showOverviewCardProperty() {
+        return showOverviewCardProperty;
+    }
+    
+    public String getFirstNoteDate() {
+        return properties.getProperty(KEY_FIRST_NOTE_DATE);
+    }
+    
+    public void setFirstNoteDate(String date) {
+        if (date == null || date.isEmpty()) {
+            properties.remove(KEY_FIRST_NOTE_DATE);
+        } else {
+            properties.setProperty(KEY_FIRST_NOTE_DATE, date);
+        }
+    }
+    
+    // Note font size settings
+    public int getNoteFontSize() {
+        try {
+            int size = Integer.parseInt(properties.getProperty(KEY_NOTE_FONT_SIZE, String.valueOf(DEFAULT_NOTE_FONT_SIZE)));
+            return Math.max(MIN_NOTE_FONT_SIZE, Math.min(MAX_NOTE_FONT_SIZE, size));
+        } catch (NumberFormatException e) {
+            return DEFAULT_NOTE_FONT_SIZE;
+        }
+    }
+    
+    public void setNoteFontSize(int size) {
+        int clampedSize = Math.max(MIN_NOTE_FONT_SIZE, Math.min(MAX_NOTE_FONT_SIZE, size));
+        properties.setProperty(KEY_NOTE_FONT_SIZE, String.valueOf(clampedSize));
+        noteFontSizeProperty.set(clampedSize);
+    }
+    
+    public IntegerProperty noteFontSizeProperty() {
+        return noteFontSizeProperty;
+    }
+    
+    public void zoomIn() {
+        int currentSize = getNoteFontSize();
+        if (currentSize < MAX_NOTE_FONT_SIZE) {
+            setNoteFontSize(currentSize + FONT_SIZE_STEP);
+            save();
+        }
+    }
+    
+    public void zoomOut() {
+        int currentSize = getNoteFontSize();
+        if (currentSize > MIN_NOTE_FONT_SIZE) {
+            setNoteFontSize(currentSize - FONT_SIZE_STEP);
+            save();
+        }
+    }
+    
+    // Zoom shortcuts
+    public String getZoomInShortcut() {
+        return properties.getProperty(KEY_ZOOM_IN_SHORTCUT, DEFAULT_ZOOM_IN_SHORTCUT);
+    }
+    
+    public void setZoomInShortcut(String shortcut) {
+        properties.setProperty(KEY_ZOOM_IN_SHORTCUT, shortcut);
+    }
+    
+    public String getZoomOutShortcut() {
+        return properties.getProperty(KEY_ZOOM_OUT_SHORTCUT, DEFAULT_ZOOM_OUT_SHORTCUT);
+    }
+    
+    public void setZoomOutShortcut(String shortcut) {
+        properties.setProperty(KEY_ZOOM_OUT_SHORTCUT, shortcut);
     }
 }

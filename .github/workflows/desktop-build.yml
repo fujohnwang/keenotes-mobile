@@ -110,6 +110,24 @@ jobs:
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
           mv dist/KeeNotes-1.0.0.dmg dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.dmg
+          
+          # Create installation instructions for unsigned builds
+          cat > dist/INSTALL-MACOS.txt << 'EOF'
+          KeeNotes for macOS - Installation Instructions
+          ===============================================
+          
+          This is an unsigned development build for testing purposes.
+          
+          If you see "KeeNotes.app is damaged" error, run this command in Terminal:
+          
+              xattr -cr /Applications/KeeNotes.app
+          
+          Or right-click the app and select "Open" (first time only).
+          
+          This is safe - the app is open source and built from GitHub Actions.
+          
+          For signed releases, please download from the Releases page.
+          EOF
 
       - name: Create macOS PKG for ${{ matrix.name-suffix }}
         run: |
@@ -128,6 +146,12 @@ jobs:
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
           mv dist/KeeNotes-1.0.0.pkg dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.pkg
+
+      # Cleanup keychain
+      - name: Cleanup Keychain
+        if: always()
+        run: |
+          security delete-keychain build.keychain || true
 
       - name: Upload macOS Packages (${{ matrix.name-suffix }})
         uses: actions/upload-artifact@v4

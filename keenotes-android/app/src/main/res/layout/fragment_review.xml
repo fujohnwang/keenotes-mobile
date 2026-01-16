@@ -7,27 +7,17 @@
     android:orientation="vertical"
     android:background="@color/background">
 
-    <!-- Header with back button and centered title -->
+    <!-- Header with centered title -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:background="@color/surface">
 
-        <ImageButton
-            android:id="@+id/btnBack"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_gravity="start|center_vertical"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_back"
-            android:contentDescription="Back"
-            app:tint="@color/text_secondary" />
-
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="@string/nav_review"
+            android:text="KeeNotes Review"
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="@color/text_primary" />
@@ -87,34 +77,84 @@
 
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
-        <TextView
-            android:id="@+id/countText"
-            android:layout_width="wrap_content"
+        <!-- Header row: Notes count with period info + Syncing status + Sync Channel status (same line) -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Notes count with period info -->
+            <TextView
+                android:id="@+id/countText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <!-- Syncing status (shown when syncing) -->
+            <LinearLayout
+                android:id="@+id/syncingContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/syncingSpinner"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:src="@drawable/ic_spinner"
+                    app:tint="@color/warning" />
+
+                <TextView
+                    android:id="@+id/syncingText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="Syncing..."
+                    android:textColor="@color/warning"
+                    android:textSize="11sp" />
+
+            </LinearLayout>
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!-- Sync Channel status -->
+            <ImageView
+                android:id="@+id/syncIndicator"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:src="@drawable/ic_circle"
+                app:tint="@color/text_secondary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="Sync Channel:"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary" />
+
+            <TextView
+                android:id="@+id/syncStatusText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="✗"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_secondary" />
+
+        </LinearLayout>
 
     </LinearLayout>
-
-    <!-- Loading -->
-    <TextView
-        android:id="@+id/loadingText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:text="Loading notes..."
-        android:textColor="@color/text_secondary"
-        android:visibility="gone" />
-
-    <!-- Empty state -->
-    <TextView
-        android:id="@+id/emptyText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:textColor="@color/text_secondary"
-        android:visibility="gone" />
 
     <!-- Notes list -->
     <androidx.recyclerview.widget.RecyclerView

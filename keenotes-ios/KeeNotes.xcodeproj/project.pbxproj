@@ -9,7 +9,9 @@
 /* Begin PBXBuildFile section */
 		1522A18793715A66AF3C5B1E /* encoding.c in Sources */ = {isa = PBXBuildFile; fileRef = CD8A13501AA7A7CAB9DD2D6B /* encoding.c */; };
 		185B386682B6638BD824635B /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516619C5BAA926CB01F4B456 /* DatabaseService.swift */; };
+		1FFF7BD4F1D6ED72F2E2FA18 /* OverviewCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FC4DD3D4698E0F2A59FF2 /* OverviewCardView.swift */; };
 		2FAF71FD90FB24A293D9C1DC /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = 599C37F5BE3DA3E0B0E48AD9 /* core.c */; };
+		34FEEF16981E07FC6FB35260 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBFDFFD9FC62E4A40312B79 /* SearchView.swift */; };
 		382B7B75B8E85659AAED35AD /* SettingsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC56614EF00CDBBE7B740F99 /* SettingsService.swift */; };
 		3D3A986E86CF4FAC5FBCDA0A /* DebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71854385AA7C1EECC7F20F2 /* DebugView.swift */; };
 		41F5062EB8A1F683E01EC160 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EAA89252DC520456A6A43EEC /* Assets.xcassets */; };
@@ -40,11 +42,13 @@
 		3630EFD2F3AD1B593AE659EA /* CryptoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoService.swift; sourceTree = "<group>"; };
 		3B8DCBEC22348C792E803554 /* Argon2Swift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2Swift.swift; sourceTree = "<group>"; };
 		40D8A3032850BEA6F1E1698E /* KeeNotesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeeNotesApp.swift; sourceTree = "<group>"; };
+		4DBFDFFD9FC62E4A40312B79 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		516619C5BAA926CB01F4B456 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		58873415E76E9E252DEA0F7A /* Note.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Note.swift; sourceTree = "<group>"; };
 		599C37F5BE3DA3E0B0E48AD9 /* core.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = core.c; sourceTree = "<group>"; };
 		6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		6D467341E90F4D144FCEC974 /* argon2.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = argon2.c; sourceTree = "<group>"; };
+		764FC4DD3D4698E0F2A59FF2 /* OverviewCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewCardView.swift; sourceTree = "<group>"; };
 		76A65FB003A8C97D156D2E71 /* core.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = core.h; sourceTree = "<group>"; };
 		87901956656FA3E18B94F424 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
 		8E07C8BA817350735F9023F6 /* blamka-round-opt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blamka-round-opt.h"; sourceTree = "<group>"; };
@@ -90,7 +94,9 @@
 				E71854385AA7C1EECC7F20F2 /* DebugView.swift */,
 				A9040A9739D8D0416CE13A31 /* MainTabView.swift */,
 				BC48816DBEEFEE56707E5302 /* NoteView.swift */,
+				764FC4DD3D4698E0F2A59FF2 /* OverviewCardView.swift */,
 				87901956656FA3E18B94F424 /* ReviewView.swift */,
+				4DBFDFFD9FC62E4A40312B79 /* SearchView.swift */,
 				6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */,
 			);
 			path = Views;
@@ -263,7 +269,9 @@
 				E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */,
 				6D81FA454D6E54D241F31894 /* Note.swift in Sources */,
 				E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */,
+				1FFF7BD4F1D6ED72F2E2FA18 /* OverviewCardView.swift in Sources */,
 				9E1AA8C7DADD4E82A4D437BC /* ReviewView.swift in Sources */,
+				34FEEF16981E07FC6FB35260 /* SearchView.swift in Sources */,
 				382B7B75B8E85659AAED35AD /* SettingsService.swift in Sources */,
 				6FB30AE0AADAFBFDFCE3F48E /* SettingsView.swift in Sources */,
 				5DD67890F51B1621810AB13C /* WebSocketService.swift in Sources */,
@@ -341,7 +349,7 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -363,7 +371,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -385,7 +393,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -444,7 +452,7 @@
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};

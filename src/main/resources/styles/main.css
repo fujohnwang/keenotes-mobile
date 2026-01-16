@@ -690,6 +690,109 @@
     -fx-font-weight: bold;
 }
 
+/* ==================== Desktop Main View ==================== */
+.desktop-main-view {
+    -fx-background-color: -fx-background;
+}
+
+/* Sidebar */
+.sidebar {
+    /* Subtle gradient background for depth */
+    -fx-background-color: linear-gradient(to bottom, #161B22, #0D1117);
+    -fx-border-color: -fx-border;
+    -fx-border-width: 0 1 0 0;
+}
+
+.sidebar-logo-text {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-primary;
+}
+
+/* Sidebar Status Area */
+.sidebar-status-area {
+    -fx-background-color: transparent;
+}
+
+.sidebar-status-area .status-indicator {
+    -fx-stroke: transparent;
+}
+
+.sidebar-status-area .status-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.sidebar-status-area .status-label.connected {
+    -fx-text-fill: -fx-success;
+}
+
+.sidebar-status-area .status-label.disconnected {
+    -fx-text-fill: -fx-error;
+}
+
+.sidebar-status-area .status-label.connecting {
+    -fx-text-fill: #FFC107;
+}
+
+.navigation-group {
+    -fx-padding: 12 0;
+}
+
+/* Floating pill-style navigation buttons */
+.navigation-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #8B949E; /* Muted gray for unselected */
+    -fx-background-radius: 10px;
+    -fx-cursor: hand;
+    -fx-padding: 0;
+}
+
+.navigation-button:hover {
+    -fx-background-color: rgba(0, 212, 255, 0.12);
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* Review Periods Panel */
+.review-periods-panel {
+    -fx-background-color: transparent;
+}
+
+.period-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #8B949E; /* Muted gray */
+    -fx-background-radius: 8px;
+    -fx-padding: 8 16;
+    -fx-cursor: hand;
+    -fx-font-size: 13px;
+}
+
+.period-button:hover {
+    -fx-background-color: rgba(0, 212, 255, 0.12);
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* Main Content Area */
+.main-content-area {
+    -fx-background-color: -fx-background;
+}
+
+.mode-panel {
+    -fx-background-color: -fx-background;
+}
+
+/* Status Footer Bar */
+.status-footer-bar {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-border-width: 1 0 0 0;
+}
+
+.status-footer-bar .status-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-text-secondary;
+}
+
 /* ==================== Period Toggle Buttons (Segmented Control) ==================== */
 .period-toggle-button {
     -fx-background-color: transparent;
@@ -729,4 +832,260 @@
 /* Middle buttons - no rounding, remove left border to avoid double borders */
 .period-toggle-button:nth-child(n+2) {
     -fx-border-width: 1 1 1 0;
+}
+
+/* ==================== Desktop Note Mode Components ==================== */
+.note-input-panel {
+    -fx-background-color: transparent;
+}
+
+.notes-display-panel {
+    -fx-background-color: transparent;
+}
+
+/* Fixed header container (stays at top, doesn't scroll) */
+.notes-display-panel > .fixed-header {
+    -fx-background-color: -fx-background;
+}
+
+.notes-container {
+    -fx-background-color: transparent;
+}
+
+.mode-separator {
+    -fx-background-color: -fx-border;
+    -fx-padding: 0;
+    -fx-pref-height: 1px;
+}
+
+/* ==================== Unified Input Container (Modern Design) ==================== */
+.unified-input-container {
+    -fx-background-color: -fx-surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -fx-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 8, 0, 0, 2);
+}
+
+.unified-input-container:focused-within {
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, -fx-accent-glow, 16, 0, 0, 0);
+}
+
+.unified-note-input {
+    -fx-background-color: transparent;
+    -fx-background-radius: 12px;
+    -fx-padding: 12 60 12 12;
+    -fx-font-size: 15px;
+    -fx-text-fill: -fx-text-primary;
+    -fx-prompt-text-fill: -fx-text-secondary;
+    -fx-border-width: 0;
+}
+
+.unified-note-input:focused {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-effect: none;
+}
+
+.unified-note-input .content {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .scroll-pane .content {
+    -fx-background-color: transparent;
+}
+
+/* Unified Send Button (embedded in input) */
+.unified-send-button {
+    -fx-background-color: -fx-primary;
+    -fx-background-radius: 20px;
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+    -fx-padding: 0 16 0 12;
+    -fx-cursor: hand;
+    -fx-border-width: 0;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0D1117; /* Dark text on bright button */
+    -fx-graphic-text-gap: 6;
+}
+
+.unified-send-button:hover {
+    -fx-background-color: -fx-primary-dark;
+    -fx-effect: dropshadow(gaussian, -fx-primary, 12, 0.5, 0, 0);
+}
+
+.unified-send-button:disabled {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-opacity: 0.5;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.unified-send-button .send-icon {
+    -fx-fill: #0D1117; /* Dark icon on bright button */
+    -fx-stroke: none;
+    -fx-scale-x: 0.7;
+    -fx-scale-y: 0.7;
+}
+
+.unified-send-button:disabled .send-icon {
+    -fx-fill: -fx-text-secondary;
+    -fx-stroke: none;
+}
+
+/* Unified Status Label (embedded in input container) */
+.unified-status-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-padding: 6 0;
+}
+
+.unified-status-label.success {
+    -fx-text-fill: -fx-success;
+}
+
+.unified-status-label.error {
+    -fx-text-fill: -fx-error;
+}
+
+/* ==================== Desktop Search Mode Components ==================== */
+.search-input-panel {
+    -fx-background-color: transparent;
+}
+
+/* ==================== Desktop Review Mode Components ==================== */
+.review-mode-panel {
+    -fx-background-color: transparent;
+}
+
+/* ==================== Desktop Settings Mode Components ==================== */
+.settings-mode-panel {
+    -fx-background-color: transparent;
+}
+
+/* ==================== Desktop Window Size ==================== */
+.desktop-main-view {
+    -fx-min-width: 800px;
+    -fx-min-height: 600px;
+    -fx-pref-width: 1200px;
+    -fx-pref-height: 800px;
+}
+
+
+/* ==================== Note Card Content Area (Selectable Text) ==================== */
+.note-content-area {
+    -fx-cursor: hand;
+}
+
+.note-content-area .content {
+    -fx-cursor: hand;
+}
+
+.note-content-area .scroll-pane {
+    -fx-cursor: hand;
+}
+
+.note-content-area .scroll-pane .viewport {
+    -fx-cursor: hand;
+}
+
+.note-content-area .text {
+    -fx-cursor: hand;
+}
+
+
+/* ==================== Context Menu (Right-click Menu) ==================== */
+.context-menu {
+    -fx-background-color: -fx-surface;
+    -fx-background-radius: 8px;
+    -fx-border-color: -fx-border;
+    -fx-border-radius: 8px;
+    -fx-border-width: 1px;
+    -fx-padding: 4px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 12, 0, 0, 4);
+}
+
+.context-menu .menu-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 6px;
+    -fx-padding: 8px 16px;
+    -fx-cursor: hand;
+}
+
+.context-menu .menu-item .label {
+    -fx-text-fill: -fx-text-primary;
+    -fx-font-size: 13px;
+}
+
+.context-menu .menu-item:hover {
+    -fx-background-color: rgba(0, 212, 255, 0.15);
+}
+
+.context-menu .menu-item:hover .label {
+    -fx-text-fill: -fx-primary;
+}
+
+.context-menu .menu-item:focused {
+    -fx-background-color: rgba(0, 212, 255, 0.15);
+}
+
+.context-menu .menu-item:focused .label {
+    -fx-text-fill: -fx-primary;
+}
+
+.context-menu .separator {
+    -fx-padding: 4px 8px;
+}
+
+.context-menu .separator .line {
+    -fx-border-color: -fx-border;
+    -fx-border-width: 1px 0 0 0;
+}
+
+
+/* ==================== Send Channel Status (in input panel) ==================== */
+.send-channel-status {
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+    -fx-max-height: 36px;
+}
+
+/* Overview Card - Weakened background */
+.overview-card {
+    -fx-background-color: rgba(33, 38, 45, 0.3); /* Low opacity background */
+    -fx-background-radius: 12px;
+    -fx-border-color: rgba(48, 54, 61, 0.5); /* Subtle border */
+    -fx-border-width: 1;
+    -fx-border-radius: 12px;
+    /* Removed heavy shadow for cleaner look */
+}
+
+.overview-section {
+    -fx-spacing: 8px;
+}
+
+.overview-value {
+    -fx-font-size: 26px; /* Slightly smaller */
+    -fx-font-weight: bold;
+    -fx-text-fill: rgba(34, 211, 238, 0.9); /* Slightly muted cyan */
+}
+
+.overview-label {
+    -fx-font-size: 11px; /* Slightly smaller */
+    -fx-text-fill: rgba(139, 148, 158, 0.8); /* More muted */
+}
+
+.overview-divider {
+    -fx-background-color: -fx-text-secondary;
+    -fx-opacity: 0.15; /* More subtle divider */
 }

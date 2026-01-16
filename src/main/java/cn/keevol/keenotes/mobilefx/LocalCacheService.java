@@ -1,6 +1,9 @@
 package cn.keevol.keenotes.mobilefx;
 
 import com.gluonhq.attach.storage.StorageService;
+import javafx.application.Platform;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -9,6 +12,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 本地缓存服务，管理客户端的SQLite数据库
@@ -32,11 +36,76 @@ public class LocalCacheService {
     
     // 用于追踪初始化步骤
     private volatile String initStep = "not started";
+    
+    // Reactive property for note count
+    private final IntegerProperty noteCountProperty = new SimpleIntegerProperty(0);
+    
+    // Data change listeners
+    private final List<NoteChangeListener> changeListeners = new CopyOnWriteArrayList<>();
+    
+    /**
+     * Listener interface for note data changes
+     */
+    public interface NoteChangeListener {
+        /**
+         * Called when a single note is inserted (realtime update)
+         */
+        void onNoteInserted(NoteData note);
+        
+        /**
+         * Called when multiple notes are inserted (batch sync)
+         */
+        void onNotesInserted(List<NoteData> notes);
+    }
+    
+    /**
+     * Add a listener for note data changes
+     */
+    public void addChangeListener(NoteChangeListener listener) {
+        changeListeners.add(listener);
+    }
+    
+    /**
+     * Remove a listener
+     */
+    public void removeChangeListener(NoteChangeListener listener) {
+        changeListeners.remove(listener);
+    }
+    
+    /**
+     * Notify listeners of single note insertion
+     */
+    private void notifyNoteInserted(NoteData note) {
+        for (NoteChangeListener listener : changeListeners) {
+            try {
+                listener.onNoteInserted(note);
+            } catch (Exception e) {
+                // Ignore listener errors
+            }
+        }
+    }
+    
+    /**
+     * Notify listeners of batch note insertion
+     */
+    private void notifyNotesInserted(List<NoteData> notes) {
+        for (NoteChangeListener listener : changeListeners) {
+            try {
+                listener.onNotesInserted(notes);
+            } catch (Exception e) {
+                // Ignore listener errors
+            }
+        }
+    }
 
     private LocalCacheService() {
         this.cryptoService = new CryptoService();
         this.isAndroid = detectAndroid();
         this.dbPathString = resolveDbPath();
+    }
+    
+    public IntegerProperty noteCountProperty() {
+        return noteCountProperty;
     }
     
     private boolean detectAndroid() {
@@ -63,6 +132,8 @@ public class LocalCacheService {
         if (!initialized) {
             initDatabase();
             initialized = true;
+            // Initialize note count property
+            refreshNoteCount();
         }
     }
 
@@ -327,6 +398,12 @@ public class LocalCacheService {
             pstmt.executeBatch();
             connection.commit();
             connection.setAutoCommit(true);
+            
+            // Update note count property
+            refreshNoteCount();
+            
+            // Notify listeners of batch insertion (on JavaFX thread)
+            Platform.runLater(() -> notifyNotesInserted(notes));
         }
     }
 
@@ -341,6 +418,24 @@ public class LocalCacheService {
             pstmt.setString(4, note.createdAt);
             pstmt.setString(5, note.encryptedContent);
             pstmt.executeUpdate();
+            
+            // Update note count property
+            refreshNoteCount();
+            
+            // Notify listeners of single note insertion (on JavaFX thread)
+            Platform.runLater(() -> notifyNoteInserted(note));
+        }
+    }
+    
+    /**
+     * Refresh note count property from database
+     */
+    private void refreshNoteCount() {
+        try {
+            int count = getLocalNoteCount();
+            javafx.application.Platform.runLater(() -> noteCountProperty.set(count));
+        } catch (Exception e) {
+            // Ignore errors
         }
     }
 
@@ -478,6 +573,108 @@ public class LocalCacheService {
         return 0;
     }
 
+    /**
+     * Get notes with pagination for lazy loading
+     * @param offset Starting position (0-based)
+     * @param limit Number of notes to fetch
+     * @return List of notes
+     */
+    public List<NoteData> getNotesPaged(int offset, int limit) {
+        ensureInitialized();
+        List<NoteData> results = new ArrayList<>();
+        String sql = "SELECT id, content, channel, created_at FROM notes_cache ORDER BY created_at DESC LIMIT ? OFFSET ?";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, limit);
+            pstmt.setInt(2, offset);
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                results.add(new NoteData(
+                    rs.getLong("id"),
+                    rs.getString("content"),
+                    rs.getString("channel"),
+                    rs.getString("created_at"),
+                    null
+                ));
+            }
+        } catch (SQLException e) {
+            // Get paged notes failed
+        }
+        return results;
+    }
+
+    /**
+     * Get notes for review with pagination
+     * @param days Number of days to look back
+     * @param offset Starting position (0-based)
+     * @param limit Number of notes to fetch
+     * @return List of notes
+     */
+    public List<NoteData> getNotesForReviewPaged(int days, int offset, int limit) {
+        ensureInitialized();
+        List<NoteData> results = new ArrayList<>();
+        String sql = "SELECT id, content, channel, created_at FROM notes_cache WHERE created_at >= datetime('now', '-' || ? || ' days') ORDER BY created_at DESC LIMIT ? OFFSET ?";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, days);
+            pstmt.setInt(2, limit);
+            pstmt.setInt(3, offset);
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                results.add(new NoteData(
+                    rs.getLong("id"),
+                    rs.getString("content"),
+                    rs.getString("channel"),
+                    rs.getString("created_at"),
+                    null
+                ));
+            }
+        } catch (SQLException e) {
+            // Get paged review notes failed
+        }
+        return results;
+    }
+
+    /**
+     * Get count of notes for review period
+     * @param days Number of days to look back
+     * @return Count of notes
+     */
+    public int getNotesCountForReview(int days) {
+        ensureInitialized();
+        String sql = "SELECT COUNT(*) FROM notes_cache WHERE created_at >= datetime('now', '-' || ? || ' days')";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, days);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            // Get review notes count failed
+        }
+        return 0;
+    }
+    
+    public String getOldestNoteDate() {
+        ensureInitialized();
+        String sql = "SELECT MIN(created_at) FROM notes_cache";
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            if (rs.next()) {
+                return rs.getString(1);
+            }
+        } catch (SQLException e) {
+            // Get oldest note date failed
+        }
+        return null;
+    }
+
     public void close() {
         try {
             if (connection != null && !connection.isClosed()) {
@@ -502,6 +699,9 @@ public class LocalCacheService {
         try (Statement stmt = connection.createStatement()) {
             stmt.executeUpdate("DELETE FROM notes_cache");
             stmt.executeUpdate("UPDATE sync_state SET last_sync_id = -1, last_sync_time = NULL WHERE id = 1");
+            
+            // Update note count property to 0
+            refreshNoteCount();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to clear cache data", e);
         }

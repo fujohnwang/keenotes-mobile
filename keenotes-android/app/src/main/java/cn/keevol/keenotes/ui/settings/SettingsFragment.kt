@@ -1,19 +1,25 @@
 package cn.keevol.keenotes.ui.settings
 
+import android.content.Context
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentSettingsBinding
+import cn.keevol.keenotes.ui.MainActivity
+import cn.keevol.keenotes.util.DebugLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsFragment : Fragment() {
     
@@ -23,6 +29,12 @@ class SettingsFragment : Fragment() {
     // Easter egg counter
     private var copyrightTapCount = 0
     private var lastTapTime = 0L
+    
+    // StateFlows for reactive binding
+    private val endpointFlow = MutableStateFlow("")
+    private val tokenFlow = MutableStateFlow("")
+    private val passwordFlow = MutableStateFlow("")
+    private val confirmPasswordFlow = MutableStateFlow("")
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -36,16 +48,48 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
-        setupHeader()
+        setupSaveButtonBinding()
         setupCopyToClipboardToggle()
         setupSaveButton()
         setupCopyrightEasterEgg()
         loadSettings()
     }
     
-    private fun setupHeader() {
-        binding.btnBack.setOnClickListener {
-            findNavController().popBackStack()
+    private var textWatcher: android.text.TextWatcher? = null
+    
+    private fun setupSaveButtonBinding() {
+        // Setup TextWatchers to update StateFlows
+        binding.endpointInput.addTextChangedListener(createTextWatcher { endpointFlow.value = it })
+        binding.tokenInput.addTextChangedListener(createTextWatcher { tokenFlow.value = it })
+        binding.passwordInput.addTextChangedListener(createTextWatcher { passwordFlow.value = it })
+        binding.passwordConfirmInput.addTextChangedListener(createTextWatcher { confirmPasswordFlow.value = it })
+        
+        // Reactive binding: combine all StateFlows to determine button enabled state
+        lifecycleScope.launch {
+            combine(
+                endpointFlow,
+                tokenFlow,
+                passwordFlow,
+                confirmPasswordFlow
+            ) { endpoint, token, password, confirmPassword ->
+                endpoint.trim().isNotEmpty() &&
+                token.trim().isNotEmpty() &&
+                password.trim().isNotEmpty() &&
+                confirmPassword.trim().isNotEmpty() &&
+                password == confirmPassword
+            }.collect { isEnabled ->
+                binding.btnSave.isEnabled = isEnabled
+            }
+        }
+    }
+    
+    private fun createTextWatcher(onTextChanged: (String) -> Unit): android.text.TextWatcher {
+        return object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                onTextChanged(s?.toString() ?: "")
+            }
         }
     }
     
@@ -55,6 +99,8 @@ class SettingsFragment : Fragment() {
         // Load initial state
         lifecycleScope.launch {
             binding.copyToClipboardSwitch.isChecked = app.settingsRepository.copyToClipboardOnPost.first()
+            binding.showOverviewCardSwitch.isChecked = app.settingsRepository.showOverviewCard.first()
+            binding.autoFocusInputSwitch.isChecked = app.settingsRepository.autoFocusInputOnLaunch.first()
         }
         
         // Auto-save on toggle change
@@ -63,11 +109,31 @@ class SettingsFragment : Fragment() {
                 app.settingsRepository.setCopyToClipboardOnPost(isChecked)
             }
         }
+        
+        binding.showOverviewCardSwitch.setOnCheckedChangeListener { _, isChecked ->
+            lifecycleScope.launch {
+                app.settingsRepository.setShowOverviewCard(isChecked)
+            }
+        }
+        
+        binding.autoFocusInputSwitch.setOnCheckedChangeListener { _, isChecked ->
+            lifecycleScope.launch {
+                app.settingsRepository.setAutoFocusInputOnLaunch(isChecked)
+            }
+        }
     }
     
     private fun setupSaveButton() {
         binding.btnSave.setOnClickListener {
+            hideKeyboard()
             saveSettings()
+        }
+    }
+    
+    private fun hideKeyboard() {
+        val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        view?.windowToken?.let { token ->
+            imm.hideSoftInputFromWindow(token, 0)
         }
     }
     
@@ -94,7 +160,12 @@ class SettingsFragment : Fragment() {
         }
         
         binding.btnDebug.setOnClickListener {
-            findNavController().navigate(R.id.action_settings_to_debug)
+            // Navigate to debug logs fragment
+            try {
+                findNavController().navigate(R.id.action_settings_to_debug)
+            } catch (e: Exception) {
+                DebugLogger.error("Settings", "Failed to navigate to debug", e)
+            }
         }
     }
     
@@ -102,21 +173,29 @@ class SettingsFragment : Fragment() {
         val app = requireActivity().application as KeeNotesApp
         
         lifecycleScope.launch {
-            binding.endpointInput.setText(app.settingsRepository.endpointUrl.first())
-            binding.tokenInput.setText(app.settingsRepository.token.first())
+            val endpoint = app.settingsRepository.endpointUrl.first()
+            val token = app.settingsRepository.token.first()
             val password = app.settingsRepository.encryptionPassword.first()
-            binding.passwordInput.setText(password)
-            binding.passwordConfirmInput.setText(password)
-            // copyToClipboardSwitch is loaded in setupCopyToClipboardToggle()
+            
+            // Update UI on main thread
+            withContext(Dispatchers.Main) {
+                binding.endpointInput.setText(endpoint)
+                binding.tokenInput.setText(token)
+                binding.passwordInput.setText(password)
+                binding.passwordConfirmInput.setText(password)
+            }
         }
     }
     
     private fun saveSettings() {
+        DebugLogger.log("Settings", "saveSettings() called")
+        
         val endpoint = binding.endpointInput.text.toString().trim()
         val token = binding.tokenInput.text.toString()
         val password = binding.passwordInput.text.toString()
         val confirmPassword = binding.passwordConfirmInput.text.toString()
-        // copyToClipboard is auto-saved, no need to save here
+        
+        DebugLogger.log("Settings", "endpoint=${endpoint.take(30)}..., token=${token.take(10)}..., hasPassword=${password.isNotEmpty()}")
         
         // Validate password match
         if (password != confirmPassword) {
@@ -125,92 +204,119 @@ class SettingsFragment : Fragment() {
             binding.passwordInput.requestFocus()
             binding.statusText.text = "Passwords do not match"
             binding.statusText.setTextColor(requireContext().getColor(R.color.error))
+            DebugLogger.log("Settings", "Password mismatch, returning")
             return
         }
         
         val app = requireActivity().application as KeeNotesApp
         
-        lifecycleScope.launch {
-            // Get old settings to detect changes
-            val oldEndpoint = app.settingsRepository.endpointUrl.first()
-            val oldToken = app.settingsRepository.token.first()
-            val oldPassword = app.settingsRepository.encryptionPassword.first()
-            val wasConfigured = oldEndpoint.isNotBlank() && oldToken.isNotBlank()
+        // Show saving status immediately on UI thread
+        binding.statusText.text = "Saving..."
+        binding.statusText.setTextColor(requireContext().getColor(R.color.text_secondary))
+        
+        // BRANCH 1: Background save + WebSocket (completely async, no Fragment dependency)
+        lifecycleScope.launch(Dispatchers.IO) {
+            DebugLogger.log("Settings", "Branch 1: Background save started")
             
-            // Check if configuration changed
-            val endpointChanged = oldEndpoint != endpoint
-            val tokenChanged = oldToken != token
-            val passwordChanged = oldPassword != password
-            val configurationChanged = endpointChanged || tokenChanged || passwordChanged
-            
-            // Save new settings
-            app.settingsRepository.saveSettings(endpoint, token, password)
-            // copyToClipboard is auto-saved on toggle change
-            
-            val msg = if (password.isNotEmpty()) {
-                "Settings saved ✓ (E2E encryption enabled)"
-            } else {
-                "Settings saved ✓"
-            }
-            
-            if (configurationChanged && wasConfigured) {
-                // Configuration changed: need to reset state and reconnect
-                binding.statusText.text = "Configuration changed, reconnecting..."
-                binding.statusText.setTextColor(requireContext().getColor(R.color.success))
+            try {
+                // Get old settings to detect changes
+                val oldEndpoint = app.settingsRepository.endpointUrl.first()
+                val oldToken = app.settingsRepository.token.first()
+                val oldPassword = app.settingsRepository.encryptionPassword.first()
+                val wasConfigured = oldEndpoint.isNotBlank() && oldToken.isNotBlank()
                 
-                // 1. Disconnect old WebSocket and reset internal state
-                app.webSocketService.disconnect()
-                app.webSocketService.resetState()
+                DebugLogger.log("Settings", "wasConfigured=$wasConfigured")
                 
-                // 2. Reset sync state (set lastSyncId to -1 to trigger full re-sync)
-                app.database.syncStateDao().clearSyncState()
+                // Check if configuration changed
+                val endpointChanged = oldEndpoint != endpoint
+                val tokenChanged = oldToken != token
+                val passwordChanged = oldPassword != password
+                val configurationChanged = endpointChanged || tokenChanged || passwordChanged
                 
-                // 3. Clear notes if endpoint or token changed (different server or account = different data)
-                if (endpointChanged || tokenChanged) {
-                    app.database.noteDao().deleteAll()
-                }
+                DebugLogger.log("Settings", "configurationChanged=$configurationChanged")
                 
-                // 4. Reconnect with new settings
-                if (endpoint.isNotBlank() && token.isNotBlank()) {
-                    app.webSocketService.connect()
-                    binding.statusText.text = "$msg (Reconnected)"
+                // Save new settings (IO operation)
+                app.settingsRepository.saveSettings(endpoint, token, password)
+                DebugLogger.log("Settings", "Settings saved to repository")
+                
+                val msg = if (password.isNotEmpty()) {
+                    "Settings saved ✓ (E2E encryption enabled)"
                 } else {
-                    binding.statusText.text = msg
+                    "Settings saved ✓"
                 }
                 
-                // Navigate back to Note fragment after 1 second delay
-                Handler(Looper.getMainLooper()).postDelayed({
-                    findNavController().popBackStack()
-                }, 1000)
+                // Update UI safely - check lifecycle
+                withContext(Dispatchers.Main) {
+                    DebugLogger.log("Settings", "Updating UI, isAdded=$isAdded, _binding=${_binding != null}")
+                    if (isAdded && _binding != null && activity != null) {
+                        try {
+                            binding.statusText.setTextColor(requireContext().getColor(R.color.success))
+                            binding.statusText.text = msg
+                            DebugLogger.log("Settings", "UI updated successfully")
+                        } catch (e: Exception) {
+                            DebugLogger.error("Settings", "UI update failed", e)
+                        }
+                    }
+                }
                 
-            } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
-                // First time configuration
-                binding.statusText.text = msg
-                binding.statusText.setTextColor(requireContext().getColor(R.color.success))
-                app.webSocketService.connect()
-                
-                // Navigate back to Note fragment after 500ms delay
-                Handler(Looper.getMainLooper()).postDelayed({
-                    findNavController().popBackStack()
-                }, 500)
-                
-            } else {
-                // No critical configuration change
-                binding.statusText.text = msg
-                binding.statusText.setTextColor(requireContext().getColor(R.color.success))
-                
-                // Still reconnect if configured (in case connection was lost)
-                app.webSocketService.disconnect()
-                if (endpoint.isNotBlank() && token.isNotBlank()) {
+                // Handle WebSocket connection based on configuration state
+                if (configurationChanged && wasConfigured) {
+                    DebugLogger.log("Settings", "WebSocket: Reconfiguration detected")
+                    
+                    app.webSocketService.disconnect()
+                    app.webSocketService.resetState()
+                    app.database.syncStateDao().clearSyncState()
+                    
+                    if (endpointChanged || tokenChanged) {
+                        app.database.noteDao().deleteAll()
+                    }
+                    
+                    if (endpoint.isNotBlank() && token.isNotBlank()) {
+                        app.webSocketService.connect()
+                    }
+                    
+                } else if (!wasConfigured && endpoint.isNotBlank() && token.isNotBlank()) {
+                    DebugLogger.log("Settings", "WebSocket: First time configuration")
                     app.webSocketService.connect()
+                    
+                } else {
+                    DebugLogger.log("Settings", "WebSocket: No action needed")
                 }
                 
-                // Navigate back to Note fragment after 500ms delay
-                Handler(Looper.getMainLooper()).postDelayed({
-                    findNavController().popBackStack()
-                }, 500)
+                DebugLogger.log("Settings", "Branch 1: Completed")
+                
+            } catch (e: Exception) {
+                DebugLogger.error("Settings", "Branch 1: Save failed", e)
+                withContext(Dispatchers.Main) {
+                    if (isAdded && _binding != null && activity != null) {
+                        try {
+                            binding.statusText.text = "Save failed: ${e.message}"
+                            binding.statusText.setTextColor(requireContext().getColor(R.color.error))
+                        } catch (ex: Exception) {
+                            DebugLogger.error("Settings", "Error UI update failed", ex)
+                        }
+                    }
+                }
             }
         }
+        
+        // BRANCH 2: Delayed navigation (UI thread safe, independent of Branch 1)
+        view?.postDelayed({
+            DebugLogger.log("Settings", "Branch 2: Navigation delay completed")
+            if (isAdded && activity != null) {
+                try {
+                    DebugLogger.log("Settings", "Branch 2: Navigating to Note")
+                    (activity as? MainActivity)?.navigateToNote()
+                    DebugLogger.log("Settings", "Branch 2: Navigation triggered")
+                } catch (e: Exception) {
+                    DebugLogger.error("Settings", "Branch 2: Navigation failed", e)
+                }
+            } else {
+                DebugLogger.log("Settings", "Branch 2: Fragment not attached, skipping navigation")
+            }
+        }, 500)
+        
+        DebugLogger.log("Settings", "saveSettings() returning (both branches started)")
     }
     
     override fun onDestroyView() {

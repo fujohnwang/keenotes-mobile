@@ -12,6 +12,15 @@ struct SettingsView: View {
     @State private var statusMessage = ""
     @State private var isSuccess = true
     
+    // Computed property for Save button enabled state
+    private var isSaveEnabled: Bool {
+        let e = endpointUrl.trimmingCharacters(in: .whitespaces)
+        let t = token.trimmingCharacters(in: .whitespaces)
+        let p = password.trimmingCharacters(in: .whitespaces)
+        let c = confirmPassword.trimmingCharacters(in: .whitespaces)
+        return !e.isEmpty && !t.isEmpty && !p.isEmpty && !c.isEmpty && password == confirmPassword
+    }
+    
     // Easter egg state
     @State private var copyrightTapCount = 0
     @State private var lastTapTime: Date = .distantPast
@@ -47,15 +56,6 @@ struct SettingsView: View {
                         .textInputAutocapitalization(.never)
                 }
                 
-                // Preferences
-                Section(header: Text("Preferences")) {
-                    Toggle("Copy to clipboard on post success", isOn: Binding(
-                        get: { appState.settingsService.copyToClipboardOnPost },
-                        set: { appState.settingsService.copyToClipboardOnPost = $0 }
-                    ))
-                }
-                .font(.body)
-                
                 // Save button
                 Section {
                     Button(action: saveSettings) {
@@ -66,6 +66,7 @@ struct SettingsView: View {
                             Spacer()
                         }
                     }
+                    .disabled(!isSaveEnabled)
                     
                     // Status message
                     if !statusMessage.isEmpty {
@@ -75,6 +76,25 @@ struct SettingsView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
+                
+                // Preferences
+                Section(header: Text("Preferences")) {
+                    Toggle("Copy to clipboard on post success", isOn: Binding(
+                        get: { appState.settingsService.copyToClipboardOnPost },
+                        set: { appState.settingsService.copyToClipboardOnPost = $0 }
+                    ))
+                    
+                    Toggle("Show Overview Card", isOn: Binding(
+                        get: { appState.settingsService.showOverviewCard },
+                        set: { appState.settingsService.showOverviewCard = $0 }
+                    ))
+                    
+                    Toggle("Auto-focus input on launch", isOn: Binding(
+                        get: { appState.settingsService.autoFocusInputOnLaunch },
+                        set: { appState.settingsService.autoFocusInputOnLaunch = $0 }
+                    ))
+                }
+                .font(.body)
                 
                 // Debug section (hidden by default)
                 if showDebugSection {
@@ -102,7 +122,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("KeeNotes Settings")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear(perform: loadSettings)
             .sheet(isPresented: $showDebugView) {
@@ -112,10 +132,13 @@ struct SettingsView: View {
     }
     
     private func loadSettings() {
-        endpointUrl = appState.settingsService.endpointUrl
-        token = appState.settingsService.token
-        password = appState.settingsService.encryptionPassword
-        confirmPassword = appState.settingsService.encryptionPassword
+        // Ensure we're on the main thread when accessing @Published properties
+        DispatchQueue.main.async {
+            endpointUrl = appState.settingsService.endpointUrl
+            token = appState.settingsService.token
+            password = appState.settingsService.encryptionPassword
+            confirmPassword = appState.settingsService.encryptionPassword
+        }
     }
     
     private func saveSettings() {

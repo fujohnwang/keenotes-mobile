@@ -3,7 +3,7 @@ import GRDB
 
 /// SQLite database service using GRDB
 class DatabaseService: ObservableObject {
-    private var dbQueue: DatabaseQueue?
+    var dbQueue: DatabaseQueue?
     
     @Published var noteCount: Int = 0
     
@@ -28,8 +28,22 @@ class DatabaseService: ObservableObject {
             try db.create(table: Note.databaseTableName, ifNotExists: true) { t in
                 t.column("id", .integer).primaryKey()
                 t.column("content", .text).notNull()
+                t.column("channel", .text).notNull().defaults(to: "default")
                 t.column("createdAt", .text).notNull()
                 t.column("syncedAt", .integer).notNull().defaults(to: 0)
+            }
+            
+            // Migrate existing tables - add channel column if it doesn't exist
+            if try db.tableExists(Note.databaseTableName) {
+                let columns = try db.columns(in: Note.databaseTableName)
+                let hasChannel = columns.contains { $0.name == "channel" }
+                
+                if !hasChannel {
+                    print("[DB] Migrating notes table: adding channel column")
+                    try db.alter(table: Note.databaseTableName) { t in
+                        t.add(column: "channel", .text).notNull().defaults(to: "default")
+                    }
+                }
             }
             
             // Create sync_state table
@@ -125,6 +139,59 @@ class DatabaseService: ObservableObject {
                 .filter(Note.Columns.createdAt >= cutoffString)
                 .order(Note.Columns.createdAt.desc)
                 .fetchAll(db)
+        }
+    }
+    
+    func getNotesByPeriodPaged(days: Int, limit: Int, offset: Int) async throws -> [Note] {
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        
+        if days <= 0 {
+            // "All" - paginated
+            return try await dbQueue.read { db in
+                try Note
+                    .order(Note.Columns.createdAt.desc)
+                    .limit(limit, offset: offset)
+                    .fetchAll(db)
+            }
+        }
+        
+        // Calculate cutoff date
+        let calendar = Calendar.current
+        let cutoffDate = calendar.date(byAdding: .day, value: -days, to: Date())!
+        let formatter = ISO8601DateFormatter()
+        let cutoffString = formatter.string(from: cutoffDate)
+        
+        return try await dbQueue.read { db in
+            try Note
+                .filter(Note.Columns.createdAt >= cutoffString)
+                .order(Note.Columns.createdAt.desc)
+                .limit(limit, offset: offset)
+                .fetchAll(db)
+        }
+    }
+    
+    func getNotesCountByPeriod(days: Int) async throws -> Int {
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        
+        if days <= 0 {
+            // "All"
+            return try await getNoteCount()
+        }
+        
+        // Calculate cutoff date
+        let calendar = Calendar.current
+        let cutoffDate = calendar.date(byAdding: .day, value: -days, to: Date())!
+        let formatter = ISO8601DateFormatter()
+        let cutoffString = formatter.string(from: cutoffDate)
+        
+        return try await dbQueue.read { db in
+            try Note
+                .filter(Note.Columns.createdAt >= cutoffString)
+                .fetchCount(db)
         }
     }
     

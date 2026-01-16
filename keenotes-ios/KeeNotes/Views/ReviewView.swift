@@ -4,82 +4,128 @@ import SwiftUI
 struct ReviewView: View {
     @EnvironmentObject var appState: AppState
     @State private var notes: [Note] = []
-    @State private var searchText = ""
     @State private var isLoading = false
+    @State private var isLoadingMore = false
     @State private var selectedPeriod = 0  // 0: 7 days, 1: 30 days, 2: 90 days, 3: All
-    @State private var searchTask: Task<Void, Never>?
+    @State private var totalCount = 0
+    @State private var hasMoreData = true
     
     private let periods = ["7 days", "30 days", "90 days", "All"]
     private let periodDays = [7, 30, 90, 0]  // 0 means all
+    private let pageSize = 20
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Search bar (moved to top)
-                SearchBar(text: $searchText)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
-                
-                // Period selector
-                Picker("Period", selection: $selectedPeriod) {
-                    ForEach(0..<periods.count, id: \.self) { index in
-                        Text(periods[index]).tag(index)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                
-                // Notes list
-                if isLoading {
-                    Spacer()
-                    ProgressView("Loading...")
-                    Spacer()
-                } else if appState.webSocketService.syncStatus == .syncing && notes.isEmpty {
-                    // Syncing state - show when actively syncing and no local notes yet
-                    Spacer()
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                        Text("Syncing notes...")
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                } else if notes.isEmpty {
-                    Spacer()
-                    VStack(spacing: 12) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 48))
-                            .foregroundColor(.gray)
-                        Text(searchText.isEmpty ? "No notes yet" : "No results found")
-                            .foregroundColor(.gray)
-                    }
-                    Spacer()
-                } else {
-                    List {
-                        ForEach(notes) { note in
-                            NoteRow(note: note)
-                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
+            ZStack {
+                VStack(spacing: 0) {
+                    // Period selector
+                    Picker("Period", selection: $selectedPeriod) {
+                        ForEach(0..<periods.count, id: \.self) { index in
+                            Text(periods[index]).tag(index)
                         }
                     }
-                    .listStyle(.plain)
-                    .refreshable {
-                        await loadNotes()
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
+                    
+                    // Header row: Notes count (left) + Sync Channel status (right)
+                    HStack {
+                        // Notes count with period info (left)
+                        Text(notesCountText)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        // Sync Channel status (right)
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(syncChannelColor)
+                                .frame(width: 8, height: 8)
+                            
+                            Text("Sync Channel:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text(syncChannelText)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(syncChannelColor)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    
+                    // Notes list
+                    if isLoading {
+                        Spacer()
+                        ProgressView("Loading...")
+                        Spacer()
+                    } else if notes.isEmpty {
+                        Spacer()
+                        VStack(spacing: 12) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 48))
+                                .foregroundColor(.gray)
+                            Text("No notes yet")
+                                .foregroundColor(.gray)
+                        }
+                        Spacer()
+                    } else {
+                        List {
+                            ForEach(notes) { note in
+                                NoteRow(note: note)
+                                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                                    .onAppear {
+                                        // Load more when approaching the end
+                                        if note.id == notes.last?.id && hasMoreData && !isLoadingMore {
+                                            Task {
+                                                await loadMoreNotes()
+                                            }
+                                        }
+                                    }
+                            }
+                            
+                            // Loading indicator at bottom
+                            if isLoadingMore {
+                                HStack {
+                                    Spacer()
+                                    ProgressView()
+                                        .padding()
+                                    Spacer()
+                                }
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                            }
+                        }
+                        .listStyle(.plain)
+                        .refreshable {
+                            await loadNotes()
+                        }
                     }
                 }
+                
+                // Centered sync spinner (transient, shown during sync)
+                if appState.webSocketService.syncStatus == .syncing {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        Text("Syncing...")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                    }
+                    .padding(24)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(16)
+                }
             }
-            .navigationTitle("Review")
+            .navigationTitle("KeeNotes Review")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { Task { await loadNotes() } }) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-            }
         }
         .onAppear {
             Task { await loadNotes() }
@@ -97,66 +143,92 @@ struct ReviewView: View {
         .onChange(of: selectedPeriod) { _ in
             Task { await loadNotes() }
         }
-        .onChange(of: searchText) { _ in
-            // Debounce search - cancel previous task and start new one
-            searchTask?.cancel()
-            searchTask = Task {
-                try? await Task.sleep(nanoseconds: 500_000_000)  // 500ms debounce
-                guard !Task.isCancelled else { return }
-                await loadNotes()
-            }
-        }
     }
     
     private func loadNotes() async {
         isLoading = true
+        hasMoreData = true
         defer { isLoading = false }
         
         do {
-            let loadedNotes: [Note]
+            // Get total count
+            totalCount = try await appState.databaseService.getNotesCountByPeriod(days: periodDays[selectedPeriod])
             
-            if searchText.isEmpty {
-                // Load by period
-                loadedNotes = try await appState.databaseService.getNotesByPeriod(days: periodDays[selectedPeriod])
-            } else {
-                // Search
-                loadedNotes = try await appState.databaseService.searchNotes(query: searchText)
-            }
+            // Load first page
+            let loadedNotes = try await appState.databaseService.getNotesByPeriodPaged(
+                days: periodDays[selectedPeriod],
+                limit: pageSize,
+                offset: 0
+            )
             
-            print("[ReviewView] Loaded \(loadedNotes.count) notes from database")
+            print("[ReviewView] Loaded \(loadedNotes.count) of \(totalCount) notes from database")
             await MainActor.run {
                 notes = loadedNotes
+                hasMoreData = notes.count < totalCount
             }
         } catch {
             print("[ReviewView] Failed to load notes: \(error)")
         }
     }
-}
-
-/// Search bar component
-struct SearchBar: View {
-    @Binding var text: String
     
-    var body: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.gray)
+    private func loadMoreNotes() async {
+        guard !isLoadingMore && hasMoreData else { return }
+        
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        
+        do {
+            let loadedNotes = try await appState.databaseService.getNotesByPeriodPaged(
+                days: periodDays[selectedPeriod],
+                limit: pageSize,
+                offset: notes.count
+            )
             
-            TextField("Search notes...", text: $text)
-                .textFieldStyle(.plain)
+            print("[ReviewView] Loaded \(loadedNotes.count) more notes (total: \(notes.count + loadedNotes.count)/\(totalCount))")
             
-            if !text.isEmpty {
-                Button(action: {
-                    text = ""
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.gray)
-                }
+            await MainActor.run {
+                notes.append(contentsOf: loadedNotes)
+                hasMoreData = notes.count < totalCount
             }
+        } catch {
+            print("[ReviewView] Failed to load more notes: \(error)")
         }
-        .padding(10)
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
+    }
+    
+    // MARK: - Sync Channel Status
+    
+    private var syncChannelColor: Color {
+        switch appState.webSocketService.connectionState {
+        case .connected: return .green
+        case .connecting: return .orange
+        case .disconnected: return .gray
+        }
+    }
+    
+    private var syncChannelText: String {
+        switch appState.webSocketService.connectionState {
+        case .connected: return "✓"
+        case .connecting: return "..."
+        case .disconnected: return "✗"
+        }
+    }
+    
+    // MARK: - Notes Count Text
+    
+    private var notesCountText: String {
+        let count = totalCount > 0 ? totalCount : notes.count
+        let periodInfo: String
+        
+        // Show period info
+        switch selectedPeriod {
+        case 0: periodInfo = " - Last 7 days"
+        case 1: periodInfo = " - Last 30 days"
+        case 2: periodInfo = " - Last 90 days"
+        case 3: periodInfo = " - All"
+        default: periodInfo = ""
+        }
+        
+        return "\(count) note(s)\(periodInfo)"
     }
 }
 
@@ -166,40 +238,30 @@ struct NoteRow: View {
     @State private var showCopiedAlert = false
     
     private var formattedDate: String {
-        // Parse ISO date or custom format
+        // Simply return the first 19 characters (yyyy-MM-dd HH:mm:ss)
+        // Most notes already have this format from the server
+        if note.createdAt.count >= 19 {
+            return String(note.createdAt.prefix(19))
+        }
+        
+        // Fallback: try to parse and format
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         
         if let date = dateFormatter.date(from: note.createdAt) {
             let displayFormatter = DateFormatter()
-            displayFormatter.dateStyle = .medium
-            displayFormatter.timeStyle = .short
+            displayFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
             return displayFormatter.string(from: date)
         }
         
-        // Try alternative format
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        if let date = dateFormatter.date(from: note.createdAt) {
-            let displayFormatter = DateFormatter()
-            displayFormatter.dateStyle = .medium
-            displayFormatter.timeStyle = .short
-            return displayFormatter.string(from: date)
-        }
-        
+        // If all else fails, return as-is
         return note.createdAt
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Note content
-            Text(note.content)
-                .font(.body)
-                .foregroundColor(.primary)
-                .lineLimit(5)
-                .fixedSize(horizontal: false, vertical: true)
-            
-            // Footer with date and copy hint
-            HStack {
+            // Header: Date and Channel
+            HStack(spacing: 8) {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
                         .font(.caption2)
@@ -208,18 +270,27 @@ struct NoteRow: View {
                 }
                 .foregroundColor(.secondary)
                 
-                Spacer()
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "hand.tap")
-                        .font(.caption2)
-                    Text("Long press to copy")
-                        .font(.caption2)
+                // Channel info
+                if !note.channel.isEmpty {
+                    Text("•")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(note.channel)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                .foregroundColor(.secondary)
-                .opacity(0.6)
             }
+            
+            // Note content (full text with auto wrap)
+            // Long press to select text fragments
+            Text(note.content)
+                .font(.body)
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 12)
@@ -231,7 +302,7 @@ struct NoteRow: View {
                 .stroke(Color(.systemGray5), lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onLongPressGesture(minimumDuration: 0.5) {
+        .onTapGesture {
             copyToClipboard()
         }
         .overlay(

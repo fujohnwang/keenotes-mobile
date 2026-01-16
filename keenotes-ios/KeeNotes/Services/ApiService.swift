@@ -48,7 +48,7 @@ class ApiService {
             
             // Build JSON body - match JavaFX format exactly
             let body: [String: Any] = [
-                "channel": "mobile",
+                "channel": "mobile-ios",
                 "text": encrypted,
                 "ts": ts,
                 "encrypted": true
