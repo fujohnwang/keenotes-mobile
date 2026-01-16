@@ -222,45 +222,50 @@ jobs:
           
           echo "=== Extracting Native Libraries ==="
           
-          # 找到主 Jar 包
-          MAIN_JAR="$APP_PATH/Contents/app/keenotes-mobile-1.0.0-SNAPSHOT.jar"
+          # 1. 获取主 Jar 的【绝对路径】，避免后续 cd 导致找不到文件
+          # 使用 $(pwd) 拼接当前工作目录
+          MAIN_JAR="$(pwd)/$APP_PATH/Contents/app/keenotes-mobile-1.0.0-SNAPSHOT.jar"
           
-          # 优化：不解压 Main Jar，直接从里面提取 sqlite jar
-          # 1. 提取内部的 sqlite jar 到临时文件
+          echo "Target Main JAR: $MAIN_JAR"
+          
+          # 2. 提取 sqlite jar 到临时文件 (直接在当前目录操作，不 cd)
           unzip -p "$MAIN_JAR" "BOOT-INF/lib/sqlite-jdbc-*.jar" > sqlite-temp.jar
           
-          # 2. 从临时 sqlite jar 中提取 dylib
-          # 注意路径：sqlite jar 内部结构通常是 org/sqlite/native/Mac/...
+          # 3. 提取 dylib
           unzip -p sqlite-temp.jar "org/sqlite/native/Mac/$SQLITE_ARCH/libsqlitejdbc.dylib" > "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
           
           if [ -f "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
              echo "  ✓ Extracted libsqlitejdbc.dylib to Frameworks"
-          
-             # 3. 关键优化：使用 zip -d 直接从 Jar 中删除文件，避免重打包破坏 Spring Boot 结构
-             # 先删除临时 sqlite jar 里的 native 文件夹
+             
+             # 4. 从临时 sqlite jar 中删除 native 文件夹
              zip -d sqlite-temp.jar "org/sqlite/native/Mac/*"
-          
-             # 4. 将修改后的 sqlite jar 更新回 Main Jar
-             # 需要先确定 Main Jar 里 sqlite 的具体路径名
+             
+             # 5. 获取 sqlite 在 Main Jar 中的具体路径 (例如 BOOT-INF/lib/sqlite-jdbc-3.46.0.0.jar)
              SQLITE_PATH_IN_MAIN=$(unzip -l "$MAIN_JAR" | grep "sqlite-jdbc-.*\.jar" | awk '{print $4}')
-          
-             # 这是一个比较 tricky 的操作，因为 zip 命令更新嵌套 jar 比较麻烦。
-             # 回退到解压 Main Jar 方案，但使用 zip -0 (store) 以防破坏 Spring Boot 性能，
-             # 或者为了安全起见，我们只解压 Main Jar，替换里面的文件，再用 jar u (update) 更新
-          
-             # --- 采用稳健的 Update 方案 ---
+             
+             echo "Updating $SQLITE_PATH_IN_MAIN inside Main Jar..."
+             
+             # --- 修复核心：构造正确的目录结构进行更新 ---
              TEMP_WORK=$(mktemp -d)
-             mkdir -p "$TEMP_WORK/BOOT-INF/lib"
-             cp sqlite-temp.jar "$TEMP_WORK/$SQLITE_PATH_IN_MAIN"
-          
-             # 使用 jar uf 更新主 Jar (仅更新变动的文件，保留其他结构)
-             # 需要 jar 命令可用 (JDK 环境)
+             
+             # 在临时目录中重建 BOOT-INF/lib/xxx.jar 的目录结构
+             # dirname 获取路径目录 (BOOT-INF/lib)
+             DIR_STRUCTURE=$(dirname "$SQLITE_PATH_IN_MAIN")
+             mkdir -p "$TEMP_WORK/$DIR_STRUCTURE"
+             
+             # 将剥离了 native 的 jar 移动到临时目录对应的位置
+             mv sqlite-temp.jar "$TEMP_WORK/$SQLITE_PATH_IN_MAIN"
+             
+             # 进入临时目录，使用 jar uf 更新主 Jar
+             # 因为 MAIN_JAR 已经是绝对路径了，所以这里不会报错
              (cd "$TEMP_WORK" && jar uf "$MAIN_JAR" "$SQLITE_PATH_IN_MAIN")
-          
+             
              echo "  ✓ Updated Main JAR (stripped natives)"
-             rm -rf "$TEMP_WORK" sqlite-temp.jar
+             rm -rf "$TEMP_WORK"
           else
              echo "⚠ Warning: SQLite dylib not found in jar!"
+             # 如果提取失败，清理临时文件
+             rm -f sqlite-temp.jar
           fi
           
           # ==========================================
