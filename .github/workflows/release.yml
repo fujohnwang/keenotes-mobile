@@ -271,31 +271,39 @@ jobs:
           # ==========================================
           # 3. 签名流程
           # ==========================================
+          
           echo "=== Signing Binaries ==="
           
-          # 1. 签名 Frameworks (刚才提取出来的)
+          # 0. 【关键修复】重构 libjli.dylib
+          # jpackage 可能会生成硬链接或物理拷贝，导致签名冲突。
+          # 我们强制将其改为软链接，确保只签名一次。
+          JLI_REAL="$APP_PATH/Contents/runtime/Contents/Home/lib/libjli.dylib"
+          JLI_LINK="$APP_PATH/Contents/runtime/Contents/MacOS/libjli.dylib"
+          
+          if [ -f "$JLI_LINK" ]; then
+            echo "Fixing libjli.dylib structure..."
+            # 删除 MacOS 下的物理文件/硬链接
+            rm "$JLI_LINK"
+            # 创建指向 Home/lib 的相对路径软链接
+            # 注意：从 Contents/MacOS 跳转到 Contents/Home/lib 需要 ../Home/lib
+            ln -s "../Home/lib/libjli.dylib" "$JLI_LINK"
+            echo "  ✓ Replaced MacOS/libjli.dylib with symlink"
+          fi
+          
+          # 1. 签名 Frameworks (之前提取的 sqlite)
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
           
           # 2. 签名 App 内的所有 .dylib 和 .jnilib
+          # 因为上面把 libjli 改成了软链接，-type f 会自动忽略它，只签 Home/lib 下的真身
           find "$APP_PATH/Contents" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
-             
-             # 排除 1: 之前签过的 Frameworks
-             if [[ "$lib" == *"/Frameworks/"* ]]; then
-                 continue
+             # 排除 Frameworks 防止重复
+             if [[ "$lib" != *"/Frameworks/"* ]]; then
+                 echo "Signing lib: $(basename $lib)"
+                 codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
              fi
-             
-             # 排除 2: 【关键修复】显式跳过 MacOS 目录下的 libjli.dylib
-             # 我们只需要签 Home/lib/libjli.dylib，不需要签 MacOS/libjli.dylib
-             if [[ "$lib" == *"/Contents/MacOS/libjli.dylib" ]]; then
-                 echo "  ⚠️ Skipping libjli wrapper in MacOS dir: $(basename $lib)"
-                 continue
-             fi
-
-             echo "Signing lib: $(basename $lib)"
-             codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
           done
           
-          # 3. 签名 JRE 的可执行文件 (jspawnhelper, java 等)
+          # 3. 签名 JRE 的可执行文件
           find "$APP_PATH/Contents/runtime" -type f -perm +111 | while read exe; do
              if file "$exe" | grep -q "Mach-O"; then
                 echo "Signing exe: $(basename $exe)"
@@ -303,11 +311,11 @@ jobs:
              fi
           done
           
-          # 4. 签名主启动器 (Contents/MacOS/KeeNotes)
+          # 4. 签名主启动器
           echo "Signing Main Executable..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH/Contents/MacOS/KeeNotes"
           
-          # 5. 签名整个 App Bundle
+          # 5. 签名整个 App Bundle (不要加 --deep)
           echo "Signing App Bundle..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH"
           
