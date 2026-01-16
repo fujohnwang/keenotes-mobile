@@ -271,16 +271,17 @@ jobs:
           # ==========================================
           # 3. 签名流程
           # ==========================================
-          
           echo "=== Signing Binaries ==="
           
           # 1. 签名 Frameworks (刚才提取出来的)
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
           
           # 2. 签名 App 内的所有 .dylib 和 .jnilib (JRE 自带的)
-          # 注意：排除刚才签过的 Frameworks 目录，防止重复
-          find "$APP_PATH/Contents" -name "*.dylib" -o -name "*.jnilib" | while read lib; do
+          # 【修复点】：添加 -type f 参数，且用括号包裹名字匹配，确保只签实体文件，跳过软链接
+          find "$APP_PATH/Contents" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
+             # 排除刚才已经签过的 Frameworks 目录，防止重复报错
              if [[ "$lib" != *"/Frameworks/"* ]]; then
+                 echo "Signing lib: $(basename $lib)"
                  codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
              fi
           done
@@ -288,19 +289,16 @@ jobs:
           # 3. 签名 JRE 的可执行文件 (jspawnhelper, java 等)
           find "$APP_PATH/Contents/runtime" -type f -perm +111 | while read exe; do
              if file "$exe" | grep -q "Mach-O"; then
-                # 可执行文件也需要 entitlements 吗？通常 helper 不需要，主程序需要。
-                # 给 JRE 里的 java 加上 entitlements 比较稳妥，防止它自己启动子进程受限
+                echo "Signing exe: $(basename $exe)"
                 codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$exe"
              fi
           done
           
           # 4. 签名主启动器 (Contents/MacOS/KeeNotes)
-          # 这是最重要的！必须带上 Entitlements
           echo "Signing Main Executable..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH/Contents/MacOS/KeeNotes"
           
-          # 5. 签名整个 App Bundle (这一步通常不需要 entitlements 参数，因为 components 已经签好了)
-          # 但为了保险，保持一致
+          # 5. 签名整个 App Bundle
           echo "Signing App Bundle..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH"
           
