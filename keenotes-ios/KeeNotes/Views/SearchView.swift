@@ -9,16 +9,18 @@ struct SearchView: View {
     @State private var isLoading = false
     @State private var searchTask: Task<Void, Never>?
     @FocusState private var isSearchFocused: Bool
+
+    // Adaptive layout based on device
+    private var isPad: Bool { DeviceType.isPad }
+    private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
     
     var body: some View {
         VStack(spacing: 0) {
             // Search bar
-            SearchBar(text: $searchText)
+            SearchBar(text: $searchText, isPad: isPad)
                 .focused($isSearchFocused)
-                .padding(.horizontal)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
-            
+                .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 4, trailing: horizontalPadding))
+
             // Header row: Notes count (left) + Sync Channel status (right)
             if !searchText.isEmpty {
                 HStack {
@@ -26,27 +28,26 @@ struct SearchView: View {
                     Text("\(notes.count) note(s) - Search results")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     Spacer()
-                    
+
                     // Sync Channel status (right)
                     HStack(spacing: 6) {
                         Circle()
                             .fill(syncChannelColor)
                             .frame(width: 8, height: 8)
-                        
+
                         Text("Sync Channel:")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        
+
                         Text(syncChannelText)
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(syncChannelColor)
                     }
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
             }
             
             // Search results
@@ -78,7 +79,7 @@ struct SearchView: View {
                 List {
                     ForEach(notes) { note in
                         NoteRow(note: note)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                     }
@@ -150,37 +151,61 @@ struct SearchView: View {
 struct SearchBar: View {
     @Binding var text: String
     var focused: FocusState<Bool>.Binding
-    
+    private let isPad: Bool
+
     init(text: Binding<String>) {
         self._text = text
         self.focused = FocusState<Bool>().projectedValue
+        self.isPad = false
     }
-    
+
     init(text: Binding<String>, focused: FocusState<Bool>.Binding) {
         self._text = text
         self.focused = focused
+        self.isPad = false
     }
-    
+
+    init(text: Binding<String>, isPad: Bool) {
+        self._text = text
+        self.focused = FocusState<Bool>().projectedValue
+        self.isPad = isPad
+    }
+
+    init(text: Binding<String>, focused: FocusState<Bool>.Binding, isPad: Bool) {
+        self._text = text
+        self.focused = focused
+        self.isPad = isPad
+    }
+
+    private var fontSize: CGFloat { isPad ? 18 : 17 }
+    private var paddingSize: CGFloat { isPad ? 14 : 10 }
+    private var cornerRadius: CGFloat { isPad ? 12 : 10 }
+    private var iconSize: CGFloat { isPad ? 20 : 17 }
+    private var clearIconSize: CGFloat { isPad ? 22 : 17 }
+
     var body: some View {
-        HStack {
+        HStack(spacing: isPad ? 12 : 8) {
             Image(systemName: "magnifyingglass")
+                .font(.system(size: iconSize))
                 .foregroundColor(.gray)
-            
+
             TextField("Search notes...", text: $text)
                 .textFieldStyle(.plain)
+                .font(.system(size: fontSize))
                 .focused(focused)
-            
+
             if !text.isEmpty {
                 Button(action: {
                     text = ""
                 }) {
                     Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: clearIconSize))
                         .foregroundColor(.gray)
                 }
             }
         }
-        .padding(10)
+        .padding(paddingSize)
         .background(Color(.systemGray6))
-        .cornerRadius(10)
+        .cornerRadius(cornerRadius)
     }
 }
