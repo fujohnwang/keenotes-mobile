@@ -385,84 +385,84 @@ jobs:
             exit 1
           fi
 
-      - name: Create Signed macOS PKG
-        env:
-          MACOS_INSTALLER_IDENTITY: ${{ secrets.MACOS_INSTALLER_IDENTITY }}
-        run: |
-          # Create PKG from the already signed app bundle
-          jpackage \
-            --app-image dist/KeeNotes.app \
-            --name "KeeNotes" \
-            --type pkg \
-            --app-version ${{ steps.version.outputs.app_version }} \
-            --vendor "Keevol" \
-            --mac-package-identifier "cn.keevol.keenotes" \
-            --mac-package-name "KeeNotes" \
-            --mac-sign \
-            --mac-signing-key-user-name "$MACOS_INSTALLER_IDENTITY" \
-            --dest dist
+      # - name: Create Signed macOS PKG
+      #   env:
+      #     MACOS_INSTALLER_IDENTITY: ${{ secrets.MACOS_INSTALLER_IDENTITY }}
+      #   run: |
+      #     # Create PKG from the already signed app bundle
+      #     jpackage \
+      #       --app-image dist/KeeNotes.app \
+      #       --name "KeeNotes" \
+      #       --type pkg \
+      #       --app-version ${{ steps.version.outputs.app_version }} \
+      #       --vendor "Keevol" \
+      #       --mac-package-identifier "cn.keevol.keenotes" \
+      #       --mac-package-name "KeeNotes" \
+      #       --mac-sign \
+      #       --mac-signing-key-user-name "$MACOS_INSTALLER_IDENTITY" \
+      #       --dest dist
           
-          # Rename PKG to include platform suffix
-          mv dist/KeeNotes-${{ steps.version.outputs.app_version }}.pkg dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
+      #     # Rename PKG to include platform suffix
+      #     mv dist/KeeNotes-${{ steps.version.outputs.app_version }}.pkg dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
           
-          # Verify PKG signature
-          echo "Verifying PKG signature..."
-          pkgutil --check-signature dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
+      #     # Verify PKG signature
+      #     echo "Verifying PKG signature..."
+      #     pkgutil --check-signature dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
 
-      # Notarize PKG
-      - name: Notarize PKG
-        id: notarize-pkg
-        env:
-          APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PWD }}
-          APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
-        run: |
-          echo "Submitting PKG for notarization..."
+      # # Notarize PKG
+      # - name: Notarize PKG
+      #   id: notarize-pkg
+      #   env:
+      #     APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+      #     APPLE_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PWD }}
+      #     APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+      #   run: |
+      #     echo "Submitting PKG for notarization..."
           
-          # Submit for notarization
-          SUBMISSION_OUTPUT=$(xcrun notarytool submit dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait \
-            --timeout 30m \
-            --output-format json)
+      #     # Submit for notarization
+      #     SUBMISSION_OUTPUT=$(xcrun notarytool submit dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg \
+      #       --apple-id "$APPLE_ID" \
+      #       --password "$APPLE_PASSWORD" \
+      #       --team-id "$APPLE_TEAM_ID" \
+      #       --wait \
+      #       --timeout 30m \
+      #       --output-format json)
           
-          echo "$SUBMISSION_OUTPUT"
+      #     echo "$SUBMISSION_OUTPUT"
           
-          # Check if notarization was successful
-          STATUS=$(echo "$SUBMISSION_OUTPUT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+      #     # Check if notarization was successful
+      #     STATUS=$(echo "$SUBMISSION_OUTPUT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
           
-          if [ "$STATUS" = "Accepted" ]; then
-            echo "✅ Notarization successful!"
+      #     if [ "$STATUS" = "Accepted" ]; then
+      #       echo "✅ Notarization successful!"
             
-            # Staple the notarization ticket to the PKG
-            echo "Stapling notarization ticket..."
-            xcrun stapler staple dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
+      #       # Staple the notarization ticket to the PKG
+      #       echo "Stapling notarization ticket..."
+      #       xcrun stapler staple dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
             
-            # Verify stapling
-            xcrun stapler validate dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
+      #       # Verify stapling
+      #       xcrun stapler validate dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
             
-            # Final verification with spctl
-            echo "Verifying Gatekeeper acceptance..."
-            spctl -a -vvv -t install dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
+      #       # Final verification with spctl
+      #       echo "Verifying Gatekeeper acceptance..."
+      #       spctl -a -vvv -t install dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
             
-            echo "notarized=true" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Notarization failed with status: $STATUS"
+      #       echo "notarized=true" >> $GITHUB_OUTPUT
+      #     else
+      #       echo "❌ Notarization failed with status: $STATUS"
             
-            # Get submission ID for debugging
-            SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
-            if [ -n "$SUBMISSION_ID" ]; then
-              echo "Fetching notarization log..."
-              xcrun notarytool log "$SUBMISSION_ID" \
-                --apple-id "$APPLE_ID" \
-                --password "$APPLE_PASSWORD" \
-                --team-id "$APPLE_TEAM_ID"
-            fi
+      #       # Get submission ID for debugging
+      #       SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+      #       if [ -n "$SUBMISSION_ID" ]; then
+      #         echo "Fetching notarization log..."
+      #         xcrun notarytool log "$SUBMISSION_ID" \
+      #           --apple-id "$APPLE_ID" \
+      #           --password "$APPLE_PASSWORD" \
+      #           --team-id "$APPLE_TEAM_ID"
+      #       fi
             
-            exit 1
-          fi
+      #       exit 1
+      #     fi
 
       # Generate build summary
       - name: Generate Build Summary
