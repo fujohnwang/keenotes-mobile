@@ -175,7 +175,7 @@ jobs:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           # ==========================================
-          # 1. 准备 Entitlements (必须!)
+          # 1. 准备 Entitlements
           # ==========================================
           cat > entitlements.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -199,7 +199,6 @@ jobs:
             SQLITE_ARCH="x86_64"
           fi
           
-          # 注意：这里我们使用 $APPDIR/../Frameworks，这非常正确
           jpackage \
             --input target \
             --name "KeeNotes" \
@@ -220,87 +219,93 @@ jobs:
           FRAMEWORKS_DIR="$APP_PATH/Contents/Frameworks"
           mkdir -p "$FRAMEWORKS_DIR"
           
-          echo "=== Extracting Native Libraries ==="
+          echo "=== Processing Native Libraries ==="
           
-          # 1. 获取主 Jar 的【绝对路径】，避免后续 cd 导致找不到文件
-          # 使用 $(pwd) 拼接当前工作目录
+          # 获取 Main Jar 的绝对路径
           MAIN_JAR="$(pwd)/$APP_PATH/Contents/app/keenotes-mobile-1.0.0-SNAPSHOT.jar"
+          echo "Processing Main JAR: $MAIN_JAR"
           
-          echo "Target Main JAR: $MAIN_JAR"
-          
-          # 2. 提取 sqlite jar 到临时文件 (直接在当前目录操作，不 cd)
+          # 1. 提取 sqlite jar 到临时文件
           unzip -p "$MAIN_JAR" "BOOT-INF/lib/sqlite-jdbc-*.jar" > sqlite-temp.jar
           
-          # 3. 提取 dylib
-          unzip -p sqlite-temp.jar "org/sqlite/native/Mac/$SQLITE_ARCH/libsqlitejdbc.dylib" > "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
-          
-          if [ -f "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
-             echo "  ✓ Extracted libsqlitejdbc.dylib to Frameworks"
+          if [ -s sqlite-temp.jar ]; then
+             echo "Found SQLite JDBC jar."
              
-             # 4. 从临时 sqlite jar 中删除 native 文件夹
-             zip -d sqlite-temp.jar "org/sqlite/native/Mac/*"
+             # 2. 提取 dylib 到 Frameworks (供 App 运行时加载)
+             unzip -p sqlite-temp.jar "org/sqlite/native/Mac/$SQLITE_ARCH/libsqlitejdbc.dylib" > "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
              
-             # 5. 获取 sqlite 在 Main Jar 中的具体路径 (例如 BOOT-INF/lib/sqlite-jdbc-3.46.0.0.jar)
-             SQLITE_PATH_IN_MAIN=$(unzip -l "$MAIN_JAR" | grep "sqlite-jdbc-.*\.jar" | awk '{print $4}')
-             
-             echo "Updating $SQLITE_PATH_IN_MAIN inside Main Jar..."
-             
-             # --- 修复核心：构造正确的目录结构进行更新 ---
-             TEMP_WORK=$(mktemp -d)
-             
-             # 在临时目录中重建 BOOT-INF/lib/xxx.jar 的目录结构
-             # dirname 获取路径目录 (BOOT-INF/lib)
-             DIR_STRUCTURE=$(dirname "$SQLITE_PATH_IN_MAIN")
-             mkdir -p "$TEMP_WORK/$DIR_STRUCTURE"
-             
-             # 将剥离了 native 的 jar 移动到临时目录对应的位置
-             mv sqlite-temp.jar "$TEMP_WORK/$SQLITE_PATH_IN_MAIN"
-             
-             # 进入临时目录，使用 jar uf 更新主 Jar
-             # 因为 MAIN_JAR 已经是绝对路径了，所以这里不会报错
-             (cd "$TEMP_WORK" && jar uf "$MAIN_JAR" "$SQLITE_PATH_IN_MAIN")
-             
-             echo "  ✓ Updated Main JAR (stripped natives)"
-             rm -rf "$TEMP_WORK"
+             if [ -s "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
+                echo "  ✓ Extracted libsqlitejdbc.dylib to Frameworks"
+                
+                # 3. 【关键】从 sqlite-temp.jar 中彻底删除 Mac native 库
+                # 这一步是为了满足 Apple 公证，因为它们在 jar 里没法签名
+                echo "  Stripping unsigned binaries from sqlite-temp.jar..."
+                zip -d sqlite-temp.jar "org/sqlite/native/Mac/*" 2>/dev/null || true
+                
+                # 4. 【核心修复】将处理干净的 jar 塞回 Main Jar
+                # 必须使用 zip -0 (无压缩模式) 更新，否则 Spring Boot 启动会报错
+                SQLITE_INTERNAL_PATH=$(unzip -l "$MAIN_JAR" | grep "sqlite-jdbc-.*\.jar" | awk '{print $4}')
+                echo "  Updating $SQLITE_INTERNAL_PATH inside Main JAR..."
+                
+                # 创建对应的目录结构以便 zip 更新
+                TEMP_UPDATE_DIR="update_tmp"
+                mkdir -p "$TEMP_UPDATE_DIR/$(dirname "$SQLITE_INTERNAL_PATH")"
+                mv sqlite-temp.jar "$TEMP_UPDATE_DIR/$SQLITE_INTERNAL_PATH"
+                
+                # 进入临时目录执行更新
+                cd "$TEMP_UPDATE_DIR"
+                # -u: 更新, -0: 仅存储(不压缩) -> 这解决了 ClassNotFoundException
+                zip -0 -u "$MAIN_JAR" "$SQLITE_INTERNAL_PATH"
+                cd ..
+                rm -rf "$TEMP_UPDATE_DIR"
+                
+                echo "  ✓ Successfully patched Main JAR (Store mode)"
+             else
+                echo "  ⚠ Failed to extract dylib (Architecture mismatch?)"
+             fi
           else
-             echo "⚠ Warning: SQLite dylib not found in jar!"
-             # 如果提取失败，清理临时文件
-             rm -f sqlite-temp.jar
+             echo "  ⚠ SQLite JDBC jar not found inside Main JAR"
           fi
-          
+
           # ==========================================
           # 3. 签名流程
           # ==========================================
-          
           echo "=== Signing Binaries ==="
           
-          # 1. 签名 Frameworks (刚才提取出来的)
-          codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
+          # [关键] 修复 libjli.dylib 软链接
+          JLI_REAL="$APP_PATH/Contents/runtime/Contents/Home/lib/libjli.dylib"
+          JLI_LINK="$APP_PATH/Contents/runtime/Contents/MacOS/libjli.dylib"
+          if [ -f "$JLI_LINK" ]; then
+            rm "$JLI_LINK"
+            ln -s "../Home/lib/libjli.dylib" "$JLI_LINK"
+            echo "  ✓ Fixed libjli.dylib symlink"
+          fi
           
-          # 2. 签名 App 内的所有 .dylib 和 .jnilib (JRE 自带的)
-          # 注意：排除刚才签过的 Frameworks 目录，防止重复
-          find "$APP_PATH/Contents" -name "*.dylib" -o -name "*.jnilib" | while read lib; do
+          # 1. 签名 Frameworks (刚才提取出来的 sqlite)
+          if [ -f "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
+             codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
+          fi
+          
+          # 2. 签名所有 dylib/jnilib (排除 Frameworks)
+          find "$APP_PATH/Contents" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
              if [[ "$lib" != *"/Frameworks/"* ]]; then
+                 echo "Signing lib: $(basename $lib)"
                  codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
              fi
           done
           
-          # 3. 签名 JRE 的可执行文件 (jspawnhelper, java 等)
+          # 3. 签名 JRE 可执行文件
           find "$APP_PATH/Contents/runtime" -type f -perm +111 | while read exe; do
              if file "$exe" | grep -q "Mach-O"; then
-                # 可执行文件也需要 entitlements 吗？通常 helper 不需要，主程序需要。
-                # 给 JRE 里的 java 加上 entitlements 比较稳妥，防止它自己启动子进程受限
+                echo "Signing exe: $(basename $exe)"
                 codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$exe"
              fi
           done
           
-          # 4. 签名主启动器 (Contents/MacOS/KeeNotes)
-          # 这是最重要的！必须带上 Entitlements
+          # 4. 签名主程序和 App Bundle
           echo "Signing Main Executable..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH/Contents/MacOS/KeeNotes"
           
-          # 5. 签名整个 App Bundle (这一步通常不需要 entitlements 参数，因为 components 已经签好了)
-          # 但为了保险，保持一致
           echo "Signing App Bundle..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH"
           
@@ -315,16 +320,13 @@ jobs:
           
           hdiutil create -volname "$VOLNAME" -srcfolder dist/KeeNotes.app -ov -format UDZO "$DMG_TEMP"
           
-          # === 新增：签名 DMG ===
           echo "Signing DMG..."
           codesign --force --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --timestamp "$DMG_TEMP"
           
           mv "$DMG_TEMP" "$DMG_FINAL"
-          
-          # 验证 DMG 签名
           codesign -vvv "$DMG_FINAL"
 
-      # Notarize DMG
+      # Notarize DMG (保持不变)
       - name: Notarize DMG
         id: notarize-dmg
         env:
@@ -333,8 +335,6 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
         run: |
           echo "Submitting DMG for notarization..."
-          
-          # Submit for notarization
           SUBMISSION_OUTPUT=$(xcrun notarytool submit dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
@@ -345,41 +345,215 @@ jobs:
           
           echo "$SUBMISSION_OUTPUT"
           
-          # Check if notarization was successful
           STATUS=$(echo "$SUBMISSION_OUTPUT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
           
           if [ "$STATUS" = "Accepted" ]; then
             echo "✅ Notarization successful!"
-            
-            # Staple the notarization ticket to the DMG
-            echo "Stapling notarization ticket..."
             xcrun stapler staple dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
-            
-            # Verify stapling
-            xcrun stapler validate dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
-            
-            # Final verification with spctl (should pass now after notarization)
-            echo "Verifying Gatekeeper acceptance..."
-            hdiutil attach dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg -nobrowse -mountpoint /Volumes/KeeNotes
-            spctl -a -vvv -t install /Volumes/KeeNotes/KeeNotes.app
-            hdiutil detach /Volumes/KeeNotes
-            
             echo "notarized=true" >> $GITHUB_OUTPUT
           else
             echo "❌ Notarization failed with status: $STATUS"
-            
-            # Get submission ID for debugging
-            SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
-            if [ -n "$SUBMISSION_ID" ]; then
-              echo "Fetching notarization log..."
-              xcrun notarytool log "$SUBMISSION_ID" \
-                --apple-id "$APPLE_ID" \
-                --password "$APPLE_PASSWORD" \
-                --team-id "$APPLE_TEAM_ID"
-            fi
-            
             exit 1
           fi
+
+      # - name: Create Signed macOS App Bundle
+      #   env:
+      #     MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      #   run: |
+      #     # ==========================================
+      #     # 1. 准备 Entitlements (必须!)
+      #     # ==========================================
+      #     cat > entitlements.plist <<EOF
+      #     <?xml version="1.0" encoding="UTF-8"?>
+      #     <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      #     <plist version="1.0">
+      #     <dict>
+      #         <key>com.apple.security.cs.allow-jit</key>
+      #         <true/>
+      #         <key>com.apple.security.cs.disable-library-validation</key>
+      #         <true/>
+      #     </dict>
+      #     </plist>
+      #     EOF
+
+      #     # ==========================================
+      #     # 2. 生成 App Image
+      #     # ==========================================
+      #     if [ "${{ matrix.arch }}" = "mac-aarch64" ]; then
+      #       SQLITE_ARCH="aarch64"
+      #     else
+      #       SQLITE_ARCH="x86_64"
+      #     fi
+          
+      #     # jpackage 命令
+      #     # -Dorg.sqlite.lib.path 告诉 SQLite 优先去 Frameworks 找库
+      #     jpackage \
+      #       --input target \
+      #       --name "KeeNotes" \
+      #       --main-jar keenotes-mobile-1.0.0-SNAPSHOT.jar \
+      #       --main-class org.springframework.boot.loader.launch.JarLauncher \
+      #       --type app-image \
+      #       --app-version ${{ steps.version.outputs.app_version }} \
+      #       --vendor "Keevol" \
+      #       --icon "src/main/resources/icons/keenotes.icns" \
+      #       --mac-package-identifier "cn.keevol.keenotes" \
+      #       --mac-package-name "KeeNotes" \
+      #       --java-options "-Xmx512m" \
+      #       --java-options "-Xdock:name=KeeNotes" \
+      #       --java-options "-Dorg.sqlite.lib.path=\$APPDIR/../Frameworks" \
+      #       --dest dist
+          
+      #     APP_PATH="dist/KeeNotes.app"
+      #     FRAMEWORKS_DIR="$APP_PATH/Contents/Frameworks"
+      #     mkdir -p "$FRAMEWORKS_DIR"
+          
+      #     # ==========================================
+      #     # 3. 提取 Native Libraries (只提取，不修改 Jar)
+      #     # ==========================================
+      #     echo "=== Extracting Native Libraries to Frameworks ==="
+          
+      #     MAIN_JAR="$APP_PATH/Contents/app/keenotes-mobile-1.0.0-SNAPSHOT.jar"
+          
+      #     # 使用 unzip 管道提取，不解压整个 Jar，保证 Main Jar 完好无损
+      #     # 1. 从 Main Jar 提取 sqlite jar 到 stdout -> 写入 temp jar
+      #     unzip -p "$MAIN_JAR" "BOOT-INF/lib/sqlite-jdbc-*.jar" > sqlite-temp.jar
+          
+      #     if [ -s sqlite-temp.jar ]; then
+      #        echo "Found SQLite JDBC jar, extracting dylib..."
+      #        # 2. 从 temp jar 提取 dylib 到 Frameworks
+      #        unzip -p sqlite-temp.jar "org/sqlite/native/Mac/$SQLITE_ARCH/libsqlitejdbc.dylib" > "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
+             
+      #        if [ -s "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
+      #           echo "  ✓ Extracted libsqlitejdbc.dylib to Frameworks"
+      #        else
+      #           echo "  ⚠ Failed to extract dylib from sqlite jar"
+      #        fi
+      #        rm sqlite-temp.jar
+      #     else
+      #        echo "  ⚠ SQLite JDBC jar not found in BOOT-INF/lib"
+      #     fi
+
+      #     # ==========================================
+      #     # 4. 签名流程
+      #     # ==========================================
+      #     echo "=== Signing Binaries ==="
+          
+      #     # [关键步骤] 修复 libjli.dylib 结构，防止 Notarization 失败
+      #     JLI_REAL="$APP_PATH/Contents/runtime/Contents/Home/lib/libjli.dylib"
+      #     JLI_LINK="$APP_PATH/Contents/runtime/Contents/MacOS/libjli.dylib"
+          
+      #     if [ -f "$JLI_LINK" ]; then
+      #       echo "Fixing libjli.dylib structure..."
+      #       rm "$JLI_LINK"
+      #       ln -s "../Home/lib/libjli.dylib" "$JLI_LINK"
+      #       echo "  ✓ Replaced MacOS/libjli.dylib with symlink"
+      #     fi
+          
+      #     # 1. 签名 Frameworks (刚才提取出来的 sqlite)
+      #     if [ -f "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
+      #        codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
+      #     fi
+          
+      #     # 2. 签名 App 内的所有 .dylib 和 .jnilib (JRE 自带的)
+      #     # 使用 -type f 忽略我们刚才建立的软链接
+      #     find "$APP_PATH/Contents" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
+      #        if [[ "$lib" != *"/Frameworks/"* ]]; then
+      #            echo "Signing lib: $(basename $lib)"
+      #            codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
+      #        fi
+      #     done
+          
+      #     # 3. 签名 JRE 的可执行文件
+      #     find "$APP_PATH/Contents/runtime" -type f -perm +111 | while read exe; do
+      #        if file "$exe" | grep -q "Mach-O"; then
+      #           echo "Signing exe: $(basename $exe)"
+      #           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$exe"
+      #        fi
+      #     done
+          
+      #     # 4. 签名主启动器
+      #     echo "Signing Main Executable..."
+      #     codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH/Contents/MacOS/KeeNotes"
+          
+      #     # 5. 签名整个 App Bundle (不加 --deep)
+      #     echo "Signing App Bundle..."
+      #     codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH"
+          
+      #     # 验证
+      #     codesign -vvv --deep --strict "$APP_PATH"
+
+      # - name: Create Signed macOS DMG
+      #   run: |
+      #     VOLNAME="KeeNotes"
+      #     DMG_TEMP="dist/KeeNotes-temp.dmg"
+      #     DMG_FINAL="dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg"
+          
+      #     # 创建 DMG
+      #     hdiutil create -volname "$VOLNAME" -srcfolder dist/KeeNotes.app -ov -format UDZO "$DMG_TEMP"
+          
+      #     # 签名 DMG (Notarization 需要)
+      #     echo "Signing DMG..."
+      #     codesign --force --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --timestamp "$DMG_TEMP"
+          
+      #     mv "$DMG_TEMP" "$DMG_FINAL"
+      #     codesign -vvv "$DMG_FINAL"
+
+      # # Notarize DMG
+      # - name: Notarize DMG
+      #   id: notarize-dmg
+      #   env:
+      #     APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+      #     APPLE_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PWD }}
+      #     APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+      #   run: |
+      #     echo "Submitting DMG for notarization..."
+          
+      #     # Submit for notarization
+      #     SUBMISSION_OUTPUT=$(xcrun notarytool submit dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg \
+      #       --apple-id "$APPLE_ID" \
+      #       --password "$APPLE_PASSWORD" \
+      #       --team-id "$APPLE_TEAM_ID" \
+      #       --wait \
+      #       --timeout 30m \
+      #       --output-format json)
+          
+      #     echo "$SUBMISSION_OUTPUT"
+          
+      #     # Check if notarization was successful
+      #     STATUS=$(echo "$SUBMISSION_OUTPUT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+          
+      #     if [ "$STATUS" = "Accepted" ]; then
+      #       echo "✅ Notarization successful!"
+            
+      #       # Staple the notarization ticket to the DMG
+      #       echo "Stapling notarization ticket..."
+      #       xcrun stapler staple dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
+            
+      #       # Verify stapling
+      #       xcrun stapler validate dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
+            
+      #       # Final verification with spctl (should pass now after notarization)
+      #       echo "Verifying Gatekeeper acceptance..."
+      #       hdiutil attach dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg -nobrowse -mountpoint /Volumes/KeeNotes
+      #       spctl -a -vvv -t install /Volumes/KeeNotes/KeeNotes.app
+      #       hdiutil detach /Volumes/KeeNotes
+            
+      #       echo "notarized=true" >> $GITHUB_OUTPUT
+      #     else
+      #       echo "❌ Notarization failed with status: $STATUS"
+            
+      #       # Get submission ID for debugging
+      #       SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+      #       if [ -n "$SUBMISSION_ID" ]; then
+      #         echo "Fetching notarization log..."
+      #         xcrun notarytool log "$SUBMISSION_ID" \
+      #           --apple-id "$APPLE_ID" \
+      #           --password "$APPLE_PASSWORD" \
+      #           --team-id "$APPLE_TEAM_ID"
+      #       fi
+            
+      #       exit 1
+      #     fi
 
       # - name: Create Signed macOS PKG
       #   env:
