@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
@@ -29,6 +28,12 @@ class ReviewFragment : Fragment() {
     private var notesJob: Job? = null
     private var dotsAnimationJob: Job? = null
     
+    // Pagination state
+    private val loadedNotes = mutableListOf<cn.keevol.keenotes.data.entity.Note>()
+    private var isLoadingMore = false
+    private var hasMoreData = true
+    private val pageSize = 20
+    
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -41,16 +46,10 @@ class ReviewFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
-        setupHeader()
         setupPeriodSelector()
         setupRecyclerView()
-        observeNotes(currentPeriod)
-    }
-    
-    private fun setupHeader() {
-        binding.btnBack.setOnClickListener {
-            findNavController().popBackStack()
-        }
+        setupSyncChannelStatus()
+        loadInitialNotes()
     }
     
     private fun setupPeriodSelector() {
@@ -66,7 +65,10 @@ class ReviewFragment : Fragment() {
                     R.id.periodAll -> "All"
                     else -> "7 days"
                 }
-                observeNotes(currentPeriod)
+                // Reset and reload
+                loadedNotes.clear()
+                hasMoreData = true
+                loadInitialNotes()
             }
         }
     }
@@ -75,82 +77,241 @@ class ReviewFragment : Fragment() {
         binding.notesRecyclerView.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = notesAdapter
+            
+            // Add scroll listener for pagination
+            addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+                    
+                    val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+                    val visibleItemCount = layoutManager.childCount
+                    val totalItemCount = layoutManager.itemCount
+                    val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
+                    
+                    // Load more when scrolled to bottom
+                    if (!isLoadingMore && hasMoreData && dy > 0) {
+                        if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 5) {
+                            loadMoreNotes()
+                        }
+                    }
+                }
+            })
         }
     }
     
-    /**
-     * Observe notes from database using Flow - auto-updates when data changes
-     * Simplified logic: primarily rely on notes data, use syncState only for empty message
-     */
-    private fun observeNotes(period: String) {
+    private fun setupSyncChannelStatus() {
         val app = requireActivity().application as KeeNotesApp
         
-        // Show initial loading state
-        binding.loadingText.visibility = View.VISIBLE
-        binding.notesRecyclerView.visibility = View.GONE
-        binding.emptyText.visibility = View.GONE
+        // Observe WebSocket connection state
+        viewLifecycleOwner.lifecycleScope.launch {
+            app.webSocketService.connectionState.collectLatest { state ->
+                if (_binding != null) {
+                    updateSyncChannelStatus(state)
+                }
+            }
+        }
         
-        // Cancel previous observation
-        notesJob?.cancel()
+        // Observe sync state for syncing indicator
+        viewLifecycleOwner.lifecycleScope.launch {
+            app.webSocketService.syncState.collectLatest { syncState ->
+                if (_binding != null) {
+                    updateSyncingIndicator(syncState)
+                    // Reload when sync completes
+                    if (syncState == WebSocketService.SyncState.COMPLETED) {
+                        loadedNotes.clear()
+                        hasMoreData = true
+                        loadInitialNotes()
+                    }
+                }
+            }
+        }
         
-        val days = when (period) {
+        // Observe note count changes for realtime updates
+        var previousCount = 0
+        viewLifecycleOwner.lifecycleScope.launch {
+            app.database.noteDao().getNoteCountFlow().collectLatest { count ->
+                if (_binding != null && previousCount > 0 && count > previousCount) {
+                    // New notes arrived - load and add them at top
+                    loadNewNotesAtTop(previousCount, count)
+                }
+                previousCount = count
+            }
+        }
+    }
+    
+    private fun loadInitialNotes() {
+        val app = requireActivity().application as KeeNotesApp
+        val days = getDaysForPeriod(currentPeriod)
+        val since = getSinceDate(days)
+        
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                // Get total count
+                val totalCount = app.database.noteDao().getNotesCountForReview(since)
+                
+                // Load first page
+                val notes = app.database.noteDao().getNotesForReviewPaged(since, pageSize, 0)
+                
+                loadedNotes.clear()
+                loadedNotes.addAll(notes)
+                hasMoreData = loadedNotes.size < totalCount
+                
+                if (loadedNotes.isEmpty()) {
+                    binding.notesRecyclerView.visibility = View.GONE
+                } else {
+                    binding.notesRecyclerView.visibility = View.VISIBLE
+                    notesAdapter.submitList(loadedNotes.toList())
+                }
+                
+                updateCountText(totalCount, currentPeriod)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    private fun loadNewNotesAtTop(previousCount: Int, newCount: Int) {
+        val app = requireActivity().application as KeeNotesApp
+        val days = getDaysForPeriod(currentPeriod)
+        val since = getSinceDate(days)
+        
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                // Calculate how many new notes
+                val newNotesCount = newCount - previousCount
+                
+                // Load the newest notes (they should be at the top)
+                val newNotes = app.database.noteDao().getNotesForReviewPaged(since, newNotesCount, 0)
+                
+                if (newNotes.isNotEmpty()) {
+                    // Filter out notes that are already in the list
+                    val existingIds = loadedNotes.map { it.id }.toSet()
+                    val trulyNewNotes = newNotes.filter { it.id !in existingIds }
+                    
+                    if (trulyNewNotes.isNotEmpty()) {
+                        // Add new notes at the beginning
+                        loadedNotes.addAll(0, trulyNewNotes)
+                        
+                        // Update adapter
+                        notesAdapter.submitList(loadedNotes.toList()) {
+                            // Scroll to top to show new notes
+                            binding.notesRecyclerView.scrollToPosition(0)
+                        }
+                        
+                        // Update count
+                        val totalCount = app.database.noteDao().getNotesCountForReview(since)
+                        updateCountText(totalCount, currentPeriod)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    private fun loadMoreNotes() {
+        if (isLoadingMore || !hasMoreData) return
+        
+        isLoadingMore = true
+        val app = requireActivity().application as KeeNotesApp
+        val days = getDaysForPeriod(currentPeriod)
+        val since = getSinceDate(days)
+        
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val notes = app.database.noteDao().getNotesForReviewPaged(
+                    since, 
+                    pageSize, 
+                    loadedNotes.size
+                )
+                
+                if (notes.isEmpty()) {
+                    hasMoreData = false
+                } else {
+                    loadedNotes.addAll(notes)
+                    notesAdapter.submitList(loadedNotes.toList())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                isLoadingMore = false
+            }
+        }
+    }
+    
+    private fun getDaysForPeriod(period: String): Int {
+        return when (period) {
             "30 days" -> 30
             "90 days" -> 90
             "All" -> 3650
             else -> 7
         }
+    }
+    
+    private fun getSinceDate(days: Int): String {
+        return Instant.now().minus(days.toLong(), ChronoUnit.DAYS).toString()
+    }
+    
+    private fun updateSyncChannelStatus(state: WebSocketService.ConnectionState) {
+        // Check if view is still attached
+        if (_binding == null || !isAdded) return
         
-        val since = Instant.now().minus(days.toLong(), ChronoUnit.DAYS).toString()
+        val (text, color) = when (state) {
+            WebSocketService.ConnectionState.CONNECTED -> 
+                "✓" to requireContext().getColor(R.color.success)
+            WebSocketService.ConnectionState.CONNECTING -> 
+                "..." to requireContext().getColor(R.color.warning)
+            WebSocketService.ConnectionState.DISCONNECTED -> 
+                "✗" to requireContext().getColor(R.color.text_secondary)
+        }
         
-        notesJob = lifecycleScope.launch {
-            // Combine notes flow with sync state flow
-            combine(
-                app.database.noteDao().getNotesForReviewFlow(since),
-                app.webSocketService.syncState
-            ) { notes, syncState ->
-                Pair(notes, syncState)
-            }.collectLatest { (notes, syncState) ->
-                if (notes.isEmpty()) {
-                    // Hide loading, show empty state
-                    binding.loadingText.visibility = View.GONE
-                    binding.emptyText.visibility = View.VISIBLE
-                    binding.notesRecyclerView.visibility = View.GONE
-                    
-                    // Show different message based on sync state
-                    when (syncState) {
-                        WebSocketService.SyncState.SYNCING -> {
-                            startDotsAnimation("Notes syncing")
-                        }
-                        WebSocketService.SyncState.IDLE -> {
-                            stopDotsAnimation()
-                            binding.emptyText.text = "Waiting for sync..."
-                        }
-                        WebSocketService.SyncState.COMPLETED -> {
-                            stopDotsAnimation()
-                            binding.emptyText.text = "No notes found for $period"
-                        }
-                    }
-                    binding.countText.text = "0 note(s)"
-                } else {
-                    // Show notes list
-                    stopDotsAnimation()
-                    binding.loadingText.visibility = View.GONE
-                    binding.emptyText.visibility = View.GONE
-                    binding.notesRecyclerView.visibility = View.VISIBLE
-                    binding.countText.text = "${notes.size} note(s)"
-                    notesAdapter.submitList(notes)
-                }
+        binding.syncIndicator.setColorFilter(color)
+        binding.syncStatusText.text = text
+        binding.syncStatusText.setTextColor(color)
+    }
+    
+    private fun updateSyncingIndicator(syncState: WebSocketService.SyncState) {
+        if (_binding == null || !isAdded) return
+        
+        when (syncState) {
+            WebSocketService.SyncState.SYNCING -> {
+                binding.syncingContainer.visibility = View.VISIBLE
+                binding.syncingText.text = "Syncing..."
+                // Start rotation animation for spinner
+                val rotateAnimation = android.view.animation.AnimationUtils.loadAnimation(
+                    requireContext(), 
+                    R.anim.rotate_spinner
+                )
+                binding.syncingSpinner.startAnimation(rotateAnimation)
+            }
+            else -> {
+                binding.syncingContainer.visibility = View.GONE
+                // Stop animation
+                binding.syncingSpinner.clearAnimation()
             }
         }
     }
     
-    private fun startDotsAnimation(baseText: String) {
+
+    
+    private fun updateCountText(count: Int, period: String) {
+        val periodInfo = when (period) {
+            "7 days" -> " - Last 7 days"
+            "30 days" -> " - Last 30 days"
+            "90 days" -> " - Last 90 days"
+            "All" -> " - All"
+            else -> ""
+        }
+        binding.countText.text = "$count note(s)$periodInfo"
+    }
+    
+    private fun startDotsAnimation() {
         stopDotsAnimation()
         dotsAnimationJob = lifecycleScope.launch {
             var dotCount = 0
             while (true) {
                 val dots = ".".repeat(dotCount)
-                binding.emptyText.text = "$baseText$dots"
+                binding.syncingText.text = "Syncing$dots"
                 dotCount = (dotCount + 1) % 4  // 0, 1, 2, 3, then back to 0
                 kotlinx.coroutines.delay(500)  // Update every 500ms
             }

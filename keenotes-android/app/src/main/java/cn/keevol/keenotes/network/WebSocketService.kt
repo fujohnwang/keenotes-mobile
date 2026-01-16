@@ -7,6 +7,7 @@ import cn.keevol.keenotes.data.dao.SyncStateDao
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.data.entity.SyncState
 import cn.keevol.keenotes.data.repository.SettingsRepository
+import cn.keevol.keenotes.util.DebugLogger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -116,11 +117,15 @@ class WebSocketService(
         }
         
         isConnecting = true
+        DebugLogger.log("WebSocket", "connect() called, starting scope.launch")
         
         scope.launch {
             try {
+                DebugLogger.log("WebSocket", "Inside scope.launch, about to get endpoint")
                 val endpoint = settingsRepository.getEndpointUrl()
+                DebugLogger.log("WebSocket", "Got endpoint: ${endpoint.take(30)}...")
                 val token = settingsRepository.getToken()
+                DebugLogger.log("WebSocket", "Got token: ${token.take(10)}...")
                 
                 if (endpoint.isBlank() || token.isBlank()) {
                     Log.w(TAG, "Not configured, skipping connection")
@@ -129,11 +134,12 @@ class WebSocketService(
                 }
                 
                 // CRITICAL: Cache the encryption password BEFORE WebSocket connection
-                // This avoids nested runBlocking calls in onMessage callback
+                DebugLogger.log("WebSocket", "About to get encryption password")
                 cachedPassword = settingsRepository.getEncryptionPassword().takeIf { it.isNotBlank() }
-                Log.i(TAG, "Cached encryption password: ${if (cachedPassword != null) "yes (${cachedPassword!!.length} chars)" else "no"}")
+                DebugLogger.log("WebSocket", "Cached password: ${if (cachedPassword != null) "yes" else "no"}")
                 
                 // Parse URL and build WebSocket URL
+                DebugLogger.log("WebSocket", "Parsing URL")
                 val uri = URI(endpoint)
                 val host = uri.host
                 val ssl = uri.scheme.equals("https", ignoreCase = true) || uri.scheme.equals("wss", ignoreCase = true)
@@ -150,16 +156,14 @@ class WebSocketService(
                 val protocol = if (ssl) "wss" else "ws"
                 val wsUrl = "$protocol://$host:$port$path"
                 
-                Log.i(TAG, "WebSocket connecting to: $wsUrl")
+                DebugLogger.log("WebSocket", "Connecting to: $wsUrl")
                 _connectionState.value = ConnectionState.CONNECTING
                 
                 // CRITICAL: Load last sync ID BEFORE creating WebSocket
-                // OkHttp's onOpen callback runs on a different thread, so we must
-                // ensure lastSyncId is set before newWebSocket() is called
-                // If no sync_state record exists, use -1 (means never synced)
+                DebugLogger.log("WebSocket", "About to get sync state from DB")
                 val syncState = syncStateDao.getSyncState()
                 lastSyncId = syncState?.lastSyncId ?: -1
-                Log.i(TAG, "Loaded lastSyncId: $lastSyncId (syncState exists: ${syncState != null})")
+                DebugLogger.log("WebSocket", "Loaded lastSyncId: $lastSyncId")
                 
                 // Build request with headers (match JavaFX)
                 val origin = "${if (ssl) "https" else "http"}://$host"
@@ -169,13 +173,19 @@ class WebSocketService(
                     .addHeader("Authorization", "Bearer $token")
                     .build()
                 
-                Log.i(TAG, "Adding Authorization header: Bearer ${token.take(4)}...")
+                DebugLogger.log("WebSocket", "About to create WebSocket")
                 
-                // Create WebSocket - onOpen callback will use the lastSyncId we just set
-                // @Volatile ensures lastSyncId is visible to OkHttp's callback thread
-                webSocket = client.newWebSocket(request, createWebSocketListener())
+                // Create WebSocket with try-catch
+                try {
+                    webSocket = client.newWebSocket(request, createWebSocketListener())
+                    DebugLogger.log("WebSocket", "WebSocket created successfully")
+                } catch (e: Exception) {
+                    DebugLogger.error("WebSocket", "newWebSocket() threw exception", e)
+                    throw e
+                }
                 
             } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "Connection error", e)
                 Log.e(TAG, "Connection error", e)
                 _connectionState.value = ConnectionState.DISCONNECTED
                 isConnecting = false
@@ -208,43 +218,66 @@ class WebSocketService(
     private fun createWebSocketListener() = object : WebSocketListener() {
         
         override fun onOpen(ws: WebSocket, response: Response) {
-            Log.i(TAG, "WebSocket onOpen called, response code: ${response.code}")
-            isConnecting = false
-            webSocket = ws  // Store the WebSocket reference
-            _connectionState.value = ConnectionState.CONNECTED
-            
-            // Send handshake (matching JavaFX)
-            Log.i(TAG, "About to send handshake...")
-            sendHandshake()
-            Log.i(TAG, "Handshake sent, waiting for server response...")
+            try {
+                DebugLogger.log("WebSocket", "onOpen START")
+                Log.i(TAG, "WebSocket onOpen called, response code: ${response.code}")
+                isConnecting = false
+                webSocket = ws  // Store the WebSocket reference
+                DebugLogger.log("WebSocket", "onOpen: webSocket assigned")
+                _connectionState.value = ConnectionState.CONNECTED
+                DebugLogger.log("WebSocket", "onOpen: state set to CONNECTED")
+                
+                // Send handshake (matching JavaFX)
+                DebugLogger.log("WebSocket", "onOpen: about to send handshake...")
+                sendHandshake()
+                DebugLogger.log("WebSocket", "onOpen: handshake sent")
+            } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "onOpen EXCEPTION", e)
+            }
         }
         
         override fun onMessage(ws: WebSocket, text: String) {
-            Log.i(TAG, "onMessage received, length=${text.length}")
-            // Use single-threaded dispatcher to maintain message order
-            // This avoids blocking OkHttp's callback thread while ensuring sequential processing
-            scope.launch(messageDispatcher) {
-                handleMessage(text)
+            try {
+                DebugLogger.log("WebSocket", "onMessage received, length=${text.length}")
+                // Use single-threaded dispatcher to maintain message order
+                scope.launch(messageDispatcher) {
+                    handleMessage(text)
+                }
+            } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "onMessage EXCEPTION", e)
             }
         }
         
         override fun onClosing(ws: WebSocket, code: Int, reason: String) {
-            Log.i(TAG, "WebSocket closing: $code $reason")
-            ws.close(1000, null)
+            try {
+                DebugLogger.log("WebSocket", "onClosing: $code $reason")
+                ws.close(1000, null)
+            } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "onClosing EXCEPTION", e)
+            }
         }
         
         override fun onClosed(ws: WebSocket, code: Int, reason: String) {
-            Log.i(TAG, "WebSocket closed: $code $reason")
-            isConnecting = false
-            _connectionState.value = ConnectionState.DISCONNECTED
-            scheduleReconnect()
+            try {
+                DebugLogger.log("WebSocket", "onClosed: $code $reason")
+                isConnecting = false
+                _connectionState.value = ConnectionState.DISCONNECTED
+                scheduleReconnect()
+            } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "onClosed EXCEPTION", e)
+            }
         }
         
         override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
-            Log.e(TAG, "WebSocket failure: ${t.message}", t)
-            isConnecting = false
-            _connectionState.value = ConnectionState.DISCONNECTED
-            scheduleReconnect()
+            try {
+                DebugLogger.error("WebSocket", "onFailure: ${t.message}", t)
+                Log.e(TAG, "WebSocket failure: ${t.message}", t)
+                isConnecting = false
+                _connectionState.value = ConnectionState.DISCONNECTED
+                scheduleReconnect()
+            } catch (e: Exception) {
+                DebugLogger.error("WebSocket", "onFailure handler EXCEPTION", e)
+            }
         }
     }
     
@@ -458,9 +491,10 @@ class WebSocketService(
             val id = json.getLong("id")
             val encryptedContent = json.getString("content")
             val createdAt = json.optString("created_at", json.optString("createdAt", ""))
+            val channel = json.optString("channel", "default")
             
             val password = cachedPassword
-            Log.i(TAG, "parseNote: id=$id, createdAt=$createdAt, hasPassword=${password != null}")
+            Log.i(TAG, "parseNote: id=$id, createdAt=$createdAt, channel=$channel, hasPassword=${password != null}")
             
             val content = if (password != null) {
                 try {
@@ -469,16 +503,16 @@ class WebSocketService(
                     Log.i(TAG, "Decrypted note $id successfully, length=${decrypted.length}")
                     decrypted
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to decrypt note $id: ${e.message}", e)
+                    Log.e(TAG, "Failed to decrypt note $id: ${e.message}, storing encrypted content", e)
                     e.printStackTrace()
-                    "[Decryption failed: ${e.message}]"
+                    encryptedContent
                 }
             } else {
                 Log.w(TAG, "No encryption password, using raw content for note $id")
                 encryptedContent
             }
             
-            Note(id = id, content = content, createdAt = createdAt)
+            Note(id = id, content = content, channel = channel, createdAt = createdAt)
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing note JSON: ${e.message}", e)
             e.printStackTrace()

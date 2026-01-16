@@ -1,0 +1,796 @@
+/* Dark Theme - Tech Style */
+* {
+    -fx-primary: #00D4FF;
+    -fx-primary-dark: #00A8CC;
+    -fx-background: #0D1117;
+    -fx-surface: #161B22;
+    -fx-surface-elevated: #21262D;
+    -fx-text-primary: #E6EDF3;
+    -fx-text-secondary: #8B949E;
+    -fx-border: #30363D;
+    -fx-success: #3FB950;
+    -fx-error: #F85149;
+    -fx-accent-glow: rgba(0, 212, 255, 0.15);
+}
+
+.main-view {
+    -fx-background-color: -fx-background;
+}
+
+/* Header */
+.header {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+}
+
+.header-title {
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* Search field */
+.search-field {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-border-color: -fx-border;
+    -fx-text-fill: -fx-text-primary;
+    -fx-prompt-text-fill: -fx-text-secondary;
+}
+
+.search-field:focused {
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, -fx-accent-glow, 12, 0, 0, 0);
+}
+
+.clear-search-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.clear-search-btn:hover {
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* Search results */
+.search-results {
+    -fx-background-color: -fx-surface;
+}
+
+.search-loading, .no-results {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.search-result-card {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-border-color: -fx-border;
+}
+
+.search-result-card:hover {
+    -fx-background-color: -fx-surface;
+}
+
+.search-result-title {
+    -fx-text-fill: -fx-primary;
+}
+
+.search-result-snippet {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.search-result-preview {
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* Search pane */
+.search-pane, .note-pane {
+    -fx-background-color: -fx-background;
+}
+
+.search-pane-title {
+    -fx-text-fill: -fx-text-primary;
+}
+
+.back-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-primary;
+}
+
+.back-button:hover {
+    -fx-text-fill: -fx-text-primary;
+}
+
+.search-count {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.copied-label {
+    -fx-text-fill: -fx-success;
+}
+
+.expand-icon {
+    -fx-text-fill: -fx-primary;
+}
+
+.search-result-content {
+    -fx-background-color: -fx-background;
+    -fx-border-color: -fx-border;
+}
+
+.search-result-content-text {
+    -fx-text-fill: -fx-text-primary;
+}
+
+.search-result-card.expanded {
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, -fx-accent-glow, 12, 0, 0, 0);
+}
+
+.copy-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-primary;
+    -fx-border-color: -fx-primary;
+}
+
+.copy-button:hover {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: -fx-background;
+}
+
+.load-more-button {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-text-fill: -fx-primary;
+    -fx-border-color: -fx-border;
+}
+
+.load-more-button:hover {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-primary;
+}
+
+/* Copyright footer */
+.copyright-label {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.copyright-link {
+    -fx-text-fill: -fx-primary;
+}
+
+.copyright-link:hover {
+    -fx-text-fill: -fx-text-primary;
+}
+
+.header-title {
+    -fx-text-fill: -fx-primary;
+}
+
+.header-button {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: -fx-background;
+}
+
+.header-button:hover {
+    -fx-background-color: -fx-primary-dark;
+    -fx-effect: dropshadow(gaussian, -fx-primary, 12, 0.5, 0, 0);
+}
+
+.header-button-text {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-primary;
+}
+
+.header-button-text:hover {
+    -fx-text-fill: -fx-text-primary;
+    -fx-effect: dropshadow(gaussian, -fx-primary, 8, 0.3, 0, 0);
+}
+
+/* Icon button (gear) */
+.icon-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.icon-button:hover {
+    -fx-text-fill: -fx-primary;
+    -fx-effect: dropshadow(gaussian, -fx-primary, 8, 0.3, 0, 0);
+}
+
+/* Icon button with label (icon + text) */
+.icon-button-with-label {
+    -fx-background-color: transparent;
+}
+
+.icon-button-with-label:hover {
+    -fx-effect: dropshadow(gaussian, -fx-primary, 8, 0.3, 0, 0);
+}
+
+.icon-button-label {
+    -fx-text-fill: #8B949E;
+}
+
+/* Content area */
+.content-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.content-scroll>.viewport {
+    -fx-background-color: transparent;
+}
+
+/* Note input */
+.note-input {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-text-fill: -fx-text-primary;
+    -fx-prompt-text-fill: -fx-text-secondary;
+}
+
+.note-input:focused {
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, -fx-accent-glow, 16, 0, 0, 0);
+}
+
+.note-input .content {
+    -fx-background-color: -fx-surface;
+}
+
+/* Form fields */
+.input-field {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-text-fill: -fx-text-primary;
+    -fx-prompt-text-fill: -fx-text-secondary;
+}
+
+.input-field:focused {
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, -fx-accent-glow, 12, 0, 0, 0);
+}
+
+.field-label {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* Action buttons */
+.action-button.primary {
+    -fx-background-color: linear-gradient(to right, #00D4FF, #00A8CC);
+    -fx-text-fill: #0D1117;
+}
+
+.action-button.primary:hover {
+    -fx-background-color: linear-gradient(to right, #00E5FF, #00D4FF);
+    -fx-effect: dropshadow(gaussian, -fx-primary, 16, 0.4, 0, 0);
+}
+
+.action-button:disabled {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* Status label */
+.status-label {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.status-label.success {
+    -fx-text-fill: -fx-success;
+}
+
+.status-label.error {
+    -fx-text-fill: -fx-error;
+}
+
+/* Note cards and echo */
+.note-card {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-border-color: -fx-border;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0, 0, 2);
+}
+
+.echo-title {
+    -fx-text-fill: -fx-primary;
+}
+
+.echo-content {
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* Bottom navigation */
+.bottom-nav {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+}
+
+.nav-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.nav-button:hover {
+    -fx-text-fill: -fx-primary;
+}
+
+.nav-button.active {
+    -fx-text-fill: -fx-primary;
+}
+
+/* Scrollbar styling */
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: -fx-border;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: -fx-text-secondary;
+}
+
+.scroll-bar .track {
+    -fx-background-color: transparent;
+}
+
+/* Text area internal styling */
+.text-area .scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.text-area .scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.text-area .scroll-pane .content {
+    -fx-background-color: transparent;
+}
+
+/* Bottom Tab Bar */
+.bottom-tab-bar {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+}
+
+.tab-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.tab-button:hover {
+    -fx-text-fill: -fx-text-primary;
+}
+
+.tab-button.active {
+    -fx-text-fill: -fx-primary;
+    -fx-border-color: -fx-primary;
+}
+
+/* Review View */
+.days-input {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-border-color: -fx-border;
+    -fx-text-fill: -fx-text-primary;
+}
+
+.days-input:focused {
+    -fx-border-color: -fx-primary;
+}
+
+.days-label {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.refresh-button {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: -fx-background;
+}
+
+.refresh-button:hover {
+    -fx-background-color: -fx-primary-dark;
+}
+
+.note-date {
+    -fx-text-fill: -fx-primary;
+}
+
+/* Field hint */
+.field-hint {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* Review Period Select (ComboBox) */
+.period-label {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.review-period-select {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-border-color: -fx-border;
+    -fx-text-fill: -fx-text-primary;
+}
+
+.review-period-select:hover {
+    -fx-border-color: -fx-primary;
+}
+
+.review-period-select:focused {
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, -fx-accent-glow, 12, 0, 0, 0);
+}
+
+/* ComboBox dropdown list */
+.review-period-select .list-view {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+}
+
+.review-period-select .list-cell {
+    -fx-background-color: -fx-surface;
+    -fx-text-fill: -fx-text-primary;
+}
+
+.review-period-select .list-cell:hover {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-text-fill: -fx-primary;
+}
+
+.review-period-select .list-cell:selected {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: -fx-background;
+}
+
+/* Arrow button styling */
+.review-period-select .arrow {
+    -fx-background-color: -fx-text-secondary;
+}
+
+.review-period-select:hover .arrow {
+    -fx-background-color: -fx-primary;
+}
+
+.review-period-select:showing .arrow {
+    -fx-background-color: -fx-primary;
+}
+
+/* Error display styles for initialization failures */
+.error-title {
+    -fx-text-fill: -fx-error;
+}
+
+.error-detail {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* Status Footer */
+.status-footer {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+}
+
+.status-footer .status-indicator.connected {
+    -fx-fill: #4CAF50;
+}
+
+.status-footer .status-indicator.disconnected {
+    -fx-fill: #F44336;
+}
+
+.status-footer .status-indicator.connecting {
+    -fx-fill: #FFC107;
+}
+
+.status-footer .status-label {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.status-footer .status-label.connected {
+    -fx-text-fill: #4CAF50;
+}
+
+.status-footer .status-label.disconnected {
+    -fx-text-fill: #F44336;
+}
+
+.status-footer .status-label.connecting {
+    -fx-text-fill: #FFC107;
+}
+
+/* Review Button in Header */
+.review-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.review-button:hover {
+    -fx-text-fill: -fx-primary;
+}
+
+.review-button.active {
+    -fx-text-fill: -fx-primary;
+}
+
+/* Desktop Main View */
+.desktop-main-view {
+    -fx-background-color: -fx-background;
+}
+
+/* Sidebar */
+.sidebar {
+    -fx-background-color: linear-gradient(to bottom, #161B22, #0D1117);
+    -fx-border-color: -fx-border;
+}
+
+.sidebar-logo-text {
+    -fx-text-fill: -fx-primary;
+}
+
+/* Sidebar Status Area */
+.sidebar-status-area {
+    -fx-background-color: transparent;
+}
+
+.sidebar-status-area .status-indicator {
+    -fx-stroke: transparent;
+}
+
+.sidebar-status-area .status-label {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.sidebar-status-area .status-label.connected {
+    -fx-text-fill: -fx-success;
+}
+
+.sidebar-status-area .status-label.disconnected {
+    -fx-text-fill: -fx-error;
+}
+
+.sidebar-status-area .status-label.connecting {
+    -fx-text-fill: #FFC107;
+}
+
+/* Floating pill-style navigation buttons */
+.navigation-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #8B949E;
+}
+
+.navigation-button:hover {
+    -fx-background-color: rgba(0, 212, 255, 0.12);
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* Review Periods Panel */
+.review-periods-panel {
+    -fx-background-color: transparent;
+}
+
+.period-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #8B949E;
+}
+
+.period-button:hover {
+    -fx-background-color: rgba(0, 212, 255, 0.12);
+    -fx-text-fill: -fx-text-primary;
+}
+
+/* Main Content Area */
+.main-content-area {
+    -fx-background-color: -fx-background;
+}
+
+.mode-panel {
+    -fx-background-color: -fx-background;
+}
+
+/* Status Footer Bar */
+.status-footer-bar {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+}
+
+.status-footer-bar .status-label {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+/* Period Toggle Buttons (Segmented Control) */
+.period-toggle-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-border-color: -fx-border;
+}
+
+.period-toggle-button:hover {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-text-fill: -fx-text-primary;
+}
+
+.period-toggle-button:selected {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: -fx-background;
+}
+
+/* Desktop Note Mode Components */
+.note-input-panel {
+    -fx-background-color: transparent;
+}
+
+.notes-display-panel {
+    -fx-background-color: transparent;
+}
+
+.notes-display-panel > .fixed-header {
+    -fx-background-color: -fx-background;
+}
+
+.notes-container {
+    -fx-background-color: transparent;
+}
+
+.mode-separator {
+    -fx-background-color: -fx-border;
+}
+
+/* Unified Input Container (Modern Design) */
+.unified-input-container {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 8, 0, 0, 2);
+}
+
+.unified-input-container:focused-within {
+    -fx-border-color: -fx-primary;
+    -fx-effect: dropshadow(gaussian, -fx-accent-glow, 16, 0, 0, 0);
+}
+
+.unified-note-input {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-primary;
+    -fx-prompt-text-fill: -fx-text-secondary;
+}
+
+.unified-note-input:focused {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .content {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.unified-note-input .scroll-pane .content {
+    -fx-background-color: transparent;
+}
+
+/* Unified Send Button (embedded in input) */
+.unified-send-button {
+    -fx-background-color: -fx-primary;
+    -fx-text-fill: #0D1117;
+}
+
+.unified-send-button:hover {
+    -fx-background-color: -fx-primary-dark;
+    -fx-effect: dropshadow(gaussian, -fx-primary, 12, 0.5, 0, 0);
+}
+
+.unified-send-button:disabled {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.unified-send-button .send-icon {
+    -fx-fill: #0D1117;
+}
+
+.unified-send-button:disabled .send-icon {
+    -fx-fill: -fx-text-secondary;
+}
+
+/* Unified Status Label (embedded in input container) */
+.unified-status-label {
+    -fx-text-fill: -fx-text-secondary;
+}
+
+.unified-status-label.success {
+    -fx-text-fill: -fx-success;
+}
+
+.unified-status-label.error {
+    -fx-text-fill: -fx-error;
+}
+
+/* Desktop Search Mode Components */
+.search-input-panel {
+    -fx-background-color: transparent;
+}
+
+/* Desktop Review Mode Components */
+.review-mode-panel {
+    -fx-background-color: transparent;
+}
+
+/* Desktop Settings Mode Components */
+.settings-mode-panel {
+    -fx-background-color: transparent;
+}
+
+/* Note Card Content Area (Selectable Text) */
+.note-content-area {
+    -fx-cursor: hand;
+}
+
+.note-content-area .content {
+    -fx-cursor: hand;
+}
+
+.note-content-area .scroll-pane {
+    -fx-cursor: hand;
+}
+
+.note-content-area .scroll-pane .viewport {
+    -fx-cursor: hand;
+}
+
+.note-content-area .text {
+    -fx-cursor: hand;
+}
+
+/* Context Menu (Right-click Menu) */
+.context-menu {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 12, 0, 0, 4);
+}
+
+.context-menu .menu-item {
+    -fx-background-color: transparent;
+}
+
+.context-menu .menu-item .label {
+    -fx-text-fill: -fx-text-primary;
+}
+
+.context-menu .menu-item:hover {
+    -fx-background-color: rgba(0, 212, 255, 0.15);
+}
+
+.context-menu .menu-item:hover .label {
+    -fx-text-fill: -fx-primary;
+}
+
+.context-menu .menu-item:focused {
+    -fx-background-color: rgba(0, 212, 255, 0.15);
+}
+
+.context-menu .menu-item:focused .label {
+    -fx-text-fill: -fx-primary;
+}
+
+.context-menu .separator .line {
+    -fx-border-color: -fx-border;
+}
+
+/* Overview Card - Weakened background */
+.overview-card {
+    -fx-background-color: rgba(33, 38, 45, 0.3);
+    -fx-border-color: rgba(48, 54, 61, 0.5);
+}
+
+.overview-value {
+    -fx-text-fill: rgba(34, 211, 238, 0.9);
+}
+
+.overview-label {
+    -fx-text-fill: rgba(139, 148, 158, 0.8);
+}
+
+.overview-divider {
+    -fx-background-color: -fx-text-secondary;
+    -fx-opacity: 0.15;
+}

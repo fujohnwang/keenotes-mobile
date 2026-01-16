@@ -1,88 +1,166 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background"
-    android:fillViewport="true">
+    android:orientation="vertical"
+    android:background="@color/background">
 
+    <!-- Toolbar with centered title -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/surface">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="KeeNotes"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+
+        <!-- Search icon (right) -->
+        <ImageView
+            android:id="@+id/btnSearch"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="4dp"
+            android:src="@drawable/ic_search"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            app:tint="@color/text_primary"
+            android:contentDescription="@string/search_notes" />
+
+    </FrameLayout>
+
+    <!-- Content -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Note Input -->
-        <EditText
-            android:id="@+id/noteInput"
+        <!-- Overview Card -->
+        <include
+            android:id="@+id/overviewCardInclude"
+            layout="@layout/view_overview_card" />
+
+        <!-- Unified input container - fills remaining space -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="200dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
             android:background="@drawable/bg_note_input"
-            android:hint="@string/hint_note_input"
-            android:textColorHint="@color/text_secondary"
-            android:textColor="@color/text_primary"
-            android:padding="16dp"
-            android:gravity="top|start"
-            android:inputType="textMultiLine"
-            android:scrollbars="vertical" />
+            android:padding="12dp">
 
-        <!-- Save Button -->
-        <Button
-            android:id="@+id/btnSave"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="16dp"
-            android:text="@string/btn_save"
-            android:textColor="@color/background"
-            android:backgroundTint="@color/primary"
-            app:cornerRadius="8dp" />
+            <!-- Note Input - fills all available space -->
+            <EditText
+                android:id="@+id/noteInput"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="@string/hint_note_input"
+                android:textColorHint="@color/text_secondary"
+                android:textColor="@color/text_primary"
+                android:gravity="top|start"
+                android:inputType="textMultiLine"
+                android:scrollbars="vertical" />
 
-        <!-- Status Text -->
-        <TextView
-            android:id="@+id/statusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:textSize="14sp"
-            android:textColor="@color/text_secondary" />
-
-        <!-- Echo Card -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/echoCard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:visibility="gone"
-            app:cardBackgroundColor="@color/surface_elevated"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="0dp">
-
+            <!-- Bottom row: Send Channel (left) + Send button (right) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- Send Channel status (left) -->
+                <ImageView
+                    android:id="@+id/sendIndicator"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:src="@drawable/ic_circle"
+                    app:tint="@color/warning" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Last saved:"
-                    android:textSize="12sp"
+                    android:layout_marginStart="6dp"
+                    android:text="Send Channel:"
+                    android:textSize="11sp"
                     android:textColor="@color/text_secondary" />
 
                 <TextView
-                    android:id="@+id/echoContent"
-                    android:layout_width="match_parent"
+                    android:id="@+id/sendStatusText"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_primary" />
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:text="Not Configured"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/warning" />
+
+                <!-- Send button (right) - shows icon + text, or spinner + "Sending..." when posting -->
+                <LinearLayout
+                    android:id="@+id/btnSend"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:paddingHorizontal="16dp"
+                    android:background="@drawable/bg_send_button"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/sendProgress"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_gravity="center_vertical"
+                        android:src="@drawable/ic_spinner"
+                        android:visibility="gone" />
+
+                    <ImageView
+                        android:id="@+id/sendIcon"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_gravity="center_vertical"
+                        android:src="@drawable/ic_send"
+                        android:scaleType="fitCenter"
+                        app:tint="@color/background" />
+
+                    <TextView
+                        android:id="@+id/sendText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginStart="6dp"
+                        android:text="Send"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/background" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
-        </androidx.cardview.widget.CardView>
+        </LinearLayout>
 
     </LinearLayout>
 
-</ScrollView>
+</LinearLayout>

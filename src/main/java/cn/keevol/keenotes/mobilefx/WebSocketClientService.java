@@ -376,11 +376,18 @@ public class WebSocketClientService {
                     String channel = note.getString("channel");
                     String createdAt = note.getString("created_at");
 
-                    String decryptedContent = cryptoService.decrypt(encryptedContent);
+                    String decryptedContent;
+                    try {
+                        decryptedContent = cryptoService.decrypt(encryptedContent);
+                    } catch (Exception e) {
+                        logger.warning("Failed to decrypt note " + id + ": " + e.getMessage() + ", storing encrypted content");
+                        decryptedContent = encryptedContent;
+                    }
+                    
                     syncBatchBuffer.add(new LocalCacheService.NoteData(
                             id, decryptedContent, channel, createdAt, encryptedContent));
                 } catch (Exception e) {
-                    logger.warning("Failed to decrypt note: " + e.getMessage());
+                    logger.warning("Failed to parse note: " + e.getMessage());
                 }
             }
         }
@@ -437,8 +444,14 @@ public class WebSocketClientService {
 
             logger.info("Parsed note - id: " + id + ", channel: " + channel + ", createdAt: " + createdAt);
 
-            String decryptedContent = cryptoService.decrypt(encryptedContent);
-            logger.info("Decrypted content: " + decryptedContent);
+            String decryptedContent;
+            try {
+                decryptedContent = cryptoService.decrypt(encryptedContent);
+                logger.info("Decrypted content: " + decryptedContent);
+            } catch (Exception e) {
+                logger.warning("Failed to decrypt note " + id + ": " + e.getMessage() + ", storing encrypted content");
+                decryptedContent = encryptedContent;
+            }
 
             LocalCacheService.NoteData note = new LocalCacheService.NoteData(
                     id, decryptedContent, channel, createdAt, encryptedContent);

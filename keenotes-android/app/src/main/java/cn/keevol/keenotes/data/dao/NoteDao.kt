@@ -19,11 +19,29 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE createdAt >= :since ORDER BY id DESC")
     fun getNotesForReviewFlow(since: String): Flow<List<Note>>
     
+    /**
+     * Paginated version for memory optimization
+     */
+    @Query("SELECT * FROM notes WHERE createdAt >= :since ORDER BY id DESC LIMIT :limit OFFSET :offset")
+    suspend fun getNotesForReviewPaged(since: String, limit: Int, offset: Int): List<Note>
+    
+    /**
+     * Get count of notes for review period
+     */
+    @Query("SELECT COUNT(*) FROM notes WHERE createdAt >= :since")
+    suspend fun getNotesCountForReview(since: String): Int
+    
     @Query("SELECT * FROM notes ORDER BY id DESC LIMIT :limit")
     suspend fun getRecentNotes(limit: Int = 100): List<Note>
     
     @Query("SELECT COUNT(*) FROM notes")
     suspend fun getNoteCount(): Int
+    
+    @Query("SELECT COUNT(*) FROM notes")
+    fun getNoteCountFlow(): Flow<Int>
+    
+    @Query("SELECT MIN(createdAt) FROM notes")
+    suspend fun getOldestNoteDate(): String?
     
     @Query("SELECT MAX(id) FROM notes")
     suspend fun getMaxId(): Long?
