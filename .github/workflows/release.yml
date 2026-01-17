@@ -95,7 +95,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref_type == 'tag'
         with:
-          path: dist/*
+          files: dist/*
           repository: fujohnwang/keenotes-releases
           token: ${{ secrets.RELEASE_TOKEN }} # 使用上面配置的Token
           tag_name: ${{ github.ref_name }} # 同步Tag名称
