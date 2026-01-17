@@ -4,45 +4,52 @@ import SwiftUI
 struct OverviewCardView: View {
     @EnvironmentObject var appState: AppState
     @State private var daysUsing: Int = 0
+
+    // Adaptive layout based on device
+    private var isPad: Bool { DeviceType.isPad }
+    private var cardHeight: CGFloat { isPad ? 112 : 88 }
+    private var cardPadding: CGFloat { isPad ? 16 : 12 }
+    private var numberFontSize: CGFloat { isPad ? 42 : 32 }
+    private var labelFontSize: CGFloat { isPad ? 10 : 8 }
     
     var body: some View {
         HStack(spacing: 0) {
             // Total Notes
             VStack(spacing: 1) {
                 Text("\(appState.databaseService.noteCount)")
-                    .font(.system(size: 32, weight: .bold))
+                    .font(.system(size: numberFontSize, weight: .bold))
                     .foregroundColor(.blue)
-                
+
                 Text("Total Notes")
-                    .font(.system(size: 8))
+                    .font(.system(size: labelFontSize))
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity)
-            
+
             // Divider
             Rectangle()
                 .fill(Color.secondary.opacity(0.2))
                 .frame(width: 1)
                 .padding(.vertical, 2)
-            
+
             // Days Using
             VStack(spacing: 1) {
                 Text("\(daysUsing)")
-                    .font(.system(size: 32, weight: .bold))
+                    .font(.system(size: numberFontSize, weight: .bold))
                     .foregroundColor(.blue)
-                
+
                 Text("Days Using")
-                    .font(.system(size: 8))
+                    .font(.system(size: labelFontSize))
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity)
         }
-        .frame(height: 88)
-        .padding(.horizontal, 12)
+        .frame(height: cardHeight)
+        .padding(.horizontal, cardPadding)
         .background(Color(.systemBackground))
-        .cornerRadius(12)
+        .cornerRadius(DeviceType.cornerRadius)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
                 .stroke(Color(.systemGray4), lineWidth: 1)
         )
         .onAppear {

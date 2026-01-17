@@ -11,7 +11,12 @@ struct NoteView: View {
     @State private var isPosting = false
     @FocusState private var isTextFieldFocused: Bool
     @State private var keyboardVisible = false
-    
+
+    // Adaptive layout based on device
+    private var isPad: Bool { DeviceType.isPad }
+    private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
+    private var cardCornerRadius: CGFloat { DeviceType.cornerRadius }
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -19,21 +24,22 @@ struct NoteView: View {
                 if appState.settingsService.showOverviewCard && !keyboardVisible {
                     OverviewCardView()
                         .environmentObject(appState)
-                        .padding(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                        .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 4, trailing: horizontalPadding))
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
-                
+
                 // Main content
-                VStack(spacing: 16) {
+                VStack(spacing: isPad ? 24 : 16) {
                     // Unified input container with embedded Send Channel and Send button
                     ZStack(alignment: .bottom) {
                         // Note input area (keep border, remove fill background)
                         TextEditor(text: $noteText)
                             .focused($isTextFieldFocused)
-                            .frame(minHeight: 150)
-                            .padding(.top, 12)
-                            .padding(.horizontal, 12)
-                            .padding(.bottom, 48) // Space for bottom row
+                            .frame(minHeight: isPad ? 200 : 150)
+                            .padding(.top, isPad ? 16 : 12)
+                            .padding(.horizontal, isPad ? 16 : 12)
+                            .padding(.bottom, isPad ? 60 : 48) // Space for bottom row
+                            .font(.system(size: isPad ? 18 : 17))
                             .onAppear {
                                 // Hide default TextEditor background for iOS 15 compatibility
                                 UITextView.appearance().backgroundColor = .clear
@@ -42,53 +48,54 @@ struct NoteView: View {
                                 if noteText.isEmpty {
                                     Text("Write your note here...")
                                         .foregroundColor(.gray)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 20)
+                                        .padding(.horizontal, isPad ? 20 : 16)
+                                        .padding(.vertical, isPad ? 24 : 20)
                                         .allowsHitTesting(false)
                                 }
                             }
-                        
+
                         // Bottom row: Send Channel (left) + Send button (right)
                         HStack {
                             // Send Channel status (left)
                             SendChannelStatus()
-                            
+                                .font(.caption)
+
                             Spacer()
-                            
+
                             // Send button (right) - shows "Sending..." when posting
                             Button(action: postNote) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: isPad ? 8 : 6) {
                                     if isPosting {
                                         ProgressView()
                                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                            .scaleEffect(0.8)
+                                            .scaleEffect(isPad ? 1.0 : 0.8)
                                         Text("Sending...")
                                             .fontWeight(.semibold)
                                     } else {
                                         Image(systemName: "paperplane.fill")
-                                            .font(.system(size: 14))
+                                            .font(.system(size: isPad ? 18 : 14))
                                         Text("Send")
                                             .fontWeight(.semibold)
                                     }
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
+                                .padding(.horizontal, isPad ? 24 : 16)
+                                .padding(.vertical, isPad ? 12 : 8)
                                 .background(buttonBackgroundColor)
                                 .foregroundColor(.white)
-                                .cornerRadius(8)
+                                .cornerRadius(isPad ? 12 : 8)
                             }
                             .disabled(!canPost || isPosting)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
+                        .padding(.horizontal, isPad ? 16 : 12)
+                        .padding(.bottom, isPad ? 12 : 10)
                     }
                     .background(Color.clear)
-                    .cornerRadius(12)
+                    .cornerRadius(cardCornerRadius)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: cardCornerRadius)
                             .stroke(Color(.systemGray4), lineWidth: 1)
                     )
-                    
+
                     Spacer()
                         .contentShape(Rectangle())
                         .onTapGesture {
@@ -96,7 +103,7 @@ struct NoteView: View {
                             isTextFieldFocused = false
                         }
                 }
-                .padding()
+                .padding(EdgeInsets(top: 16, leading: horizontalPadding, bottom: 16, trailing: horizontalPadding))
                 .contentShape(Rectangle())
                 .onTapGesture {
                     // Tap outside to dismiss keyboard
@@ -126,15 +133,15 @@ struct NoteView: View {
                             .font(.system(size: 17))
                     }
                 }
-                
+
                 ToolbarItemGroup(placement: .keyboard) {
                     // Keyboard hint
                     Text("Tap outside or")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     Spacer()
-                    
+
                     Button("Done") {
                         isTextFieldFocused = false
                     }
@@ -147,7 +154,7 @@ struct NoteView: View {
                         Circle()
                             .fill(Color.green)
                             .frame(width: 80, height: 80)
-                        
+
                         Image(systemName: "checkmark")
                             .font(.system(size: 40, weight: .bold))
                             .foregroundColor(.white)
@@ -176,47 +183,48 @@ struct NoteView: View {
                 }
             }
         }
+        .navigationViewStyle(.stack)
     }
-    
+
     private var canPost: Bool {
         !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         appState.settingsService.isConfigured &&
         appState.settingsService.isEncryptionEnabled
     }
-    
+
     private var buttonBackgroundColor: Color {
         // Keep blue color, use opacity to indicate posting state
         return canPost ? Color.blue : Color.gray
     }
-    
+
     private func postNote() {
         guard canPost else { return }
-        
+
         isPosting = true
-        
+
         Task {
             let result = await appState.apiService.postNote(content: noteText)
-            
+
             await MainActor.run {
                 isPosting = false
-                
+
                 if result.success {
                     // Hide keyboard on success
                     isTextFieldFocused = false
-                    
+
                     let sentContent = noteText  // Save before clearing
                     noteText = ""
-                    
+
                     // Copy to clipboard if enabled
                     if appState.settingsService.copyToClipboardOnPost {
                         UIPasteboard.general.string = sentContent
                     }
-                    
+
                     // Show success checkmark
                     withAnimation(.spring()) {
                         showSuccessToast = true
                     }
-                    
+
                     // Hide after 1 second
                     Task {
                         try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -233,7 +241,7 @@ struct NoteView: View {
                     withAnimation(.spring()) {
                         showErrorToast = true
                     }
-                    
+
                     // Hide after 3 seconds
                     Task {
                         try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -247,7 +255,7 @@ struct NoteView: View {
             }
         }
     }
-    
+
     private func setupKeyboardObservers() {
         NotificationCenter.default.addObserver(
             forName: UIResponder.keyboardWillShowNotification,
@@ -258,7 +266,7 @@ struct NoteView: View {
                 keyboardVisible = true
             }
         }
-        
+
         NotificationCenter.default.addObserver(
             forName: UIResponder.keyboardWillHideNotification,
             object: nil,
@@ -269,7 +277,7 @@ struct NoteView: View {
             }
         }
     }
-    
+
     private func removeKeyboardObservers() {
         NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
@@ -280,31 +288,36 @@ struct NoteView: View {
 struct SendChannelStatus: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var networkMonitor = NetworkMonitor()
-    
+
+    private var isPad: Bool { DeviceType.isPad }
+    private var statusSpacing: CGFloat { isPad ? 10 : 6 }
+    private var indicatorSize: CGFloat { isPad ? 10 : 8 }
+    private var fontScale: CGFloat { DeviceType.fontScale }
+
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: statusSpacing) {
             Circle()
                 .fill(sendChannelColor)
-                .frame(width: 8, height: 8)
-            
+                .frame(width: indicatorSize, height: indicatorSize)
+
             Text("Send Channel:")
-                .font(.caption)
+                .font(.system(size: 12 * fontScale))
                 .foregroundColor(.secondary)
-            
+
             Text(sendChannelText)
-                .font(.caption)
+                .font(.system(size: 12 * fontScale))
                 .fontWeight(.medium)
                 .foregroundColor(sendChannelColor)
         }
     }
-    
+
     private var sendChannelColor: Color {
         if !appState.settingsService.isConfigured {
             return .orange
         }
         return networkMonitor.isConnected ? .green : .red
     }
-    
+
     private var sendChannelText: String {
         if !appState.settingsService.isConfigured {
             return "Not Configured"
@@ -316,24 +329,24 @@ struct SendChannelStatus: View {
 /// Sync Channel status indicator (for Review view toolbar)
 struct SyncChannelStatus: View {
     @EnvironmentObject var appState: AppState
-    
+
     var body: some View {
         HStack(spacing: 6) {
             Circle()
                 .fill(syncChannelColor)
                 .frame(width: 8, height: 8)
-            
+
             Text("Sync:")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            
+
             Text(syncChannelText)
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundColor(syncChannelColor)
         }
     }
-    
+
     private var syncChannelColor: Color {
         switch appState.webSocketService.connectionState {
         case .connected: return .green
@@ -341,7 +354,7 @@ struct SyncChannelStatus: View {
         case .disconnected: return .gray
         }
     }
-    
+
     private var syncChannelText: String {
         switch appState.webSocketService.connectionState {
         case .connected: return "✓"
@@ -355,10 +368,10 @@ struct SyncChannelStatus: View {
 class NetworkMonitor: ObservableObject {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "NetworkMonitor")
-    
+
     @Published var isConnected = true
     @Published var connectionType: NWInterface.InterfaceType?
-    
+
     init() {
         monitor.pathUpdateHandler = { [weak self] path in
             DispatchQueue.main.async {
@@ -368,7 +381,7 @@ class NetworkMonitor: ObservableObject {
         }
         monitor.start(queue: queue)
     }
-    
+
     deinit {
         monitor.cancel()
     }
