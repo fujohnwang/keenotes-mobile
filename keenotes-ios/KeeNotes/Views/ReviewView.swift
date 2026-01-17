@@ -9,11 +9,15 @@ struct ReviewView: View {
     @State private var selectedPeriod = 0  // 0: 7 days, 1: 30 days, 2: 90 days, 3: All
     @State private var totalCount = 0
     @State private var hasMoreData = true
-    
+
+    // Adaptive layout based on device
+    private var isPad: Bool { DeviceType.isPad }
+    private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
+
     private let periods = ["7 days", "30 days", "90 days", "All"]
     private let periodDays = [7, 30, 90, 0]  // 0 means all
     private let pageSize = 20
-    
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -25,38 +29,35 @@ struct ReviewView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    .padding(.bottom, 8)
-                    
+                    .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
+
                     // Header row: Notes count (left) + Sync Channel status (right)
                     HStack {
                         // Notes count with period info (left)
                         Text(notesCountText)
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        
+
                         Spacer()
-                        
+
                         // Sync Channel status (right)
                         HStack(spacing: 6) {
                             Circle()
                                 .fill(syncChannelColor)
                                 .frame(width: 8, height: 8)
-                            
+
                             Text("Sync Channel:")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            
+
                             Text(syncChannelText)
                                 .font(.caption)
                                 .fontWeight(.medium)
                                 .foregroundColor(syncChannelColor)
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    
+                    .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
+
                     // Notes list
                     if isLoading {
                         Spacer()
@@ -76,7 +77,7 @@ struct ReviewView: View {
                         List {
                             ForEach(notes) { note in
                                 NoteRow(note: note)
-                                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                    .listRowInsets(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
                                     .listRowSeparator(.hidden)
                                     .listRowBackground(Color.clear)
                                     .onAppear {
@@ -88,7 +89,7 @@ struct ReviewView: View {
                                         }
                                     }
                             }
-                            
+
                             // Loading indicator at bottom
                             if isLoadingMore {
                                 HStack {
@@ -108,7 +109,7 @@ struct ReviewView: View {
                         }
                     }
                 }
-                
+
                 // Centered sync spinner (transient, shown during sync)
                 if appState.webSocketService.syncStatus == .syncing {
                     VStack(spacing: 12) {
@@ -127,6 +128,7 @@ struct ReviewView: View {
             .navigationTitle("KeeNotes Review")
             .navigationBarTitleDisplayMode(.inline)
         }
+        .navigationViewStyle(.stack)
         .onAppear {
             Task { await loadNotes() }
         }
@@ -144,23 +146,23 @@ struct ReviewView: View {
             Task { await loadNotes() }
         }
     }
-    
+
     private func loadNotes() async {
         isLoading = true
         hasMoreData = true
         defer { isLoading = false }
-        
+
         do {
             // Get total count
             totalCount = try await appState.databaseService.getNotesCountByPeriod(days: periodDays[selectedPeriod])
-            
+
             // Load first page
             let loadedNotes = try await appState.databaseService.getNotesByPeriodPaged(
                 days: periodDays[selectedPeriod],
                 limit: pageSize,
                 offset: 0
             )
-            
+
             print("[ReviewView] Loaded \(loadedNotes.count) of \(totalCount) notes from database")
             await MainActor.run {
                 notes = loadedNotes
@@ -170,22 +172,22 @@ struct ReviewView: View {
             print("[ReviewView] Failed to load notes: \(error)")
         }
     }
-    
+
     private func loadMoreNotes() async {
         guard !isLoadingMore && hasMoreData else { return }
-        
+
         isLoadingMore = true
         defer { isLoadingMore = false }
-        
+
         do {
             let loadedNotes = try await appState.databaseService.getNotesByPeriodPaged(
                 days: periodDays[selectedPeriod],
                 limit: pageSize,
                 offset: notes.count
             )
-            
+
             print("[ReviewView] Loaded \(loadedNotes.count) more notes (total: \(notes.count + loadedNotes.count)/\(totalCount))")
-            
+
             await MainActor.run {
                 notes.append(contentsOf: loadedNotes)
                 hasMoreData = notes.count < totalCount
@@ -194,9 +196,9 @@ struct ReviewView: View {
             print("[ReviewView] Failed to load more notes: \(error)")
         }
     }
-    
+
     // MARK: - Sync Channel Status
-    
+
     private var syncChannelColor: Color {
         switch appState.webSocketService.connectionState {
         case .connected: return .green
@@ -204,7 +206,7 @@ struct ReviewView: View {
         case .disconnected: return .gray
         }
     }
-    
+
     private var syncChannelText: String {
         switch appState.webSocketService.connectionState {
         case .connected: return "✓"
@@ -212,13 +214,13 @@ struct ReviewView: View {
         case .disconnected: return "✗"
         }
     }
-    
+
     // MARK: - Notes Count Text
-    
+
     private var notesCountText: String {
         let count = totalCount > 0 ? totalCount : notes.count
         let periodInfo: String
-        
+
         // Show period info
         switch selectedPeriod {
         case 0: periodInfo = " - Last 7 days"
@@ -227,7 +229,7 @@ struct ReviewView: View {
         case 3: periodInfo = " - All"
         default: periodInfo = ""
         }
-        
+
         return "\(count) note(s)\(periodInfo)"
     }
 }
@@ -236,32 +238,36 @@ struct ReviewView: View {
 struct NoteRow: View {
     let note: Note
     @State private var showCopiedAlert = false
-    
+
+    private var isPad: Bool { DeviceType.isPad }
+    private var cardPadding: CGFloat { isPad ? 24 : 16 }
+    private var messageFontSize: CGFloat { isPad ? 18 : 17 }
+
     private var formattedDate: String {
         // Simply return the first 19 characters (yyyy-MM-dd HH:mm:ss)
         // Most notes already have this format from the server
         if note.createdAt.count >= 19 {
             return String(note.createdAt.prefix(19))
         }
-        
+
         // Fallback: try to parse and format
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        
+
         if let date = dateFormatter.date(from: note.createdAt) {
             let displayFormatter = DateFormatter()
             displayFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
             return displayFormatter.string(from: date)
         }
-        
+
         // If all else fails, return as-is
         return note.createdAt
     }
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: isPad ? 16 : 12) {
             // Header: Date and Channel
-            HStack(spacing: 8) {
+            HStack(spacing: isPad ? 10 : 8) {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
                         .font(.caption2)
@@ -269,7 +275,7 @@ struct NoteRow: View {
                         .font(.caption)
                 }
                 .foregroundColor(.secondary)
-                
+
                 // Channel info
                 if !note.channel.isEmpty {
                     Text("•")
@@ -280,25 +286,25 @@ struct NoteRow: View {
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             // Note content (full text with auto wrap)
             // Long press to select text fragments
             Text(note.content)
-                .font(.body)
+                .font(.system(size: messageFontSize))
                 .foregroundColor(.primary)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
+        .padding(cardPadding)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
                 .fill(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
                 .stroke(Color(.systemGray5), lineWidth: 1)
         )
         .contentShape(Rectangle())
@@ -328,19 +334,19 @@ struct NoteRow: View {
             }
         )
     }
-    
+
     private func copyToClipboard() {
         UIPasteboard.general.string = note.content
-        
+
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
-        
+
         // Show copied feedback
         withAnimation {
             showCopiedAlert = true
         }
-        
+
         // Hide after 1.5 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation {

@@ -3,15 +3,18 @@ import SwiftUI
 /// Settings view with configuration options and easter egg
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
-    
+
+    // Adaptive layout based on device
+    private var isPad: Bool { DeviceType.isPad }
+
     @State private var endpointUrl = ""
     @State private var token = ""
     @State private var password = ""
     @State private var confirmPassword = ""
-    
+
     @State private var statusMessage = ""
     @State private var isSuccess = true
-    
+
     // Computed property for Save button enabled state
     private var isSaveEnabled: Bool {
         let e = endpointUrl.trimmingCharacters(in: .whitespaces)
@@ -20,13 +23,13 @@ struct SettingsView: View {
         let c = confirmPassword.trimmingCharacters(in: .whitespaces)
         return !e.isEmpty && !t.isEmpty && !p.isEmpty && !c.isEmpty && password == confirmPassword
     }
-    
+
     // Easter egg state
     @State private var copyrightTapCount = 0
     @State private var lastTapTime: Date = .distantPast
     @State private var showDebugSection = false
     @State private var showDebugView = false
-    
+
     var body: some View {
         NavigationView {
             Form {
@@ -36,26 +39,30 @@ struct SettingsView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
-                    
+                        .font(.system(size: isPad ? 17 : 17))
+
                     SecureField("Token", text: $token)
                         .textContentType(.init(rawValue: ""))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
+                        .font(.system(size: isPad ? 17 : 17))
                 }
-                
+
                 // Encryption
                 Section(header: Text("Encryption"), footer: Text("E2E encryption password. Must match across all devices.")) {
                     SecureField("Password", text: $password)
                         .textContentType(.init(rawValue: ""))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
-                    
+                        .font(.system(size: isPad ? 17 : 17))
+
                     SecureField("Confirm Password", text: $confirmPassword)
                         .textContentType(.init(rawValue: ""))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
+                        .font(.system(size: isPad ? 17 : 17))
                 }
-                
+
                 // Save button
                 Section {
                     Button(action: saveSettings) {
@@ -63,57 +70,59 @@ struct SettingsView: View {
                             Spacer()
                             Text("Save Settings")
                                 .fontWeight(.semibold)
+                                .font(.system(size: isPad ? 18 : 17))
                             Spacer()
                         }
                     }
                     .disabled(!isSaveEnabled)
-                    
+
                     // Status message
                     if !statusMessage.isEmpty {
                         Text(statusMessage)
-                            .font(.footnote)
+                            .font(.system(size: (isPad ? 14 : 13)))
                             .foregroundColor(isSuccess ? .green : .red)
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
-                
+
                 // Preferences
                 Section(header: Text("Preferences")) {
                     Toggle("Copy to clipboard on post success", isOn: Binding(
                         get: { appState.settingsService.copyToClipboardOnPost },
                         set: { appState.settingsService.copyToClipboardOnPost = $0 }
                     ))
-                    
+
                     Toggle("Show Overview Card", isOn: Binding(
                         get: { appState.settingsService.showOverviewCard },
                         set: { appState.settingsService.showOverviewCard = $0 }
                     ))
-                    
+
                     Toggle("Auto-focus input on launch", isOn: Binding(
                         get: { appState.settingsService.autoFocusInputOnLaunch },
                         set: { appState.settingsService.autoFocusInputOnLaunch = $0 }
                     ))
                 }
-                .font(.body)
-                
+                .font(.system(size: isPad ? 17 : 17))
+
                 // Debug section (hidden by default)
                 if showDebugSection {
                     Section(header: Text("Debug")) {
                         Button("Open Debug View") {
                             showDebugView = true
                         }
+                        .font(.system(size: isPad ? 17 : 17))
                     }
                 }
-                
+
                 // Copyright with easter egg
                 Section {
                     VStack(spacing: 4) {
                         Text("©2025 王福强(Fuqiang Wang) All Rights Reserved")
-                            .font(.footnote)
+                            .font(.system(size: isPad ? 13 : 12))
                             .foregroundColor(.secondary)
-                        
+
                         Link("https://keenotes.afoo.me", destination: URL(string: "https://keenotes.afoo.me")!)
-                            .font(.footnote)
+                            .font(.system(size: isPad ? 13 : 12))
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                     .contentShape(Rectangle())
@@ -129,8 +138,9 @@ struct SettingsView: View {
                 DebugView()
             }
         }
+        .navigationViewStyle(.stack)
     }
-    
+
     private func loadSettings() {
         // Ensure we're on the main thread when accessing @Published properties
         DispatchQueue.main.async {
@@ -140,10 +150,10 @@ struct SettingsView: View {
             confirmPassword = appState.settingsService.encryptionPassword
         }
     }
-    
+
     private func saveSettings() {
         print("[Settings] saveSettings called")
-        
+
         // Validate password match
         guard password == confirmPassword else {
             print("[Settings] Password mismatch")
@@ -153,19 +163,19 @@ struct SettingsView: View {
             confirmPassword = ""
             return
         }
-        
+
         let oldEndpoint = appState.settingsService.endpointUrl
         let oldToken = appState.settingsService.token
         let oldPassword = appState.settingsService.encryptionPassword
         let wasConfigured = !oldEndpoint.isEmpty && !oldToken.isEmpty
-        
+
         let endpointChanged = oldEndpoint != endpointUrl
         let tokenChanged = oldToken != token
         let passwordChanged = oldPassword != password
         let configurationChanged = endpointChanged || tokenChanged || passwordChanged
-        
+
         print("[Settings] Configuration: endpoint=\(endpointChanged), token=\(tokenChanged), password=\(passwordChanged)")
-        
+
         // Save settings
         do {
             appState.settingsService.saveSettings(
@@ -180,30 +190,30 @@ struct SettingsView: View {
             isSuccess = false
             return
         }
-        
+
         // Update status message
         let msg = password.isEmpty ? "Settings saved ✓" : "Settings saved ✓ (E2E encryption enabled)"
-        
+
         if configurationChanged && wasConfigured {
             statusMessage = "Configuration changed, reconnecting..."
             isSuccess = true
             print("[Settings] Configuration changed, reconnecting...")
-            
+
             // Reset and reconnect
             Task {
                 do {
                     print("[Settings] Disconnecting WebSocket...")
                     appState.webSocketService.disconnect()
                     appState.webSocketService.resetState()
-                    
+
                     print("[Settings] Clearing sync state...")
                     try await appState.databaseService.clearSyncState()
-                    
+
                     if endpointChanged || tokenChanged {
                         print("[Settings] Deleting all notes (endpoint/token changed)...")
                         try await appState.databaseService.deleteAllNotes()
                     }
-                    
+
                     if !endpointUrl.isEmpty && !token.isEmpty {
                         print("[Settings] Reconnecting WebSocket...")
                         try? await Task.sleep(nanoseconds: 500_000_000)
@@ -246,7 +256,7 @@ struct SettingsView: View {
             print("[Settings] Normal save, reconnecting...")
             statusMessage = msg
             isSuccess = true
-            
+
             // Reconnect if configured
             appState.webSocketService.disconnect()
             if !endpointUrl.isEmpty && !token.isEmpty {
@@ -258,17 +268,17 @@ struct SettingsView: View {
             }
         }
     }
-    
+
     private func handleCopyrightTap() {
         let now = Date()
-        
+
         // Reset if more than 1 second since last tap
         if now.timeIntervalSince(lastTapTime) > 1.0 {
             copyrightTapCount = 0
         }
         lastTapTime = now
         copyrightTapCount += 1
-        
+
         if copyrightTapCount >= 7 && !showDebugSection {
             showDebugSection = true
         }
