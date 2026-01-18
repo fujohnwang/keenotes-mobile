@@ -91,6 +91,16 @@ jobs:
           name: windows-installers
           path: dist/*
 
+      - name: Release to Public Repo
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: dist/*
+          repository: fujohnwang/keenotes-releases
+          token: ${{ secrets.RELEASE_TOKEN }} # 使用上面配置的Token
+          tag_name: ${{ github.ref_name }} # 同步Tag名称
+
+
   build-macos:
     strategy:
       matrix:
@@ -674,6 +684,15 @@ jobs:
           name: macos-${{ matrix.arch }}
           path: dist/*
 
+      - name: Release to Public Repo
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: dist/*
+          repository: fujohnwang/keenotes-releases
+          token: ${{ secrets.RELEASE_TOKEN }} # 使用上面配置的Token
+          tag_name: ${{ github.ref_name }} # 同步Tag名称
+
   build-linux:
     runs-on: ubuntu-latest
     steps:
@@ -738,6 +757,16 @@ jobs:
         with:
           name: linux-packages
           path: dist/*
+
+      - name: Release to Public Repo
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: dist/*
+          repository: fujohnwang/keenotes-releases
+          token: ${{ secrets.RELEASE_TOKEN }} # 使用上面配置的Token
+          tag_name: ${{ github.ref_name }} # 同步Tag名称
+
 
   build-android:
     runs-on: ubuntu-latest
@@ -820,6 +849,17 @@ jobs:
         with:
           name: android-aab
           path: keenotes-android/app/build/outputs/bundle/release/*.aab
+
+      - name: Release to Public Repo
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: |
+            keenotes-android/app/build/outputs/apk/release/*.apk
+            keenotes-android/app/build/outputs/bundle/release/*.aab
+          repository: fujohnwang/keenotes-releases
+          token: ${{ secrets.RELEASE_TOKEN }} # 使用上面配置的Token
+          tag_name: ${{ github.ref_name }} # 同步Tag名称
 
   # build-ios:
   #   runs-on: macos-latest
