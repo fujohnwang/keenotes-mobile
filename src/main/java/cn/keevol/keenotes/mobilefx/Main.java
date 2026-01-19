@@ -62,7 +62,7 @@ public class Main extends Application {
         Thread.ofVirtual().start(new Runnable() {
             @Override
             public void run() {
-                new SimpleForwardServer().start();
+                SimpleForwardServer.start();
             }
         });
     }

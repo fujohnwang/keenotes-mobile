@@ -1,5 +1,6 @@
 package cn.keevol.keenotes.mobilefx;
 
+import cn.keevol.keenotes.utils.SimpleForwardServer;
 import cn.keevol.keenotes.utils.javafx.JFX;
 import javafx.animation.PauseTransition;
 import javafx.beans.binding.Bindings;
@@ -65,9 +66,12 @@ public class SettingsView extends BorderPane {
             updateLocalPortSetting();
             settings.save();
             localImportServerPortField.setText(String.valueOf(settings.getLocalImportServerPort()));
-            JFX.showMessage(localPortRow.messageLabel(), "saved.");
+            JFX.showMessage(localPortRow.messageLabel(), "saved. Restart local import server...");
+            Thread.ofVirtual().start(SimpleForwardServer::restart);
         };
-        localImportServerPortField.setOnAction((e) -> localImportServerPortFieldAction.run());
+        localImportServerPortField.setOnAction((e) -> {
+            localImportServerPortField.getParent().requestFocus(); // simulate focus cancel to avoid duplicated event on focusedProperty
+        });
         localImportServerPortField.focusedProperty().addListener((o, oldValue, newValue) -> {
             if (!newValue) {
                 localImportServerPortFieldAction.run();
