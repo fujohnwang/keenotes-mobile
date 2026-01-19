@@ -15,6 +15,7 @@ public class SimpleForwardServer {
                 SettingsService settings = SettingsService.getInstance();
 
                 // 1. 创建 JDK 内置的 HTTP Server
+                // TODO settings 对应的 UI 还没有添加
                 int LOCAL_PORT = settings.getLocalImportServerPort();
                 try {
                     HttpServer server = HttpServer.create(new InetSocketAddress("localhost", LOCAL_PORT), 0);
