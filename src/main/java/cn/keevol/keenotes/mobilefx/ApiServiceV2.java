@@ -72,8 +72,12 @@ public class ApiServiceV2 {
     public CompletableFuture<ApiResult> postNote(String content) {
         return postNote(content, getDefaultChannel());
     }
-    
+
     public CompletableFuture<ApiResult> postNote(String content, String channel) {
+        return postNote(content, channel, LocalDateTime.now().format(TS_FORMATTER));
+    }
+
+    public CompletableFuture<ApiResult> postNote(String content, String channel, String ts) {
         String endpointUrl = settings.getEndpointUrl();
         String token = settings.getToken();
 
@@ -95,7 +99,6 @@ public class ApiServiceV2 {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String encrypted = cryptoService.encrypt(content);
-                String ts = LocalDateTime.now().format(TS_FORMATTER);
                 String json = String.format(
                     "{\"channel\":\"%s\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":true}",
                     channel, escapeJson(encrypted), ts
