@@ -1,5 +1,6 @@
 package cn.keevol.keenotes.mobilefx;
 
+import cn.keevol.keenotes.utils.SimpleForwardServer;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -19,7 +20,7 @@ public class Main extends Application {
         System.out.println("[Main] OS: " + System.getProperty("os.name") + " " + System.getProperty("os.version"));
         System.out.println("[Main] User home: " + System.getProperty("user.home"));
         System.out.println("[Main] JavaFX version: " + System.getProperty("javafx.version", "unknown"));
-        
+
         // Load Chinese font
         loadCustomFont();
 
@@ -29,10 +30,10 @@ public class Main extends Application {
 
         // Scene size for desktop
         Scene scene = new Scene(mainView, 1200, 800);
-        
+
         // Load theme CSS
         loadThemeCSS(scene);
-        
+
         // Listen for theme changes
         ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
             Platform.runLater(() -> loadThemeCSS(scene));
@@ -40,7 +41,7 @@ public class Main extends Application {
 
         stage.setTitle("KeeNotes");
         stage.setScene(scene);
-        
+
         // Set minimum window size for desktop
         stage.setMinWidth(800);
         stage.setMinHeight(600);
@@ -56,6 +57,14 @@ public class Main extends Application {
 
         // UI显示后，延迟初始化服务（在后台线程）
         initializeServicesAfterUI();
+
+        // kick off local import server at background @ by fq
+        Thread.ofVirtual().start(new Runnable() {
+            @Override
+            public void run() {
+                new SimpleForwardServer().start();
+            }
+        });
     }
 
     /**
@@ -117,7 +126,7 @@ public class Main extends Application {
 
     private void loadCustomFont() {
         String fontResourcePath = "/fonts/MiSans-Regular.ttf";
-        
+
         try {
             var fontStream = getClass().getResourceAsStream(fontResourcePath);
             if (fontStream == null) {
@@ -138,21 +147,21 @@ public class Main extends Application {
         }
         System.err.println("Failed to load custom font");
     }
-    
+
     /**
      * Load theme CSS files based on current theme setting
      */
     private void loadThemeCSS(Scene scene) {
         scene.getStylesheets().clear();
-        
+
         // Always load common.css first (layout styles)
         scene.getStylesheets().add(getClass().getResource("/styles/common.css").toExternalForm());
-        
+
         // Load theme-specific CSS
         ThemeService.Theme theme = ThemeService.getInstance().getCurrentTheme();
         String themeFile = theme == ThemeService.Theme.LIGHT ? "light.css" : "dark.css";
         scene.getStylesheets().add(getClass().getResource("/styles/" + themeFile).toExternalForm());
-        
+
         System.out.println("[Main] Loaded theme: " + theme + " (" + themeFile + ")");
     }
 
