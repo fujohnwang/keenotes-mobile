@@ -32,6 +32,8 @@ public class SettingsService {
     private static final String KEY_NOTE_FONT_SIZE = "note.font.size";
     private static final String KEY_ZOOM_IN_SHORTCUT = "shortcut.zoom.in";
     private static final String KEY_ZOOM_OUT_SHORTCUT = "shortcut.zoom.out";
+    private static final String KEY_LOCAL_IMPORT_SERVER_PORT = "local.import.server.port";
+
     private static final int DEFAULT_REVIEW_DAYS = 7;
     private static final String DEFAULT_SEARCH_SHORTCUT = "Alt+Shift+S";
     private static final String DEFAULT_SEND_SHORTCUT = "Alt+Enter";
@@ -43,10 +45,11 @@ public class SettingsService {
     private static final String DEFAULT_ZOOM_IN_SHORTCUT = "Meta+EQUALS";
     private static final String DEFAULT_ZOOM_OUT_SHORTCUT = "Meta+MINUS";
 
+
     private static SettingsService instance;
     private final Properties properties;
     private final Path settingsPath;
-    
+
     // JavaFX Property for reactive binding
     private final BooleanProperty showOverviewCardProperty = new SimpleBooleanProperty(true);
     private final IntegerProperty noteFontSizeProperty = new SimpleIntegerProperty(DEFAULT_NOTE_FONT_SIZE);
@@ -70,11 +73,10 @@ public class SettingsService {
     private Path resolveSettingsPath() {
         try {
             System.out.println("[Settings] Resolving settings path...");
-            
+
             // 尝试使用Gluon Attach StorageService (Android/iOS)
-            Optional<File> privateStorage = StorageService.create()
-                    .flatMap(StorageService::getPrivateStorage);
-            
+            Optional<File> privateStorage = StorageService.create().flatMap(StorageService::getPrivateStorage);
+
             if (privateStorage.isPresent()) {
                 Path settingsPath = privateStorage.get().toPath().resolve(SETTINGS_FILE);
                 System.out.println("[Settings] Using Gluon private storage: " + settingsPath);
@@ -86,7 +88,7 @@ public class SettingsService {
             System.err.println("[Settings] Error accessing Gluon storage: " + e.getMessage());
             e.printStackTrace();
         }
-        
+
         // 桌面环境或Gluon存储不可用时的回退方案
         Path fallbackPath = Path.of(System.getProperty("user.home"), ".keenotes", SETTINGS_FILE);
         System.out.println("[Settings] Using fallback storage: " + fallbackPath);
@@ -162,56 +164,69 @@ public class SettingsService {
         String pwd = getEncryptionPassword();
         return pwd != null && !pwd.isEmpty();
     }
-    
+
+    public int getLocalImportServerPort() {
+        String port = properties.getProperty(KEY_LOCAL_IMPORT_SERVER_PORT, "1979");
+        return Integer.parseInt(port);
+    }
+
+    public void setLocalImportServerPort(int port) {
+        if (port < 1 || port > 65535) {
+            properties.setProperty("local.import.server.port", "1979");
+        } else {
+            properties.setProperty("local.import.server.port", String.valueOf(port));
+        }
+    }
+
     public boolean getCopyToClipboardOnPost() {
         return Boolean.parseBoolean(properties.getProperty(KEY_COPY_TO_CLIPBOARD, "false"));
     }
-    
+
     public void setCopyToClipboardOnPost(boolean enabled) {
         properties.setProperty(KEY_COPY_TO_CLIPBOARD, String.valueOf(enabled));
     }
-    
+
     public String getSearchShortcut() {
         return properties.getProperty(KEY_SEARCH_SHORTCUT, DEFAULT_SEARCH_SHORTCUT);
     }
-    
+
     public void setSearchShortcut(String shortcut) {
         properties.setProperty(KEY_SEARCH_SHORTCUT, shortcut);
     }
-    
+
     public String getSendShortcut() {
         return properties.getProperty(KEY_SEND_SHORTCUT, DEFAULT_SEND_SHORTCUT);
     }
-    
+
     public void setSendShortcut(String shortcut) {
         properties.setProperty(KEY_SEND_SHORTCUT, shortcut);
     }
-    
+
     public String getTheme() {
         return properties.getProperty(KEY_THEME, DEFAULT_THEME);
     }
-    
+
     public void setTheme(String theme) {
         properties.setProperty(KEY_THEME, theme);
     }
-    
+
     public boolean getShowOverviewCard() {
         return Boolean.parseBoolean(properties.getProperty(KEY_SHOW_OVERVIEW_CARD, "true"));
     }
-    
+
     public void setShowOverviewCard(boolean enabled) {
         properties.setProperty(KEY_SHOW_OVERVIEW_CARD, String.valueOf(enabled));
         showOverviewCardProperty.set(enabled);
     }
-    
+
     public BooleanProperty showOverviewCardProperty() {
         return showOverviewCardProperty;
     }
-    
+
     public String getFirstNoteDate() {
         return properties.getProperty(KEY_FIRST_NOTE_DATE);
     }
-    
+
     public void setFirstNoteDate(String date) {
         if (date == null || date.isEmpty()) {
             properties.remove(KEY_FIRST_NOTE_DATE);
@@ -219,7 +234,7 @@ public class SettingsService {
             properties.setProperty(KEY_FIRST_NOTE_DATE, date);
         }
     }
-    
+
     // Note font size settings
     public int getNoteFontSize() {
         try {
@@ -229,17 +244,17 @@ public class SettingsService {
             return DEFAULT_NOTE_FONT_SIZE;
         }
     }
-    
+
     public void setNoteFontSize(int size) {
         int clampedSize = Math.max(MIN_NOTE_FONT_SIZE, Math.min(MAX_NOTE_FONT_SIZE, size));
         properties.setProperty(KEY_NOTE_FONT_SIZE, String.valueOf(clampedSize));
         noteFontSizeProperty.set(clampedSize);
     }
-    
+
     public IntegerProperty noteFontSizeProperty() {
         return noteFontSizeProperty;
     }
-    
+
     public void zoomIn() {
         int currentSize = getNoteFontSize();
         if (currentSize < MAX_NOTE_FONT_SIZE) {
@@ -247,7 +262,7 @@ public class SettingsService {
             save();
         }
     }
-    
+
     public void zoomOut() {
         int currentSize = getNoteFontSize();
         if (currentSize > MIN_NOTE_FONT_SIZE) {
@@ -255,20 +270,20 @@ public class SettingsService {
             save();
         }
     }
-    
+
     // Zoom shortcuts
     public String getZoomInShortcut() {
         return properties.getProperty(KEY_ZOOM_IN_SHORTCUT, DEFAULT_ZOOM_IN_SHORTCUT);
     }
-    
+
     public void setZoomInShortcut(String shortcut) {
         properties.setProperty(KEY_ZOOM_IN_SHORTCUT, shortcut);
     }
-    
+
     public String getZoomOutShortcut() {
         return properties.getProperty(KEY_ZOOM_OUT_SHORTCUT, DEFAULT_ZOOM_OUT_SHORTCUT);
     }
-    
+
     public void setZoomOutShortcut(String shortcut) {
         properties.setProperty(KEY_ZOOM_OUT_SHORTCUT, shortcut);
     }
