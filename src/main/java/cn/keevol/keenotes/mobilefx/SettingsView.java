@@ -1,5 +1,6 @@
 package cn.keevol.keenotes.mobilefx;
 
+import cn.keevol.keenotes.utils.javafx.JFX;
 import javafx.animation.PauseTransition;
 import javafx.beans.binding.Bindings;
 import javafx.geometry.Insets;
@@ -30,6 +31,7 @@ public class SettingsView extends BorderPane {
     private final KeyCaptureField zoomOutShortcutField;
 
     private final TextField localImportServerPortField;
+    private SettingsPrefRow localPortRow;
 
 
     public SettingsView(Runnable onBack) {
@@ -60,8 +62,10 @@ public class SettingsView extends BorderPane {
         localImportServerPortField = new TextField();
         localImportServerPortField.getStyleClass().add("input-field");
         Runnable localImportServerPortFieldAction = () -> {
-            saveSettings();
+            updateLocalPortSetting();
+            settings.save();
             localImportServerPortField.setText(String.valueOf(settings.getLocalImportServerPort()));
+            JFX.showMessage(localPortRow.messageLabel(), "saved.");
         };
         localImportServerPortField.setOnAction((e) -> localImportServerPortFieldAction.run());
         localImportServerPortField.focusedProperty().addListener((o, oldValue, newValue) -> {
@@ -309,10 +313,10 @@ public class SettingsView extends BorderPane {
         HBox zoomOutShortcutRow = new HBox(16, zoomOutShortcutLabelWrapper, zoomOutShortcutFieldWithHint);
         zoomOutShortcutRow.setAlignment(Pos.TOP_LEFT);
 
-        HBox localPortRow = createPrefRow("Local Import Server Port", localImportServerPortField);
+        localPortRow = createPrefRow("Local Import Server Port", localImportServerPortField);
 
         // Preferences container with proper spacing
-        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, themeRow, shortcutRow, sendShortcutRow, zoomInShortcutRow, zoomOutShortcutRow, localPortRow);
+        VBox preferencesSection = new VBox(12, preferencesLabel, toggleRow, overviewCardRow, themeRow, shortcutRow, sendShortcutRow, zoomInShortcutRow, zoomOutShortcutRow, localPortRow.row());
         preferencesSection.setPadding(new Insets(8, 0, 8, 0)); // Add top/bottom padding
 
         // Debug entry (hidden by default) - removed for desktop version
@@ -475,16 +479,9 @@ public class SettingsView extends BorderPane {
         if (!zoomOutShortcut.isEmpty()) {
             settings.setZoomOutShortcut(zoomOutShortcut);
         }
-        String localPort = localImportServerPortField.getText();
-        if (localPort == null || localPort.isEmpty()) {
-            settings.setLocalImportServerPort(1979);
-        } else {
-            try {
-                settings.setLocalImportServerPort(Integer.parseInt(localPort));
-            } catch (Throwable t) {
-                settings.setLocalImportServerPort(1979);
-            }
-        }
+        // by fq
+        updateLocalPortSetting();
+
         // copyToClipboard is auto-saved on checkbox change
         settings.save();
 
@@ -604,15 +601,39 @@ public class SettingsView extends BorderPane {
         }, "ClearLocalData").start();
     }
 
-    protected HBox createPrefRow(String labelName, Node node) {
+    /**
+     * by fq
+     */
+    protected SettingsPrefRow createPrefRow(String labelName, Node node) {
         Label label = new Label(labelName);
         label.getStyleClass().add("field-label");
         label.setMinWidth(259);
         label.setMaxWidth(259);
         label.setAlignment(Pos.CENTER_RIGHT);
 
-        HBox row = new HBox(16, label, node);
+        Label messageLabel = new Label("");
+        label.getStyleClass().add("field-label");
+        label.setAlignment(Pos.CENTER_LEFT);
+
+        HBox row = new HBox(16, label, node, messageLabel);
         row.setAlignment(Pos.CENTER_LEFT);
-        return row;
+
+        return new SettingsPrefRow(row, label, node, messageLabel);
+    }
+
+    /**
+     * by fq
+     */
+    private void updateLocalPortSetting() {
+        String localPort = localImportServerPortField.getText();
+        if (localPort == null || localPort.isEmpty()) {
+            settings.setLocalImportServerPort(1979);
+        } else {
+            try {
+                settings.setLocalImportServerPort(Integer.parseInt(localPort));
+            } catch (Throwable t) {
+                settings.setLocalImportServerPort(1979);
+            }
+        }
     }
 }
