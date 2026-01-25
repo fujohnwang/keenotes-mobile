@@ -292,15 +292,11 @@ struct NoteRow: View {
             }
 
             // Note content with selectable text using UITextView
-            GeometryReader { geometry in
-                SelectableTextView(
-                    text: note.content,
-                    fontSize: messageFontSize,
-                    availableWidth: geometry.size.width,
-                    onTap: copyToClipboard
-                )
-            }
-            .frame(height: calculateHeight(for: note.content, width: UIScreen.main.bounds.width - (isPad ? 48 : 32) - (cardPadding * 2), fontSize: messageFontSize))
+            SelectableTextView(
+                text: note.content,
+                fontSize: messageFontSize,
+                onTap: copyToClipboard
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(cardPadding)
@@ -383,11 +379,12 @@ struct NoteRow: View {
 struct SelectableTextView: UIViewRepresentable {
     let text: String
     let fontSize: CGFloat
-    let availableWidth: CGFloat
     let onTap: () -> Void
     
-    func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
+    func makeUIView(context: Context) -> UITextViewWrapper {
+        let wrapper = UITextViewWrapper()
+        let textView = wrapper.textView
+        
         textView.isEditable = false
         textView.isSelectable = true
         textView.isScrollEnabled = false
@@ -402,15 +399,13 @@ struct SelectableTextView: UIViewRepresentable {
         tapGesture.delegate = context.coordinator
         textView.addGestureRecognizer(tapGesture)
         
-        return textView
+        return wrapper
     }
     
-    func updateUIView(_ uiView: UITextView, context: Context) {
-        uiView.text = text
-        uiView.font = .systemFont(ofSize: fontSize)
-        
-        // Critical: Set the text container width so UITextView knows where to wrap
-        uiView.textContainer.size = CGSize(width: availableWidth, height: .greatestFiniteMagnitude)
+    func updateUIView(_ uiView: UITextViewWrapper, context: Context) {
+        let textView = uiView.textView
+        textView.text = text
+        textView.font = .systemFont(ofSize: fontSize)
     }
     
     func makeCoordinator() -> Coordinator {
@@ -437,5 +432,39 @@ struct SelectableTextView: UIViewRepresentable {
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
             return true
         }
+    }
+}
+
+/// Wrapper view that properly constrains UITextView width
+class UITextViewWrapper: UIView {
+    let textView = UITextView()
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupView()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupView()
+    }
+    
+    private func setupView() {
+        addSubview(textView)
+        textView.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            textView.topAnchor.constraint(equalTo: topAnchor),
+            textView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            textView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            textView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+    
+    override var intrinsicContentSize: CGSize {
+        let width = bounds.width > 0 ? bounds.width : UIScreen.main.bounds.width
+        textView.textContainer.size = CGSize(width: width, height: .greatestFiniteMagnitude)
+        let size = textView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: width, height: size.height)
     }
 }
