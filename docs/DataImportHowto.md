@@ -22,3 +22,6 @@ NDJSON每一行JSON的内容和必要字段，跟[使用本地API导入](#使用
 
 
 
+> NOTE
+> 
+> 润色后的版本见： [https://afoo.me/posts/2026-01-25-keenotes-desk-data-import.html](https://afoo.me/posts/2026-01-25-keenotes-desk-data-import.html)
