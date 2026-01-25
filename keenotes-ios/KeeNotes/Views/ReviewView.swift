@@ -297,7 +297,6 @@ struct NoteRow: View {
                 fontSize: messageFontSize,
                 onTap: copyToClipboard
             )
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(cardPadding)
@@ -373,9 +372,13 @@ struct SelectableTextView: UIViewRepresentable {
         textView.textColor = .label
         textView.delegate = context.coordinator
         
-        // Critical: Allow text view to size itself based on content
+        // CRITICAL: Prevent horizontal expansion
+        textView.textContainer.widthTracksTextView = true
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        
+        // CRITICAL: Allow vertical expansion based on content
         textView.setContentCompressionResistancePriority(.required, for: .vertical)
-        textView.setContentHuggingPriority(.required, for: .vertical)
+        textView.setContentHuggingPriority(.defaultHigh, for: .vertical)
         
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
@@ -388,10 +391,6 @@ struct SelectableTextView: UIViewRepresentable {
     func updateUIView(_ uiView: UITextView, context: Context) {
         uiView.text = text
         uiView.font = .systemFont(ofSize: fontSize)
-        
-        // Force layout update
-        uiView.setNeedsLayout()
-        uiView.layoutIfNeeded()
     }
     
     func makeCoordinator() -> Coordinator {
