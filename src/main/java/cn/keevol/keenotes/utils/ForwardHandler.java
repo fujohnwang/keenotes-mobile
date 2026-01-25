@@ -39,7 +39,7 @@ public class ForwardHandler implements HttpHandler {
             JsonObject json = new JsonObject(new String(requestBody, StandardCharsets.UTF_8));
             String content = json.getString("content");
             String channel = json.getString("channel");
-            String ts = json.getString("ts");
+            String ts = json.getString("created_at");
             
             // 2. Check if data is already encrypted
             Boolean encrypted = json.getBoolean("encrypted", false);
