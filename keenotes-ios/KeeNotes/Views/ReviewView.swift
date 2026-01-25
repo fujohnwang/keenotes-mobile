@@ -297,6 +297,7 @@ struct NoteRow: View {
                 text: note.content,
                 fontSize: messageFontSize,
                 onTap: copyToClipboard,
+                onCopyMenuAction: showCopiedAlert,
                 onHeightChange: { height in
                     textViewHeight = height
                 }
@@ -340,7 +341,10 @@ struct NoteRow: View {
 
     private func copyToClipboard() {
         UIPasteboard.general.string = note.content
-
+        showCopiedAlert()
+    }
+    
+    private func showCopiedAlert() {
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
@@ -385,10 +389,11 @@ struct SelectableTextView: UIViewRepresentable {
     let text: String
     let fontSize: CGFloat
     let onTap: () -> Void
+    let onCopyMenuAction: () -> Void
     let onHeightChange: (CGFloat) -> Void
     
-    func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
+    func makeUIView(context: Context) -> CustomUITextView {
+        let textView = CustomUITextView()
         textView.isEditable = false
         textView.isSelectable = true
         textView.isScrollEnabled = true  // Keep scrolling enabled but frame will always be large enough
@@ -398,6 +403,7 @@ struct SelectableTextView: UIViewRepresentable {
         textView.font = .systemFont(ofSize: fontSize)
         textView.textColor = .label
         textView.bounces = false  // Disable bouncing to hide scrolling behavior
+        textView.copyActionCallback = context.coordinator.handleCopyAction
         
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
@@ -407,9 +413,10 @@ struct SelectableTextView: UIViewRepresentable {
         return textView
     }
     
-    func updateUIView(_ uiView: UITextView, context: Context) {
+    func updateUIView(_ uiView: CustomUITextView, context: Context) {
         uiView.text = text
         uiView.font = .systemFont(ofSize: fontSize)
+        uiView.copyActionCallback = context.coordinator.handleCopyAction
         
         // Defer height calculation to next runloop to avoid modifying state during view update
         // and to allow UITextView to recalculate its content size
@@ -420,14 +427,16 @@ struct SelectableTextView: UIViewRepresentable {
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(onTap: onTap)
+        Coordinator(onTap: onTap, onCopyMenuAction: onCopyMenuAction)
     }
     
     class Coordinator: NSObject, UIGestureRecognizerDelegate {
         let onTap: () -> Void
+        let onCopyMenuAction: () -> Void
         
-        init(onTap: @escaping () -> Void) {
+        init(onTap: @escaping () -> Void, onCopyMenuAction: @escaping () -> Void) {
             self.onTap = onTap
+            self.onCopyMenuAction = onCopyMenuAction
         }
         
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
@@ -439,9 +448,29 @@ struct SelectableTextView: UIViewRepresentable {
             }
         }
         
+        func handleCopyAction() {
+            onCopyMenuAction()
+        }
+        
         // Allow tap gesture to work alongside text selection
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
             return true
         }
+    }
+}
+
+/// Custom UITextView that handles copy menu action
+class CustomUITextView: UITextView {
+    var copyActionCallback: (() -> Void)?
+    
+    override func copy(_ sender: Any?) {
+        // Let system handle the copy
+        super.copy(sender)
+        
+        // Deselect text
+        selectedTextRange = nil
+        
+        // Notify SwiftUI to show copied alert
+        copyActionCallback?()
     }
 }
