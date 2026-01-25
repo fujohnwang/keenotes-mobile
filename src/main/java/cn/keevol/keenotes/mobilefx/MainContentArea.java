@@ -657,4 +657,11 @@ public class MainContentArea extends StackPane {
             pendingSearchFocus = true;
         }
     }
+    
+    /**
+     * Get settings view (for sub-navigation)
+     */
+    public SettingsView getSettingsView() {
+        return settingsView;
+    }
 }

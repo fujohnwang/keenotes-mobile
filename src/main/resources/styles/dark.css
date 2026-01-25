@@ -794,3 +794,12 @@
     -fx-background-color: -fx-text-secondary;
     -fx-opacity: 0.15;
 }
+
+/* Import Section - Dark theme */
+.import-title-header {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 16, 0.3, 0, 6);
+}
+
+.import-section {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 8, 0, 0, 2);
+}
