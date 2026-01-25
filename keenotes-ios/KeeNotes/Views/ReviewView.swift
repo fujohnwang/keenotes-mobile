@@ -393,6 +393,9 @@ struct SelectableTextView: UIViewRepresentable {
         textView.font = .systemFont(ofSize: fontSize)
         textView.textColor = .label
         
+        // CRITICAL: Set width constraint
+        textView.translatesAutoresizingMaskIntoConstraints = false
+        
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
         tapGesture.delegate = context.coordinator
@@ -404,6 +407,15 @@ struct SelectableTextView: UIViewRepresentable {
     func updateUIView(_ uiView: UITextView, context: Context) {
         uiView.text = text
         uiView.font = .systemFont(ofSize: fontSize)
+        
+        // Update width constraint
+        if let widthConstraint = context.coordinator.widthConstraint {
+            widthConstraint.constant = availableWidth
+        } else {
+            let constraint = uiView.widthAnchor.constraint(equalToConstant: availableWidth)
+            constraint.isActive = true
+            context.coordinator.widthConstraint = constraint
+        }
     }
     
     func makeCoordinator() -> Coordinator {
@@ -412,6 +424,7 @@ struct SelectableTextView: UIViewRepresentable {
     
     class Coordinator: NSObject, UIGestureRecognizerDelegate {
         let onTap: () -> Void
+        var widthConstraint: NSLayoutConstraint?
         
         init(onTap: @escaping () -> Void) {
             self.onTap = onTap
