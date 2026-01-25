@@ -297,7 +297,7 @@ struct NoteRow: View {
                 text: note.content,
                 fontSize: messageFontSize,
                 onTap: copyToClipboard,
-                onCopyMenuAction: showCopiedAlert,
+                onCopyMenuAction: showCopiedNotification,
                 onHeightChange: { height in
                     textViewHeight = height
                 }
@@ -341,10 +341,10 @@ struct NoteRow: View {
 
     private func copyToClipboard() {
         UIPasteboard.general.string = note.content
-        showCopiedAlert()
+        showCopiedNotification()
     }
     
-    private func showCopiedAlert() {
+    private func showCopiedNotification() {
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
