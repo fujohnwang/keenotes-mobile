@@ -286,15 +286,17 @@ struct NoteRow: View {
                         .foregroundColor(.secondary)
                 }
             }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                copyToClipboard()
+            }
 
-            // Note content (full text with auto wrap)
-            // Long press to select text fragments
-            Text(note.content)
-                .font(.system(size: messageFontSize))
-                .foregroundColor(.primary)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
+            // Note content with selectable text using UITextView
+            SelectableTextView(
+                text: note.content,
+                fontSize: messageFontSize,
+                onTap: copyToClipboard
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(cardPadding)
@@ -306,13 +308,6 @@ struct NoteRow: View {
         .overlay(
             RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
                 .stroke(Color(.systemGray5), lineWidth: 1)
-        )
-        .contentShape(Rectangle())
-        .simultaneousGesture(
-            TapGesture()
-                .onEnded { _ in
-                    copyToClipboard()
-                }
         )
         .overlay(
             Group {
@@ -355,6 +350,64 @@ struct NoteRow: View {
             withAnimation {
                 showCopiedAlert = false
             }
+        }
+    }
+}
+
+/// UITextView wrapper that supports both tap-to-copy and long-press-to-select
+struct SelectableTextView: UIViewRepresentable {
+    let text: String
+    let fontSize: CGFloat
+    let onTap: () -> Void
+    
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isScrollEnabled = false
+        textView.backgroundColor = .clear
+        textView.textContainerInset = .zero
+        textView.textContainer.lineFragmentPadding = 0
+        textView.font = .systemFont(ofSize: fontSize)
+        textView.textColor = .label
+        textView.delegate = context.coordinator
+        
+        // Add tap gesture for copy
+        let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
+        tapGesture.delegate = context.coordinator
+        textView.addGestureRecognizer(tapGesture)
+        
+        return textView
+    }
+    
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        uiView.text = text
+        uiView.font = .systemFont(ofSize: fontSize)
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onTap: onTap)
+    }
+    
+    class Coordinator: NSObject, UITextViewDelegate, UIGestureRecognizerDelegate {
+        let onTap: () -> Void
+        
+        init(onTap: @escaping () -> Void) {
+            self.onTap = onTap
+        }
+        
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            guard let textView = gesture.view as? UITextView else { return }
+            
+            // Only trigger copy if no text is selected
+            if textView.selectedRange.length == 0 {
+                onTap()
+            }
+        }
+        
+        // Allow tap gesture to work alongside text selection
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            return true
         }
     }
 }
