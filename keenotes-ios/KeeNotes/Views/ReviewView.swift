@@ -300,7 +300,7 @@ struct NoteRow: View {
                     onTap: copyToClipboard
                 )
             }
-            .frame(height: calculateHeight(for: note.content, width: UIScreen.main.bounds.width - (isPad ? 48 : 32) - (cardPadding * 2), fontSize: messageFontSize))
+            .frame(height: calculateHeight(for: note.content, width: nil, fontSize: messageFontSize))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(cardPadding)
@@ -357,10 +357,14 @@ struct NoteRow: View {
         }
     }
     
-    private func calculateHeight(for text: String, width: CGFloat, fontSize: CGFloat) -> CGFloat {
+    private func calculateHeight(for text: String, width: CGFloat?, fontSize: CGFloat) -> CGFloat {
+        // Use a reasonable default width for height calculation
+        // The actual width will be constrained by GeometryReader
+        let calculationWidth = width ?? (UIScreen.main.bounds.width - (isPad ? 48 : 32) - (cardPadding * 2))
+        
         let font = UIFont.systemFont(ofSize: fontSize)
         let textStorage = NSTextStorage(string: text)
-        let textContainer = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
+        let textContainer = NSTextContainer(size: CGSize(width: calculationWidth, height: .greatestFiniteMagnitude))
         let layoutManager = NSLayoutManager()
         
         layoutManager.addTextContainer(textContainer)
@@ -392,9 +396,13 @@ struct SelectableTextView: UIViewRepresentable {
         textView.textContainer.lineFragmentPadding = 0
         textView.font = .systemFont(ofSize: fontSize)
         textView.textColor = .label
+        textView.text = text
         
-        // CRITICAL: Set width constraint
+        // CRITICAL: Set width constraint immediately
         textView.translatesAutoresizingMaskIntoConstraints = false
+        let widthConstraint = textView.widthAnchor.constraint(equalToConstant: availableWidth)
+        widthConstraint.isActive = true
+        context.coordinator.widthConstraint = widthConstraint
         
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
@@ -405,16 +413,18 @@ struct SelectableTextView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UITextView, context: Context) {
-        uiView.text = text
-        uiView.font = .systemFont(ofSize: fontSize)
+        if uiView.text != text {
+            uiView.text = text
+        }
+        if uiView.font?.pointSize != fontSize {
+            uiView.font = .systemFont(ofSize: fontSize)
+        }
         
-        // Update width constraint
+        // Update width constraint if changed
         if let widthConstraint = context.coordinator.widthConstraint {
-            widthConstraint.constant = availableWidth
-        } else {
-            let constraint = uiView.widthAnchor.constraint(equalToConstant: availableWidth)
-            constraint.isActive = true
-            context.coordinator.widthConstraint = constraint
+            if widthConstraint.constant != availableWidth {
+                widthConstraint.constant = availableWidth
+            }
         }
     }
     
