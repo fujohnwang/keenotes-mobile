@@ -238,6 +238,7 @@ struct ReviewView: View {
 struct NoteRow: View {
     let note: Note
     @State private var showCopiedAlert = false
+    @State private var textViewHeight: CGFloat?
 
     private var isPad: Bool { DeviceType.isPad }
     private var cardPadding: CGFloat { isPad ? 24 : 16 }
@@ -295,8 +296,12 @@ struct NoteRow: View {
             SelectableTextView(
                 text: note.content,
                 fontSize: messageFontSize,
-                onTap: copyToClipboard
+                onTap: copyToClipboard,
+                onHeightChange: { height in
+                    textViewHeight = height
+                }
             )
+            .frame(height: textViewHeight)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(cardPadding)
@@ -380,32 +385,38 @@ struct SelectableTextView: UIViewRepresentable {
     let text: String
     let fontSize: CGFloat
     let onTap: () -> Void
+    let onHeightChange: (CGFloat) -> Void
     
-    func makeUIView(context: Context) -> UITextViewWrapper {
-        let wrapper = UITextViewWrapper()
-        let textView = wrapper.textView
-        
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
         textView.isEditable = false
         textView.isSelectable = true
-        textView.isScrollEnabled = false
+        textView.isScrollEnabled = true  // Keep scrolling enabled but frame will always be large enough
         textView.backgroundColor = .clear
         textView.textContainerInset = .zero
         textView.textContainer.lineFragmentPadding = 0
         textView.font = .systemFont(ofSize: fontSize)
         textView.textColor = .label
+        textView.bounces = false  // Disable bouncing to hide scrolling behavior
         
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
         tapGesture.delegate = context.coordinator
         textView.addGestureRecognizer(tapGesture)
         
-        return wrapper
+        return textView
     }
     
-    func updateUIView(_ uiView: UITextViewWrapper, context: Context) {
-        let textView = uiView.textView
-        textView.text = text
-        textView.font = .systemFont(ofSize: fontSize)
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        uiView.text = text
+        uiView.font = .systemFont(ofSize: fontSize)
+        
+        // Defer height calculation to next runloop to avoid modifying state during view update
+        // and to allow UITextView to recalculate its content size
+        DispatchQueue.main.async {
+            let height = uiView.contentSize.height
+            onHeightChange(height)
+        }
     }
     
     func makeCoordinator() -> Coordinator {
@@ -432,39 +443,5 @@ struct SelectableTextView: UIViewRepresentable {
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
             return true
         }
-    }
-}
-
-/// Wrapper view that properly constrains UITextView width
-class UITextViewWrapper: UIView {
-    let textView = UITextView()
-    
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setupView()
-    }
-    
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setupView()
-    }
-    
-    private func setupView() {
-        addSubview(textView)
-        textView.translatesAutoresizingMaskIntoConstraints = false
-        
-        NSLayoutConstraint.activate([
-            textView.topAnchor.constraint(equalTo: topAnchor),
-            textView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            textView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            textView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
-    }
-    
-    override var intrinsicContentSize: CGSize {
-        let width = bounds.width > 0 ? bounds.width : UIScreen.main.bounds.width
-        textView.textContainer.size = CGSize(width: width, height: .greatestFiniteMagnitude)
-        let size = textView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
-        return CGSize(width: width, height: size.height)
     }
 }
