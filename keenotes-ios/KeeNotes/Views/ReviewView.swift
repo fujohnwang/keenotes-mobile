@@ -300,7 +300,7 @@ struct NoteRow: View {
                     onTap: copyToClipboard
                 )
             }
-            .frame(height: calculateHeight(for: note.content, width: nil, fontSize: messageFontSize))
+            .frame(height: calculateHeight(for: note.content, width: UIScreen.main.bounds.width - (isPad ? 48 : 32) - (cardPadding * 2), fontSize: messageFontSize))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(cardPadding)
@@ -396,7 +396,6 @@ struct SelectableTextView: UIViewRepresentable {
         textView.textContainer.lineFragmentPadding = 0
         textView.font = .systemFont(ofSize: fontSize)
         textView.textColor = .label
-        textView.text = text
         
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
@@ -407,20 +406,11 @@ struct SelectableTextView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UITextView, context: Context) {
-        if uiView.text != text {
-            uiView.text = text
-        }
-        if uiView.font?.pointSize != fontSize {
-            uiView.font = .systemFont(ofSize: fontSize)
-        }
+        uiView.text = text
+        uiView.font = .systemFont(ofSize: fontSize)
         
-        // CRITICAL: Set frame width explicitly
-        let currentFrame = uiView.frame
-        if currentFrame.width != availableWidth {
-            uiView.frame = CGRect(x: 0, y: 0, width: availableWidth, height: currentFrame.height)
-            uiView.setNeedsLayout()
-            uiView.layoutIfNeeded()
-        }
+        // Critical: Set the text container width so UITextView knows where to wrap
+        uiView.textContainer.size = CGSize(width: availableWidth, height: .greatestFiniteMagnitude)
     }
     
     func makeCoordinator() -> Coordinator {
