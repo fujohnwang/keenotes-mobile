@@ -291,12 +291,16 @@ struct NoteRow: View {
                 copyToClipboard()
             }
 
-            // Note content with selectable text using UILabel
-            SelectableTextView(
-                text: note.content,
-                fontSize: messageFontSize,
-                onTap: copyToClipboard
-            )
+            // Note content with selectable text using UITextView
+            GeometryReader { geometry in
+                SelectableTextView(
+                    text: note.content,
+                    fontSize: messageFontSize,
+                    availableWidth: geometry.size.width,
+                    onTap: copyToClipboard
+                )
+            }
+            .frame(height: calculateHeight(for: note.content, width: UIScreen.main.bounds.width - (isPad ? 48 : 32) - (cardPadding * 2), fontSize: messageFontSize))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(cardPadding)
@@ -352,100 +356,79 @@ struct NoteRow: View {
             }
         }
     }
+    
+    private func calculateHeight(for text: String, width: CGFloat, fontSize: CGFloat) -> CGFloat {
+        let font = UIFont.systemFont(ofSize: fontSize)
+        let textStorage = NSTextStorage(string: text)
+        let textContainer = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
+        let layoutManager = NSLayoutManager()
+        
+        layoutManager.addTextContainer(textContainer)
+        textStorage.addLayoutManager(layoutManager)
+        textStorage.addAttribute(.font, value: font, range: NSRange(location: 0, length: text.count))
+        
+        textContainer.lineFragmentPadding = 0
+        layoutManager.glyphRange(for: textContainer)
+        
+        let rect = layoutManager.usedRect(for: textContainer)
+        return ceil(rect.height)
+    }
 }
 
-/// UILabel wrapper that supports both tap-to-copy and long-press-to-select
+/// UITextView wrapper that supports both tap-to-copy and long-press-to-select
 struct SelectableTextView: UIViewRepresentable {
     let text: String
     let fontSize: CGFloat
+    let availableWidth: CGFloat
     let onTap: () -> Void
     
-    func makeUIView(context: Context) -> UILabel {
-        let label = UILabel()
-        label.numberOfLines = 0
-        label.lineBreakMode = .byWordWrapping
-        label.font = .systemFont(ofSize: fontSize)
-        label.textColor = .label
-        label.isUserInteractionEnabled = true
-        
-        // Enable text selection (iOS 15+)
-        label.isUserInteractionEnabled = true
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isScrollEnabled = false
+        textView.backgroundColor = .clear
+        textView.textContainerInset = .zero
+        textView.textContainer.lineFragmentPadding = 0
+        textView.font = .systemFont(ofSize: fontSize)
+        textView.textColor = .label
         
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
-        label.addGestureRecognizer(tapGesture)
+        tapGesture.delegate = context.coordinator
+        textView.addGestureRecognizer(tapGesture)
         
-        // Add long press gesture for text selection
-        let longPressGesture = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress))
-        label.addGestureRecognizer(longPressGesture)
-        
-        return label
+        return textView
     }
     
-    func updateUIView(_ uiView: UILabel, context: Context) {
-        if uiView.text != text {
-            uiView.text = text
-        }
-        if uiView.font?.pointSize != fontSize {
-            uiView.font = .systemFont(ofSize: fontSize)
-        }
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        uiView.text = text
+        uiView.font = .systemFont(ofSize: fontSize)
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: text, onTap: onTap)
+        Coordinator(onTap: onTap)
     }
     
-    class Coordinator: NSObject {
-        let text: String
+    class Coordinator: NSObject, UIGestureRecognizerDelegate {
         let onTap: () -> Void
         
-        init(text: String, onTap: @escaping () -> Void) {
-            self.text = text
+        init(onTap: @escaping () -> Void) {
             self.onTap = onTap
         }
         
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
-            onTap()
-        }
-        
-        @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-            guard gesture.state == .began else { return }
-            guard let label = gesture.view as? UILabel else { return }
+            guard let textView = gesture.view as? UITextView else { return }
             
-            // Make label first responder and show menu
-            label.becomeFirstResponder()
-            
-            let menuController = UIMenuController.shared
-            if !menuController.isMenuVisible {
-                let selectItem = UIMenuItem(title: "Select", action: #selector(showTextSelection))
-                menuController.menuItems = [selectItem]
-                
-                // Show menu at tap location
-                let location = gesture.location(in: label)
-                let rect = CGRect(x: location.x, y: location.y, width: 1, height: 1)
-                menuController.showMenu(from: label, rect: rect)
+            // Only trigger copy if no text is selected
+            if textView.selectedRange.length == 0 {
+                onTap()
             }
         }
         
-        @objc func showTextSelection() {
-            // This will be called when user taps "Select" in menu
-            // For now, copy the full text
-            UIPasteboard.general.string = text
+        // Allow tap gesture to work alongside text selection
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            return true
         }
-    }
-}
-
-// Extension to make UILabel first responder
-extension UILabel {
-    open override var canBecomeFirstResponder: Bool {
-        return true
-    }
-    
-    open override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-        return action == #selector(copy(_:))
-    }
-    
-    open override func copy(_ sender: Any?) {
-        UIPasteboard.general.string = text
     }
 }
