@@ -376,6 +376,7 @@ struct SelectableTextView: UIViewRepresentable {
         textView.textContainer.lineBreakMode = .byWordWrapping
         textView.textContainer.widthTracksTextView = true
         textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        textView.setContentHuggingPriority(.defaultHigh, for: .vertical)
         
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
@@ -388,6 +389,11 @@ struct SelectableTextView: UIViewRepresentable {
     func updateUIView(_ uiView: UITextView, context: Context) {
         uiView.text = text
         uiView.font = .systemFont(ofSize: fontSize)
+        
+        // Force layout to calculate correct height
+        DispatchQueue.main.async {
+            uiView.invalidateIntrinsicContentSize()
+        }
     }
     
     func makeCoordinator() -> Coordinator {
