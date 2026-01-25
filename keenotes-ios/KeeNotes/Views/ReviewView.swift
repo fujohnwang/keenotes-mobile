@@ -297,6 +297,8 @@ struct NoteRow: View {
                 fontSize: messageFontSize,
                 onTap: copyToClipboard
             )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(cardPadding)
