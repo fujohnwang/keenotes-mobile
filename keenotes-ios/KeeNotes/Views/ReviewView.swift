@@ -292,15 +292,12 @@ struct NoteRow: View {
             }
 
             // Note content with selectable text using UITextView
-            GeometryReader { geometry in
-                SelectableTextView(
-                    text: note.content,
-                    fontSize: messageFontSize,
-                    width: geometry.size.width,
-                    onTap: copyToClipboard
-                )
-            }
-            .frame(height: calculateTextHeight(text: note.content, width: UIScreen.main.bounds.width - (isPad ? 48 : 32) - (cardPadding * 2), fontSize: messageFontSize))
+            SelectableTextView(
+                text: note.content,
+                fontSize: messageFontSize,
+                onTap: copyToClipboard
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(cardPadding)
@@ -356,27 +353,12 @@ struct NoteRow: View {
             }
         }
     }
-    
-    private func calculateTextHeight(text: String, width: CGFloat, fontSize: CGFloat) -> CGFloat {
-        let font = UIFont.systemFont(ofSize: fontSize)
-        let attributes: [NSAttributedString.Key: Any] = [.font: font]
-        let attributedText = NSAttributedString(string: text, attributes: attributes)
-        
-        let rect = attributedText.boundingRect(
-            with: CGSize(width: width, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            context: nil
-        )
-        
-        return ceil(rect.height)
-    }
 }
 
 /// UITextView wrapper that supports both tap-to-copy and long-press-to-select
 struct SelectableTextView: UIViewRepresentable {
     let text: String
     let fontSize: CGFloat
-    let width: CGFloat
     let onTap: () -> Void
     
     func makeUIView(context: Context) -> UITextView {
@@ -391,6 +373,10 @@ struct SelectableTextView: UIViewRepresentable {
         textView.textColor = .label
         textView.delegate = context.coordinator
         
+        // Critical: Allow text view to size itself based on content
+        textView.setContentCompressionResistancePriority(.required, for: .vertical)
+        textView.setContentHuggingPriority(.required, for: .vertical)
+        
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
         tapGesture.delegate = context.coordinator
@@ -402,6 +388,10 @@ struct SelectableTextView: UIViewRepresentable {
     func updateUIView(_ uiView: UITextView, context: Context) {
         uiView.text = text
         uiView.font = .systemFont(ofSize: fontSize)
+        
+        // Force layout update
+        uiView.setNeedsLayout()
+        uiView.layoutIfNeeded()
     }
     
     func makeCoordinator() -> Coordinator {
