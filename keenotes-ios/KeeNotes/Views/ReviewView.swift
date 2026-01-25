@@ -308,9 +308,12 @@ struct NoteRow: View {
                 .stroke(Color(.systemGray5), lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onTapGesture {
-            copyToClipboard()
-        }
+        .simultaneousGesture(
+            TapGesture()
+                .onEnded { _ in
+                    copyToClipboard()
+                }
+        )
         .overlay(
             Group {
                 if showCopiedAlert {
