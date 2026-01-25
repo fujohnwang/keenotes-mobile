@@ -179,4 +179,51 @@ public class ApiServiceV2 {
     public boolean isEncryptionEnabled() {
         return cryptoService.isEncryptionEnabled();
     }
+    
+    /**
+     * Post note directly without encryption (for importing already encrypted data)
+     * This method should ONLY be used by DataImportService
+     */
+    public CompletableFuture<ApiResult> postNoteDirectly(String encryptedContent, String channel, String ts) {
+        String endpointUrl = settings.getEndpointUrl();
+        String token = settings.getToken();
+
+        if (endpointUrl == null || endpointUrl.isBlank()) {
+            return CompletableFuture.completedFuture(ApiResult.failure("Endpoint URL not configured."));
+        }
+        if (token == null || token.isBlank()) {
+            return CompletableFuture.completedFuture(ApiResult.failure("Token not configured."));
+        }
+        if (encryptedContent == null || encryptedContent.isBlank()) {
+            return CompletableFuture.completedFuture(ApiResult.failure("Note content cannot be empty."));
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                String json = String.format(
+                    "{\"channel\":\"%s\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":true}",
+                    channel, escapeJson(encryptedContent), ts
+                );
+
+                Request request = new Request.Builder()
+                        .url(endpointUrl)
+                        .header("Content-Type", "application/json")
+                        .header("Authorization", "Bearer " + token)
+                        .post(RequestBody.create(json, JSON))
+                        .build();
+
+                try (Response response = httpClient.newCall(request).execute()) {
+                    if (response.isSuccessful()) {
+                        String body = response.body() != null ? response.body().string() : "";
+                        return ApiResult.success(encryptedContent, parseNoteId(body));
+                    } else {
+                        return ApiResult.failure("Server error: " + response.code());
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ApiResult.failure("Network error: " + e.getMessage());
+            }
+        });
+    }
 }

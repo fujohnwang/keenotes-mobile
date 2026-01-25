@@ -40,7 +40,19 @@ public class ForwardHandler implements HttpHandler {
             String content = json.getString("content");
             String channel = json.getString("channel");
             String ts = json.getString("ts");
-            CompletableFuture<ApiServiceV2.ApiResult> future = serviceManager.postNote(content, channel, ts);
+            
+            // 2. Check if data is already encrypted
+            Boolean encrypted = json.getBoolean("encrypted", false);
+            
+            CompletableFuture<ApiServiceV2.ApiResult> future;
+            if (encrypted) {
+                // Data is already encrypted, send directly without E2EE
+                future = serviceManager.postNoteDirectly(content, channel, ts);
+            } else {
+                // Data is not encrypted, use E2EE encryption
+                future = serviceManager.postNote(content, channel, ts);
+            }
+            
             ApiServiceV2.ApiResult result = future.get(30, TimeUnit.SECONDS);
             if (result.success()) {
                 exchange.sendResponseHeaders(200, 0);

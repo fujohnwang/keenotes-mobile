@@ -18,6 +18,7 @@ public class StatusFooterBar extends HBox {
     private final Label sendChannelLabel;
     private final Circle syncChannelIndicator;
     private final Label syncChannelLabel;
+    private final Label importStatusLabel;
     
     public StatusFooterBar() {
         getStyleClass().add("status-footer-bar");
@@ -52,9 +53,14 @@ public class StatusFooterBar extends HBox {
         HBox syncChannel = new HBox(6, syncChannelIndicator, syncChannelLabel);
         syncChannel.setAlignment(Pos.CENTER_LEFT);
         
-        getChildren().addAll(sendChannel, spacer, syncChannel);
+        // Import status (initially hidden)
+        importStatusLabel = new Label("");
+        importStatusLabel.getStyleClass().add("status-label");
+        importStatusLabel.setVisible(false);
+        importStatusLabel.setManaged(false);
         
-        // TODO: Connect to actual service status
+        getChildren().addAll(sendChannel, spacer, syncChannel, importStatusLabel);
+        
         startStatusMonitoring();
     }
     
@@ -88,5 +94,36 @@ public class StatusFooterBar extends HBox {
         syncChannelLabel.setText("Sync Channel: " + text);
         syncChannelLabel.setStyle(connected ? 
             "-fx-text-fill: #4CAF50;" : "-fx-text-fill: #F44336;");
+    }
+    
+    /**
+     * Set import status
+     */
+    public void setImportStatus(String text, boolean inProgress) {
+        if (text == null || text.isEmpty()) {
+            importStatusLabel.setVisible(false);
+            importStatusLabel.setManaged(false);
+        } else {
+            importStatusLabel.setText("Import: " + text);
+            importStatusLabel.setStyle(inProgress ? 
+                "-fx-text-fill: #FF9800;" : "-fx-text-fill: #4CAF50;");
+            importStatusLabel.setVisible(true);
+            importStatusLabel.setManaged(true);
+            
+            // Auto-hide after 5 seconds if not in progress
+            if (!inProgress) {
+                javafx.application.Platform.runLater(() -> {
+                    try {
+                        Thread.sleep(5000);
+                        javafx.application.Platform.runLater(() -> {
+                            importStatusLabel.setVisible(false);
+                            importStatusLabel.setManaged(false);
+                        });
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+            }
+        }
     }
 }
