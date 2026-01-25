@@ -372,6 +372,11 @@ struct SelectableTextView: UIViewRepresentable {
         textView.textColor = .label
         textView.delegate = context.coordinator
         
+        // Ensure text wraps and doesn't expand horizontally
+        textView.textContainer.lineBreakMode = .byWordWrapping
+        textView.textContainer.widthTracksTextView = true
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
         tapGesture.delegate = context.coordinator
