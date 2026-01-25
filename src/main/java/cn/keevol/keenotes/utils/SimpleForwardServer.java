@@ -37,7 +37,7 @@ public class SimpleForwardServer {
                         server.setExecutor(Executors.newSingleThreadExecutor());
 
                         // 2. 创建上下文，绑定路径
-                        server.createContext("/ingest", new ForwardHandler());
+                        server.createContext("/", new ForwardHandler());
 
                         // 3. 启动
                         System.out.println("Forward Server started on port " + LOCAL_PORT);

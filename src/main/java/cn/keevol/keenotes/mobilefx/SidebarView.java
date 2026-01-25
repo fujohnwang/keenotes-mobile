@@ -27,6 +27,9 @@ public class SidebarView extends VBox {
     // Review periods panel
     private ReviewPeriodsPanel reviewPeriodsPanel;
     
+    // Settings sub panel
+    private SettingsSubPanel settingsSubPanel;
+    
     public SidebarView(Consumer<DesktopMainView.ViewMode> onNavigationChanged) {
         this.onNavigationChanged = onNavigationChanged;
         
@@ -69,9 +72,14 @@ public class SidebarView extends VBox {
         searchButton.setOnAction(e -> onNavigationChanged.accept(DesktopMainView.ViewMode.SEARCH));
         
         settingsButton = new NavigationButton("Settings", createSettingsIcon(), false);
-        settingsButton.setOnAction(e -> onNavigationChanged.accept(DesktopMainView.ViewMode.SETTINGS));
+        settingsButton.setOnAction(e -> toggleSettingsPanel());
         
-        VBox navigationGroup = new VBox(6, noteButton, reviewButton, reviewPeriodsPanel, searchButton, settingsButton);
+        // Settings sub panel (initially hidden, placed right after Settings button)
+        settingsSubPanel = new SettingsSubPanel(this::onSettingsSubItemSelected);
+        settingsSubPanel.setVisible(false);
+        settingsSubPanel.setManaged(false);
+        
+        VBox navigationGroup = new VBox(6, noteButton, reviewButton, reviewPeriodsPanel, searchButton, settingsButton, settingsSubPanel);
         navigationGroup.getStyleClass().add("navigation-group");
         
         // Add top margin to navigation group for breathing room
@@ -188,6 +196,37 @@ public class SidebarView extends VBox {
     }
     
     /**
+     * Toggle settings sub panel visibility
+     */
+    private void toggleSettingsPanel() {
+        boolean isVisible = settingsSubPanel.isVisible();
+        settingsSubPanel.setVisible(!isVisible);
+        settingsSubPanel.setManaged(!isVisible);
+        
+        // Always notify mode change to SETTINGS when clicking the button
+        onNavigationChanged.accept(DesktopMainView.ViewMode.SETTINGS);
+    }
+    
+    /**
+     * Handle settings sub item selection
+     */
+    private void onSettingsSubItemSelected(String subItem) {
+        System.out.println("[SidebarView] Settings sub item selected: " + subItem);
+        
+        // Navigate up the scene graph to find DesktopMainView
+        javafx.scene.Node node = this;
+        while (node != null) {
+            if (node instanceof DesktopMainView) {
+                System.out.println("[SidebarView] Found DesktopMainView, calling onSettingsSubItemSelected");
+                ((DesktopMainView) node).onSettingsSubItemSelected(subItem);
+                return;
+            }
+            node = node.getParent();
+        }
+        System.err.println("[SidebarView] ERROR: Could not find DesktopMainView in parent hierarchy");
+    }
+    
+    /**
      * Handle review period selection
      */
     private void onReviewPeriodSelected(String period) {
@@ -223,6 +262,15 @@ public class SidebarView extends VBox {
         } else {
             reviewPeriodsPanel.setVisible(false);
             reviewPeriodsPanel.setManaged(false);
+        }
+        
+        // Show settings panel when in SETTINGS mode, hide for other modes
+        if (mode == DesktopMainView.ViewMode.SETTINGS) {
+            settingsSubPanel.setVisible(true);
+            settingsSubPanel.setManaged(true);
+        } else {
+            settingsSubPanel.setVisible(false);
+            settingsSubPanel.setManaged(false);
         }
     }
 }

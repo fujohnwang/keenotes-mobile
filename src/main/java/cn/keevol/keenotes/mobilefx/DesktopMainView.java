@@ -199,6 +199,29 @@ public class DesktopMainView extends BorderPane {
     }
     
     /**
+     * Handle settings sub item selection
+     */
+    public void onSettingsSubItemSelected(String subItem) {
+        System.out.println("[DesktopMainView] Settings sub item selected: " + subItem);
+        // Ensure we're in SETTINGS mode
+        if (currentMode != ViewMode.SETTINGS) {
+            switchToMode(ViewMode.SETTINGS, false);
+        }
+        // Tell SettingsView to show the sub view
+        if (mainContent.getSettingsView() != null) {
+            mainContent.getSettingsView().showSubView(subItem);
+        }
+    }
+    
+    /**
+     * Show popup notification
+     */
+    public void showPopupNotification(String message) {
+        // TODO: Implement popup notification UI
+        System.out.println("[DesktopMainView] Notification: " + message);
+    }
+    
+    /**
      * Get current view mode
      */
     public ViewMode getCurrentMode() {

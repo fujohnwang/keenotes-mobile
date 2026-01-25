@@ -1089,3 +1089,20 @@
     -fx-background-color: -fx-text-secondary;
     -fx-opacity: 0.15; /* More subtle divider */
 }
+
+/* ==================== Import Section (Card with Shadow) ==================== */
+.import-title-header {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-border-width: 0 0 1 0;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 16, 0.3, 0, 6);
+}
+
+.import-section {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-background-radius: 12px;
+    -fx-border-color: -fx-border;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0, 0, 2);
+}
