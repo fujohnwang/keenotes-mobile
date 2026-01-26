@@ -1,6 +1,5 @@
 package cn.keevol.keenotes.mobilefx;
 
-import com.gluonhq.attach.storage.StorageService;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -71,25 +70,6 @@ public class SettingsService {
     }
 
     private Path resolveSettingsPath() {
-        try {
-            System.out.println("[Settings] Resolving settings path...");
-
-            // 尝试使用Gluon Attach StorageService (Android/iOS)
-            Optional<File> privateStorage = StorageService.create().flatMap(StorageService::getPrivateStorage);
-
-            if (privateStorage.isPresent()) {
-                Path settingsPath = privateStorage.get().toPath().resolve(SETTINGS_FILE);
-                System.out.println("[Settings] Using Gluon private storage: " + settingsPath);
-                return settingsPath;
-            } else {
-                System.out.println("[Settings] Gluon private storage not available, using fallback");
-            }
-        } catch (Exception e) {
-            System.err.println("[Settings] Error accessing Gluon storage: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        // 桌面环境或Gluon存储不可用时的回退方案
         Path fallbackPath = Path.of(System.getProperty("user.home"), ".keenotes", SETTINGS_FILE);
         System.out.println("[Settings] Using fallback storage: " + fallbackPath);
         return fallbackPath;
