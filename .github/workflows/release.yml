@@ -720,6 +720,10 @@ jobs:
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
+        env:
+          # 设置为 4096 (4GB) 或 8192 (8GB)，取决于你的 Runner配置
+          # 如果是 macOS runner，建议直接给 8192
+          NODE_OPTIONS: "--max-old-space-size=8192"
         with:
           name: macos-${{ matrix.arch }}
           path: dist/*
