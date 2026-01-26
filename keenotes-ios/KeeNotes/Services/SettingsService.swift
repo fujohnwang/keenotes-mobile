@@ -63,7 +63,7 @@ class SettingsService: ObservableObject {
     
     init() {
         // Initialize all @Published properties first
-        self.endpointUrl = defaults.string(forKey: Keys.endpointUrl) ?? ""
+        self.endpointUrl = defaults.string(forKey: Keys.endpointUrl) ?? "https://kns.afoo.me"
         self.token = defaults.string(forKey: Keys.token) ?? ""
         self.encryptionPassword = defaults.string(forKey: Keys.encryptionPassword) ?? ""
         
