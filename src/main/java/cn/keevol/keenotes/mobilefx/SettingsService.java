@@ -117,7 +117,7 @@ public class SettingsService {
     }
 
     public String getEndpointUrl() {
-        return properties.getProperty(KEY_ENDPOINT_URL, "");
+        return properties.getProperty(KEY_ENDPOINT_URL, "https://kns.afoo.me");
     }
 
     public void setEndpointUrl(String url) {

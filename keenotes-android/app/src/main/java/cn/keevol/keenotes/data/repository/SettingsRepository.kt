@@ -24,7 +24,7 @@ class SettingsRepository(private val context: Context) {
         private val KEY_AUTO_FOCUS_INPUT = stringPreferencesKey("auto_focus_input_on_launch")
     }
     
-    val endpointUrl: Flow<String> = context.dataStore.data.map { it[KEY_ENDPOINT] ?: "" }
+    val endpointUrl: Flow<String> = context.dataStore.data.map { it[KEY_ENDPOINT] ?: "https://kns.afoo.me" }
     val token: Flow<String> = context.dataStore.data.map { it[KEY_TOKEN] ?: "" }
     val encryptionPassword: Flow<String> = context.dataStore.data.map { it[KEY_PASSWORD] ?: "" }
     val copyToClipboardOnPost: Flow<Boolean> = context.dataStore.data.map { it[KEY_COPY_TO_CLIPBOARD]?.toBoolean() ?: false }
