@@ -369,6 +369,9 @@ jobs:
           hdiutil convert "$DMG_RW" -format UDZO -o "$DMG_TEMP"
           rm "$DMG_RW"
           
+          # Clean up temporary source directory to avoid uploading it
+          rm -rf "$SOURCE_DIR"
+          
           # Sign DMG
           echo "Signing DMG..."
           codesign --force --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --timestamp "$DMG_TEMP"
