@@ -198,7 +198,9 @@ public class LocalCacheService {
                 jdbcUrl = "jdbc:sqldroid:" + dbPathString;
             } else {
                 // SQLite JDBC URL 格式，带优化参数
-                jdbcUrl = "jdbc:sqlite:" + dbPathString + "?journal_mode=WAL&synchronous=NORMAL&cache_size=10000&timeout=30000";
+                // 在 Windows 上，必须将反斜杠替换为正斜杠，否则 ? 参数会被当成文件名的一部分
+                String safePath = dbPathString.replace("\\", "/");
+                jdbcUrl = "jdbc:sqlite:" + safePath + "?journal_mode=WAL&synchronous=NORMAL&cache_size=10000&timeout=30000";
             }
             initLog.append("JDBC URL: ").append(jdbcUrl).append("\n");
             
