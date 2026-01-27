@@ -39,7 +39,7 @@ public class Main extends Application {
             Platform.runLater(() -> loadThemeCSS(scene));
         });
 
-        stage.setTitle("KeeNotes");
+        stage.setTitle("KeeNotes (" + cn.keevol.keenotes.mobilefx.generated.BuildInfo.VERSION + ")");
         stage.setScene(scene);
 
         // Set minimum window size for desktop
@@ -97,6 +97,26 @@ public class Main extends Application {
             });
             connectThread.setDaemon(true);
             connectThread.start();
+            
+            // 4. 检查更新（在异步线程，延迟3秒启动）
+            Thread updateCheckThread = new Thread(() -> {
+                try {
+                    Thread.sleep(3000); // Wait 3 seconds after startup
+                    System.out.println("Checking for updates...");
+                    UpdateCheckService updateChecker = new UpdateCheckService();
+                    updateChecker.setUpdateListener((version, url) -> {
+                        System.out.println("[UpdateCheck] Notifying UI about update: " + version);
+                        if (mainView != null && mainView.getSidebar() != null) {
+                            mainView.getSidebar().showUpdateNotification(version, url);
+                        }
+                    });
+                    updateChecker.checkForUpdates();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+            updateCheckThread.setDaemon(true);
+            updateCheckThread.start();
         });
     }
 

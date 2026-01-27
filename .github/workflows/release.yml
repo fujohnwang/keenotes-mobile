@@ -43,6 +43,31 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Generate BuildInfo
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          mkdir -p src/main/java/cn/keevol/keenotes/mobilefx/generated
+          
+          cat > src/main/java/cn/keevol/keenotes/mobilefx/generated/BuildInfo.java <<EOF
+          package cn.keevol.keenotes.mobilefx.generated;
+          
+          /**
+           * Auto-generated build information.
+           * DO NOT EDIT - This file is generated during build.
+           */
+          public final class BuildInfo {
+              public static final String VERSION = "$VERSION";
+              public static final String BUILD_TIME = "$BUILD_TIME";
+              
+              private BuildInfo() {}
+          }
+          EOF
+          
+          echo "Generated BuildInfo.java with version: $VERSION"
+
       - name: Build JAR
         shell: bash
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=win"
@@ -135,6 +160,30 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      - name: Generate BuildInfo
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          mkdir -p src/main/java/cn/keevol/keenotes/mobilefx/generated
+          
+          cat > src/main/java/cn/keevol/keenotes/mobilefx/generated/BuildInfo.java <<EOF
+          package cn.keevol.keenotes.mobilefx.generated;
+          
+          /**
+           * Auto-generated build information.
+           * DO NOT EDIT - This file is generated during build.
+           */
+          public final class BuildInfo {
+              public static final String VERSION = "$VERSION";
+              public static final String BUILD_TIME = "$BUILD_TIME";
+              
+              private BuildInfo() {}
+          }
+          EOF
+          
+          echo "Generated BuildInfo.java with version: $VERSION"
 
       - name: Build JAR for ${{ matrix.arch }}
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=${{ matrix.arch }}"
@@ -766,6 +815,30 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Generate BuildInfo
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          mkdir -p src/main/java/cn/keevol/keenotes/mobilefx/generated
+          
+          cat > src/main/java/cn/keevol/keenotes/mobilefx/generated/BuildInfo.java <<EOF
+          package cn.keevol.keenotes.mobilefx.generated;
+          
+          /**
+           * Auto-generated build information.
+           * DO NOT EDIT - This file is generated during build.
+           */
+          public final class BuildInfo {
+              public static final String VERSION = "$VERSION";
+              public static final String BUILD_TIME = "$BUILD_TIME";
+              
+              private BuildInfo() {}
+          }
+          EOF
+          
+          echo "Generated BuildInfo.java with version: $VERSION"
+
       - name: Build JAR
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=linux"
 
@@ -989,3 +1062,18 @@ jobs:
             artifacts/android-apk/*
             artifacts/android-aab/*
             # artifacts/ios-ipa/*
+
+      - name: Update Version Info to API
+        if: github.ref_type == 'tag'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION#V}"
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          
+          echo "Updating version info: $VERSION"
+          curl -X POST https://kns.afoo.me/version/latest \
+            -H "Authorization: Bearer ${{ secrets.KNS_ADMIN_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"version\":\"$VERSION\",\"url\":\"$RELEASE_URL\"}"
+          
+          echo "Version info updated successfully"
