@@ -163,23 +163,25 @@ public class LocalCacheService {
 
             // 构建 JDBC URL
             initStep = "building JDBC URL";
-            String jdbcUrl;
-
-            // SQLite JDBC URL 格式，带优化参数
-            // 在 Windows 上，必须将反斜杠替换为正斜杠，否则 ? 参数会被当成文件名的一部分
-            String safePath = dbPathString.replace("\\", "/");
-            jdbcUrl = "jdbc:sqlite:" + safePath + "?journal_mode=WAL&synchronous=NORMAL&cache_size=10000&timeout=30000";
-
+            String jdbcUrl = "jdbc:sqlite:" + dbPathString;
             initLog.append("JDBC URL: ").append(jdbcUrl).append("\n");
 
             // 建立连接
             initStep = "connecting to DB";
             initLog.append("Connecting...\n");
 
-
             // Desktop: 使用标准 DriverManager
             Class.forName("org.sqlite.JDBC");
             connection = DriverManager.getConnection(jdbcUrl);
+            
+            // 通过 PRAGMA 语句设置 SQLite 优化参数（而不是在 URL 中拼接）
+            initStep = "setting SQLite pragmas";
+            Statement pragmaStmt = connection.createStatement();
+            pragmaStmt.execute("PRAGMA journal_mode=WAL");
+            pragmaStmt.execute("PRAGMA synchronous=NORMAL");
+            pragmaStmt.execute("PRAGMA cache_size=10000");
+            pragmaStmt.execute("PRAGMA busy_timeout=30000");
+            pragmaStmt.close();
 
 
             if (connection == null || connection.isClosed()) {
