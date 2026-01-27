@@ -188,6 +188,14 @@ public class SettingsGeneralView extends VBox {
         settings.setEndpointUrl(newEndpoint);
         settings.setToken(newToken);
         settings.setEncryptionPassword(newPassword);
+        
+        // 如果 Token 或 Endpoint 变化（切换账户），清空 firstNoteDate
+        if (endpointChanged || tokenChanged) {
+            settings.setFirstNoteDate(null);
+            // 立即通知账户切换事件，让 UI 组件可以立即重置显示
+            ServiceManager.getInstance().notifyAccountSwitched();
+        }
+        
         settings.save();
 
         String msg = settings.isEncryptionEnabled() ? 
