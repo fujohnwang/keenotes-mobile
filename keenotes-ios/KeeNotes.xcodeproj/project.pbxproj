@@ -30,6 +30,7 @@
 		B3C4D5E6F7A8293041526E8B /* WizardInlineCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D4C5B6A7980819210C6F9C /* WizardInlineCard.swift */; };
 		C3D4E5F6A7B8293041526D7F /* OnboardingWizardOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */; };
 		C0AE7EC02E4C49132B40A4A0 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 149970AB595EDA07A0940B31 /* GRDB */; };
+		D1BF8FD13F5D5A243E51B5B1 /* Instructions in Frameworks */ = {isa = PBXBuildFile; productRef = 3G74073FE53828D6EG79EEF9 /* Instructions */; };
 		DA5DD2A22882D996C37B27EF /* argon2.c in Sources */ = {isa = PBXBuildFile; fileRef = 6D467341E90F4D144FCEC974 /* argon2.c */; };
 		E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC48816DBEEFEE56707E5302 /* NoteView.swift */; };
 		E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9040A9739D8D0416CE13A31 /* MainTabView.swift */; };
@@ -84,6 +85,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C0AE7EC02E4C49132B40A4A0 /* GRDB in Frameworks */,
+				D1BF8FD13F5D5A243E51B5B1 /* Instructions in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -258,6 +260,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				1E52851DC31606B4CE57CCD7 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				2F63962ED42717C5DF68DDE8 /* XCRemoteSwiftPackageReference "Instructions" */,
 			);
 			projectDirPath = "";
 			projectRoot = "";
@@ -516,6 +519,14 @@
 				minimumVersion = 6.24.0;
 			};
 		};
+		2F63962ED42717C5DF68DDE8 /* XCRemoteSwiftPackageReference "Instructions" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ephread/Instructions.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -523,6 +534,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1E52851DC31606B4CE57CCD7 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
+		};
+		3G74073FE53828D6EG79EEF9 /* Instructions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2F63962ED42717C5DF68DDE8 /* XCRemoteSwiftPackageReference "Instructions" */;
+			productName = Instructions;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
