@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 带镂空高亮和箭头指示的首次启动配置向导
+/// 首次启动配置向导 - 高亮输入框并在其下方显示提示
 struct OnboardingWizardOverlay: View {
     @Binding var showWizard: Bool
     @State private var currentStep = 0
@@ -36,23 +36,30 @@ struct OnboardingWizardOverlay: View {
         ]
     }
     
+    // 获取当前步骤的输入框位置
+    private var currentFieldFrame: CGRect {
+        currentStep == 0 ? tokenFieldFrame : passwordFieldFrame
+    }
+    
     var body: some View {
-        if showWizard && currentStep < steps.count {
+        if showWizard && currentStep < steps.count && currentFieldFrame != .zero {
             ZStack {
-                // 镂空遮罩层
-                SpotlightOverlay(
-                    highlightFrame: currentStep == 0 ? tokenFieldFrame : passwordFieldFrame
-                )
-                .allowsHitTesting(false)  // 不阻止交互
+                // 半透明遮罩 - 不阻止交互
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
                 
-                // 提示卡片和箭头
+                // 提示卡片 - 显示在输入框下方
                 VStack(spacing: 0) {
                     Spacer()
+                        .frame(height: currentFieldFrame.maxY + 10)
                     
-                    // 箭头指示器
-                    ArrowIndicator(
-                        targetFrame: currentStep == 0 ? tokenFieldFrame : passwordFieldFrame
-                    )
+                    // 箭头指向输入框
+                    Image(systemName: "arrowtriangle.up.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.2), radius: 2)
+                        .offset(y: -1)
                     
                     // 提示卡片
                     WizardCardWithArrow(
@@ -62,9 +69,11 @@ struct OnboardingWizardOverlay: View {
                         onSkip: skipWizard
                     )
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
+                    
+                    Spacer()
                 }
             }
+            .transition(.opacity)
             .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
                 if let tokenFrame = frames["token"] {
                     tokenFieldFrame = tokenFrame
@@ -106,50 +115,7 @@ struct OnboardingWizardOverlay: View {
     }
 }
 
-/// 镂空遮罩 - 高亮显示目标区域
-struct SpotlightOverlay: View {
-    let highlightFrame: CGRect
-    
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // 全屏半透明遮罩
-                Color.black.opacity(0.6)
-                    .ignoresSafeArea()
-                
-                // 镂空区域（高亮输入框）
-                if highlightFrame != .zero {
-                    RoundedRectangle(cornerRadius: 8)
-                        .frame(width: highlightFrame.width + 8, height: highlightFrame.height + 8)
-                        .position(x: highlightFrame.midX, y: highlightFrame.midY)
-                        .blendMode(.destinationOut)
-                }
-            }
-            .compositingGroup()  // 关键：让 blendMode 生效
-        }
-    }
-}
-
-/// 箭头指示器 - 指向目标输入框
-struct ArrowIndicator: View {
-    let targetFrame: CGRect
-    
-    var body: some View {
-        if targetFrame != .zero {
-            VStack(spacing: 0) {
-                Spacer()
-                    .frame(height: targetFrame.maxY + 20)
-                
-                Image(systemName: "arrowtriangle.down.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(.white)
-                    .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-            }
-        }
-    }
-}
-
-/// 带箭头的提示卡片
+/// 提示卡片
 struct WizardCardWithArrow: View {
     let step: WizardStep
     let isLastStep: Bool
@@ -246,5 +212,25 @@ struct FrameCaptureModifier: ViewModifier {
 extension View {
     func captureFrame(fieldId: String) -> some View {
         self.modifier(FrameCaptureModifier(fieldId: fieldId))
+    }
+}
+
+/// 输入框高亮边框的 ViewModifier
+struct HighlightBorderModifier: ViewModifier {
+    let isHighlighted: Bool
+    
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.blue, lineWidth: isHighlighted ? 2 : 0)
+                    .animation(.easeInOut(duration: 0.3), value: isHighlighted)
+            )
+    }
+}
+
+extension View {
+    func highlightBorder(isHighlighted: Bool) -> some View {
+        self.modifier(HighlightBorderModifier(isHighlighted: isHighlighted))
     }
 }
