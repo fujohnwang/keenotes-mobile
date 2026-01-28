@@ -40,7 +40,7 @@ struct OnboardingWizardOverlay: View {
             let currentFieldId = steps[currentStep].fieldId
             let fieldFrame = fieldFrames[currentFieldId] ?? .zero
             
-            ZStack {
+            ZStack(alignment: .topLeading) {
                 // 胶囊式提示卡片 - 显示在输入框正下方
                 if fieldFrame != .zero {
                     CapsuleWizardCard(
@@ -51,13 +51,23 @@ struct OnboardingWizardOverlay: View {
                         onSkip: skipWizard
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                } else {
+                    // 调试：显示等待 frame 的提示
+                    Text("Loading wizard...")
+                        .foregroundColor(.red)
+                        .padding()
+                        .background(Color.yellow)
+                        .position(x: 200, y: 200)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .allowsHitTesting(true)
             .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
+                print("[Wizard] Received frames: \(frames)")
                 self.fieldFrames = frames
             }
             .onChange(of: currentStep) { _ in
+                print("[Wizard] Step changed to: \(currentStep)")
                 // 当步骤改变时，聚焦到对应的输入框
                 if currentStep < steps.count {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -72,6 +82,7 @@ struct OnboardingWizardOverlay: View {
                 checkAndDismiss()
             }
             .onAppear {
+                print("[Wizard] Wizard appeared, current step: \(currentStep)")
                 // 初始显示时聚焦第一个输入框
                 if currentStep < steps.count {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
