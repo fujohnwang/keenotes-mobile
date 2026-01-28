@@ -4,7 +4,7 @@ import SwiftUI
 struct OnboardingWizardOverlay: View {
     @Binding var showWizard: Bool
     @State private var currentStep = 0
-    @State private var fieldFrames: [String: CGRect] = [:]
+    let fieldFrames: [String: CGRect]  // 改为直接接收 frame
     let settingsService: SettingsService
     let onFocusField: (String) -> Void
     
@@ -53,7 +53,7 @@ struct OnboardingWizardOverlay: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 } else {
                     // 调试：显示等待 frame 的提示
-                    Text("Loading wizard...")
+                    Text("Waiting for field position...")
                         .foregroundColor(.red)
                         .padding()
                         .background(Color.yellow)
@@ -62,9 +62,8 @@ struct OnboardingWizardOverlay: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .allowsHitTesting(true)
-            .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
-                print("[Wizard] Received frames: \(frames)")
-                self.fieldFrames = frames
+            .onChange(of: fieldFrames) { frames in
+                print("[Wizard] Frames updated: \(frames)")
             }
             .onChange(of: currentStep) { _ in
                 print("[Wizard] Step changed to: \(currentStep)")
@@ -82,7 +81,7 @@ struct OnboardingWizardOverlay: View {
                 checkAndDismiss()
             }
             .onAppear {
-                print("[Wizard] Wizard appeared, current step: \(currentStep)")
+                print("[Wizard] Wizard appeared, current step: \(currentStep), frames: \(fieldFrames)")
                 // 初始显示时聚焦第一个输入框
                 if currentStep < steps.count {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
