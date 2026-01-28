@@ -10,9 +10,8 @@ struct OnboardingWizardOverlay: View {
     
     // 检测系统语言
     private func isChinese() -> Bool {
-        let language = Locale.current.languageCode ?? ""
-        let region = Locale.current.regionCode ?? ""
-        return language == "zh" || region == "CN" || region == "TW" || region == "HK"
+        let preferredLanguage = Locale.preferredLanguages.first ?? ""
+        return preferredLanguage.hasPrefix("zh")
     }
     
     // 定义向导步骤
@@ -38,20 +37,23 @@ struct OnboardingWizardOverlay: View {
     
     var body: some View {
         if showWizard && currentStep < steps.count {
-            GeometryReader { geometry in
-                let currentFieldId = steps[currentStep].fieldId
-                let fieldFrame = fieldFrames[currentFieldId] ?? .zero
-                
+            let currentFieldId = steps[currentStep].fieldId
+            let fieldFrame = fieldFrames[currentFieldId] ?? .zero
+            
+            ZStack {
                 // 胶囊式提示卡片 - 显示在输入框正下方
-                CapsuleWizardCard(
-                    step: steps[currentStep],
-                    isLastStep: currentStep == steps.count - 1,
-                    fieldFrame: fieldFrame,
-                    onNext: nextStep,
-                    onSkip: skipWizard
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                if fieldFrame != .zero {
+                    CapsuleWizardCard(
+                        step: steps[currentStep],
+                        isLastStep: currentStep == steps.count - 1,
+                        fieldFrame: fieldFrame,
+                        onNext: nextStep,
+                        onSkip: skipWizard
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
                 self.fieldFrames = frames
             }
@@ -113,9 +115,8 @@ struct CapsuleWizardCard: View {
     let onSkip: () -> Void
     
     private var isChinese: Bool {
-        let language = Locale.current.languageCode ?? ""
-        let region = Locale.current.regionCode ?? ""
-        return language == "zh" || region == "CN" || region == "TW" || region == "HK"
+        let preferredLanguage = Locale.preferredLanguages.first ?? ""
+        return preferredLanguage.hasPrefix("zh")
     }
     
     var body: some View {
@@ -198,10 +199,11 @@ struct CapsuleWizardCard: View {
                     .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 8)
             )
         }
+        .frame(maxWidth: 400)
         .padding(.horizontal, 16)
-        .position(
-            x: fieldFrame.midX,
-            y: fieldFrame.maxY + 70 // 卡片中心位置在输入框下方 70pt
+        .offset(
+            x: fieldFrame.midX - UIScreen.main.bounds.width / 2,
+            y: fieldFrame.maxY + 16
         )
     }
 }
