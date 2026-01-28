@@ -25,9 +25,9 @@ class CoachMarksManager: NSObject {
         coachMarksController.dataSource = self
         coachMarksController.delegate = self
         
-        // 配置样式
-        coachMarksController.overlay.color = UIColor.black.withAlphaComponent(0.7)
-        coachMarksController.overlay.allowTap = false  // 不允许点击遮罩关闭
+        // 配置样式 - 使用 overlayBackgroundColor 属性
+        coachMarksController.overlay.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        coachMarksController.overlay.isUserInteractionEnabled = false  // 不允许点击遮罩关闭
     }
     
     // MARK: - Public Methods
