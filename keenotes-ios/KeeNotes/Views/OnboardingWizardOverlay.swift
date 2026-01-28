@@ -31,6 +31,13 @@ struct OnboardingWizardOverlay: View {
                 description: chinese ? "请输入加密密码，用于端到端加密保护您的笔记数据" : 
                                       "Please enter encryption password for end-to-end encryption of your notes",
                 isRequired: true
+            ),
+            WizardStep(
+                fieldId: "confirmPassword",
+                title: chinese ? "确认加密密码" : "Confirm Encryption Password",
+                description: chinese ? "请再次输入加密密码以确认" : 
+                                      "Please re-enter the encryption password to confirm",
+                isRequired: true
             )
         ]
     }

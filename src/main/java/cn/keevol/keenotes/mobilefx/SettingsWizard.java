@@ -33,11 +33,11 @@ public class SettingsWizard {
     private boolean programmaticHide = false;  // 标志：是否是程序主动隐藏
     private javafx.beans.value.ChangeListener<Number> windowResizeListener;  // 窗口大小变化监听器
     
-    public SettingsWizard(Node endpointField, Node tokenField, Node passwordField, SettingsService settingsService) {
+    public SettingsWizard(Node endpointField, Node tokenField, Node passwordField, Node confirmPasswordField, SettingsService settingsService) {
         this.settingsService = settingsService;
         
         // 定义向导步骤
-        initSteps(endpointField, tokenField, passwordField);
+        initSteps(endpointField, tokenField, passwordField, confirmPasswordField);
         
         // 设置步骤监听器
         setupStepListener();
@@ -49,7 +49,7 @@ public class SettingsWizard {
     /**
      * 初始化向导步骤
      */
-    private void initSteps(Node endpointField, Node tokenField, Node passwordField) {
+    private void initSteps(Node endpointField, Node tokenField, Node passwordField, Node confirmPasswordField) {
         // 检测系统语言
         boolean isChinese = isChinese();
         
@@ -67,6 +67,13 @@ public class SettingsWizard {
             passwordField,
             isChinese ? "加密密码" : "Encryption Password",
             isChinese ? "请输入加密密码，用于端到端加密保护您的笔记数据" : "Please enter encryption password for end-to-end encryption of your notes",
+            true
+        ));
+        
+        steps.add(new WizardStep(
+            confirmPasswordField,
+            isChinese ? "确认加密密码" : "Confirm Encryption Password",
+            isChinese ? "请再次输入加密密码以确认" : "Please re-enter the encryption password to confirm",
             true
         ));
     }
