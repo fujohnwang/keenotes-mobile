@@ -17,35 +17,6 @@ struct SettingsView: View {
     
     // 向导状态
     @State private var showWizard = false
-    @State private var currentWizardStep = 0
-    
-    // 向导步骤
-    private var wizardSteps: [WizardStep] {
-        let chinese = isChinese()
-        return [
-            WizardStep(
-                fieldId: "token",
-                title: chinese ? "访问令牌" : "Access Token",
-                description: chinese ? "请输入访问令牌，用于安全连接到服务器" : 
-                                      "Please enter your access token for secure server connection",
-                isRequired: true
-            ),
-            WizardStep(
-                fieldId: "encryptionPassword",
-                title: chinese ? "加密密码" : "Encryption Password",
-                description: chinese ? "请输入加密密码，用于端到端加密保护您的笔记数据" : 
-                                      "Please enter encryption password for end-to-end encryption of your notes",
-                isRequired: true
-            )
-        ]
-    }
-    
-    // 检测系统语言
-    private func isChinese() -> Bool {
-        let language = Locale.current.languageCode ?? ""
-        let region = Locale.current.regionCode ?? ""
-        return language == "zh" || region == "CN" || region == "TW" || region == "HK"
-    }
 
     // Computed property for Save button enabled state
     private var isSaveEnabled: Bool {
@@ -79,25 +50,6 @@ struct SettingsView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .font(.system(size: isPad ? 17 : 17))
-                    
-                    // Token 字段的向导提示
-                    if showWizard && currentWizardStep == 0 {
-                        WizardInlineCard(
-                            step: wizardSteps[0],
-                            isLastStep: false,
-                            onNext: {
-                                withAnimation {
-                                    currentWizardStep = 1
-                                }
-                            },
-                            onSkip: {
-                                withAnimation {
-                                    showWizard = false
-                                }
-                            }
-                        )
-                        .transition(.opacity)
-                    }
                 }
 
                 // Encryption
@@ -113,25 +65,6 @@ struct SettingsView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .font(.system(size: isPad ? 17 : 17))
-                    
-                    // Password 字段的向导提示
-                    if showWizard && currentWizardStep == 1 {
-                        WizardInlineCard(
-                            step: wizardSteps[1],
-                            isLastStep: true,
-                            onNext: {
-                                withAnimation {
-                                    showWizard = false
-                                }
-                            },
-                            onSkip: {
-                                withAnimation {
-                                    showWizard = false
-                                }
-                            }
-                        )
-                        .transition(.opacity)
-                    }
                 }
 
                 // Save button
@@ -210,6 +143,12 @@ struct SettingsView: View {
                 }
             }
             .navigationViewStyle(.stack)
+            
+            // Coach Marks 向导覆盖层
+            OnboardingWizardOverlay(
+                showWizard: $showWizard,
+                settingsService: appState.settingsService
+            )
         }
     }
 
@@ -365,7 +304,6 @@ struct SettingsView: View {
             // 延迟显示，确保界面已渲染
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 showWizard = true
-                currentWizardStep = 0
             }
         }
     }
