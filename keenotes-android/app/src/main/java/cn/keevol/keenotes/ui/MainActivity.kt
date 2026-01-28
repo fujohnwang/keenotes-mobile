@@ -31,7 +31,23 @@ class MainActivity : AppCompatActivity() {
         
         setupNavigation()
         setupCustomTabBar()
+        checkConfigurationAndNavigate()
         connectWebSocket()
+    }
+    
+    /**
+     * 检查配置状态，如果未配置则跳转到设置页面
+     */
+    private fun checkConfigurationAndNavigate() {
+        val app = application as KeeNotesApp
+        
+        lifecycleScope.launch {
+            val isConfigured = app.settingsRepository.isConfigured()
+            if (!isConfigured) {
+                // 跳转到设置页面
+                navController.navigate(R.id.settingsFragment)
+            }
+        }
     }
     
     private fun setupNavigation() {

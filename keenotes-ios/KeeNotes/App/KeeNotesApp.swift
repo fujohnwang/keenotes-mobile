@@ -12,6 +12,10 @@ struct KeeNotesApp: App {
                 .environmentObject(appState)
                 .onAppear {
                     appState.initialize()
+                    // 检查配置状态，如果未配置则跳转到设置页面
+                    if !appState.settingsService.isConfigured {
+                        appState.selectedTab = 2  // 跳转到设置页面
+                    }
                 }
                 .onChange(of: scenePhase, perform: { newPhase in
                     handleScenePhaseChange(newPhase: newPhase)

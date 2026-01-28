@@ -33,7 +33,14 @@ class SettingsRepository(private val context: Context) {
     val autoFocusInputOnLaunch: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_FOCUS_INPUT]?.toBoolean() ?: true }
     
     val isConfigured: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        !prefs[KEY_ENDPOINT].isNullOrBlank() && !prefs[KEY_TOKEN].isNullOrBlank()
+        // 检查所有必填字段是否都已配置（不为空）
+        // 使用 DataStore 直接获取，避免默认值干扰
+        val endpoint = prefs[KEY_ENDPOINT]
+        val token = prefs[KEY_TOKEN]
+        val password = prefs[KEY_PASSWORD]
+        
+        // 只要有任何一个必填字段为空，就认为未配置
+        !(endpoint.isNullOrBlank() || token.isNullOrBlank() || password.isNullOrBlank())
     }
     
     suspend fun getEndpointUrl(): String = endpointUrl.first()
