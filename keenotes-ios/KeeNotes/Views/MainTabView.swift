@@ -20,7 +20,9 @@ struct MainTabView: View {
                 }
                 .tag(1)
             
-            SettingsView()
+            SettingsViewControllerWrapper(
+                showCoachMarks: !appState.settingsService.isConfigured
+            )
                 .tabItem {
                     Image(systemName: "gearshape")
                     Text("Settings")
