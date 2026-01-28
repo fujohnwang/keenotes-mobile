@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// 首次启动配置向导 - 高亮输入框并在其下方显示提示
+/// 首次启动配置向导 - 简化版，无遮罩，直接聚焦输入框
 struct OnboardingWizardOverlay: View {
     @Binding var showWizard: Bool
     @State private var currentStep = 0
-    @State private var tokenFieldFrame: CGRect = .zero
-    @State private var passwordFieldFrame: CGRect = .zero
+    @State private var fieldFrames: [String: CGRect] = [:]
     let settingsService: SettingsService
+    let onFocusField: (String) -> Void
     
     // 检测系统语言
     private func isChinese() -> Bool {
@@ -36,52 +36,31 @@ struct OnboardingWizardOverlay: View {
         ]
     }
     
-    // 获取当前步骤的输入框位置
-    private var currentFieldFrame: CGRect {
-        currentStep == 0 ? tokenFieldFrame : passwordFieldFrame
-    }
-    
     var body: some View {
         if showWizard && currentStep < steps.count {
-            ZStack {
-                // 半透明遮罩 - 不阻止交互
-                Color.black.opacity(0.4)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
+            GeometryReader { geometry in
+                let currentFieldId = steps[currentStep].fieldId
+                let fieldFrame = fieldFrames[currentFieldId] ?? .zero
+                let cardYPosition = fieldFrame.maxY + 10 // 卡片显示在输入框下方 10pt
                 
-                // 提示卡片 - 显示在输入框下方（如果已捕获到位置）
-                if currentFieldFrame != .zero {
-                    VStack(spacing: 0) {
-                        Spacer()
-                            .frame(height: currentFieldFrame.maxY + 10)
-                        
-                        // 箭头指向输入框
-                        Image(systemName: "arrowtriangle.up.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.2), radius: 2)
-                            .offset(y: -1)
-                        
-                        // 提示卡片
-                        WizardCardWithArrow(
-                            step: steps[currentStep],
-                            isLastStep: currentStep == steps.count - 1,
-                            onNext: nextStep,
-                            onSkip: skipWizard
-                        )
-                        .padding(.horizontal, 20)
-                        
-                        Spacer()
-                    }
-                }
+                // 提示卡片 - 显示在当前输入框下方
+                WizardCardWithArrow(
+                    step: steps[currentStep],
+                    isLastStep: currentStep == steps.count - 1,
+                    onNext: nextStep,
+                    onSkip: skipWizard
+                )
+                .padding(.horizontal, 20)
+                .position(x: geometry.size.width / 2, y: cardYPosition + 80)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
-            .transition(.opacity)
             .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
-                if let tokenFrame = frames["token"] {
-                    tokenFieldFrame = tokenFrame
-                }
-                if let passwordFrame = frames["password"] {
-                    passwordFieldFrame = passwordFrame
+                self.fieldFrames = frames
+            }
+            .onChange(of: currentStep) { _ in
+                // 当步骤改变时，聚焦到对应的输入框
+                if currentStep < steps.count {
+                    onFocusField(steps[currentStep].fieldId)
                 }
             }
             .onChange(of: settingsService.token) { _ in
@@ -89,6 +68,14 @@ struct OnboardingWizardOverlay: View {
             }
             .onChange(of: settingsService.encryptionPassword) { _ in
                 checkAndDismiss()
+            }
+            .onAppear {
+                // 初始显示时聚焦第一个输入框
+                if currentStep < steps.count {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        onFocusField(steps[currentStep].fieldId)
+                    }
+                }
             }
         }
     }
@@ -117,7 +104,7 @@ struct OnboardingWizardOverlay: View {
     }
 }
 
-/// 提示卡片
+/// 提示卡片（带向上箭头）
 struct WizardCardWithArrow: View {
     let step: WizardStep
     let isLastStep: Bool
@@ -131,57 +118,78 @@ struct WizardCardWithArrow: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // 标题行
-            HStack {
-                Image(systemName: "info.circle.fill")
-                    .foregroundColor(.blue)
-                    .font(.system(size: 16))
-                
-                Text(step.title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                Button(isChinese ? "跳过" : "Skip") {
-                    onSkip()
-                }
-                .font(.system(size: 14))
-                .foregroundColor(.blue)
-            }
-            
-            // 描述文本
-            Text(step.description)
-                .font(.system(size: 14))
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineSpacing(2)
-            
-            // 下一步按钮
-            Button(action: onNext) {
-                HStack {
-                    Text(isLastStep ? (isChinese ? "完成" : "Finish") : (isChinese ? "下一步" : "Next"))
-                        .font(.system(size: 15, weight: .semibold))
-                    
-                    if !isLastStep {
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(8)
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
+        VStack(spacing: 0) {
+            // 向上箭头
+            Triangle()
                 .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
-        )
+                .frame(width: 20, height: 10)
+                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: -1)
+            
+            // 卡片内容
+            VStack(alignment: .leading, spacing: 12) {
+                // 标题行
+                HStack {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 16))
+                    
+                    Text(step.title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Button(isChinese ? "跳过" : "Skip") {
+                        onSkip()
+                    }
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue)
+                }
+                
+                // 描述文本
+                Text(step.description)
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(2)
+                
+                // 下一步按钮
+                Button(action: onNext) {
+                    HStack {
+                        Text(isLastStep ? (isChinese ? "完成" : "Finish") : (isChinese ? "下一步" : "Next"))
+                            .font(.system(size: 15, weight: .semibold))
+                        
+                        if !isLastStep {
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemBackground).opacity(0.95))
+                    .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
+            )
+        }
+    }
+}
+
+/// 向上的三角形箭头
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -217,22 +225,4 @@ extension View {
     }
 }
 
-/// 输入框高亮边框的 ViewModifier
-struct HighlightBorderModifier: ViewModifier {
-    let isHighlighted: Bool
-    
-    func body(content: Content) -> some View {
-        content
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.blue, lineWidth: isHighlighted ? 2 : 0)
-                    .animation(.easeInOut(duration: 0.3), value: isHighlighted)
-            )
-    }
-}
 
-extension View {
-    func highlightBorder(isHighlighted: Bool) -> some View {
-        self.modifier(HighlightBorderModifier(isHighlighted: isHighlighted))
-    }
-}

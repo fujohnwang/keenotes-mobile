@@ -17,6 +17,9 @@ struct SettingsView: View {
     
     // 向导状态
     @State private var showWizard = false
+    
+    // 焦点状态
+    @FocusState private var focusedField: String?
 
     // Computed property for Save button enabled state
     private var isSaveEnabled: Bool {
@@ -51,7 +54,7 @@ struct SettingsView: View {
                         .textInputAutocapitalization(.never)
                         .font(.system(size: isPad ? 17 : 17))
                         .captureFrame(fieldId: "token")
-                        .highlightBorder(isHighlighted: showWizard && !appState.settingsService.isConfigured)
+                        .focused($focusedField, equals: "token")
                 }
 
                 // Encryption
@@ -61,8 +64,8 @@ struct SettingsView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .font(.system(size: isPad ? 17 : 17))
-                        .captureFrame(fieldId: "password")
-                        .highlightBorder(isHighlighted: showWizard && !appState.settingsService.isConfigured && !token.isEmpty)
+                        .captureFrame(fieldId: "encryptionPassword")
+                        .focused($focusedField, equals: "encryptionPassword")
 
                     SecureField("Confirm Password", text: $confirmPassword)
                         .textContentType(.init(rawValue: ""))
@@ -148,10 +151,13 @@ struct SettingsView: View {
             }
             .navigationViewStyle(.stack)
             
-            // Coach Marks 向导覆盖层
+            // 向导覆盖层
             OnboardingWizardOverlay(
                 showWizard: $showWizard,
-                settingsService: appState.settingsService
+                settingsService: appState.settingsService,
+                onFocusField: { fieldId in
+                    focusedField = fieldId
+                }
             )
         }
     }
