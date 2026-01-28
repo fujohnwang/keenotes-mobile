@@ -4,7 +4,8 @@ import SwiftUI
 struct OnboardingWizardOverlay: View {
     @Binding var showWizard: Bool
     @State private var currentStep = 0
-    let fieldFrames: [String: CGRect]  // 改为直接接收 frame
+    @State private var keyboardHeight: CGFloat = 0
+    let fieldFrames: [String: CGRect]
     let settingsService: SettingsService
     let onFocusField: (String) -> Void
     
@@ -40,34 +41,49 @@ struct OnboardingWizardOverlay: View {
             let currentFieldId = steps[currentStep].fieldId
             let fieldFrame = fieldFrames[currentFieldId] ?? .zero
             
-            ZStack(alignment: .topLeading) {
-                // 胶囊式提示卡片 - 显示在输入框正下方
+            GeometryReader { geometry in
                 if fieldFrame != .zero {
+                    // 计算卡片理想位置（输入框下方）
+                    let idealCardY = fieldFrame.maxY + 70
+                    // 计算键盘顶部位置
+                    let keyboardTop = geometry.size.height - keyboardHeight
+                    
+                    // 如果卡片会被键盘遮挡，则显示在输入框上方
+                    let shouldShowAbove = keyboardHeight > 0 && idealCardY + 50 > keyboardTop
+                    let cardY = shouldShowAbove ? fieldFrame.minY - 70 : idealCardY
+                    
                     CapsuleWizardCard(
                         step: steps[currentStep],
                         isLastStep: currentStep == steps.count - 1,
                         fieldFrame: fieldFrame,
+                        showAbove: shouldShowAbove,
                         onNext: nextStep,
                         onSkip: skipWizard
                     )
+                    .position(
+                        x: geometry.size.width / 2,
+                        y: cardY
+                    )
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                } else {
-                    // 调试：显示等待 frame 的提示
-                    Text("Waiting for field position...")
-                        .foregroundColor(.red)
-                        .padding()
-                        .background(Color.yellow)
-                        .position(x: 200, y: 200)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .allowsHitTesting(true)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+                if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        keyboardHeight = keyboardFrame.height
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                withAnimation(.easeOut(duration: 0.25)) {
+                    keyboardHeight = 0
+                }
+            }
             .onChange(of: fieldFrames) { frames in
                 print("[Wizard] Frames updated: \(frames)")
             }
             .onChange(of: currentStep) { _ in
                 print("[Wizard] Step changed to: \(currentStep)")
-                // 当步骤改变时，聚焦到对应的输入框
                 if currentStep < steps.count {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         onFocusField(steps[currentStep].fieldId)
@@ -82,7 +98,6 @@ struct OnboardingWizardOverlay: View {
             }
             .onAppear {
                 print("[Wizard] Wizard appeared, current step: \(currentStep), frames: \(fieldFrames)")
-                // 初始显示时聚焦第一个输入框
                 if currentStep < steps.count {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         onFocusField(steps[currentStep].fieldId)
@@ -116,11 +131,12 @@ struct OnboardingWizardOverlay: View {
     }
 }
 
-/// 胶囊式向导卡片（带向上箭头，跟随输入框）
+/// 胶囊式向导卡片（带箭头，跟随输入框）
 struct CapsuleWizardCard: View {
     let step: WizardStep
     let isLastStep: Bool
     let fieldFrame: CGRect
+    let showAbove: Bool  // 是否显示在输入框上方
     let onNext: () -> Void
     let onSkip: () -> Void
     
@@ -131,89 +147,105 @@ struct CapsuleWizardCard: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // 向上箭头 - 指向输入框
-            Triangle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color(.systemBackground).opacity(0.98), Color(.systemBackground).opacity(0.95)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 16, height: 8)
-                .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: -0.5)
-            
-            // 胶囊式卡片内容
-            HStack(spacing: 12) {
-                // 左侧图标
-                Image(systemName: "info.circle.fill")
-                    .foregroundColor(.blue)
-                    .font(.system(size: 20))
+            if showAbove {
+                // 显示在上方时，先显示卡片，再显示向下箭头
+                cardContent
                 
-                // 中间文本内容
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(step.title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.primary)
-                    
-                    Text(step.description)
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                
-                Spacer()
-                
-                // 右侧按钮组
-                VStack(spacing: 8) {
-                    // 跳过按钮
-                    Button(action: onSkip) {
-                        Text(isChinese ? "跳过" : "Skip")
-                            .font(.system(size: 12))
-                            .foregroundColor(.blue.opacity(0.8))
-                    }
-                    
-                    // 下一步按钮
-                    Button(action: onNext) {
-                        HStack(spacing: 4) {
-                            Text(isLastStep ? (isChinese ? "完成" : "Done") : (isChinese ? "下一步" : "Next"))
-                                .font(.system(size: 14, weight: .medium))
-                            
-                            if !isLastStep {
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 12, weight: .medium))
-                            }
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(Color.blue)
-                        )
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(
-                Capsule()
+                Triangle()
+                    .rotation(Angle(degrees: 180))  // 旋转180度变成向下箭头
                     .fill(
-                        .ultraThinMaterial
+                        LinearGradient(
+                            colors: [Color(.systemBackground).opacity(0.95), Color(.systemBackground).opacity(0.98)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                    .frame(width: 16, height: 8)
+                    .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 0.5)
+            } else {
+                // 显示在下方时，先显示向上箭头，再显示卡片
+                Triangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(.systemBackground).opacity(0.98), Color(.systemBackground).opacity(0.95)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                    .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 8)
-            )
+                    .frame(width: 16, height: 8)
+                    .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: -0.5)
+                
+                cardContent
+            }
         }
         .frame(maxWidth: 400)
         .padding(.horizontal, 16)
-        .offset(
-            x: fieldFrame.midX - UIScreen.main.bounds.width / 2,
-            y: fieldFrame.maxY + 16
+    }
+    
+    private var cardContent: some View {
+        HStack(spacing: 12) {
+            // 左侧图标
+            Image(systemName: "info.circle.fill")
+                .foregroundColor(.blue)
+                .font(.system(size: 20))
+            
+            // 中间文本内容
+            VStack(alignment: .leading, spacing: 4) {
+                Text(step.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Text(step.description)
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
+            Spacer()
+            
+            // 右侧按钮组
+            VStack(spacing: 8) {
+                // 跳过按钮
+                Button(action: onSkip) {
+                    Text(isChinese ? "跳过" : "Skip")
+                        .font(.system(size: 12))
+                        .foregroundColor(.blue.opacity(0.8))
+                }
+                
+                // 下一步按钮
+                Button(action: onNext) {
+                    HStack(spacing: 4) {
+                        Text(isLastStep ? (isChinese ? "完成" : "Done") : (isChinese ? "下一步" : "Next"))
+                            .font(.system(size: 14, weight: .medium))
+                        
+                        if !isLastStep {
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(Color.blue)
+                    )
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            Capsule()
+                .fill(
+                    .ultraThinMaterial
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                )
+                .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 8)
         )
     }
 }
