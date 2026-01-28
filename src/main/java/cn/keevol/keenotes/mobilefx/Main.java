@@ -55,6 +55,9 @@ public class Main extends Application {
         // 显示UI - 这是最重要的，用户应该立即看到界面
         stage.show();
 
+        // 检查配置状态，如果未配置则导航到设置界面
+        checkConfigurationAndNavigate();
+
         // UI显示后，延迟初始化服务（在后台线程）
         initializeServicesAfterUI();
 
@@ -63,6 +66,19 @@ public class Main extends Application {
             @Override
             public void run() {
                 SimpleForwardServer.start();
+            }
+        });
+    }
+
+    /**
+     * 检查配置状态，如果未配置则导航到设置界面
+     */
+    private void checkConfigurationAndNavigate() {
+        Platform.runLater(() -> {
+            SettingsService settings = SettingsService.getInstance();
+            if (!settings.isConfigured()) {
+                System.out.println("[Main] Configuration not complete, navigating to Settings...");
+                mainView.switchToSettingsMode();
             }
         });
     }
