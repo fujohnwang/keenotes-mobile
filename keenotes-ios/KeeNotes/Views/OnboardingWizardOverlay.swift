@@ -42,35 +42,37 @@ struct OnboardingWizardOverlay: View {
     }
     
     var body: some View {
-        if showWizard && currentStep < steps.count && currentFieldFrame != .zero {
+        if showWizard && currentStep < steps.count {
             ZStack {
                 // 半透明遮罩 - 不阻止交互
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                 
-                // 提示卡片 - 显示在输入框下方
-                VStack(spacing: 0) {
-                    Spacer()
-                        .frame(height: currentFieldFrame.maxY + 10)
-                    
-                    // 箭头指向输入框
-                    Image(systemName: "arrowtriangle.up.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.2), radius: 2)
-                        .offset(y: -1)
-                    
-                    // 提示卡片
-                    WizardCardWithArrow(
-                        step: steps[currentStep],
-                        isLastStep: currentStep == steps.count - 1,
-                        onNext: nextStep,
-                        onSkip: skipWizard
-                    )
-                    .padding(.horizontal, 20)
-                    
-                    Spacer()
+                // 提示卡片 - 显示在输入框下方（如果已捕获到位置）
+                if currentFieldFrame != .zero {
+                    VStack(spacing: 0) {
+                        Spacer()
+                            .frame(height: currentFieldFrame.maxY + 10)
+                        
+                        // 箭头指向输入框
+                        Image(systemName: "arrowtriangle.up.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.2), radius: 2)
+                            .offset(y: -1)
+                        
+                        // 提示卡片
+                        WizardCardWithArrow(
+                            step: steps[currentStep],
+                            isLastStep: currentStep == steps.count - 1,
+                            onNext: nextStep,
+                            onSkip: skipWizard
+                        )
+                        .padding(.horizontal, 20)
+                        
+                        Spacer()
+                    }
                 }
             }
             .transition(.opacity)
