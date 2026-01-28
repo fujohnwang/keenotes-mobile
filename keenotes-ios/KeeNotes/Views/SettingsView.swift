@@ -150,6 +150,10 @@ struct SettingsView: View {
                 }
             }
             .navigationViewStyle(.stack)
+            .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
+                // 将 frame 信息传递给外层
+                print("[SettingsView] Captured frames: \(frames)")
+            }
             
             // 向导覆盖层
             OnboardingWizardOverlay(
@@ -159,6 +163,10 @@ struct SettingsView: View {
                     focusedField = fieldId
                 }
             )
+            .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
+                // 这里也能接收到 preference
+                print("[Overlay] Received frames: \(frames)")
+            }
         }
     }
 
