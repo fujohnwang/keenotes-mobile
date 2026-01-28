@@ -11,8 +11,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.24.0"),
-        .package(url: "https://github.com/nicklockwood/SwiftFormat.git", from: "0.53.0"),
-        .package(url: "https://github.com/ephread/Instructions.git", from: "2.3.0")
+        .package(url: "https://github.com/nicklockwood/SwiftFormat.git", from: "0.53.0")
     ],
     targets: [
         .target(
