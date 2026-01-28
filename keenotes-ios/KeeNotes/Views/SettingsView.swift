@@ -75,6 +75,8 @@ struct SettingsView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .font(.system(size: isPad ? 17 : 17))
+                        .captureFrame(fieldId: "confirmPassword")
+                        .focused($focusedField, equals: "confirmPassword")
                 }
 
                 // Save button

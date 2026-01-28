@@ -65,6 +65,15 @@ class OnboardingWizardManager(
                 else 
                     "Please enter encryption password for end-to-end encryption of your notes",
                 isRequired = true
+            ),
+            WizardStep(
+                fieldId = "confirmPassword",
+                title = if (chinese) "确认加密密码" else "Confirm Encryption Password",
+                description = if (chinese) 
+                    "请再次输入加密密码以确认" 
+                else 
+                    "Please re-enter the encryption password to confirm",
+                isRequired = true
             )
         )
     }
