@@ -146,7 +146,8 @@ struct SettingsView: View {
             
             // 向导覆盖层
             OnboardingWizardOverlay(
-                showWizard: $showWizard
+                showWizard: $showWizard,
+                settingsService: appState.settingsService
             )
         }
     }
