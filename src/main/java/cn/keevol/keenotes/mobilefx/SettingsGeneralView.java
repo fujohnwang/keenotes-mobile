@@ -125,6 +125,7 @@ public class SettingsGeneralView extends VBox {
             endpointField,
             tokenField,
             encryptionPasswordField,
+            encryptionPasswordConfirmField,
             settings
         );
         
