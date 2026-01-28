@@ -1,6 +1,8 @@
 package cn.keevol.keenotes.mobilefx;
 
 import javafx.application.Platform;
+import javafx.beans.property.LongProperty;
+import javafx.beans.property.SimpleLongProperty;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -39,6 +41,9 @@ public class ServiceManager {
 
     // 服务状态监听器
     private final CopyOnWriteArrayList<ServiceStatusListener> listeners = new CopyOnWriteArrayList<>();
+    
+    // 账户切换事件 Property（响应式）
+    private final LongProperty accountSwitchedProperty = new SimpleLongProperty(0);
 
     // 初始化状态标志 - 使用新的状态管理
     private volatile InitializationState localCacheState = InitializationState.NOT_STARTED;
@@ -370,6 +375,24 @@ public class ServiceManager {
         Platform.runLater(() -> {
             listeners.forEach(l -> l.onStatusChanged(status, message));
         });
+    }
+    
+    /**
+     * 通知账户切换事件（公开方法，供外部调用）
+     * 使用响应式 Property，更新时间戳即可触发所有监听器
+     */
+    public void notifyAccountSwitched() {
+        Platform.runLater(() -> {
+            accountSwitchedProperty.set(System.currentTimeMillis());
+        });
+        notifyStatusChanged("account_switched", "账户已切换，正在清空本地数据...");
+    }
+    
+    /**
+     * 获取账户切换事件 Property（供组件监听）
+     */
+    public LongProperty accountSwitchedProperty() {
+        return accountSwitchedProperty;
     }
 
     /**

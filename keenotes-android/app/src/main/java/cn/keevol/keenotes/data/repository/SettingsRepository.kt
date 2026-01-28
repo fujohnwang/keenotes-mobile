@@ -24,7 +24,7 @@ class SettingsRepository(private val context: Context) {
         private val KEY_AUTO_FOCUS_INPUT = stringPreferencesKey("auto_focus_input_on_launch")
     }
     
-    val endpointUrl: Flow<String> = context.dataStore.data.map { it[KEY_ENDPOINT] ?: "" }
+    val endpointUrl: Flow<String> = context.dataStore.data.map { it[KEY_ENDPOINT] ?: "https://kns.afoo.me" }
     val token: Flow<String> = context.dataStore.data.map { it[KEY_TOKEN] ?: "" }
     val encryptionPassword: Flow<String> = context.dataStore.data.map { it[KEY_PASSWORD] ?: "" }
     val copyToClipboardOnPost: Flow<Boolean> = context.dataStore.data.map { it[KEY_COPY_TO_CLIPBOARD]?.toBoolean() ?: false }
@@ -33,7 +33,14 @@ class SettingsRepository(private val context: Context) {
     val autoFocusInputOnLaunch: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_FOCUS_INPUT]?.toBoolean() ?: true }
     
     val isConfigured: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        !prefs[KEY_ENDPOINT].isNullOrBlank() && !prefs[KEY_TOKEN].isNullOrBlank()
+        // 检查所有必填字段是否都已配置（不为空）
+        // 使用 DataStore 直接获取，避免默认值干扰
+        val endpoint = prefs[KEY_ENDPOINT]
+        val token = prefs[KEY_TOKEN]
+        val password = prefs[KEY_PASSWORD]
+        
+        // 只要有任何一个必填字段为空，就认为未配置
+        !(endpoint.isNullOrBlank() || token.isNullOrBlank() || password.isNullOrBlank())
     }
     
     suspend fun getEndpointUrl(): String = endpointUrl.first()

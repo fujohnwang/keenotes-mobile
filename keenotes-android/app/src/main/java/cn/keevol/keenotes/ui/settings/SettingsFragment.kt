@@ -26,6 +26,9 @@ class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
     
+    // 向导管理器
+    private var wizardManager: OnboardingWizardManager? = null
+    
     // Easter egg counter
     private var copyrightTapCount = 0
     private var lastTapTime = 0L
@@ -53,6 +56,21 @@ class SettingsFragment : Fragment() {
         setupSaveButton()
         setupCopyrightEasterEgg()
         loadSettings()
+        
+        // 初始化向导
+        val app = requireActivity().application as KeeNotesApp
+        wizardManager = OnboardingWizardManager(
+            context = requireContext(),
+            lifecycleOwner = viewLifecycleOwner,
+            settingsRepository = app.settingsRepository,
+            containerView = binding.settingsContainer
+        )
+        
+        // 检查并显示向导
+        wizardManager?.checkAndShowWizard()
+        
+        // 监听配置状态变化
+        wizardManager?.observeConfigurationState()
     }
     
     private var textWatcher: android.text.TextWatcher? = null
@@ -321,6 +339,7 @@ class SettingsFragment : Fragment() {
     
     override fun onDestroyView() {
         super.onDestroyView()
+        wizardManager = null
         _binding = null
     }
 }

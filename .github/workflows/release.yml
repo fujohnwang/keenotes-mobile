@@ -43,6 +43,31 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Generate BuildInfo
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          mkdir -p src/main/java/cn/keevol/keenotes/mobilefx/generated
+          
+          cat > src/main/java/cn/keevol/keenotes/mobilefx/generated/BuildInfo.java <<EOF
+          package cn.keevol.keenotes.mobilefx.generated;
+          
+          /**
+           * Auto-generated build information.
+           * DO NOT EDIT - This file is generated during build.
+           */
+          public final class BuildInfo {
+              public static final String VERSION = "$VERSION";
+              public static final String BUILD_TIME = "$BUILD_TIME";
+              
+              private BuildInfo() {}
+          }
+          EOF
+          
+          echo "Generated BuildInfo.java with version: $VERSION"
+
       - name: Build JAR
         shell: bash
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=win"
@@ -135,6 +160,30 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      - name: Generate BuildInfo
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          mkdir -p src/main/java/cn/keevol/keenotes/mobilefx/generated
+          
+          cat > src/main/java/cn/keevol/keenotes/mobilefx/generated/BuildInfo.java <<EOF
+          package cn.keevol.keenotes.mobilefx.generated;
+          
+          /**
+           * Auto-generated build information.
+           * DO NOT EDIT - This file is generated during build.
+           */
+          public final class BuildInfo {
+              public static final String VERSION = "$VERSION";
+              public static final String BUILD_TIME = "$BUILD_TIME";
+              
+              private BuildInfo() {}
+          }
+          EOF
+          
+          echo "Generated BuildInfo.java with version: $VERSION"
 
       - name: Build JAR for ${{ matrix.arch }}
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=${{ matrix.arch }}"
@@ -326,10 +375,53 @@ jobs:
         run: |
           VOLNAME="KeeNotes"
           DMG_TEMP="dist/KeeNotes-temp.dmg"
+          DMG_RW="dist/KeeNotes-rw.dmg"
           DMG_FINAL="dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg"
+          SOURCE_DIR="dist/dmg-source"
           
-          hdiutil create -volname "$VOLNAME" -srcfolder dist/KeeNotes.app -ov -format UDZO "$DMG_TEMP"
+          # Create source directory with app and Applications symlink
+          mkdir -p "$SOURCE_DIR"
+          cp -R dist/KeeNotes.app "$SOURCE_DIR/"
+          ln -s /Applications "$SOURCE_DIR/Applications"
           
+          # Create read-write DMG
+          hdiutil create -volname "$VOLNAME" -srcfolder "$SOURCE_DIR" -ov -format UDRW "$DMG_RW"
+          
+          # Mount the DMG
+          MOUNT_DIR=$(hdiutil attach "$DMG_RW" | grep Volumes | awk '{print $3}')
+          
+          # Set window properties and icon positions using AppleScript
+          echo '
+          tell application "Finder"
+            tell disk "'$VOLNAME'"
+              open
+              set current view of container window to icon view
+              set toolbar visible of container window to false
+              set statusbar visible of container window to false
+              set the bounds of container window to {100, 100, 600, 400}
+              set viewOptions to the icon view options of container window
+              set arrangement of viewOptions to not arranged
+              set icon size of viewOptions to 100
+              set position of item "KeeNotes.app" of container window to {150, 150}
+              set position of item "Applications" of container window to {350, 150}
+              update without registering applications
+              delay 2
+              close
+            end tell
+          end tell
+          ' | osascript
+          
+          # Unmount
+          hdiutil detach "$MOUNT_DIR"
+          
+          # Convert to compressed read-only DMG
+          hdiutil convert "$DMG_RW" -format UDZO -o "$DMG_TEMP"
+          rm "$DMG_RW"
+          
+          # Clean up temporary source directory to avoid uploading it
+          rm -rf "$SOURCE_DIR"
+          
+          # Sign DMG
           echo "Signing DMG..."
           codesign --force --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --timestamp "$DMG_TEMP"
           
@@ -680,6 +772,10 @@ jobs:
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
+        env:
+          # 设置为 4096 (4GB) 或 8192 (8GB)，取决于你的 Runner配置
+          # 如果是 macOS runner，建议直接给 8192
+          NODE_OPTIONS: "--max-old-space-size=8192"
         with:
           name: macos-${{ matrix.arch }}
           path: dist/*
@@ -718,6 +814,30 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      - name: Generate BuildInfo
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          mkdir -p src/main/java/cn/keevol/keenotes/mobilefx/generated
+          
+          cat > src/main/java/cn/keevol/keenotes/mobilefx/generated/BuildInfo.java <<EOF
+          package cn.keevol.keenotes.mobilefx.generated;
+          
+          /**
+           * Auto-generated build information.
+           * DO NOT EDIT - This file is generated during build.
+           */
+          public final class BuildInfo {
+              public static final String VERSION = "$VERSION";
+              public static final String BUILD_TIME = "$BUILD_TIME";
+              
+              private BuildInfo() {}
+          }
+          EOF
+          
+          echo "Generated BuildInfo.java with version: $VERSION"
 
       - name: Build JAR
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=linux"
@@ -942,3 +1062,18 @@ jobs:
             artifacts/android-apk/*
             artifacts/android-aab/*
             # artifacts/ios-ipa/*
+
+      - name: Update Version Info to API
+        if: github.ref_type == 'tag'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION#V}"
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          
+          echo "Updating version info: $VERSION"
+          curl -X POST https://kns.afoo.me/version/latest \
+            -H "Authorization: Bearer ${{ secrets.KNS_ADMIN_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"version\":\"$VERSION\",\"url\":\"$RELEASE_URL\"}"
+          
+          echo "Version info updated successfully"

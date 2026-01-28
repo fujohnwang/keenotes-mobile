@@ -63,7 +63,7 @@ class SettingsService: ObservableObject {
     
     init() {
         // Initialize all @Published properties first
-        self.endpointUrl = defaults.string(forKey: Keys.endpointUrl) ?? ""
+        self.endpointUrl = defaults.string(forKey: Keys.endpointUrl) ?? "https://kns.afoo.me"
         self.token = defaults.string(forKey: Keys.token) ?? ""
         self.encryptionPassword = defaults.string(forKey: Keys.encryptionPassword) ?? ""
         
@@ -76,7 +76,16 @@ class SettingsService: ObservableObject {
     }
     
     var isConfigured: Bool {
-        !endpointUrl.isEmpty && !token.isEmpty
+        // 检查所有必填字段是否都已配置（不为空）
+        // 使用 UserDefaults 直接获取，避免默认值干扰
+        let endpoint = defaults.string(forKey: Keys.endpointUrl)
+        let token = defaults.string(forKey: Keys.token)
+        let encryptionPassword = defaults.string(forKey: Keys.encryptionPassword)
+        
+        // 只要有任何一个必填字段为空，就认为未配置
+        return !(endpoint == nil || endpoint!.isEmpty || 
+                 token == nil || token!.isEmpty ||
+                 encryptionPassword == nil || encryptionPassword!.isEmpty)
     }
     
     var isEncryptionEnabled: Bool {
