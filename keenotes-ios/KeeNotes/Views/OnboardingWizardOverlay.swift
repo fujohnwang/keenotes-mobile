@@ -40,41 +40,39 @@ struct OnboardingWizardOverlay: View {
             let currentFieldId = steps[currentStep].fieldId
             let fieldFrame = fieldFrames[currentFieldId] ?? .zero
             
-            ZStack(alignment: .topLeading) {
-                if fieldFrame != .zero {
-                    let _ = print("[Wizard] Field: \(currentFieldId), Frame: \(fieldFrame)")
-                    
+            if fieldFrame != .zero {
+                GeometryReader { _ in
                     CapsuleWizardCard(
                         step: steps[currentStep],
                         isLastStep: currentStep == steps.count - 1,
                         onNext: nextStep,
                         onSkip: skipWizard
                     )
-                    .offset(
-                        x: 0,
-                        y: fieldFrame.maxY + 16
+                    .position(
+                        x: UIScreen.main.bounds.width / 2,
+                        y: fieldFrame.maxY + 70
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .onChange(of: currentStep) { _ in
-                if currentStep < steps.count {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        onFocusField(steps[currentStep].fieldId)
+                .ignoresSafeArea()
+                .onChange(of: currentStep) { _ in
+                    if currentStep < steps.count {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            onFocusField(steps[currentStep].fieldId)
+                        }
                     }
                 }
-            }
-            .onChange(of: settingsService.token) { _ in
-                checkAndDismiss()
-            }
-            .onChange(of: settingsService.encryptionPassword) { _ in
-                checkAndDismiss()
-            }
-            .onAppear {
-                if currentStep < steps.count {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        onFocusField(steps[currentStep].fieldId)
+                .onChange(of: settingsService.token) { _ in
+                    checkAndDismiss()
+                }
+                .onChange(of: settingsService.encryptionPassword) { _ in
+                    checkAndDismiss()
+                }
+                .onAppear {
+                    if currentStep < steps.count {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            onFocusField(steps[currentStep].fieldId)
+                        }
                     }
                 }
             }
