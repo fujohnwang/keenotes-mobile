@@ -4,7 +4,7 @@ import SwiftUI
 struct OnboardingWizardOverlay: View {
     @Binding var showWizard: Bool
     @State private var currentStep = 0
-    @EnvironmentObject var appState: AppState
+    let settingsService: SettingsService
     
     // 检测系统语言
     private func isChinese() -> Bool {
@@ -66,17 +66,17 @@ struct OnboardingWizardOverlay: View {
                     .transition(.move(edge: .bottom))
                 }
             }
-            .onChange(of: appState.settingsService.token) { _ in
+            .onChange(of: settingsService.token) { _ in
                 checkAndDismiss()
             }
-            .onChange(of: appState.settingsService.encryptionPassword) { _ in
+            .onChange(of: settingsService.encryptionPassword) { _ in
                 checkAndDismiss()
             }
         }
     }
     
     private func checkAndDismiss() {
-        if appState.settingsService.isConfigured {
+        if settingsService.isConfigured {
             withAnimation {
                 showWizard = false
             }
