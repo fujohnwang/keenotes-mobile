@@ -25,6 +25,9 @@
 		928FB5A4314467ABDBE9CCBE /* blake2b.c in Sources */ = {isa = PBXBuildFile; fileRef = CEED188D3B81AF7268E2D579 /* blake2b.c */; };
 		946E8578E0A828A727191C99 /* ApiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CCFBB1C4E585233C8949042 /* ApiService.swift */; };
 		9E1AA8C7DADD4E82A4D437BC /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87901956656FA3E18B94F424 /* ReviewView.swift */; };
+		A1B2C3D4E5F6071829304A5B /* WizardStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A6978081920A3B /* WizardStep.swift */; };
+		B2C3D4E5F6A7182930415C6D /* WizardCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D3C4B5A6978081920B4C5E /* WizardCard.swift */; };
+		C3D4E5F6A7B8293041526D7F /* OnboardingWizardOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */; };
 		C0AE7EC02E4C49132B40A4A0 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 149970AB595EDA07A0940B31 /* GRDB */; };
 		DA5DD2A22882D996C37B27EF /* argon2.c in Sources */ = {isa = PBXBuildFile; fileRef = 6D467341E90F4D144FCEC974 /* argon2.c */; };
 		E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC48816DBEEFEE56707E5302 /* NoteView.swift */; };
@@ -62,12 +65,15 @@
 		CEED188D3B81AF7268E2D579 /* blake2b.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = blake2b.c; sourceTree = "<group>"; };
 		D1DA3D7B9EC0F4278F1C8070 /* argon2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = argon2.h; sourceTree = "<group>"; };
 		D34FAB7AB6D6F412B2AD704B /* KeeNotes-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "KeeNotes-Bridging-Header.h"; sourceTree = "<group>"; };
+		D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWizardOverlay.swift; sourceTree = "<group>"; };
 		D6B16CD3673E6F843DF0CC2C /* blake2-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blake2-impl.h"; sourceTree = "<group>"; };
 		DF16E09CF759358B4C94BCBD /* DeviceType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceType.swift; sourceTree = "<group>"; };
 		DFE252BFDC15087E4D34EB51 /* WebSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketService.swift; sourceTree = "<group>"; };
+		E2D3C4B5A6978081920B4C5E /* WizardCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardCard.swift; sourceTree = "<group>"; };
 		E71854385AA7C1EECC7F20F2 /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
 		EAA89252DC520456A6A43EEC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		EC56614EF00CDBBE7B740F99 /* SettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsService.swift; sourceTree = "<group>"; };
+		F1E2D3C4B5A6978081920A3B /* WizardStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,10 +102,12 @@
 				E71854385AA7C1EECC7F20F2 /* DebugView.swift */,
 				A9040A9739D8D0416CE13A31 /* MainTabView.swift */,
 				BC48816DBEEFEE56707E5302 /* NoteView.swift */,
+				D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */,
 				764FC4DD3D4698E0F2A59FF2 /* OverviewCardView.swift */,
 				87901956656FA3E18B94F424 /* ReviewView.swift */,
 				4DBFDFFD9FC62E4A40312B79 /* SearchView.swift */,
 				6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */,
+				E2D3C4B5A6978081920B4C5E /* WizardCard.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -164,6 +172,7 @@
 			isa = PBXGroup;
 			children = (
 				58873415E76E9E252DEA0F7A /* Note.swift */,
+				F1E2D3C4B5A6978081920A3B /* WizardStep.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -281,12 +290,15 @@
 				E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */,
 				6D81FA454D6E54D241F31894 /* Note.swift in Sources */,
 				E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */,
+				C3D4E5F6A7B8293041526D7F /* OnboardingWizardOverlay.swift in Sources */,
 				1FFF7BD4F1D6ED72F2E2FA18 /* OverviewCardView.swift in Sources */,
 				9E1AA8C7DADD4E82A4D437BC /* ReviewView.swift in Sources */,
 				34FEEF16981E07FC6FB35260 /* SearchView.swift in Sources */,
 				382B7B75B8E85659AAED35AD /* SettingsService.swift in Sources */,
 				6FB30AE0AADAFBFDFCE3F48E /* SettingsView.swift in Sources */,
 				5DD67890F51B1621810AB13C /* WebSocketService.swift in Sources */,
+				B2C3D4E5F6A7182930415C6D /* WizardCard.swift in Sources */,
+				A1B2C3D4E5F6071829304A5B /* WizardStep.swift in Sources */,
 				DA5DD2A22882D996C37B27EF /* argon2.c in Sources */,
 				928FB5A4314467ABDBE9CCBE /* blake2b.c in Sources */,
 				2FAF71FD90FB24A293D9C1DC /* core.c in Sources */,
