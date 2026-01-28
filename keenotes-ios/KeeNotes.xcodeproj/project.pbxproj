@@ -27,6 +27,7 @@
 		9E1AA8C7DADD4E82A4D437BC /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87901956656FA3E18B94F424 /* ReviewView.swift */; };
 		A1B2C3D4E5F6071829304A5B /* WizardStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A6978081920A3B /* WizardStep.swift */; };
 		B2C3D4E5F6A7182930415C6D /* WizardCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D3C4B5A6978081920B4C5E /* WizardCard.swift */; };
+		B3C4D5E6F7A8293041526E8B /* WizardInlineCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D4C5B6A7980819210C6F9C /* WizardInlineCard.swift */; };
 		C3D4E5F6A7B8293041526D7F /* OnboardingWizardOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */; };
 		C0AE7EC02E4C49132B40A4A0 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 149970AB595EDA07A0940B31 /* GRDB */; };
 		DA5DD2A22882D996C37B27EF /* argon2.c in Sources */ = {isa = PBXBuildFile; fileRef = 6D467341E90F4D144FCEC974 /* argon2.c */; };
@@ -70,6 +71,7 @@
 		DF16E09CF759358B4C94BCBD /* DeviceType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceType.swift; sourceTree = "<group>"; };
 		DFE252BFDC15087E4D34EB51 /* WebSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketService.swift; sourceTree = "<group>"; };
 		E2D3C4B5A6978081920B4C5E /* WizardCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardCard.swift; sourceTree = "<group>"; };
+		E3D4C5B6A7980819210C6F9C /* WizardInlineCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardInlineCard.swift; sourceTree = "<group>"; };
 		E71854385AA7C1EECC7F20F2 /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
 		EAA89252DC520456A6A43EEC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		EC56614EF00CDBBE7B740F99 /* SettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsService.swift; sourceTree = "<group>"; };
@@ -108,6 +110,7 @@
 				4DBFDFFD9FC62E4A40312B79 /* SearchView.swift */,
 				6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */,
 				E2D3C4B5A6978081920B4C5E /* WizardCard.swift */,
+				E3D4C5B6A7980819210C6F9C /* WizardInlineCard.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -298,6 +301,7 @@
 				6FB30AE0AADAFBFDFCE3F48E /* SettingsView.swift in Sources */,
 				5DD67890F51B1621810AB13C /* WebSocketService.swift in Sources */,
 				B2C3D4E5F6A7182930415C6D /* WizardCard.swift in Sources */,
+				B3C4D5E6F7A8293041526E8B /* WizardInlineCard.swift in Sources */,
 				A1B2C3D4E5F6071829304A5B /* WizardStep.swift in Sources */,
 				DA5DD2A22882D996C37B27EF /* argon2.c in Sources */,
 				928FB5A4314467ABDBE9CCBE /* blake2b.c in Sources */,

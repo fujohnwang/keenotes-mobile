@@ -36,35 +36,28 @@ struct OnboardingWizardOverlay: View {
     
     var body: some View {
         if showWizard && currentStep < steps.count {
-            ZStack {
-                // 半透明遮罩（不阻止交互）
-                Color.black.opacity(0.3)
-                    .allowsHitTesting(false)
-                    .ignoresSafeArea()
+            VStack {
+                Spacer()
                 
-                VStack {
-                    Spacer()
-                    
-                    // 提示卡片
-                    WizardCard(
-                        step: steps[currentStep],
-                        isLastStep: currentStep == steps.count - 1,
-                        onNext: {
-                            withAnimation {
-                                currentStep += 1
-                                if currentStep >= steps.count {
-                                    showWizard = false
-                                }
-                            }
-                        },
-                        onSkip: {
-                            withAnimation {
+                // 提示卡片 - 固定在底部
+                WizardCard(
+                    step: steps[currentStep],
+                    isLastStep: currentStep == steps.count - 1,
+                    onNext: {
+                        withAnimation {
+                            currentStep += 1
+                            if currentStep >= steps.count {
                                 showWizard = false
                             }
                         }
-                    )
-                    .transition(.move(edge: .bottom))
-                }
+                    },
+                    onSkip: {
+                        withAnimation {
+                            showWizard = false
+                        }
+                    }
+                )
+                .transition(.move(edge: .bottom))
             }
             .onChange(of: settingsService.token) { _ in
                 checkAndDismiss()
