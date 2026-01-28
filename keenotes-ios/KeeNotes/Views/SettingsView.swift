@@ -20,6 +20,9 @@ struct SettingsView: View {
     
     // 焦点状态
     @FocusState private var focusedField: String?
+    
+    // 输入框位置状态
+    @State private var fieldFrames: [String: CGRect] = [:]
 
     // Computed property for Save button enabled state
     private var isSaveEnabled: Bool {
@@ -151,22 +154,20 @@ struct SettingsView: View {
             }
             .navigationViewStyle(.stack)
             .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
-                // 将 frame 信息传递给外层
+                // 将 frame 信息保存到 state
+                self.fieldFrames = frames
                 print("[SettingsView] Captured frames: \(frames)")
             }
             
             // 向导覆盖层
             OnboardingWizardOverlay(
                 showWizard: $showWizard,
+                fieldFrames: fieldFrames,
                 settingsService: appState.settingsService,
                 onFocusField: { fieldId in
                     focusedField = fieldId
                 }
             )
-            .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
-                // 这里也能接收到 preference
-                print("[Overlay] Received frames: \(frames)")
-            }
         }
     }
 
