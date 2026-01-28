@@ -8,8 +8,8 @@ struct OnboardingWizardOverlay: View {
     
     // 检测系统语言
     private func isChinese() -> Bool {
-        let language = Locale.current.language.languageCode?.identifier ?? ""
-        let region = Locale.current.region?.identifier ?? ""
+        let language = Locale.current.languageCode ?? ""
+        let region = Locale.current.regionCode ?? ""
         return language == "zh" || region == "CN" || region == "TW" || region == "HK"
     }
     
