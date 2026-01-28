@@ -34,13 +34,14 @@ class SettingsHostingController: UIHostingController<AnyView> {
         
         // 创建 SwiftUI 视图
         let settingsView = SettingsViewForCoachMarks(
-            appState: appState,
-            onTokenFieldAppear: { [weak self] in
-                self?.findTokenField()
-            },
-            onPasswordFieldAppear: { [weak self] in
-                self?.findPasswordField()
-            }
+            settingsService: appState.settingsService,
+            webSocketService: appState.webSocketService,
+            selectedTab: Binding(
+                get: { appState.selectedTab },
+                set: { appState.selectedTab = $0 }
+            ),
+            onTokenFieldAppear: {},  // 临时空闭包，稍后会被替换
+            onPasswordFieldAppear: {}  // 临时空闭包，稍后会被替换
         )
         
         super.init(rootView: AnyView(settingsView))
@@ -142,7 +143,9 @@ class SettingsHostingController: UIHostingController<AnyView> {
 /// 用于 Coach Marks 的 SettingsView 变体
 /// 添加了回调来通知字段出现
 struct SettingsViewForCoachMarks: View {
-    let appState: AppState
+    @ObservedObject var settingsService: SettingsService
+    @ObservedObject var webSocketService: WebSocketService
+    var selectedTab: Binding<Int>
     let onTokenFieldAppear: () -> Void
     let onPasswordFieldAppear: () -> Void
     
@@ -234,10 +237,10 @@ struct SettingsViewForCoachMarks: View {
     
     private func loadSettings() {
         DispatchQueue.main.async {
-            endpointUrl = appState.settingsService.endpointUrl
-            token = appState.settingsService.token
-            password = appState.settingsService.encryptionPassword
-            confirmPassword = appState.settingsService.encryptionPassword
+            endpointUrl = settingsService.endpointUrl
+            token = settingsService.token
+            password = settingsService.encryptionPassword
+            confirmPassword = settingsService.encryptionPassword
         }
     }
     
@@ -251,7 +254,7 @@ struct SettingsViewForCoachMarks: View {
         }
         
         do {
-            appState.settingsService.saveSettings(
+            settingsService.saveSettings(
                 endpoint: endpointUrl,
                 token: token,
                 password: password
@@ -260,14 +263,14 @@ struct SettingsViewForCoachMarks: View {
             isSuccess = true
             
             // 重新连接
-            appState.webSocketService.disconnect()
+            webSocketService.disconnect()
             if !endpointUrl.isEmpty && !token.isEmpty {
-                appState.webSocketService.connect()
+                webSocketService.connect()
             }
             
             // 切换到笔记页面
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                appState.selectedTab = 0
+                selectedTab.wrappedValue = 0
             }
         } catch {
             statusMessage = "Failed to save: \(error.localizedDescription)"
