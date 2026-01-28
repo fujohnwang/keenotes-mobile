@@ -1,0 +1,57 @@
+iOS Coach Marks 集成步骤
+========================
+
+已完成的代码修改：
+1. ✅ Package.swift - 添加了 Instructions 依赖
+2. ✅ CoachMarksManager.swift - 创建了引导管理器
+3. ✅ SettingsViewControllerWrapper.swift - 创建了 UIKit 桥接
+4. ✅ MainTabView.swift - 修改为使用新的包装器
+
+需要在 Xcode 中完成的步骤：
+================================
+
+1. 打开 Xcode 项目
+   - 打开 keenotes-ios/KeeNotes.xcodeproj
+
+2. 添加新文件到项目
+   - 右键点击 "Services" 文件夹
+   - 选择 "Add Files to KeeNotes..."
+   - 添加: keenotes-ios/KeeNotes/Services/CoachMarksManager.swift
+   
+   - 右键点击 "Views" 文件夹
+   - 选择 "Add Files to KeeNotes..."
+   - 添加: keenotes-ios/KeeNotes/Views/SettingsViewControllerWrapper.swift
+
+3. 解析 Swift Package 依赖
+   - Xcode 会自动检测 Package.swift 的变化
+   - 等待 Instructions 库下载完成
+   - 如果没有自动下载，选择 File > Packages > Resolve Package Versions
+
+4. 构建项目
+   - Command + B 构建项目
+   - 检查是否有编译错误
+
+5. 运行测试
+   - 运行应用
+   - 首次启动时应该自动跳转到设置页面
+   - 应该看到 Coach Marks 引导效果（遮罩 + 高亮 + 提示卡片）
+
+预期效果：
+=========
+- 全屏半透明黑色遮罩
+- Token 字段被镂空高亮
+- 显示带箭头的提示卡片
+- 点击"下一步"进入 Password 字段引导
+- 点击"完成"或填写完配置后引导消失
+
+故障排查：
+=========
+如果 Coach Marks 没有显示：
+1. 检查控制台日志，查看是否找到了 Token 和 Password 字段
+2. 确认 Instructions 库已正确添加到项目
+3. 尝试增加 viewDidAppear 中的延迟时间（当前是 0.8 秒）
+
+如果找不到输入框：
+1. 检查 accessibility identifier 是否正确设置
+2. 尝试在 Xcode 的 View Hierarchy Debugger 中查看视图层次
+3. 可能需要调整查找逻辑的延迟时间
