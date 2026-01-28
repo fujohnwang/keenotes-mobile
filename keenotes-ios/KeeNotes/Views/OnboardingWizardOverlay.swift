@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 首次启动配置向导 - 简化版，无遮罩，直接聚焦输入框
+/// 首次启动配置向导 - 胶囊式设计，跟随输入框
 struct OnboardingWizardOverlay: View {
     @Binding var showWizard: Bool
     @State private var currentStep = 0
@@ -41,18 +41,16 @@ struct OnboardingWizardOverlay: View {
             GeometryReader { geometry in
                 let currentFieldId = steps[currentStep].fieldId
                 let fieldFrame = fieldFrames[currentFieldId] ?? .zero
-                let cardYPosition = fieldFrame.maxY + 10 // 卡片显示在输入框下方 10pt
                 
-                // 提示卡片 - 显示在当前输入框下方
-                WizardCardWithArrow(
+                // 胶囊式提示卡片 - 显示在输入框正下方
+                CapsuleWizardCard(
                     step: steps[currentStep],
                     isLastStep: currentStep == steps.count - 1,
+                    fieldFrame: fieldFrame,
                     onNext: nextStep,
                     onSkip: skipWizard
                 )
-                .padding(.horizontal, 20)
-                .position(x: geometry.size.width / 2, y: cardYPosition + 80)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
             .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
                 self.fieldFrames = frames
@@ -60,7 +58,9 @@ struct OnboardingWizardOverlay: View {
             .onChange(of: currentStep) { _ in
                 // 当步骤改变时，聚焦到对应的输入框
                 if currentStep < steps.count {
-                    onFocusField(steps[currentStep].fieldId)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        onFocusField(steps[currentStep].fieldId)
+                    }
                 }
             }
             .onChange(of: settingsService.token) { _ in
@@ -81,7 +81,7 @@ struct OnboardingWizardOverlay: View {
     }
     
     private func nextStep() {
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             currentStep += 1
             if currentStep >= steps.count {
                 showWizard = false
@@ -90,7 +90,7 @@ struct OnboardingWizardOverlay: View {
     }
     
     private func skipWizard() {
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(.easeOut(duration: 0.25)) {
             showWizard = false
         }
     }
@@ -104,10 +104,11 @@ struct OnboardingWizardOverlay: View {
     }
 }
 
-/// 提示卡片（带向上箭头）
-struct WizardCardWithArrow: View {
+/// 胶囊式向导卡片（带向上箭头，跟随输入框）
+struct CapsuleWizardCard: View {
     let step: WizardStep
     let isLastStep: Bool
+    let fieldFrame: CGRect
     let onNext: () -> Void
     let onSkip: () -> Void
     
@@ -119,65 +120,89 @@ struct WizardCardWithArrow: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // 向上箭头
+            // 向上箭头 - 指向输入框
             Triangle()
-                .fill(Color(.systemBackground))
-                .frame(width: 20, height: 10)
-                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: -1)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(.systemBackground).opacity(0.98), Color(.systemBackground).opacity(0.95)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 16, height: 8)
+                .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: -0.5)
             
-            // 卡片内容
-            VStack(alignment: .leading, spacing: 12) {
-                // 标题行
-                HStack {
-                    Image(systemName: "info.circle.fill")
-                        .foregroundColor(.blue)
-                        .font(.system(size: 16))
-                    
+            // 胶囊式卡片内容
+            HStack(spacing: 12) {
+                // 左侧图标
+                Image(systemName: "info.circle.fill")
+                    .foregroundColor(.blue)
+                    .font(.system(size: 20))
+                
+                // 中间文本内容
+                VStack(alignment: .leading, spacing: 4) {
                     Text(step.title)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.primary)
                     
-                    Spacer()
-                    
-                    Button(isChinese ? "跳过" : "Skip") {
-                        onSkip()
-                    }
-                    .font(.system(size: 14))
-                    .foregroundColor(.blue)
+                    Text(step.description)
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 
-                // 描述文本
-                Text(step.description)
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .lineSpacing(2)
+                Spacer()
                 
-                // 下一步按钮
-                Button(action: onNext) {
-                    HStack {
-                        Text(isLastStep ? (isChinese ? "完成" : "Finish") : (isChinese ? "下一步" : "Next"))
-                            .font(.system(size: 15, weight: .semibold))
-                        
-                        if !isLastStep {
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 13, weight: .semibold))
-                        }
+                // 右侧按钮组
+                VStack(spacing: 8) {
+                    // 跳过按钮
+                    Button(action: onSkip) {
+                        Text(isChinese ? "跳过" : "Skip")
+                            .font(.system(size: 12))
+                            .foregroundColor(.blue.opacity(0.8))
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
+                    
+                    // 下一步按钮
+                    Button(action: onNext) {
+                        HStack(spacing: 4) {
+                            Text(isLastStep ? (isChinese ? "完成" : "Done") : (isChinese ? "下一步" : "Next"))
+                                .font(.system(size: 14, weight: .medium))
+                            
+                            if !isLastStep {
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.blue)
+                        )
+                    }
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemBackground).opacity(0.95))
-                    .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
+                Capsule()
+                    .fill(
+                        .ultraThinMaterial
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                    )
+                    .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 8)
             )
         }
+        .padding(.horizontal, 16)
+        .position(
+            x: fieldFrame.midX,
+            y: fieldFrame.maxY + 70 // 卡片中心位置在输入框下方 70pt
+        )
     }
 }
 
