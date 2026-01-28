@@ -50,6 +50,7 @@ struct SettingsView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .font(.system(size: isPad ? 17 : 17))
+                        .captureFrame(fieldId: "token")  // 捕获位置
                 }
 
                 // Encryption
@@ -59,6 +60,7 @@ struct SettingsView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .font(.system(size: isPad ? 17 : 17))
+                        .captureFrame(fieldId: "password")  // 捕获位置
 
                     SecureField("Confirm Password", text: $confirmPassword)
                         .textContentType(.init(rawValue: ""))
