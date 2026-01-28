@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 首次启动配置向导覆盖层
+/// Coach Marks 风格的首次启动配置向导
 struct OnboardingWizardOverlay: View {
     @Binding var showWizard: Bool
     @State private var currentStep = 0
@@ -36,28 +36,46 @@ struct OnboardingWizardOverlay: View {
     
     var body: some View {
         if showWizard && currentStep < steps.count {
-            VStack {
-                Spacer()
-                
-                // 提示卡片 - 固定在底部
-                WizardCard(
-                    step: steps[currentStep],
-                    isLastStep: currentStep == steps.count - 1,
-                    onNext: {
-                        withAnimation {
-                            currentStep += 1
-                            if currentStep >= steps.count {
-                                showWizard = false
-                            }
-                        }
-                    },
-                    onSkip: {
-                        withAnimation {
-                            showWizard = false
-                        }
+            ZStack {
+                // 全屏半透明遮罩
+                Color.black.opacity(0.7)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        // 点击遮罩不关闭，保持引导
                     }
-                )
-                .transition(.move(edge: .bottom))
+                
+                // 提示卡片 - 根据步骤显示在不同位置
+                VStack {
+                    if currentStep == 0 {
+                        // Token 字段提示 - 显示在屏幕上方
+                        Spacer()
+                            .frame(height: 200)
+                        
+                        CoachMarkCard(
+                            step: steps[currentStep],
+                            isLastStep: false,
+                            onNext: nextStep,
+                            onSkip: skipWizard
+                        )
+                        .transition(.opacity.combined(with: .scale))
+                        
+                        Spacer()
+                    } else if currentStep == 1 {
+                        // Password 字段提示 - 显示在屏幕中部
+                        Spacer()
+                            .frame(height: 350)
+                        
+                        CoachMarkCard(
+                            step: steps[currentStep],
+                            isLastStep: true,
+                            onNext: nextStep,
+                            onSkip: skipWizard
+                        )
+                        .transition(.opacity.combined(with: .scale))
+                        
+                        Spacer()
+                    }
+                }
             }
             .onChange(of: settingsService.token) { _ in
                 checkAndDismiss()
@@ -68,11 +86,95 @@ struct OnboardingWizardOverlay: View {
         }
     }
     
+    private func nextStep() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            currentStep += 1
+            if currentStep >= steps.count {
+                showWizard = false
+            }
+        }
+    }
+    
+    private func skipWizard() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showWizard = false
+        }
+    }
+    
     private func checkAndDismiss() {
         if settingsService.isConfigured {
             withAnimation {
                 showWizard = false
             }
         }
+    }
+}
+
+/// Coach Mark 卡片组件
+struct CoachMarkCard: View {
+    let step: WizardStep
+    let isLastStep: Bool
+    let onNext: () -> Void
+    let onSkip: () -> Void
+    
+    private var isChinese: Bool {
+        let language = Locale.current.languageCode ?? ""
+        let region = Locale.current.regionCode ?? ""
+        return language == "zh" || region == "CN" || region == "TW" || region == "HK"
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // 标题和跳过按钮
+            HStack {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundColor(.yellow)
+                    .font(.system(size: 20))
+                
+                Text(step.title)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Button(isChinese ? "跳过" : "Skip") {
+                    onSkip()
+                }
+                .font(.system(size: 15))
+                .foregroundColor(.white.opacity(0.8))
+            }
+            
+            // 描述
+            Text(step.description)
+                .font(.system(size: 15))
+                .foregroundColor(.white.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(4)
+            
+            // 下一步按钮
+            Button(action: onNext) {
+                HStack {
+                    Text(isLastStep ? (isChinese ? "完成" : "Finish") : (isChinese ? "下一步" : "Next"))
+                        .font(.system(size: 16, weight: .semibold))
+                    
+                    if !isLastStep {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.black.opacity(0.9))
+                .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
+        )
+        .padding(.horizontal, 24)
     }
 }
