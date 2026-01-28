@@ -1,6 +1,5 @@
 package cn.keevol.keenotes.mobilefx;
 
-import com.gluonhq.attach.storage.StorageService;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -71,25 +70,6 @@ public class SettingsService {
     }
 
     private Path resolveSettingsPath() {
-        try {
-            System.out.println("[Settings] Resolving settings path...");
-
-            // 尝试使用Gluon Attach StorageService (Android/iOS)
-            Optional<File> privateStorage = StorageService.create().flatMap(StorageService::getPrivateStorage);
-
-            if (privateStorage.isPresent()) {
-                Path settingsPath = privateStorage.get().toPath().resolve(SETTINGS_FILE);
-                System.out.println("[Settings] Using Gluon private storage: " + settingsPath);
-                return settingsPath;
-            } else {
-                System.out.println("[Settings] Gluon private storage not available, using fallback");
-            }
-        } catch (Exception e) {
-            System.err.println("[Settings] Error accessing Gluon storage: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        // 桌面环境或Gluon存储不可用时的回退方案
         Path fallbackPath = Path.of(System.getProperty("user.home"), ".keenotes", SETTINGS_FILE);
         System.out.println("[Settings] Using fallback storage: " + fallbackPath);
         return fallbackPath;
@@ -117,7 +97,7 @@ public class SettingsService {
     }
 
     public String getEndpointUrl() {
-        return properties.getProperty(KEY_ENDPOINT_URL, "");
+        return properties.getProperty(KEY_ENDPOINT_URL, "https://kns.afoo.me");
     }
 
     public void setEndpointUrl(String url) {
@@ -133,7 +113,17 @@ public class SettingsService {
     }
 
     public boolean isConfigured() {
-        return !getEndpointUrl().isBlank() && !getToken().isBlank();
+        // 检查所有必填字段是否都已配置（不为空）
+        // 使用 properties.getProperty() 而不是 getter，避免默认值干扰判断
+        String endpoint = properties.getProperty(KEY_ENDPOINT_URL);
+        String token = properties.getProperty(KEY_TOKEN);
+        String encryptionPassword = properties.getProperty(KEY_ENCRYPTION_PASSWORD);
+        
+        // 只要有任何一个必填字段为空，就认为未配置
+        // 包括：endpoint, token, encryptionPassword（三个都是必填）
+        return !(endpoint == null || endpoint.isBlank() || 
+                 token == null || token.isBlank() ||
+                 encryptionPassword == null || encryptionPassword.isBlank());
     }
 
     public int getReviewDays() {

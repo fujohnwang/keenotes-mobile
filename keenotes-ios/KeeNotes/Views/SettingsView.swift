@@ -14,6 +14,9 @@ struct SettingsView: View {
 
     @State private var statusMessage = ""
     @State private var isSuccess = true
+    
+    // 向导状态
+    @State private var showWizard = false
 
     // Computed property for Save button enabled state
     private var isSaveEnabled: Bool {
@@ -31,10 +34,11 @@ struct SettingsView: View {
     @State private var showDebugView = false
 
     var body: some View {
-        NavigationView {
-            Form {
-                // Server configuration
-                Section(header: Text("Server Configuration")) {
+        ZStack {
+            NavigationView {
+                Form {
+                    // Server configuration
+                    Section(header: Text("Server Configuration")) {
                     TextField("Endpoint URL", text: $endpointUrl)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -130,15 +134,22 @@ struct SettingsView: View {
                         handleCopyrightTap()
                     }
                 }
+                }
+                .navigationTitle("KeeNotes Settings")
+                .navigationBarTitleDisplayMode(.inline)
+                .onAppear(perform: loadSettings)
+                .sheet(isPresented: $showDebugView) {
+                    DebugView()
+                }
             }
-            .navigationTitle("KeeNotes Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .onAppear(perform: loadSettings)
-            .sheet(isPresented: $showDebugView) {
-                DebugView()
-            }
+            .navigationViewStyle(.stack)
+            
+            // 向导覆盖层
+            OnboardingWizardOverlay(
+                showWizard: $showWizard,
+                settings: appState.settingsService
+            )
         }
-        .navigationViewStyle(.stack)
     }
 
     private func loadSettings() {
@@ -148,6 +159,9 @@ struct SettingsView: View {
             token = appState.settingsService.token
             password = appState.settingsService.encryptionPassword
             confirmPassword = appState.settingsService.encryptionPassword
+            
+            // 检查并显示向导
+            checkAndShowWizard()
         }
     }
 
@@ -281,6 +295,16 @@ struct SettingsView: View {
 
         if copyrightTapCount >= 7 && !showDebugSection {
             showDebugSection = true
+        }
+    }
+    
+    private func checkAndShowWizard() {
+        // 检查是否需要显示向导
+        if !appState.settingsService.isConfigured {
+            // 延迟显示，确保界面已渲染
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                showWizard = true
+            }
         }
     }
 }

@@ -39,7 +39,7 @@ public class Main extends Application {
             Platform.runLater(() -> loadThemeCSS(scene));
         });
 
-        stage.setTitle("KeeNotes");
+        stage.setTitle("KeeNotes (" + cn.keevol.keenotes.mobilefx.generated.BuildInfo.VERSION + ")");
         stage.setScene(scene);
 
         // Set minimum window size for desktop
@@ -55,6 +55,9 @@ public class Main extends Application {
         // 显示UI - 这是最重要的，用户应该立即看到界面
         stage.show();
 
+        // 检查配置状态，如果未配置则导航到设置界面
+        checkConfigurationAndNavigate();
+
         // UI显示后，延迟初始化服务（在后台线程）
         initializeServicesAfterUI();
 
@@ -63,6 +66,19 @@ public class Main extends Application {
             @Override
             public void run() {
                 SimpleForwardServer.start();
+            }
+        });
+    }
+
+    /**
+     * 检查配置状态，如果未配置则导航到设置界面
+     */
+    private void checkConfigurationAndNavigate() {
+        Platform.runLater(() -> {
+            SettingsService settings = SettingsService.getInstance();
+            if (!settings.isConfigured()) {
+                System.out.println("[Main] Configuration not complete, navigating to Settings...");
+                mainView.switchToSettingsMode();
             }
         });
     }
@@ -97,6 +113,26 @@ public class Main extends Application {
             });
             connectThread.setDaemon(true);
             connectThread.start();
+            
+            // 4. 检查更新（在异步线程，延迟3秒启动）
+            Thread updateCheckThread = new Thread(() -> {
+                try {
+                    Thread.sleep(3000); // Wait 3 seconds after startup
+                    System.out.println("Checking for updates...");
+                    UpdateCheckService updateChecker = new UpdateCheckService();
+                    updateChecker.setUpdateListener((version, url) -> {
+                        System.out.println("[UpdateCheck] Notifying UI about update: " + version);
+                        if (mainView != null && mainView.getSidebar() != null) {
+                            mainView.getSidebar().showUpdateNotification(version, url);
+                        }
+                    });
+                    updateChecker.checkForUpdates();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+            updateCheckThread.setDaemon(true);
+            updateCheckThread.start();
         });
     }
 

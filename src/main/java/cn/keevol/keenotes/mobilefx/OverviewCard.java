@@ -70,8 +70,14 @@ public class OverviewCard extends HBox {
         getChildren().addAll(totalNotesBox, divider, daysUsingBox);
         
         // Bind labels to properties
-        totalNotesProperty.addListener((obs, oldVal, newVal) -> 
-            totalNotesValue.setText(String.valueOf(newVal.intValue())));
+        totalNotesProperty.addListener((obs, oldVal, newVal) -> {
+            totalNotesValue.setText(String.valueOf(newVal.intValue()));
+            
+            // 方案 A: 当 Total Notes 从 0 变为非 0 时，更新 Days Using
+            if (oldVal.intValue() == 0 && newVal.intValue() > 0) {
+                initializeFirstNoteDateIfNeeded();
+            }
+        });
         
         daysUsingProperty.addListener((obs, oldVal, newVal) -> 
             daysUsingValue.setText(String.valueOf(newVal.intValue())));
@@ -84,6 +90,13 @@ public class OverviewCard extends HBox {
      * Initialize reactive data binding
      */
     private void initializeDataBinding() {
+        // 监听账户切换事件（响应式）
+        ServiceManager.getInstance().accountSwitchedProperty().addListener((obs, oldVal, newVal) -> {
+            // Property 值变化时自动触发，直接重置
+            System.out.println("[OverviewCard] Account switched detected! oldVal: " + oldVal + ", newVal: " + newVal);
+            reset();
+        });
+        
         new Thread(() -> {
             try {
                 // Wait for ServiceManager to be ready
@@ -99,19 +112,53 @@ public class OverviewCard extends HBox {
                     totalNotesProperty.bind(cache.noteCountProperty());
                 });
                 
+                // 方案 B: 监听批量插入事件
+                cache.addChangeListener(new LocalCacheService.NoteChangeListener() {
+                    @Override
+                    public void onNoteInserted(LocalCacheService.NoteData note) {
+                        // Single note - check if need to initialize
+                        initializeFirstNoteDateIfNeeded();
+                    }
+                    
+                    @Override
+                    public void onNotesInserted(java.util.List<LocalCacheService.NoteData> notes) {
+                        // Batch insert - definitely need to update
+                        initializeFirstNoteDateIfNeeded();
+                    }
+                });
+                
                 // Initialize first note date if needed
                 if (cache.getLocalNoteCount() > 0) {
-                    SettingsService settings = SettingsService.getInstance();
-                    if (settings.getFirstNoteDate() == null) {
-                        initializeFirstNoteDate();
-                    } else {
-                        updateDaysUsing();
-                    }
+                    initializeFirstNoteDateIfNeeded();
                 }
             } catch (Exception e) {
                 System.err.println("[OverviewCard] Failed to initialize data binding: " + e.getMessage());
             }
         }, "OverviewCardInit").start();
+    }
+    
+    /**
+     * Reset both metrics to 0 (called when account is switched)
+     */
+    public void reset() {
+        System.out.println("[OverviewCard] reset() called - resetting both metrics to 0");
+        Platform.runLater(() -> {
+            // totalNotesProperty 已经绑定到 cache.noteCountProperty，直接更新源头
+            try {
+                ServiceManager serviceManager = ServiceManager.getInstance();
+                if (serviceManager.getLocalCacheState() == ServiceManager.InitializationState.READY) {
+                    LocalCacheService cache = serviceManager.getLocalCacheService();
+                    cache.noteCountProperty().set(0);
+                    System.out.println("[OverviewCard] Set cache.noteCountProperty to 0");
+                }
+            } catch (Exception e) {
+                System.err.println("[OverviewCard] Failed to reset noteCount: " + e.getMessage());
+            }
+            
+            // daysUsingProperty 没有绑定，直接设置
+            daysUsingProperty.set(0);
+            System.out.println("[OverviewCard] Set daysUsingProperty to 0");
+        });
     }
     
     /**
@@ -122,10 +169,19 @@ public class OverviewCard extends HBox {
         
         // Initialize first note date if needed
         if (count > 0) {
-            SettingsService settings = SettingsService.getInstance();
-            if (settings.getFirstNoteDate() == null) {
-                initializeFirstNoteDate();
-            }
+            initializeFirstNoteDateIfNeeded();
+        }
+    }
+    
+    /**
+     * Initialize first note date if needed (unified method)
+     */
+    private void initializeFirstNoteDateIfNeeded() {
+        SettingsService settings = SettingsService.getInstance();
+        if (settings.getFirstNoteDate() == null) {
+            initializeFirstNoteDate();
+        } else {
+            updateDaysUsing();
         }
     }
     

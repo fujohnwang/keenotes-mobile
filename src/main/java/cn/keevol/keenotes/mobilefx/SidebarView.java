@@ -85,17 +85,93 @@ public class SidebarView extends VBox {
         // Add top margin to navigation group for breathing room
         VBox.setMargin(navigationGroup, new Insets(12, 0, 0, 0));
         
-        // Spacer (no status area at bottom anymore)
+        // Spacer
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
         
-        // Add all components (no status area)
+        // Update notification area (initially hidden)
+        VBox updateNotification = createUpdateNotification();
+        updateNotification.setVisible(false);
+        updateNotification.setManaged(false);
+        
+        // Add all components
         getChildren().addAll(
             logoArea,
             overviewCard,
             navigationGroup,
-            spacer
+            spacer,
+            updateNotification
         );
+    }
+    
+    /**
+     * Create update notification area
+     */
+    private VBox createUpdateNotification() {
+        VBox notification = new VBox(8);
+        notification.getStyleClass().add("update-notification");
+        notification.setPadding(new Insets(12));
+        notification.setStyle("-fx-background-color: rgba(0, 212, 255, 0.1); " +
+                             "-fx-background-radius: 8; " +
+                             "-fx-border-color: #00D4FF; " +
+                             "-fx-border-width: 1; " +
+                             "-fx-border-radius: 8;");
+        
+        Label titleLabel = new Label("🎉 New Version Available");
+        titleLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #00D4FF; -fx-font-size: 12px;");
+        
+        Label versionLabel = new Label();
+        versionLabel.setStyle("-fx-text-fill: #8B949E; -fx-font-size: 11px;");
+        versionLabel.setUserData("version"); // Tag for later update
+        
+        Label downloadLabel = new Label("Click to download");
+        downloadLabel.setStyle("-fx-text-fill: #00D4FF; -fx-font-size: 11px; -fx-cursor: hand; -fx-underline: true;");
+        downloadLabel.setUserData("download"); // Tag for later update
+        
+        notification.getChildren().addAll(titleLabel, versionLabel, downloadLabel);
+        notification.setUserData(notification); // Store reference for showUpdateNotification
+        
+        return notification;
+    }
+    
+    /**
+     * Show update notification with version info
+     */
+    public void showUpdateNotification(String version, String downloadUrl) {
+        // Find update notification in children
+        VBox updateNotification = null;
+        for (javafx.scene.Node child : getChildren()) {
+            if (child instanceof VBox && child.getStyleClass().contains("update-notification")) {
+                updateNotification = (VBox) child;
+                break;
+            }
+        }
+        
+        if (updateNotification == null) {
+            return;
+        }
+        
+        // Update version label
+        for (javafx.scene.Node node : updateNotification.getChildren()) {
+            if (node instanceof Label) {
+                Label label = (Label) node;
+                if ("version".equals(label.getUserData())) {
+                    label.setText("Version " + version);
+                } else if ("download".equals(label.getUserData())) {
+                    label.setOnMouseClicked(e -> {
+                        try {
+                            java.awt.Desktop.getDesktop().browse(new java.net.URI(downloadUrl));
+                        } catch (Exception ex) {
+                            System.err.println("Failed to open download URL: " + ex.getMessage());
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Show notification
+        updateNotification.setVisible(true);
+        updateNotification.setManaged(true);
     }
     
     /**

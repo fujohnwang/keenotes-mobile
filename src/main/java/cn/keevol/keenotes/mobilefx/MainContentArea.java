@@ -56,41 +56,22 @@ public class MainContentArea extends StackPane {
         this.apiService = ServiceManager.getInstance().getApiService();
         this.webSocketService = ServiceManager.getInstance().getWebSocketService();
         
-        // Listen to WebSocket events for sync status display only
-        // Note: UI updates are now driven by LocalCacheService change listeners
-        webSocketService.addListener(new WebSocketClientService.SyncListener() {
-            @Override
-            public void onConnectionStatus(boolean connected) {
-                // Not needed here
-            }
-            
-            @Override
-            public void onSyncProgress(int current, int total) {
-                // Not needed here
-            }
-            
-            @Override
-            public void onSyncComplete(int total, long lastSyncId) {
-                // Sync complete - UI will be updated via LocalCacheService listener
-                // Only reload if this is initial sync (displayedNoteIds is empty)
-                Platform.runLater(() -> {
-                    if (currentPanel == noteModePanel && displayedNoteIds.isEmpty()) {
-                        System.out.println("[MainContentArea] Initial sync complete, loading notes");
-                        loadRecentNotes();
-                    }
-                });
-            }
-            
-            @Override
-            public void onRealtimeUpdate(long id, String content) {
-                // Realtime update - UI will be updated via LocalCacheService listener
-                // No action needed here
-            }
-            
-            @Override
-            public void onError(String error) {
-                // Not needed here
-            }
+        // Register WebSocket listener
+        registerWebSocketListener();
+        
+        // Listen to account switch events to re-register WebSocket listener
+        ServiceManager.getInstance().accountSwitchedProperty().addListener((obs, oldVal, newVal) -> {
+            Platform.runLater(() -> {
+                System.out.println("[MainContentArea] Account switched, re-registering WebSocket listener");
+                // Get new WebSocket service instance
+                webSocketService = ServiceManager.getInstance().getWebSocketService();
+                // Re-register listener
+                registerWebSocketListener();
+                // Reset displayed notes tracking
+                displayedNoteIds.clear();
+                // Note: Don't reset localCacheListenerRegistered
+                // LocalCacheService is singleton and listener is still valid
+            });
         });
         
         // Listen to ServiceManager for cache ready event
@@ -110,6 +91,79 @@ public class MainContentArea extends StackPane {
         });
         
         setupPanels();
+    }
+    
+    /**
+     * Register WebSocket listener for sync events
+     */
+    private void registerWebSocketListener() {
+        System.out.println("[MainContentArea] Registering WebSocket listener");
+        // Listen to WebSocket events for sync status display only
+        // Note: UI updates are now driven by LocalCacheService change listeners
+        webSocketService.addListener(new WebSocketClientService.SyncListener() {
+            @Override
+            public void onConnectionStatus(boolean connected) {
+                // Not needed here
+            }
+            
+            @Override
+            public void onSyncProgress(int current, int total) {
+                // Show sync indicator on all NotesDisplayPanel instances
+                Platform.runLater(() -> {
+                    if (currentPanel == noteModePanel && notesDisplayPanel != null) {
+                        notesDisplayPanel.showSyncIndicator("Syncing...");
+                    }
+                    if (currentPanel == reviewModePanel && reviewNotesPanel != null) {
+                        reviewNotesPanel.showSyncIndicator("Syncing...");
+                    }
+                    // Search results panel doesn't need sync indicator (it's for manual search)
+                });
+            }
+            
+            @Override
+            public void onSyncComplete(int total, long lastSyncId) {
+                // Hide sync indicator on all NotesDisplayPanel instances
+                Platform.runLater(() -> {
+                    if (notesDisplayPanel != null) {
+                        notesDisplayPanel.hideSyncIndicator();
+                    }
+                    if (reviewNotesPanel != null) {
+                        reviewNotesPanel.hideSyncIndicator();
+                    }
+                    
+                    // Note: Data refresh is handled by LocalCacheService change listener
+                    // Don't reload here to avoid duplicate loading
+                });
+            }
+            
+            @Override
+            public void onRealtimeUpdate(long id, String content) {
+                // Realtime update - UI will be updated via LocalCacheService listener
+                // Show brief sync indicator for realtime updates
+                Platform.runLater(() -> {
+                    if (currentPanel == noteModePanel && notesDisplayPanel != null) {
+                        notesDisplayPanel.showSyncIndicator("Syncing...");
+                        // Hide after short delay (same as NotesDisplayPanel's own listener)
+                        javafx.animation.PauseTransition hideDelay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(500));
+                        hideDelay.setOnFinished(e -> notesDisplayPanel.hideSyncIndicator());
+                        hideDelay.play();
+                    }
+                });
+            }
+            
+            @Override
+            public void onError(String error) {
+                // Hide sync indicator on error
+                Platform.runLater(() -> {
+                    if (notesDisplayPanel != null) {
+                        notesDisplayPanel.hideSyncIndicator();
+                    }
+                    if (reviewNotesPanel != null) {
+                        reviewNotesPanel.hideSyncIndicator();
+                    }
+                });
+            }
+        });
     }
     
     /**
@@ -183,16 +237,16 @@ public class MainContentArea extends StackPane {
      * For batch sync (>1 notes), reload the list instead of adding one by one
      */
     private void handleBatchNotesFromDb(java.util.List<LocalCacheService.NoteData> notes) {
-        // Only update UI if Note mode is visible
-        if (currentPanel != noteModePanel) {
-            System.out.println("[MainContentArea] Note mode not visible, skipping batch UI update");
-            return;
+        // Update UI based on current panel
+        if (currentPanel == noteModePanel) {
+            System.out.println("[MainContentArea] Batch sync completed with " + notes.size() + " notes, reloading Note list");
+            loadRecentNotes();
+        } else if (currentPanel == reviewModePanel) {
+            System.out.println("[MainContentArea] Batch sync completed with " + notes.size() + " notes, reloading Review list");
+            loadReviewNotes(currentReviewPeriod);
+        } else {
+            System.out.println("[MainContentArea] Batch sync completed but current panel is not Note/Review mode, skipping UI update");
         }
-        
-        System.out.println("[MainContentArea] Batch sync completed with " + notes.size() + " notes, reloading list");
-        
-        // For batch sync, reload the entire list to avoid memory issues and ensure correct order
-        loadRecentNotes();
     }
     
     private void setupPanels() {
