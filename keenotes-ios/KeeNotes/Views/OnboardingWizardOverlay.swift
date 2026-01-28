@@ -42,6 +42,8 @@ struct OnboardingWizardOverlay: View {
             
             GeometryReader { geometry in
                 if fieldFrame != .zero {
+                    let _ = print("[Wizard] Field: \(currentFieldId), Frame: \(fieldFrame), Geometry: \(geometry.size)")
+                    
                     CapsuleWizardCard(
                         step: steps[currentStep],
                         isLastStep: currentStep == steps.count - 1,
@@ -53,6 +55,11 @@ struct OnboardingWizardOverlay: View {
                         y: fieldFrame.maxY + 70
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                } else {
+                    Text("Waiting for frame: \(currentFieldId)")
+                        .foregroundColor(.red)
+                        .padding()
+                        .background(Color.yellow)
                 }
             }
             .onChange(of: currentStep) { _ in
