@@ -236,6 +236,13 @@ public class DesktopMainView extends BorderPane {
     }
     
     /**
+     * Switch to Settings mode (public method for external calls)
+     */
+    public void switchToSettingsMode() {
+        switchToMode(ViewMode.SETTINGS);
+    }
+    
+    /**
      * Get the sidebar (for status updates from Main)
      */
     public SidebarView getSidebar() {

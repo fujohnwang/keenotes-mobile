@@ -23,6 +23,7 @@ public class SettingsGeneralView extends VBox {
     private final Label statusLabel;
     private final SettingsService settings;
     private final Runnable onSaveSuccess;
+    private SettingsWizard wizard;
     
     public SettingsGeneralView(Runnable onSaveSuccess) {
         this.onSaveSuccess = onSaveSuccess;
@@ -107,6 +108,39 @@ public class SettingsGeneralView extends VBox {
         );
         
         loadSettings();
+        
+        // 初始化向导
+        initializeWizard();
+    }
+    
+    /**
+     * 初始化向导
+     */
+    private void initializeWizard() {
+        System.out.println("[SettingsGeneralView] Initializing wizard...");
+        System.out.println("[SettingsGeneralView] isConfigured: " + settings.isConfigured());
+        
+        // 创建向导实例
+        wizard = new SettingsWizard(
+            endpointField,
+            tokenField,
+            encryptionPasswordField,
+            settings
+        );
+        
+        // 延迟启动向导，确保界面已完全渲染
+        // 使用 PauseTransition 延迟 500ms
+        javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(500));
+        delay.setOnFinished(e -> {
+            // 只有在未配置时才显示向导
+            if (!settings.isConfigured()) {
+                System.out.println("[SettingsGeneralView] Starting wizard...");
+                wizard.start();
+            } else {
+                System.out.println("[SettingsGeneralView] Already configured, skipping wizard");
+            }
+        });
+        delay.play();
     }
     
     private VBox createFieldGroup(String labelText, Control field) {

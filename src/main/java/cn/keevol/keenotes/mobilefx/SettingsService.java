@@ -113,7 +113,17 @@ public class SettingsService {
     }
 
     public boolean isConfigured() {
-        return !getEndpointUrl().isBlank() && !getToken().isBlank();
+        // 检查所有必填字段是否都已配置（不为空）
+        // 使用 properties.getProperty() 而不是 getter，避免默认值干扰判断
+        String endpoint = properties.getProperty(KEY_ENDPOINT_URL);
+        String token = properties.getProperty(KEY_TOKEN);
+        String encryptionPassword = properties.getProperty(KEY_ENCRYPTION_PASSWORD);
+        
+        // 只要有任何一个必填字段为空，就认为未配置
+        // 包括：endpoint, token, encryptionPassword（三个都是必填）
+        return !(endpoint == null || endpoint.isBlank() || 
+                 token == null || token.isBlank() ||
+                 encryptionPassword == null || encryptionPassword.isBlank());
     }
 
     public int getReviewDays() {
