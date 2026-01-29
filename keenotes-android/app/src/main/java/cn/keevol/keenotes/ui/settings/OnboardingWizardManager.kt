@@ -1,9 +1,12 @@
 package cn.keevol.keenotes.ui.settings
 
 import android.content.Context
+import android.graphics.Color
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.lifecycle.LifecycleOwner
@@ -16,6 +19,7 @@ import java.util.Locale
 
 /**
  * 首次启动配置向导管理器
+ * 实现 Spotlight 效果：半透明遮罩 + 底部浮动卡片
  */
 class OnboardingWizardManager(
     private val context: Context,
@@ -25,7 +29,7 @@ class OnboardingWizardManager(
 ) {
     
     private var currentStep = 0
-    private var wizardCard: CardView? = null
+    private var overlayView: FrameLayout? = null
     private val steps: List<WizardStep>
     
     init {
@@ -104,15 +108,45 @@ class OnboardingWizardManager(
         val step = steps[currentStep]
         val chinese = isChinese()
         
+        // 创建覆盖层容器（包含遮罩 + 卡片）
+        overlayView = FrameLayout(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            
+            // 半透明黑色遮罩背景
+            setBackgroundColor(Color.parseColor("#B3000000")) // 70% 透明度
+            
+            // 点击遮罩不关闭（非侵入式，但引导用户注意）
+            isClickable = false
+            isFocusable = false
+        }
+        
         // 创建向导卡片
         val inflater = LayoutInflater.from(context)
-        wizardCard = inflater.inflate(R.layout.wizard_card, null) as CardView
+        val wizardCard = inflater.inflate(R.layout.wizard_card, null) as CardView
         
-        // 设置内容
-        val titleView = wizardCard!!.findViewById<TextView>(R.id.wizardTitle)
-        val descriptionView = wizardCard!!.findViewById<TextView>(R.id.wizardDescription)
-        val nextButton = wizardCard!!.findViewById<Button>(R.id.wizardNext)
-        val skipButton = wizardCard!!.findViewById<TextView>(R.id.wizardSkip)
+        // 设置卡片位置参数（底部居中，带边距）
+        val cardLayoutParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            setMargins(
+                dpToPx(16), // left
+                0,          // top
+                dpToPx(16), // right
+                dpToPx(32)  // bottom - 留出底部导航栏空间
+            )
+        }
+        wizardCard.layoutParams = cardLayoutParams
+        
+        // 设置卡片内容
+        val titleView = wizardCard.findViewById<TextView>(R.id.wizardTitle)
+        val descriptionView = wizardCard.findViewById<TextView>(R.id.wizardDescription)
+        val nextButton = wizardCard.findViewById<Button>(R.id.wizardNext)
+        val skipButton = wizardCard.findViewById<TextView>(R.id.wizardSkip)
         
         titleView.text = step.title
         descriptionView.text = step.description
@@ -140,9 +174,12 @@ class OnboardingWizardManager(
             hideWizard()
         }
         
-        // 添加到容器底部
+        // 将卡片添加到覆盖层
+        overlayView?.addView(wizardCard)
+        
+        // 将覆盖层添加到容器
         if (containerView is android.view.ViewGroup) {
-            containerView.addView(wizardCard)
+            containerView.addView(overlayView)
         }
     }
     
@@ -150,12 +187,20 @@ class OnboardingWizardManager(
      * 隐藏向导
      */
     private fun hideWizard() {
-        wizardCard?.let { card ->
+        overlayView?.let { overlay ->
             if (containerView is android.view.ViewGroup) {
-                containerView.removeView(card)
+                containerView.removeView(overlay)
             }
         }
-        wizardCard = null
+        overlayView = null
+    }
+    
+    /**
+     * dp 转 px
+     */
+    private fun dpToPx(dp: Int): Int {
+        val density = context.resources.displayMetrics.density
+        return (dp * density).toInt()
     }
     
     /**
