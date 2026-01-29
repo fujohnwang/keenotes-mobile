@@ -131,15 +131,25 @@ class OnboardingWizardManager(
         }
         
         // 聚焦到目标输入框
-        targetInput.requestFocus()
+        targetInput.post {
+            targetInput.requestFocus()
+        }
         
-        // 等待输入框布局完成后再显示卡片
-        targetInput.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
-            override fun onGlobalLayout() {
-                targetInput.viewTreeObserver.removeOnGlobalLayoutListener(this)
+        // 延迟一小段时间确保输入框已经渲染和聚焦
+        targetInput.postDelayed({
+            if (targetInput.width > 0 && targetInput.height > 0) {
+                // 输入框已经布局完成，直接显示卡片
                 showCardBelowInput(targetInput, step, chinese)
+            } else {
+                // 输入框尚未布局，等待布局完成
+                targetInput.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        targetInput.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                        showCardBelowInput(targetInput, step, chinese)
+                    }
+                })
             }
-        })
+        }, 100) // 延迟 100ms
     }
     
     /**
