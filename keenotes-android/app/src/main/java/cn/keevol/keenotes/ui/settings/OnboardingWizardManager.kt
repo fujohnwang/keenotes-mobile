@@ -39,6 +39,11 @@ class OnboardingWizardManager(
     private val passwordInput: EditText?
     private val confirmPasswordInput: EditText?
     
+    // Label 引用
+    private val tokenLabel: TextView?
+    private val passwordLabel: TextView?
+    private val confirmPasswordLabel: TextView?
+    
     // ScrollView 引用
     private val scrollView: ScrollView?
     
@@ -49,6 +54,11 @@ class OnboardingWizardManager(
         tokenInput = containerView.findViewById(R.id.tokenInput)
         passwordInput = containerView.findViewById(R.id.passwordInput)
         confirmPasswordInput = containerView.findViewById(R.id.passwordConfirmInput)
+        
+        // 获取 Label 引用
+        tokenLabel = containerView.findViewById(R.id.tokenLabel)
+        passwordLabel = containerView.findViewById(R.id.passwordLabel)
+        confirmPasswordLabel = containerView.findViewById(R.id.confirmPasswordLabel)
         
         // 获取 ScrollView 引用
         scrollView = containerView.findViewById(R.id.settingsScrollView)
@@ -137,8 +147,12 @@ class OnboardingWizardManager(
             return
         }
         
-        // 滚动输入框到屏幕顶部
-        scrollInputToTop(targetInput)
+        // 获取对应的 label
+        val targetLabel = getLabelForStep(step.fieldId)
+        
+        // 滚动 label 到屏幕顶部（如果 label 存在，否则滚动输入框）
+        val scrollTarget = targetLabel ?: targetInput
+        scrollViewToTop(scrollTarget)
         
         // 聚焦到目标输入框
         targetInput.post {
@@ -163,18 +177,18 @@ class OnboardingWizardManager(
     }
     
     /**
-     * 滚动输入框到屏幕顶部（留出一点顶部边距）
+     * 滚动视图到屏幕顶部（留出一点顶部边距）
      */
-    private fun scrollInputToTop(targetInput: View) {
+    private fun scrollViewToTop(targetView: View) {
         scrollView?.post {
-            // 计算输入框相对于 ScrollView 内容的位置
+            // 计算目标视图相对于 ScrollView 内容的位置
             val location = IntArray(2)
-            targetInput.getLocationInWindow(location)
+            targetView.getLocationInWindow(location)
             
             val scrollViewLocation = IntArray(2)
             scrollView.getLocationInWindow(scrollViewLocation)
             
-            // 计算需要滚动的距离（输入框顶部 - ScrollView 顶部 - 顶部边距）
+            // 计算需要滚动的距离（目标视图顶部 - ScrollView 顶部 - 顶部边距）
             val topPadding = dpToPx(16) // 留出 16dp 顶部边距
             val scrollY = location[1] - scrollViewLocation[1] - topPadding + scrollView.scrollY
             
@@ -259,6 +273,18 @@ class OnboardingWizardManager(
             "token" -> tokenInput
             "encryptionPassword" -> passwordInput
             "confirmPassword" -> confirmPasswordInput
+            else -> null
+        }
+    }
+    
+    /**
+     * 根据 fieldId 获取对应的 label
+     */
+    private fun getLabelForStep(fieldId: String): TextView? {
+        return when (fieldId) {
+            "token" -> tokenLabel
+            "encryptionPassword" -> passwordLabel
+            "confirmPassword" -> confirmPasswordLabel
             else -> null
         }
     }
