@@ -43,7 +43,7 @@ public class SettingsGeneralView extends VBox {
         tokenField.getStyleClass().add("input-field");
 
         encryptionPasswordField = new PasswordField();
-        encryptionPasswordField.setPromptText("E2E encryption password (optional)");
+        encryptionPasswordField.setPromptText("E2E encryption password (required)");
         encryptionPasswordField.getStyleClass().add("input-field");
 
         encryptionPasswordConfirmField = new PasswordField();
