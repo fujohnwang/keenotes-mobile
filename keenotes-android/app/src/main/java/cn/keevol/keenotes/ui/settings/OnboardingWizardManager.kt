@@ -1,11 +1,12 @@
 package cn.keevol.keenotes.ui.settings
 
 import android.content.Context
-import android.graphics.Color
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewTreeObserver
 import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.cardview.widget.CardView
@@ -19,7 +20,7 @@ import java.util.Locale
 
 /**
  * 首次启动配置向导管理器
- * 实现 Spotlight 效果：半透明遮罩 + 底部浮动卡片
+ * iOS 风格：卡片紧跟输入框，自动聚焦
  */
 class OnboardingWizardManager(
     private val context: Context,
@@ -29,11 +30,21 @@ class OnboardingWizardManager(
 ) {
     
     private var currentStep = 0
-    private var overlayView: FrameLayout? = null
+    private var wizardCard: CardView? = null
     private val steps: List<WizardStep>
+    
+    // 输入框引用
+    private val tokenInput: EditText?
+    private val passwordInput: EditText?
+    private val confirmPasswordInput: EditText?
     
     init {
         steps = createSteps()
+        
+        // 获取输入框引用
+        tokenInput = containerView.findViewById(R.id.tokenInput)
+        passwordInput = containerView.findViewById(R.id.passwordInput)
+        confirmPasswordInput = containerView.findViewById(R.id.passwordConfirmInput)
     }
     
     /**
@@ -108,45 +119,64 @@ class OnboardingWizardManager(
         val step = steps[currentStep]
         val chinese = isChinese()
         
-        // 创建覆盖层容器（包含遮罩 + 卡片）
-        overlayView = FrameLayout(context).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            
-            // 半透明黑色遮罩背景
-            setBackgroundColor(Color.parseColor("#B3000000")) // 70% 透明度
-            
-            // 点击遮罩不关闭（非侵入式，但引导用户注意）
-            isClickable = false
-            isFocusable = false
+        // 获取当前步骤对应的输入框
+        val targetInput = getInputForStep(step.fieldId)
+        if (targetInput == null) {
+            // 输入框未找到，跳过此步骤
+            currentStep++
+            if (currentStep < steps.count()) {
+                showWizard()
+            }
+            return
         }
+        
+        // 聚焦到目标输入框
+        targetInput.requestFocus()
+        
+        // 等待输入框布局完成后再显示卡片
+        targetInput.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                targetInput.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                showCardBelowInput(targetInput, step, chinese)
+            }
+        })
+    }
+    
+    /**
+     * 在输入框下方显示卡片
+     */
+    private fun showCardBelowInput(targetInput: View, step: WizardStep, chinese: Boolean) {
+        // 移除旧卡片
+        hideWizard()
         
         // 创建向导卡片
         val inflater = LayoutInflater.from(context)
-        val wizardCard = inflater.inflate(R.layout.wizard_card, null) as CardView
+        wizardCard = inflater.inflate(R.layout.wizard_card, null) as CardView
         
-        // 设置卡片位置参数（底部居中，带边距）
+        // 计算卡片位置（输入框下方，带小间距）
+        val location = IntArray(2)
+        targetInput.getLocationInWindow(location)
+        val inputX = location[0]
+        val inputY = location[1]
+        val inputHeight = targetInput.height
+        
+        // 设置卡片位置参数
         val cardLayoutParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            setMargins(
-                dpToPx(16), // left
-                0,          // top
-                dpToPx(16), // right
-                dpToPx(32)  // bottom - 留出底部导航栏空间
-            )
+            // 计算卡片的 top margin（输入框底部 + 8dp 间距）
+            topMargin = inputY + inputHeight + dpToPx(8)
+            leftMargin = dpToPx(16)
+            rightMargin = dpToPx(16)
         }
-        wizardCard.layoutParams = cardLayoutParams
+        wizardCard!!.layoutParams = cardLayoutParams
         
         // 设置卡片内容
-        val titleView = wizardCard.findViewById<TextView>(R.id.wizardTitle)
-        val descriptionView = wizardCard.findViewById<TextView>(R.id.wizardDescription)
-        val nextButton = wizardCard.findViewById<Button>(R.id.wizardNext)
-        val skipButton = wizardCard.findViewById<TextView>(R.id.wizardSkip)
+        val titleView = wizardCard!!.findViewById<TextView>(R.id.wizardTitle)
+        val descriptionView = wizardCard!!.findViewById<TextView>(R.id.wizardDescription)
+        val nextButton = wizardCard!!.findViewById<Button>(R.id.wizardNext)
+        val skipButton = wizardCard!!.findViewById<TextView>(R.id.wizardSkip)
         
         titleView.text = step.title
         descriptionView.text = step.description
@@ -174,12 +204,21 @@ class OnboardingWizardManager(
             hideWizard()
         }
         
-        // 将卡片添加到覆盖层
-        overlayView?.addView(wizardCard)
-        
-        // 将覆盖层添加到容器
+        // 将卡片添加到容器
         if (containerView is android.view.ViewGroup) {
-            containerView.addView(overlayView)
+            containerView.addView(wizardCard)
+        }
+    }
+    
+    /**
+     * 根据 fieldId 获取对应的输入框
+     */
+    private fun getInputForStep(fieldId: String): EditText? {
+        return when (fieldId) {
+            "token" -> tokenInput
+            "encryptionPassword" -> passwordInput
+            "confirmPassword" -> confirmPasswordInput
+            else -> null
         }
     }
     
@@ -187,12 +226,12 @@ class OnboardingWizardManager(
      * 隐藏向导
      */
     private fun hideWizard() {
-        overlayView?.let { overlay ->
+        wizardCard?.let { card ->
             if (containerView is android.view.ViewGroup) {
-                containerView.removeView(overlay)
+                containerView.removeView(card)
             }
         }
-        overlayView = null
+        wizardCard = null
     }
     
     /**
