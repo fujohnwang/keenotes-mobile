@@ -8,6 +8,7 @@ import android.view.ViewTreeObserver
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.lifecycle.LifecycleOwner
@@ -20,7 +21,7 @@ import java.util.Locale
 
 /**
  * 首次启动配置向导管理器
- * iOS 风格：卡片紧跟输入框，自动聚焦
+ * iOS 风格：卡片紧跟输入框，自动聚焦，自动滚动
  */
 class OnboardingWizardManager(
     private val context: Context,
@@ -38,6 +39,9 @@ class OnboardingWizardManager(
     private val passwordInput: EditText?
     private val confirmPasswordInput: EditText?
     
+    // ScrollView 引用
+    private val scrollView: ScrollView?
+    
     init {
         steps = createSteps()
         
@@ -45,6 +49,9 @@ class OnboardingWizardManager(
         tokenInput = containerView.findViewById(R.id.tokenInput)
         passwordInput = containerView.findViewById(R.id.passwordInput)
         confirmPasswordInput = containerView.findViewById(R.id.passwordConfirmInput)
+        
+        // 获取 ScrollView 引用
+        scrollView = containerView.findViewById(R.id.settingsScrollView)
     }
     
     /**
@@ -130,12 +137,15 @@ class OnboardingWizardManager(
             return
         }
         
+        // 滚动输入框到屏幕顶部
+        scrollInputToTop(targetInput)
+        
         // 聚焦到目标输入框
         targetInput.post {
             targetInput.requestFocus()
         }
         
-        // 延迟一小段时间确保输入框已经渲染和聚焦
+        // 延迟一小段时间确保输入框已经渲染、聚焦和滚动完成
         targetInput.postDelayed({
             if (targetInput.width > 0 && targetInput.height > 0) {
                 // 输入框已经布局完成，直接显示卡片
@@ -149,7 +159,28 @@ class OnboardingWizardManager(
                     }
                 })
             }
-        }, 100) // 延迟 100ms
+        }, 200) // 延迟 200ms，给滚动动画时间
+    }
+    
+    /**
+     * 滚动输入框到屏幕顶部（留出一点顶部边距）
+     */
+    private fun scrollInputToTop(targetInput: View) {
+        scrollView?.post {
+            // 计算输入框相对于 ScrollView 内容的位置
+            val location = IntArray(2)
+            targetInput.getLocationInWindow(location)
+            
+            val scrollViewLocation = IntArray(2)
+            scrollView.getLocationInWindow(scrollViewLocation)
+            
+            // 计算需要滚动的距离（输入框顶部 - ScrollView 顶部 - 顶部边距）
+            val topPadding = dpToPx(16) // 留出 16dp 顶部边距
+            val scrollY = location[1] - scrollViewLocation[1] - topPadding + scrollView.scrollY
+            
+            // 平滑滚动
+            scrollView.smoothScrollTo(0, scrollY)
+        }
     }
     
     /**
@@ -175,8 +206,8 @@ class OnboardingWizardManager(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            // 计算卡片的 top margin（输入框底部 + 8dp 间距）
-            topMargin = inputY + inputHeight + dpToPx(8)
+            // 计算卡片的 top margin（输入框底部 + 4dp 间距，体现亲密度原则）
+            topMargin = inputY + inputHeight + dpToPx(4)
             leftMargin = dpToPx(16)
             rightMargin = dpToPx(16)
         }
