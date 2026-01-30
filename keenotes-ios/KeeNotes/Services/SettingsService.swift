@@ -51,7 +51,8 @@ class SettingsService: ObservableObject {
     }
     
     @Published var firstNoteDate: String? {
-        didSet { 
+        didSet {
+            print("[SettingsService] firstNoteDate didSet: old=\(oldValue ?? "nil"), new=\(firstNoteDate ?? "nil")")
             if let value = firstNoteDate {
                 defaults.set(value, forKey: Keys.firstNoteDate)
             } else {
