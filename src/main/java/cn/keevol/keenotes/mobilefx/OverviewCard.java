@@ -177,12 +177,9 @@ public class OverviewCard extends HBox {
      * Initialize first note date if needed (unified method)
      */
     private void initializeFirstNoteDateIfNeeded() {
-        SettingsService settings = SettingsService.getInstance();
-        if (settings.getFirstNoteDate() == null) {
-            initializeFirstNoteDate();
-        } else {
-            updateDaysUsing();
-        }
+        // Always update firstNoteDate when notes change
+        // This ensures we capture the earliest note even after sync
+        initializeFirstNoteDate();
     }
     
     /**

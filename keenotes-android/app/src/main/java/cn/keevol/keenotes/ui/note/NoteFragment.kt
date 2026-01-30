@@ -106,14 +106,12 @@ class NoteFragment : Fragment() {
                 if (_binding != null) {
                     binding.overviewCardInclude.totalNotesValue.text = count.toString()
                     
-                    // Initialize first note date if needed
+                    // Always update first note date when note count changes
+                    // This ensures we capture the earliest note even after sync
                     if (count > 0) {
-                        val firstDate = app.settingsRepository.getFirstNoteDate()
-                        if (firstDate == null) {
-                            val oldestDate = app.database.noteDao().getOldestNoteDate()
-                            if (oldestDate != null) {
-                                app.settingsRepository.setFirstNoteDate(oldestDate)
-                            }
+                        val oldestDate = app.database.noteDao().getOldestNoteDate()
+                        if (oldestDate != null) {
+                            app.settingsRepository.setFirstNoteDate(oldestDate)
                         }
                     }
                 }
