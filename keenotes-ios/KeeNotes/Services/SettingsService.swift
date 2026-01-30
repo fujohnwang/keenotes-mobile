@@ -50,10 +50,9 @@ class SettingsService: ObservableObject {
         }
     }
     
-    var firstNoteDate: String? {
-        get { defaults.string(forKey: Keys.firstNoteDate) }
-        set { 
-            if let value = newValue {
+    @Published var firstNoteDate: String? {
+        didSet { 
+            if let value = firstNoteDate {
                 defaults.set(value, forKey: Keys.firstNoteDate)
             } else {
                 defaults.removeObject(forKey: Keys.firstNoteDate)
@@ -73,6 +72,7 @@ class SettingsService: ObservableObject {
         self.copyToClipboardOnPost = defaults.bool(forKey: Keys.copyToClipboardOnPost)
         self.showOverviewCard = defaults.object(forKey: Keys.showOverviewCard) == nil ? true : defaults.bool(forKey: Keys.showOverviewCard)
         self.autoFocusInputOnLaunch = defaults.object(forKey: Keys.autoFocusInputOnLaunch) == nil ? true : defaults.bool(forKey: Keys.autoFocusInputOnLaunch)
+        self.firstNoteDate = defaults.string(forKey: Keys.firstNoteDate)
     }
     
     var isConfigured: Bool {
