@@ -103,17 +103,20 @@ class NoteFragment : Fragment() {
         // Observe note count - use viewLifecycleOwner to auto-cancel when view is destroyed
         viewLifecycleOwner.lifecycleScope.launch {
             app.database.noteDao().getNoteCountFlow().collect { count ->
-                if (_binding != null) {
-                    binding.overviewCardInclude.totalNotesValue.text = count.toString()
-                    
-                    // Always update first note date when note count changes
-                    // Launch in separate coroutine to avoid cancellation
-                    if (count > 0) {
-                        launch {
-                            val oldestDate = app.database.noteDao().getOldestNoteDate()
-                            if (oldestDate != null) {
-                                app.settingsRepository.setFirstNoteDate(oldestDate)
-                            }
+                // Ensure UI updates happen on Main thread
+                withContext(Dispatchers.Main) {
+                    if (_binding != null) {
+                        binding.overviewCardInclude.totalNotesValue.text = count.toString()
+                    }
+                }
+                
+                // Always update first note date when note count changes
+                // Execute in IO context for database operations
+                if (count > 0) {
+                    withContext(Dispatchers.IO) {
+                        val oldestDate = app.database.noteDao().getOldestNoteDate()
+                        if (oldestDate != null) {
+                            app.settingsRepository.setFirstNoteDate(oldestDate)
                         }
                     }
                 }
@@ -123,12 +126,15 @@ class NoteFragment : Fragment() {
         // Observe first note date and calculate days - use viewLifecycleOwner to auto-cancel when view is destroyed
         viewLifecycleOwner.lifecycleScope.launch {
             app.settingsRepository.firstNoteDate.collect { firstDate ->
-                if (_binding != null) {
-                    if (firstDate != null) {
-                        val days = calculateDaysUsing(firstDate)
-                        binding.overviewCardInclude.daysUsingValue.text = days.toString()
-                    } else {
-                        binding.overviewCardInclude.daysUsingValue.text = "0"
+                // Ensure UI updates happen on Main thread
+                withContext(Dispatchers.Main) {
+                    if (_binding != null) {
+                        if (firstDate != null) {
+                            val days = calculateDaysUsing(firstDate)
+                            binding.overviewCardInclude.daysUsingValue.text = days.toString()
+                        } else {
+                            binding.overviewCardInclude.daysUsingValue.text = "0"
+                        }
                     }
                 }
             }
@@ -137,8 +143,17 @@ class NoteFragment : Fragment() {
     
     private fun calculateDaysUsing(firstDateStr: String): Int {
         return try {
-            val formatter = java.time.format.DateTimeFormatter.ISO_DATE_TIME
-            val firstDate = java.time.LocalDateTime.parse(firstDateStr, formatter).toLocalDate()
+            // Try multiple formats to handle both "2024-10-24 11:11:01" and "2024-10-24T11:11:01"
+            val firstDate = try {
+                // Try space-separated format first (from database)
+                val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                java.time.LocalDateTime.parse(firstDateStr, formatter).toLocalDate()
+            } catch (e: Exception) {
+                // Fallback to ISO format
+                val formatter = java.time.format.DateTimeFormatter.ISO_DATE_TIME
+                java.time.LocalDateTime.parse(firstDateStr, formatter).toLocalDate()
+            }
+            
             val today = java.time.LocalDate.now()
             java.time.temporal.ChronoUnit.DAYS.between(firstDate, today).toInt() + 1
         } catch (e: Exception) {
