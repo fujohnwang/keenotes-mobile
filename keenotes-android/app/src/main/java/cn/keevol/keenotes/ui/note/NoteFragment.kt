@@ -93,7 +93,7 @@ class NoteFragment : Fragment() {
         
         // Observe showOverviewCard setting - use viewLifecycleOwner to auto-cancel when view is destroyed
         viewLifecycleOwner.lifecycleScope.launch {
-            app.settingsRepository.showOverviewCard.collectLatest { show ->
+            app.settingsRepository.showOverviewCard.collect { show ->
                 if (_binding != null) {
                     shouldShowOverviewCard = show
                     // Show/hide based on setting (keyboard listener will handle dynamic hiding)
@@ -196,7 +196,7 @@ class NoteFragment : Fragment() {
         
         // Observe settings changes for send channel status - use viewLifecycleOwner
         viewLifecycleOwner.lifecycleScope.launch {
-            app.settingsRepository.isConfigured.collectLatest { configured ->
+            app.settingsRepository.isConfigured.collect { configured ->
                 if (_binding != null) {
                     updateSendChannelStatus(configured)
                 }
