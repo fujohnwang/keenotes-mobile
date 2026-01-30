@@ -30,7 +30,7 @@ class SettingsRepository(private val context: Context) {
     val copyToClipboardOnPost: Flow<Boolean> = context.dataStore.data.map { it[KEY_COPY_TO_CLIPBOARD]?.toBoolean() ?: false }
     val showOverviewCard: Flow<Boolean> = context.dataStore.data.map { it[KEY_SHOW_OVERVIEW_CARD]?.toBoolean() ?: true }
     val firstNoteDate: Flow<String?> = context.dataStore.data.map { it[KEY_FIRST_NOTE_DATE] }
-    val autoFocusInputOnLaunch: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_FOCUS_INPUT]?.toBoolean() ?: true }
+    val autoFocusInputOnLaunch: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_FOCUS_INPUT]?.toBoolean() ?: false }
     
     val isConfigured: Flow<Boolean> = context.dataStore.data.map { prefs ->
         // 检查所有必填字段是否都已配置（不为空）
