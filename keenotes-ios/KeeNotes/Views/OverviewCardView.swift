@@ -55,25 +55,27 @@ struct OverviewCardView: View {
         .onAppear {
             updateDaysUsing()
             // Initialize first note date if needed and there are notes
-            if appState.databaseService.noteCount > 0 && appState.settingsService.firstNoteDate == nil {
+            if appState.databaseService.noteCount > 0 {
                 Task {
                     if let oldestDate = try? await getOldestNoteDate() {
                         appState.settingsService.firstNoteDate = oldestDate
-                        updateDaysUsing()
                     }
                 }
             }
         }
         .onChange(of: appState.databaseService.noteCount) { newCount in
-            // Initialize first note date if needed
-            if newCount > 0 && appState.settingsService.firstNoteDate == nil {
+            // Update first note date whenever note count changes
+            if newCount > 0 {
                 Task {
                     if let oldestDate = try? await getOldestNoteDate() {
                         appState.settingsService.firstNoteDate = oldestDate
-                        updateDaysUsing()
                     }
                 }
             }
+        }
+        .onChange(of: appState.settingsService.firstNoteDate) { _ in
+            // Automatically update days using when firstNoteDate changes
+            updateDaysUsing()
         }
     }
     
