@@ -72,7 +72,7 @@ class SettingsService: ObservableObject {
         
         self.copyToClipboardOnPost = defaults.bool(forKey: Keys.copyToClipboardOnPost)
         self.showOverviewCard = defaults.object(forKey: Keys.showOverviewCard) == nil ? true : defaults.bool(forKey: Keys.showOverviewCard)
-        self.autoFocusInputOnLaunch = defaults.object(forKey: Keys.autoFocusInputOnLaunch) == nil ? true : defaults.bool(forKey: Keys.autoFocusInputOnLaunch)
+        self.autoFocusInputOnLaunch = defaults.object(forKey: Keys.autoFocusInputOnLaunch) == nil ? false : defaults.bool(forKey: Keys.autoFocusInputOnLaunch)
         self.firstNoteDate = defaults.string(forKey: Keys.firstNoteDate)
     }
     
