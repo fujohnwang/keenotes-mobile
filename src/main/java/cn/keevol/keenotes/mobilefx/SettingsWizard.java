@@ -280,6 +280,17 @@ public class SettingsWizard {
         int nextStep = currentStepProperty.get() + 1;
         currentStepProperty.set(nextStep);
         
+        // 将焦点转移到下一个输入框
+        if (nextStep < steps.size()) {
+            Node nextNode = steps.get(nextStep).getTargetNode();
+            if (nextNode != null) {
+                // 使用 Platform.runLater 确保在 UI 更新后执行
+                javafx.application.Platform.runLater(() -> {
+                    nextNode.requestFocus();
+                });
+            }
+        }
+        
         // 检查是否完成
         checkCompletion();
     }
