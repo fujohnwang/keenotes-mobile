@@ -79,6 +79,11 @@ class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     init() {
+        // Forward settings changes
+        settingsService.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+        
         // Forward database changes
         databaseService.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
