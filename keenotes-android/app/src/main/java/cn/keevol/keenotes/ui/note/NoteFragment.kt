@@ -102,16 +102,18 @@ class NoteFragment : Fragment() {
         
         // Observe note count - use viewLifecycleOwner to auto-cancel when view is destroyed
         viewLifecycleOwner.lifecycleScope.launch {
-            app.database.noteDao().getNoteCountFlow().collectLatest { count ->
+            app.database.noteDao().getNoteCountFlow().collect { count ->
                 if (_binding != null) {
                     binding.overviewCardInclude.totalNotesValue.text = count.toString()
                     
                     // Always update first note date when note count changes
-                    // This ensures we capture the earliest note even after sync
+                    // Launch in separate coroutine to avoid cancellation
                     if (count > 0) {
-                        val oldestDate = app.database.noteDao().getOldestNoteDate()
-                        if (oldestDate != null) {
-                            app.settingsRepository.setFirstNoteDate(oldestDate)
+                        launch {
+                            val oldestDate = app.database.noteDao().getOldestNoteDate()
+                            if (oldestDate != null) {
+                                app.settingsRepository.setFirstNoteDate(oldestDate)
+                            }
                         }
                     }
                 }
@@ -120,7 +122,7 @@ class NoteFragment : Fragment() {
         
         // Observe first note date and calculate days - use viewLifecycleOwner to auto-cancel when view is destroyed
         viewLifecycleOwner.lifecycleScope.launch {
-            app.settingsRepository.firstNoteDate.collectLatest { firstDate ->
+            app.settingsRepository.firstNoteDate.collect { firstDate ->
                 if (_binding != null) {
                     if (firstDate != null) {
                         val days = calculateDaysUsing(firstDate)
