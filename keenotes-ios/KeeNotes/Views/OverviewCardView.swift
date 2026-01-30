@@ -64,16 +64,22 @@ struct OverviewCardView: View {
             }
         }
         .onChange(of: appState.databaseService.noteCount) { newCount in
+            print("[OverviewCard] noteCount changed to: \(newCount)")
             // Update first note date whenever note count changes
             if newCount > 0 {
                 Task {
+                    print("[OverviewCard] Querying oldest note date...")
                     if let oldestDate = try? await getOldestNoteDate() {
+                        print("[OverviewCard] Found oldest date: \(oldestDate), updating firstNoteDate")
                         appState.settingsService.firstNoteDate = oldestDate
+                    } else {
+                        print("[OverviewCard] Failed to get oldest date")
                     }
                 }
             }
         }
-        .onChange(of: appState.settingsService.firstNoteDate) { _ in
+        .onChange(of: appState.settingsService.firstNoteDate) { newValue in
+            print("[OverviewCard] firstNoteDate changed to: \(newValue ?? "nil")")
             // Automatically update days using when firstNoteDate changes
             updateDaysUsing()
         }
