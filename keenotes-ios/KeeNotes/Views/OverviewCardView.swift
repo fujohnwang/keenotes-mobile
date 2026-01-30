@@ -94,13 +94,33 @@ struct OverviewCardView: View {
         
         print("[OverviewCard] Calculating days using from: \(firstDateStr)")
         
-        // Use DateFormatter to parse database date format: "2026-01-04T12:03:27"
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
+        // Try multiple date formats to handle both "yyyy-MM-dd HH:mm:ss" and "yyyy-MM-dd'T'HH:mm:ss"
+        let formatters = [
+            { () -> DateFormatter in
+                let f = DateFormatter()
+                f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                f.locale = Locale(identifier: "en_US_POSIX")
+                f.timeZone = TimeZone.current
+                return f
+            }(),
+            { () -> DateFormatter in
+                let f = DateFormatter()
+                f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                f.locale = Locale(identifier: "en_US_POSIX")
+                f.timeZone = TimeZone.current
+                return f
+            }()
+        ]
         
-        guard let firstDate = formatter.date(from: firstDateStr) else {
+        var firstDate: Date?
+        for formatter in formatters {
+            if let date = formatter.date(from: firstDateStr) {
+                firstDate = date
+                break
+            }
+        }
+        
+        guard let firstDate = firstDate else {
             print("[OverviewCard] Failed to parse date: \(firstDateStr)")
             daysUsing = 0
             return
