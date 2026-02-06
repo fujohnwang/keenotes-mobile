@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "cn.keevol.keenotes"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "cn.keevol.keenotes"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         
         // Version from gradle properties or default
         val versionNameProp = project.findProperty("versionName") as String? ?: "1.0.0"
