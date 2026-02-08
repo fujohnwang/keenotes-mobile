@@ -1068,7 +1068,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           VERSION="${VERSION#V}"
-          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          RELEASE_URL="https://github.com/fujohnwang/keenotes-releases/releases/tag/${{ github.ref_name }}"
           
           echo "Updating version info: $VERSION"
           curl -X POST https://kns.afoo.me/version/latest \
