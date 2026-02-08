@@ -32,6 +32,8 @@ public class SettingsService {
     private static final String KEY_ZOOM_IN_SHORTCUT = "shortcut.zoom.in";
     private static final String KEY_ZOOM_OUT_SHORTCUT = "shortcut.zoom.out";
     private static final String KEY_LOCAL_IMPORT_SERVER_PORT = "local.import.server.port";
+    private static final String KEY_MCP_SERVER_PORT = "mcp.server.port";
+    private static final String KEY_MCP_SERVER_ENABLED = "mcp.server.enabled";
 
     private static final int DEFAULT_REVIEW_DAYS = 7;
     private static final String DEFAULT_SEARCH_SHORTCUT = "Alt+Shift+S";
@@ -282,5 +284,27 @@ public class SettingsService {
 
     public void setZoomOutShortcut(String shortcut) {
         properties.setProperty(KEY_ZOOM_OUT_SHORTCUT, shortcut);
+    }
+
+    // MCP Server settings
+    public int getMcpServerPort() {
+        String port = properties.getProperty(KEY_MCP_SERVER_PORT, "1999");
+        return Integer.parseInt(port);
+    }
+
+    public void setMcpServerPort(int port) {
+        if (port < 1 || port > 65535) {
+            properties.setProperty(KEY_MCP_SERVER_PORT, "1999");
+        } else {
+            properties.setProperty(KEY_MCP_SERVER_PORT, String.valueOf(port));
+        }
+    }
+
+    public boolean isMcpServerEnabled() {
+        return Boolean.parseBoolean(properties.getProperty(KEY_MCP_SERVER_ENABLED, "true"));
+    }
+
+    public void setMcpServerEnabled(boolean enabled) {
+        properties.setProperty(KEY_MCP_SERVER_ENABLED, String.valueOf(enabled));
     }
 }

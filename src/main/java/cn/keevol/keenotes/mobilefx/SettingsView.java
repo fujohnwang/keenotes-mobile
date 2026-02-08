@@ -18,6 +18,7 @@ public class SettingsView extends BorderPane {
     // Sub views
     private VBox generalView;
     private VBox preferencesView;
+    private VBox aiView;
     private VBox dataImportView;
     private VBox debugView;
     
@@ -35,15 +36,17 @@ public class SettingsView extends BorderPane {
         // Create sub views
         generalView = new SettingsGeneralView(this::handleSaveSuccess);
         preferencesView = new SettingsPreferencesView();
+        aiView = new AIView();
         dataImportView = new DataImportView();
         debugView = createDebugView();
         
         // Add all views to content area
-        contentArea.getChildren().addAll(generalView, preferencesView, dataImportView, debugView);
+        contentArea.getChildren().addAll(generalView, preferencesView, aiView, dataImportView, debugView);
         
         // Initially show general view
         generalView.setVisible(true);
         preferencesView.setVisible(false);
+        aiView.setVisible(false);
         dataImportView.setVisible(false);
         debugView.setVisible(false);
         
@@ -65,6 +68,7 @@ public class SettingsView extends BorderPane {
         VBox targetView = switch (subView) {
             case "General" -> generalView;
             case "Preferences" -> preferencesView;
+            case "AI" -> aiView;
             case "Data Import" -> dataImportView;
             default -> generalView;
         };
