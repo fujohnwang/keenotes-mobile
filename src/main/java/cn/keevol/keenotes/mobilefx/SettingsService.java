@@ -105,11 +105,16 @@ public class SettingsService {
     }
 
     public String getToken() {
-        return properties.getProperty(KEY_TOKEN, "");
+        String value = properties.getProperty(KEY_TOKEN, "");
+        return CryptoHelper.decrypt(value);
     }
 
     public void setToken(String token) {
-        properties.setProperty(KEY_TOKEN, token);
+        if (token == null || token.isEmpty()) {
+            properties.remove(KEY_TOKEN);
+        } else {
+            properties.setProperty(KEY_TOKEN, CryptoHelper.encrypt(token));
+        }
     }
 
     public boolean isConfigured() {
@@ -139,14 +144,15 @@ public class SettingsService {
     }
 
     public String getEncryptionPassword() {
-        return properties.getProperty(KEY_ENCRYPTION_PASSWORD, "");
+        String value = properties.getProperty(KEY_ENCRYPTION_PASSWORD, "");
+        return CryptoHelper.decrypt(value);
     }
 
     public void setEncryptionPassword(String password) {
         if (password == null || password.isEmpty()) {
             properties.remove(KEY_ENCRYPTION_PASSWORD);
         } else {
-            properties.setProperty(KEY_ENCRYPTION_PASSWORD, password);
+            properties.setProperty(KEY_ENCRYPTION_PASSWORD, CryptoHelper.encrypt(password));
         }
     }
 
