@@ -68,6 +68,14 @@ public class Main extends Application {
                 SimpleForwardServer.start();
             }
         });
+
+        // kick off MCP server at background
+        Thread.ofVirtual().start(new Runnable() {
+            @Override
+            public void run() {
+                cn.keevol.keenotes.mcp.SimpleMcpServer.start();
+            }
+        });
     }
 
     /**
@@ -152,6 +160,10 @@ public class Main extends Application {
     public void stop() {
         System.out.println("Application stopping...");
         try {
+            // Stop MCP Server
+            cn.keevol.keenotes.mcp.SimpleMcpServer.stop();
+            
+            // Stop other services
             ServiceManager.getInstance().shutdown();
         } catch (Exception e) {
             System.err.println("Error during shutdown: " + e.getMessage());
