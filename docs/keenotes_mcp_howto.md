@@ -156,3 +156,39 @@ Kiro：已保存到 KeeNotes。
 - [Model Context Protocol 官方文档](https://modelcontextprotocol.io/)
 - [LangChain4j MCP 文档](https://docs.langchain4j.dev/tutorials/mcp)
 - [KeeNotes 项目主页](https://keenotes.afoo.me)
+
+
+
+## Q&A
+
+### 当ai客户端调用我们的mcp的时候，mcp的触发词是“记”？
+
+不是的。MCP (Model Context Protocol) 不是基于"触发词"工作的。
+
+当 AI 客户端（如 Claude Desktop、Kiro）配置了 KeeNotes 的 MCP server 后：
+
+1. **AI 自主判断** - AI 会根据用户的意图自主决定是否调用 `add_note` 工具
+2. **自然语言理解** - 用户可以用任何方式表达，比如：
+   - "帮我记录一个笔记：..."
+   - "保存这个想法到 KeeNotes"
+   - "记一下：..."
+   - "Add a note: ..."
+   - 或者任何其他表达记录笔记意图的说法
+
+3. **工具描述驱动** - AI 是通过读取 `add_note` 工具的描述来理解何时应该使用它的
+
+让我看看当前的工具描述：
+
+```
+"Add a new note to KeeNotes. The note content will be saved to the configured KeeNotes backend."
+```
+
+这个描述比较简单。AI 会根据这个描述来判断何时调用这个工具。用户可以用任何自然语言表达记录笔记的意图，AI 会自主决定是否调用 `add_note` 工具。
+
+**没有固定的触发词**，AI 是通过理解用户意图来决定的。比如：
+- "记一下：今天学习了 MCP"
+- "帮我保存这个想法"
+- "Add a note about the meeting"
+- "把这个记到 KeeNotes"
+
+都可能触发 AI 调用 `add_note` 工具。
