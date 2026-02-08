@@ -1,7 +1,6 @@
 docs/MACOS_SIGNING_SETUP.md
 *.jks
 API.md
-.kiro/
 snapshots
 dist/
 
