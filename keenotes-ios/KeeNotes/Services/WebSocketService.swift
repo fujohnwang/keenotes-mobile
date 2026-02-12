@@ -175,8 +175,16 @@ class WebSocketService: NSObject, ObservableObject {
     }
     
     private func receiveMessage() {
-        webSocketTask?.receive { [weak self] result in
+        guard let currentTask = webSocketTask else { return }
+        
+        currentTask.receive { [weak self] result in
             guard let self = self else { return }
+            
+            // 验证 task 仍然是当前活跃的，避免旧 task 的 callback 访问已释放的资源
+            guard currentTask === self.webSocketTask else {
+                print("[WS] Ignoring receive callback from stale WebSocket task")
+                return
+            }
             
             switch result {
             case .success(let message):
