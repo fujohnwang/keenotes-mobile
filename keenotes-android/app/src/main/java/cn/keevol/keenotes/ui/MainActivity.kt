@@ -1,6 +1,7 @@
 package cn.keevol.keenotes.ui
 
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -12,6 +13,8 @@ import androidx.navigation.fragment.NavHostFragment
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.ActivityMainBinding
+import cn.keevol.keenotes.network.WebSocketService
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -33,6 +36,7 @@ class MainActivity : AppCompatActivity() {
         setupCustomTabBar()
         checkConfigurationAndNavigate()
         connectWebSocket()
+        observeSyncStateForScreenWake()
     }
     
     /**
@@ -122,6 +126,22 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             if (app.settingsRepository.isConfigured()) {
                 app.webSocketService.connect()
+            }
+        }
+    }
+    
+    /**
+     * 同步期间保持屏幕常亮，同步完成后恢复
+     */
+    private fun observeSyncStateForScreenWake() {
+        val app = application as KeeNotesApp
+        lifecycleScope.launch {
+            app.webSocketService.syncState.collectLatest { state ->
+                if (state == WebSocketService.SyncState.SYNCING) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
             }
         }
     }

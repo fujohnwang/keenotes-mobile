@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UIKit
 
 /// WebSocket service for real-time sync
 /// Matches JavaFX/Android WebSocketClientService logic
@@ -31,8 +32,7 @@ class WebSocketService: NSObject, ObservableObject {
     private var lastSyncId: Int64 = -1
     private var cachedPassword: String?
     
-    // Batch sync buffer
-    private var syncBatchBuffer: [Note] = []
+    // Batch sync progress tracking
     private var expectedBatches = 0
     private var receivedBatches = 0
     
@@ -114,13 +114,13 @@ class WebSocketService: NSObject, ObservableObject {
         Task { @MainActor in
             connectionState = .disconnected
             syncStatus = .idle
+            UIApplication.shared.isIdleTimerDisabled = false
         }
     }
     
     func resetState() {
         lastSyncId = -1
         cachedPassword = nil
-        syncBatchBuffer.removeAll()
         expectedBatches = 0
         receivedBatches = 0
         Task { @MainActor in
@@ -251,11 +251,13 @@ class WebSocketService: NSObject, ObservableObject {
         
         print("[WS] handleSyncBatch: batch \(batchId) of \(totalBatches)")
         
-        await MainActor.run { syncStatus = .syncing }
+        await MainActor.run {
+            syncStatus = .syncing
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
         
         if expectedBatches == 0 {
             expectedBatches = totalBatches
-            syncBatchBuffer.removeAll()
             print("[WS] Starting new sync, expecting \(totalBatches) batches")
         }
         
@@ -266,46 +268,67 @@ class WebSocketService: NSObject, ObservableObject {
         
         print("[WS] Processing \(notesArray.count) notes in batch")
         
-        var successCount = 0
+        var batchNotes: [Note] = []
+        var maxNoteId: Int64 = -1
+        
         for noteJson in notesArray {
             if let note = parseNote(noteJson) {
-                syncBatchBuffer.append(note)
-                successCount += 1
+                batchNotes.append(note)
+                if note.id > maxNoteId {
+                    maxNoteId = note.id
+                }
+            }
+        }
+        
+        // 立即写入 DB（增量持久化）
+        if !batchNotes.isEmpty {
+            do {
+                try await databaseService.insertNotes(batchNotes)
+                print("[WS] Batch \(batchId): inserted \(batchNotes.count) notes to DB")
+            } catch {
+                print("[WS] Failed to insert batch \(batchId): \(error)")
+            }
+        }
+        
+        // 更新 last_sync_id 为该 batch 中最大的 note ID（断点续传）
+        if maxNoteId > 0 {
+            do {
+                try await databaseService.updateSyncState(lastSyncId: maxNoteId)
+                lastSyncId = maxNoteId
+                print("[WS] Batch \(batchId): updated lastSyncId to \(maxNoteId)")
+            } catch {
+                print("[WS] Failed to update lastSyncId after batch \(batchId): \(error)")
             }
         }
         
         receivedBatches += 1
-        print("[WS] Batch \(batchId)/\(totalBatches) complete: success=\(successCount), buffer size=\(syncBatchBuffer.count)")
+        print("[WS] Batch \(batchId)/\(totalBatches) complete: success=\(batchNotes.count)")
     }
     
     private func handleSyncComplete(_ json: [String: Any]) async {
         let totalSynced = json["total_synced"] as? Int ?? 0
         let newLastSyncId = json["last_sync_id"] as? Int64 ?? -1
         
-        print("[WS] handleSyncComplete: totalSynced=\(totalSynced), newLastSyncId=\(newLastSyncId), bufferSize=\(syncBatchBuffer.count)")
+        print("[WS] handleSyncComplete: totalSynced=\(totalSynced), newLastSyncId=\(newLastSyncId)")
         
         do {
-            if !syncBatchBuffer.isEmpty {
-                print("[WS] Inserting \(syncBatchBuffer.count) notes to database...")
-                try await databaseService.insertNotes(syncBatchBuffer)
-                print("[WS] SUCCESS: Inserted \(syncBatchBuffer.count) notes")
-            }
-            
-            // Update lastSyncId if valid
+            // 以服务器返回的 last_sync_id 为准做最终更新
             if totalSynced > 0 && newLastSyncId > 0 {
                 try await databaseService.updateSyncState(lastSyncId: newLastSyncId)
                 lastSyncId = newLastSyncId
                 print("[WS] Updated lastSyncId to: \(newLastSyncId)")
             }
         } catch {
-            print("[WS] Failed to save synced notes: \(error)")
+            print("[WS] Failed to update lastSyncId on sync complete: \(error)")
         }
         
-        syncBatchBuffer.removeAll()
         expectedBatches = 0
         receivedBatches = 0
         
-        await MainActor.run { syncStatus = .completed }
+        await MainActor.run {
+            syncStatus = .completed
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
         print("[WS] Sync complete: \(totalSynced) notes processed")
     }
     

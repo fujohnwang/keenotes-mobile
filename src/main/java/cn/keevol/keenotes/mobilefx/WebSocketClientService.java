@@ -44,8 +44,7 @@ public class WebSocketClientService {
     // 回调监听器
     private final List<SyncListener> listeners = new CopyOnWriteArrayList<>();
 
-    // 批量同步临时存储
-    private List<LocalCacheService.NoteData> syncBatchBuffer = new ArrayList<>();
+    // 批量同步进度追踪
     private int expectedBatches = 0;
     private int receivedBatches = 0;
 
@@ -356,18 +355,19 @@ public class WebSocketClientService {
 
     private void handleSyncBatch(JsonObject json) {
         isSyncing.set(true);
-        notifySyncProgress(0, 1);
 
         int batchId = json.getInteger("batch_id", 0);
         int totalBatches = json.getInteger("total_batches", 1);
 
         if (expectedBatches == 0) {
             expectedBatches = totalBatches;
-            syncBatchBuffer.clear();
         }
 
         JsonArray notes = json.getJsonArray("notes");
         if (notes != null) {
+            List<LocalCacheService.NoteData> batchNotes = new ArrayList<>();
+            long maxNoteId = -1;
+
             for (int i = 0; i < notes.size(); i++) {
                 JsonObject note = notes.getJsonObject(i);
                 try {
@@ -384,17 +384,41 @@ public class WebSocketClientService {
                         decryptedContent = encryptedContent;
                     }
                     
-                    syncBatchBuffer.add(new LocalCacheService.NoteData(
+                    batchNotes.add(new LocalCacheService.NoteData(
                             id, decryptedContent, channel, createdAt, encryptedContent));
+                    if (id > maxNoteId) {
+                        maxNoteId = id;
+                    }
                 } catch (Exception e) {
                     logger.warning("Failed to parse note: " + e.getMessage());
+                }
+            }
+
+            // 立即写入 DB（增量持久化）
+            if (!batchNotes.isEmpty()) {
+                try {
+                    localCache.batchInsertNotes(batchNotes);
+                    logger.info("Batch " + batchId + ": inserted " + batchNotes.size() + " notes to DB");
+                } catch (Exception e) {
+                    logger.warning("Failed to insert batch " + batchId + ": " + e.getMessage());
+                }
+            }
+
+            // 更新 last_sync_id 为该 batch 中最大的 note ID（断点续传）
+            if (maxNoteId > 0) {
+                try {
+                    localCache.updateLastSyncId(maxNoteId);
+                    this.lastSyncId = maxNoteId;
+                    logger.info("Batch " + batchId + ": updated lastSyncId to " + maxNoteId);
+                } catch (Exception e) {
+                    logger.warning("Failed to update lastSyncId after batch " + batchId + ": " + e.getMessage());
                 }
             }
         }
 
         receivedBatches++;
         notifySyncProgress(receivedBatches, totalBatches);
-        logger.info("Received batch " + batchId + "/" + totalBatches + ", buffer size=" + syncBatchBuffer.size());
+        logger.info("Received batch " + batchId + "/" + totalBatches);
     }
 
     private void handleSyncComplete(JsonObject json) {
@@ -402,21 +426,16 @@ public class WebSocketClientService {
         long newLastSyncId = json.getLong("last_sync_id", -1L);
 
         try {
-            if (!syncBatchBuffer.isEmpty()) {
-                localCache.batchInsertNotes(syncBatchBuffer);
-                logger.info("Batch inserted " + syncBatchBuffer.size() + " notes");
-            }
-
+            // 以服务器返回的 last_sync_id 为准做最终更新
             if (totalSynced > 0 && newLastSyncId > 0) {
                 localCache.updateLastSyncId(newLastSyncId);
                 this.lastSyncId = newLastSyncId;
                 logger.info("Updated lastSyncId to: " + newLastSyncId);
             }
         } catch (Exception e) {
-            logger.warning("Failed to save synced notes: " + e.getMessage());
+            logger.warning("Failed to update lastSyncId on sync complete: " + e.getMessage());
         }
 
-        syncBatchBuffer.clear();
         expectedBatches = 0;
         receivedBatches = 0;
         isSyncing.set(false);
@@ -539,7 +558,6 @@ public class WebSocketClientService {
             reconnectTask = null;
         }
 
-        syncBatchBuffer.clear();
         expectedBatches = 0;
         receivedBatches = 0;
         isConnected.set(false);
