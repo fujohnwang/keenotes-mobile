@@ -96,14 +96,16 @@ struct NoteView: View {
                             .stroke(Color(.systemGray4), lineWidth: 1)
                     )
 
-                    Spacer()
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            // Tap empty space to dismiss keyboard
-                            isTextFieldFocused = false
-                        }
+                    if !keyboardVisible {
+                        Spacer()
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                // Tap empty space to dismiss keyboard
+                                isTextFieldFocused = false
+                            }
+                    }
                 }
-                .padding(EdgeInsets(top: 16, leading: horizontalPadding, bottom: 16, trailing: horizontalPadding))
+                .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: keyboardVisible ? 4 : 16, trailing: horizontalPadding))
                 .contentShape(Rectangle())
                 .onTapGesture {
                     // Tap outside to dismiss keyboard
@@ -133,18 +135,24 @@ struct NoteView: View {
                             .font(.system(size: 17))
                     }
                 }
-
-                ToolbarItemGroup(placement: .keyboard) {
-                    // Keyboard hint
-                    Text("Tap outside or")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Button("Done") {
-                        isTextFieldFocused = false
+            }
+            .safeAreaInset(edge: .bottom) {
+                if keyboardVisible && appState.settingsService.showKeyboardToolbar {
+                    HStack {
+                        Text("To dismiss keyboard, tap outside or click Done →")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button(action: {
+                            isTextFieldFocused = false
+                        }) {
+                            Text("Done")
+                                .font(.callout.weight(.medium))
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemBackground))
                 }
             }
             .overlay(alignment: .center) {
