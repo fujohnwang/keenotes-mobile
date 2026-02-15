@@ -39,6 +39,10 @@
         <key>UIImageName</key>
         <string>LaunchIcon</string>
     </dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>KeeNotes needs microphone access for voice input to create notes.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>KeeNotes needs speech recognition to convert your voice into text notes.</string>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
         <string>armv7</string>
