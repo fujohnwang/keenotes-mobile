@@ -11,6 +11,9 @@ struct NoteView: View {
     @State private var isPosting = false
     @FocusState private var isTextFieldFocused: Bool
     @State private var keyboardVisible = false
+    @StateObject private var speechService = SpeechRecognitionService()
+    /// Current keyboard language for speech recognition
+    @State private var currentKeyboardLocale: Locale?
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
@@ -54,13 +57,43 @@ struct NoteView: View {
                                 }
                             }
 
-                        // Bottom row: Send Channel (left) + Send button (right)
-                        HStack {
+                        // Bottom area: live speech preview + controls row
+                        VStack(spacing: 4) {
+                            // Live speech recognition preview
+                            if speechService.isRecording, let partial = speechService.partialText, !partial.isEmpty {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "waveform")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.red)
+                                    Text(partial)
+                                        .font(.system(size: isPad ? 13 : 12))
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                }
+                                .padding(.horizontal, isPad ? 16 : 12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            
+                            // Controls row: Send Channel (left) + mic + Send button (right)
+                            HStack {
                             // Send Channel status (left)
                             SendChannelStatus()
                                 .font(.caption)
 
                             Spacer()
+
+                            // Microphone button for voice input (only show when feature is enabled)
+                            if appState.settingsService.autoStartDictation || speechService.isRecording {
+                                Button(action: {
+                                    speechService.toggleRecording()
+                                }) {
+                                    Image(systemName: speechService.isRecording ? "mic.fill" : "mic")
+                                        .font(.system(size: isPad ? 20 : 16))
+                                        .foregroundColor(speechService.isRecording ? .red : .blue)
+                                }
+                                .padding(.trailing, isPad ? 8 : 4)
+                            }
 
                             // Send button (right) - shows "Sending..." when posting
                             Button(action: postNote) {
@@ -88,6 +121,7 @@ struct NoteView: View {
                         }
                         .padding(.horizontal, isPad ? 16 : 12)
                         .padding(.bottom, isPad ? 12 : 10)
+                        }
                     }
                     .background(Color.clear)
                     .cornerRadius(cardCornerRadius)
@@ -116,16 +150,35 @@ struct NoteView: View {
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 setupKeyboardObservers()
+                // Setup speech recognition callbacks
+                speechService.onPartialResult = { _ in
+                    // partialText is updated via @Published, UI refreshes automatically
+                }
+                speechService.onFinalResult = { finalText in
+                    // Append final result to editor content
+                    if noteText.isEmpty {
+                        noteText = finalText
+                    } else {
+                        let separator = noteText.hasSuffix(" ") || noteText.hasSuffix("\n") ? "" : " "
+                        noteText += separator + finalText
+                    }
+                }
                 // Auto-focus input if enabled
                 if appState.settingsService.autoFocusInputOnLaunch {
-                    // Delay slightly to ensure view is fully loaded
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         isTextFieldFocused = true
+                    }
+                }
+                // Auto-start dictation if enabled (independent of auto-focus)
+                if appState.settingsService.autoStartDictation {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        speechService.startRecordingWithAuthCheck()
                     }
                 }
             }
             .onDisappear {
                 removeKeyboardObservers()
+                speechService.stopRecording()
             }
             .toolbar {
                 // Search button (right)
@@ -208,6 +261,8 @@ struct NoteView: View {
     private func postNote() {
         guard canPost else { return }
 
+        // Stop voice input if active
+        speechService.stopRecording()
         isPosting = true
 
         Task {
@@ -273,6 +328,7 @@ struct NoteView: View {
             withAnimation(.easeOut(duration: 0.25)) {
                 keyboardVisible = true
             }
+            updateKeyboardLocale()
         }
 
         NotificationCenter.default.addObserver(
@@ -284,11 +340,33 @@ struct NoteView: View {
                 keyboardVisible = false
             }
         }
+        
+        NotificationCenter.default.addObserver(
+            forName: UITextInputMode.currentInputModeDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            updateKeyboardLocale()
+        }
     }
 
     private func removeKeyboardObservers() {
         NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: UITextInputMode.currentInputModeDidChangeNotification, object: nil)
+    }
+    
+    private func updateKeyboardLocale() {
+        // Find the current first responder and get its keyboard language
+        UIResponder._currentFirstResponder = nil
+        UIApplication.shared.sendAction(#selector(UIResponder.captureFirstResponder(_:)), to: nil, from: nil, for: nil)
+        if let responder = UIResponder._currentFirstResponder,
+           let textInputMode = responder.textInputMode,
+           let lang = textInputMode.primaryLanguage {
+            let locale = Locale(identifier: lang)
+            currentKeyboardLocale = locale
+            speechService.currentLocale = locale
+        }
     }
 }
 
@@ -392,5 +470,14 @@ class NetworkMonitor: ObservableObject {
 
     deinit {
         monitor.cancel()
+    }
+}
+
+// MARK: - UIResponder extension to find current first responder
+extension UIResponder {
+    static weak var _currentFirstResponder: UIResponder?
+    
+    @objc func captureFirstResponder(_ sender: Any?) {
+        UIResponder._currentFirstResponder = self
     }
 }

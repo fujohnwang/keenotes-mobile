@@ -15,6 +15,7 @@ class SettingsService: ObservableObject {
         static let firstNoteDate = "first_note_date"
         static let autoFocusInputOnLaunch = "auto_focus_input_on_launch"
         static let showKeyboardToolbar = "show_keyboard_toolbar"
+        static let autoStartDictation = "auto_start_dictation"
     }
     
     @Published var endpointUrl: String {
@@ -57,6 +58,12 @@ class SettingsService: ObservableObject {
         }
     }
     
+    @Published var autoStartDictation: Bool {
+        didSet {
+            defaults.set(autoStartDictation, forKey: Keys.autoStartDictation)
+        }
+    }
+    
     @Published var firstNoteDate: String? {
         didSet {
             print("[SettingsService] firstNoteDate didSet: old=\(oldValue ?? "nil"), new=\(firstNoteDate ?? "nil")")
@@ -81,6 +88,7 @@ class SettingsService: ObservableObject {
         self.showOverviewCard = defaults.object(forKey: Keys.showOverviewCard) == nil ? true : defaults.bool(forKey: Keys.showOverviewCard)
         self.autoFocusInputOnLaunch = defaults.object(forKey: Keys.autoFocusInputOnLaunch) == nil ? false : defaults.bool(forKey: Keys.autoFocusInputOnLaunch)
         self.showKeyboardToolbar = defaults.object(forKey: Keys.showKeyboardToolbar) == nil ? true : defaults.bool(forKey: Keys.showKeyboardToolbar)
+        self.autoStartDictation = defaults.object(forKey: Keys.autoStartDictation) == nil ? false : defaults.bool(forKey: Keys.autoStartDictation)
         self.firstNoteDate = defaults.string(forKey: Keys.firstNoteDate)
     }
     
