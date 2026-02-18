@@ -71,8 +71,7 @@ class WebSocketService(
     @Volatile
     private var cachedPassword: String? = null
     
-    // Batch sync buffer - use synchronized list for thread safety
-    private val syncBatchBuffer = java.util.Collections.synchronizedList(mutableListOf<Note>())
+    // Batch sync progress tracking
     @Volatile
     private var expectedBatches = 0
     private var receivedBatches = 0
@@ -207,9 +206,6 @@ class WebSocketService(
     fun resetState() {
         lastSyncId = -1
         cachedPassword = null
-        synchronized(syncBatchBuffer) {
-            syncBatchBuffer.clear()
-        }
         expectedBatches = 0
         receivedBatches = 0
         _syncState.value = SyncState.IDLE
@@ -355,16 +351,12 @@ class WebSocketService(
         val totalBatches = json.optInt("total_batches", 1)
         
         Log.i(TAG, "handleSyncBatch: batch $batchId of $totalBatches")
-        Log.i(TAG, "handleSyncBatch: raw JSON keys = ${json.keys().asSequence().toList()}")
         
         // Set syncing state
         _syncState.value = SyncState.SYNCING
         
         if (expectedBatches == 0) {
             expectedBatches = totalBatches
-            synchronized(syncBatchBuffer) {
-                syncBatchBuffer.clear()
-            }
             Log.i(TAG, "Starting new sync, expecting $totalBatches batches")
         }
         
@@ -376,22 +368,22 @@ class WebSocketService(
         
         Log.i(TAG, "Processing ${notesArray.length()} notes in batch")
         
-        var successCount = 0
+        val batchNotes = mutableListOf<Note>()
+        var maxNoteId = -1L
         var failCount = 0
+        
         for (i in 0 until notesArray.length()) {
             try {
                 val noteJson = notesArray.getJSONObject(i)
-                Log.i(TAG, "Parsing note $i: id=${noteJson.optLong("id")}")
                 val note = parseNote(noteJson)
                 if (note != null) {
-                    synchronized(syncBatchBuffer) {
-                        syncBatchBuffer.add(note)
+                    batchNotes.add(note)
+                    if (note.id > maxNoteId) {
+                        maxNoteId = note.id
                     }
-                    successCount++
-                    Log.i(TAG, "Note $i parsed successfully: id=${note.id}")
                 } else {
                     failCount++
-                    Log.e(TAG, "Failed to parse note at index $i: ${noteJson}")
+                    Log.e(TAG, "Failed to parse note at index $i")
                 }
             } catch (e: Exception) {
                 failCount++
@@ -399,69 +391,54 @@ class WebSocketService(
             }
         }
         
+        // 立即写入 DB（增量持久化）
+        if (batchNotes.isNotEmpty()) {
+            try {
+                noteDao.insertAll(batchNotes)
+                Log.i(TAG, "Batch $batchId: inserted ${batchNotes.size} notes to DB")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to insert batch $batchId: ${e.message}", e)
+            }
+        }
+        
+        // 更新 last_sync_id 为该 batch 中最大的 note ID（断点续传）
+        if (maxNoteId > 0) {
+            try {
+                val now = DateTimeFormatter.ISO_INSTANT.format(Instant.now())
+                syncStateDao.updateSyncState(cn.keevol.keenotes.data.entity.SyncState(lastSyncId = maxNoteId, lastSyncTime = now))
+                lastSyncId = maxNoteId
+                Log.i(TAG, "Batch $batchId: updated lastSyncId to $maxNoteId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update lastSyncId after batch $batchId: ${e.message}", e)
+            }
+        }
+        
         receivedBatches++
-        Log.i(TAG, "Batch $batchId/$totalBatches complete: success=$successCount, fail=$failCount, buffer size=${syncBatchBuffer.size}")
+        Log.i(TAG, "Batch $batchId/$totalBatches complete: success=${batchNotes.size}, fail=$failCount")
     }
     
     private suspend fun handleSyncComplete(json: JSONObject) {
         val totalSynced = json.optInt("total_synced", 0)
         val newLastSyncId = json.optLong("last_sync_id", -1L)
         
-        Log.i(TAG, "handleSyncComplete: totalSynced=$totalSynced, newLastSyncId=$newLastSyncId, bufferSize=${syncBatchBuffer.size}")
+        Log.i(TAG, "handleSyncComplete: totalSynced=$totalSynced, newLastSyncId=$newLastSyncId")
         
         try {
-            // Copy buffer to avoid concurrent modification
-            val notesToInsert = synchronized(syncBatchBuffer) {
-                syncBatchBuffer.toList()
-            }
-            
-            if (notesToInsert.isNotEmpty()) {
-                Log.i(TAG, "Inserting ${notesToInsert.size} notes to database...")
-                
-                // CRITICAL: Insert notes BEFORE setting COMPLETED state
-                // This ensures UI sees data when state changes to COMPLETED
-                noteDao.insertAll(notesToInsert)
-                
-                Log.i(TAG, "SUCCESS: Inserted ${notesToInsert.size} notes to database")
-                
-                // Verify insertion
-                val count = noteDao.getNoteCount()
-                Log.i(TAG, "Database now has $count notes total")
-                
-                // Small delay to ensure Room's Flow has time to emit the update
-                // Room uses a background thread to notify observers
-                delay(100)
-            } else {
-                Log.w(TAG, "WARNING: syncBatchBuffer is empty, nothing to insert!")
-            }
-            
-            // Match JavaFX: only update if totalSynced > 0 and newLastSyncId > 0
+            // 以服务器返回的 last_sync_id 为准做最终更新
             if (totalSynced > 0 && newLastSyncId > 0) {
                 val now = DateTimeFormatter.ISO_INSTANT.format(Instant.now())
-                syncStateDao.updateSyncState(SyncState(lastSyncId = newLastSyncId, lastSyncTime = now))
+                syncStateDao.updateSyncState(cn.keevol.keenotes.data.entity.SyncState(lastSyncId = newLastSyncId, lastSyncTime = now))
                 lastSyncId = newLastSyncId
                 Log.i(TAG, "Updated lastSyncId to: $newLastSyncId")
-            } else {
-                Log.i(TAG, "Not updating lastSyncId: totalSynced=$totalSynced, newLastSyncId=$newLastSyncId")
             }
             
-            // CRITICAL: Set COMPLETED state AFTER database insertion and delay
-            // This prevents "No notes yet" flash in UI
             _syncState.value = SyncState.COMPLETED
-            
             Log.i(TAG, "Sync complete: $totalSynced notes processed, state set to COMPLETED")
             
         } catch (e: Exception) {
-            Log.e(TAG, "CRITICAL: Failed to save synced notes: ${e.message}", e)
-            e.printStackTrace()
-            
-            // Set IDLE state on error
+            Log.e(TAG, "CRITICAL: Failed to update lastSyncId on sync complete: ${e.message}", e)
             _syncState.value = SyncState.IDLE
         } finally {
-            // Clean up buffer
-            synchronized(syncBatchBuffer) {
-                syncBatchBuffer.clear()
-            }
             expectedBatches = 0
             receivedBatches = 0
         }
