@@ -4,8 +4,10 @@ import cn.keevol.keenotes.utils.SimpleForwardServer;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.image.Image;
 import javafx.scene.text.Font;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 
 public class Main extends Application {
@@ -28,8 +30,11 @@ public class Main extends Application {
         System.out.println("[Main] Using DesktopMainView for desktop platform");
         mainView = new DesktopMainView();
 
-        // Scene size for desktop
-        Scene scene = new Scene(mainView, 1200, 800);
+        // Scene size for desktop - adapt to screen size to avoid titlebar being pushed off-screen
+        Rectangle2D screenBounds = Screen.getPrimary().getVisualBounds();
+        double sceneWidth = Math.min(1200, screenBounds.getWidth() * 0.9);
+        double sceneHeight = Math.min(800, screenBounds.getHeight() * 0.85);
+        Scene scene = new Scene(mainView, sceneWidth, sceneHeight);
 
         // Load theme CSS
         loadThemeCSS(scene);
@@ -51,6 +56,10 @@ public class Main extends Application {
         if (iconStream != null) {
             stage.getIcons().add(new Image(iconStream));
         }
+
+        // 居中显示窗口，确保titlebar可见
+        stage.setX(screenBounds.getMinX() + (screenBounds.getWidth() - sceneWidth) / 2);
+        stage.setY(screenBounds.getMinY() + (screenBounds.getHeight() - sceneHeight) / 2);
 
         // 显示UI - 这是最重要的，用户应该立即看到界面
         stage.show();
