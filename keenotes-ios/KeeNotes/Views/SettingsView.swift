@@ -117,6 +117,16 @@ struct SettingsView: View {
                         get: { appState.settingsService.autoFocusInputOnLaunch },
                         set: { appState.settingsService.autoFocusInputOnLaunch = $0 }
                     ))
+
+                    Toggle("Auto-start voice input on launch", isOn: Binding(
+                        get: { appState.settingsService.autoStartDictation },
+                        set: { appState.settingsService.autoStartDictation = $0 }
+                    ))
+
+                    Toggle("Show keyboard toolbar", isOn: Binding(
+                        get: { appState.settingsService.showKeyboardToolbar },
+                        set: { appState.settingsService.showKeyboardToolbar = $0 }
+                    ))
                 }
                 .font(.system(size: isPad ? 17 : 17))
 
