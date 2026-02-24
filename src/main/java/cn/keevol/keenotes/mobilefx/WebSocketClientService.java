@@ -41,6 +41,13 @@ public class WebSocketClientService {
     private ScheduledExecutorService reconnectScheduler;
     private ScheduledFuture<?> reconnectTask;
 
+    // 心跳
+    private static final int HEARTBEAT_INTERVAL_SEC = 30;
+    private static final int HEARTBEAT_TIMEOUT_SEC = 75; // 超过此时间没收到任何消息则判定为僵尸连接
+    private ScheduledExecutorService heartbeatScheduler;
+    private ScheduledFuture<?> heartbeatTask;
+    private volatile long lastMessageTime = 0;
+
     // 回调监听器
     private final List<SyncListener> listeners = new CopyOnWriteArrayList<>();
 
@@ -185,11 +192,10 @@ public class WebSocketClientService {
                 reconnectAttempts = 0;
 
                 sendHandshake();
-                // 保留应用层ping/pong响应能力，但不主动发送ping
-                // 服务器会主动发送ping，我们只需要响应pong
+                startHeartbeat();
                 notifyConnectionStatus(true);
 
-                logger.info("WebSocket connected successfully (application-level ping/pong)");
+                logger.info("WebSocket connected successfully");
             }
 
             @Override
@@ -306,6 +312,9 @@ public class WebSocketClientService {
         try {
             logger.info("Received message: " + message);
 
+            // 每次收到消息都更新时间戳，用于心跳超时检测
+            lastMessageTime = System.currentTimeMillis();
+
             JsonObject json = new JsonObject(message);
             String type = json.getString("type");
 
@@ -335,7 +344,7 @@ public class WebSocketClientService {
                     }
                     break;
                 case "pong":
-                    // 服务器对我们ping的响应（实际不会发生，因为服务器不主动ping）
+                    // 服务器对我们ping的响应，lastMessageTime已在上面更新
                     logger.fine("Received pong from server");
                     break;
                 case "error":
@@ -506,6 +515,69 @@ public class WebSocketClientService {
     }
 
     /**
+     * 启动应用层心跳：每30秒发一次ping，超过75秒没收到任何消息则判定僵尸连接并重连
+     */
+    private void startHeartbeat() {
+        stopHeartbeat();
+        lastMessageTime = System.currentTimeMillis();
+
+        if (heartbeatScheduler == null || heartbeatScheduler.isShutdown()) {
+            heartbeatScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "WebSocket-Heartbeat");
+                t.setDaemon(true);
+                return t;
+            });
+        }
+
+        heartbeatTask = heartbeatScheduler.scheduleAtFixedRate(() -> {
+            if (isShuttingDown.get() || !isConnected.get()) return;
+
+            long silentMs = System.currentTimeMillis() - lastMessageTime;
+            if (silentMs > HEARTBEAT_TIMEOUT_SEC * 1000L) {
+                logger.warning("Heartbeat timeout (" + silentMs + "ms silent), forcing reconnect...");
+                forceReconnect();
+                return;
+            }
+
+            // 发送应用层ping
+            WebSocket ws = webSocket;
+            if (ws != null) {
+                boolean sent = ws.send("{\"type\":\"ping\"}");
+                logger.fine("Sent heartbeat ping (silent " + silentMs + "ms)");
+                if (!sent) {
+                    logger.warning("Failed to send heartbeat ping, forcing reconnect...");
+                    forceReconnect();
+                }
+            }
+        }, HEARTBEAT_INTERVAL_SEC, HEARTBEAT_INTERVAL_SEC, TimeUnit.SECONDS);
+
+        logger.info("Heartbeat started");
+    }
+
+    private void stopHeartbeat() {
+        if (heartbeatTask != null) {
+            heartbeatTask.cancel(true);
+            heartbeatTask = null;
+        }
+    }
+
+    /**
+     * 强制断开并触发重连（用于僵尸连接检测）
+     */
+    private void forceReconnect() {
+        WebSocket ws = webSocket;
+        if (ws != null) {
+            ws.cancel();
+            webSocket = null;
+        }
+        isConnected.set(false);
+        isConnecting.set(false);
+        notifyConnectionStatus(false);
+        cleanup();
+        scheduleReconnect();
+    }
+
+    /**
      * 安排重连 - 使用ScheduledExecutorService
      */
     private void scheduleReconnect() {
@@ -553,6 +625,8 @@ public class WebSocketClientService {
      * 清理资源
      */
     private void cleanup() {
+        stopHeartbeat();
+
         if (reconnectTask != null) {
             reconnectTask.cancel(true);
             reconnectTask = null;
@@ -576,6 +650,12 @@ public class WebSocketClientService {
         isConnected.set(false);
 
         // 2. 立即取消定时任务（不等待）
+        stopHeartbeat();
+        if (heartbeatScheduler != null) {
+            heartbeatScheduler.shutdownNow();
+            heartbeatScheduler = null;
+        }
+
         if (reconnectTask != null) {
             reconnectTask.cancel(true); // 中断正在执行的任务
             reconnectTask = null;
