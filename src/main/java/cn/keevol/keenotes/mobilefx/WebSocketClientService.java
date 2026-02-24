@@ -74,13 +74,19 @@ public class WebSocketClientService {
         logger.info("Initializing OkHttp...");
 
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
-                .connectTimeout(3, TimeUnit.SECONDS) // 连接超时3秒
-                .readTimeout(5, TimeUnit.SECONDS) // 读取超时5秒
-                .writeTimeout(5, TimeUnit.SECONDS) // 写入超时5秒
-                // 禁用协议层ping/pong，使用服务器的应用层心跳
-                // .pingInterval(30, TimeUnit.SECONDS) // 禁用：Armeria服务器不支持自动回复
-                .retryOnConnectionFailure(false) // 我们自己处理重连逻辑
-                .connectionPool(new ConnectionPool(0, 5, TimeUnit.SECONDS)); // 无空闲连接，5秒清理
+                .proxySelector(new java.net.ProxySelector() {
+                    @Override
+                    public java.util.List<java.net.Proxy> select(java.net.URI uri) {
+                        return java.util.Collections.singletonList(java.net.Proxy.NO_PROXY);
+                    }
+                    @Override
+                    public void connectFailed(java.net.URI uri, java.net.SocketAddress sa, java.io.IOException ioe) {}
+                })
+                .connectTimeout(3, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.SECONDS)
+                .writeTimeout(5, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(false)
+                .connectionPool(new ConnectionPool(0, 5, TimeUnit.SECONDS));
 
         if (ssl) {
             // 信任所有证书（仅用于开发/测试环境）

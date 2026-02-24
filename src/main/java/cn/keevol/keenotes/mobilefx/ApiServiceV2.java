@@ -44,6 +44,14 @@ public class ApiServiceV2 {
             sslContext.init(null, trustAll, new SecureRandom());
 
             return new OkHttpClient.Builder()
+                    .proxySelector(new java.net.ProxySelector() {
+                        @Override
+                        public java.util.List<java.net.Proxy> select(java.net.URI uri) {
+                            return java.util.Collections.singletonList(java.net.Proxy.NO_PROXY);
+                        }
+                        @Override
+                        public void connectFailed(java.net.URI uri, java.net.SocketAddress sa, java.io.IOException ioe) {}
+                    })
                     .connectTimeout(30, TimeUnit.SECONDS)
                     .readTimeout(30, TimeUnit.SECONDS)
                     .writeTimeout(30, TimeUnit.SECONDS)
@@ -53,6 +61,14 @@ public class ApiServiceV2 {
         } catch (Exception e) {
             System.err.println("[ApiServiceV2] SSL config failed: " + e.getMessage());
             return new OkHttpClient.Builder()
+                    .proxySelector(new java.net.ProxySelector() {
+                        @Override
+                        public java.util.List<java.net.Proxy> select(java.net.URI uri) {
+                            return java.util.Collections.singletonList(java.net.Proxy.NO_PROXY);
+                        }
+                        @Override
+                        public void connectFailed(java.net.URI uri, java.net.SocketAddress sa, java.io.IOException ioe) {}
+                    })
                     .connectTimeout(30, TimeUnit.SECONDS)
                     .readTimeout(30, TimeUnit.SECONDS)
                     .writeTimeout(30, TimeUnit.SECONDS)
