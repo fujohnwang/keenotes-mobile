@@ -149,6 +149,11 @@ public class NotesDisplayPanel extends VBox {
             public void onError(String error) {
                 Platform.runLater(() -> hideSyncIndicator());
             }
+
+            @Override
+            public void onOffline() {
+                Platform.runLater(() -> showSyncChannelOffline());
+            }
         });
         
         // Initial status
@@ -196,6 +201,14 @@ public class NotesDisplayPanel extends VBox {
         
         HBox syncChannelBox = new HBox(6, syncChannelIndicator, syncChannelLabel);
         syncChannelBox.setAlignment(Pos.CENTER);
+        syncChannelBox.setCursor(javafx.scene.Cursor.HAND);
+        syncChannelBox.setOnMouseClicked(e -> {
+            WebSocketClientService ws = ServiceManager.getInstance().getWebSocketService();
+            if (!ws.isConnected()) {
+                showSyncChannelReconnecting();
+                ws.manualReconnect();
+            }
+        });
         
         headerRow.getChildren().addAll(countLabel, syncIndicatorBox, spacer, syncChannelBox);
         
@@ -230,6 +243,34 @@ public class NotesDisplayPanel extends VBox {
             syncChannelLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + errorColor + ";");
         }
     }
+
+    /**
+     * 显示 offline 状态（重连耗尽），提示用户可点击重连
+     */
+    private void showSyncChannelOffline() {
+        if (syncChannelIndicator == null || syncChannelLabel == null) {
+            return;
+        }
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String offlineColor = isDark ? "#8B949E" : "#656D76";
+        syncChannelIndicator.setFill(Color.web(offlineColor));
+        syncChannelLabel.setText("Sync Channel: offline");
+        syncChannelLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + offlineColor + ";");
+    }
+
+    /**
+     * 显示重连中过渡状态
+     */
+    private void showSyncChannelReconnecting() {
+        if (syncChannelIndicator == null || syncChannelLabel == null) {
+            return;
+        }
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String reconnectingColor = isDark ? "#D29922" : "#BF8700";
+        syncChannelIndicator.setFill(Color.web(reconnectingColor));
+        syncChannelLabel.setText("Sync Channel: reconnecting...");
+        syncChannelLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + reconnectingColor + ";");
+    }
     
     /**
      * Update colors based on current theme
@@ -237,10 +278,12 @@ public class NotesDisplayPanel extends VBox {
     private void updateThemeColors() {
         // Re-apply sync channel status with new theme colors
         if (syncChannelIndicator != null && syncChannelLabel != null) {
-            // Determine current connection status from indicator color
-            Color currentColor = (Color) syncChannelIndicator.getFill();
-            boolean isConnected = currentColor.equals(Color.web("#3FB950")) || currentColor.equals(Color.web("#1A7F37"));
-            updateSyncChannelStatus(isConnected);
+            WebSocketClientService ws = ServiceManager.getInstance().getWebSocketService();
+            if (ws.isOffline()) {
+                showSyncChannelOffline();
+            } else {
+                updateSyncChannelStatus(ws.isConnected());
+            }
         }
     }
     
