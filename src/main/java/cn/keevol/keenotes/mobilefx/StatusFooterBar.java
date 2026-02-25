@@ -10,7 +10,11 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 
 /**
- * Bottom status bar showing connection status
+ * Bottom status bar showing connection status.
+ * <p>
+ * 注意：当前 Send/Sync Channel 状态监控尚未接入真实 WebSocket 状态（startStatusMonitoring 为 TODO），
+ * 仅 import 状态功能被 DataImportView 实际使用。
+ * Sync Channel 的实时状态显示由 NotesDisplayPanel 负责。
  */
 public class StatusFooterBar extends HBox {
     

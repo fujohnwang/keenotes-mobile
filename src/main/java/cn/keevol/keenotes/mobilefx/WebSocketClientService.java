@@ -24,6 +24,7 @@ public class WebSocketClientService {
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
     private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
     private final AtomicBoolean isInitialized = new AtomicBoolean(false);
+    private final AtomicBoolean isOffline = new AtomicBoolean(false);
 
     // 服务依赖
     private final LocalCacheService localCache;
@@ -275,6 +276,17 @@ public class WebSocketClientService {
             webSocket.close(1000, "Client disconnect");
         }
         cleanup();
+    }
+    /**
+     * 手动重连 - 用户主动触发，重置重试计数器后发起连接
+     */
+    public void manualReconnect() {
+        if (isShuttingDown.get()) {
+            return;
+        }
+        reconnectAttempts = 0;
+        isOffline.set(false);
+        connect();
     }
 
     /**
@@ -593,8 +605,9 @@ public class WebSocketClientService {
         }
 
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            logger.warning("Max reconnect attempts reached");
-            notifyError("Max reconnect attempts reached");
+            logger.warning("Max reconnect attempts reached, entering offline mode");
+            isOffline.set(true);
+            notifyOffline();
             return;
         }
 
@@ -742,12 +755,20 @@ public class WebSocketClientService {
         listeners.forEach(l -> l.onError(message));
     }
 
+    private void notifyOffline() {
+        listeners.forEach(SyncListener::onOffline);
+    }
+
     public boolean isConnected() {
         return isConnected.get();
     }
 
     public boolean isSyncing() {
         return isSyncing.get();
+    }
+
+    public boolean isOffline() {
+        return isOffline.get();
     }
 
     /**
@@ -763,6 +784,9 @@ public class WebSocketClientService {
         void onRealtimeUpdate(long id, String content);
 
         void onError(String message);
+
+        /** 重连耗尽后进入离线状态 */
+        default void onOffline() {}
     }
 
     /**
