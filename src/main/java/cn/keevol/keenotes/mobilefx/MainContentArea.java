@@ -2,7 +2,11 @@ package cn.keevol.keenotes.mobilefx;
 
 import javafx.animation.FadeTransition;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -47,6 +51,11 @@ public class MainContentArea extends StackPane {
     
     // Flag to prevent duplicate listener registration
     private boolean localCacheListenerRegistered = false;
+    
+    // Pending notes UI components
+    private HBox pendingBanner;
+    private Label pendingLabel;
+    private boolean showingPendingList = false;
     
     public MainContentArea() {
         getStyleClass().add("main-content-area");
@@ -500,18 +509,20 @@ public class MainContentArea extends StackPane {
      * Create note mode panel with input and recent notes
      */
     private VBox createNoteModePanel() {
-        VBox panel = new VBox(1); // Minimal spacing between components (reduced from 2 to 1)
+        VBox panel = new VBox(1);
         panel.getStyleClass().add("mode-panel");
+        
+        // Pending notes 提示条（reactive binding 控制显示/隐藏）
+        pendingBanner = createPendingBanner();
         
         // Create input panel (height auto-fits content)
         noteInputPanel = new NoteInputPanel(this::handleNoteSend);
-        // Remove fixed height constraints - let it size based on content
         
         // Create notes display panel (will grow to fill remaining space)
         notesDisplayPanel = new NotesDisplayPanel();
         VBox.setVgrow(notesDisplayPanel, Priority.ALWAYS);
         
-        panel.getChildren().addAll(noteInputPanel, notesDisplayPanel);
+        panel.getChildren().addAll(pendingBanner, noteInputPanel, notesDisplayPanel);
         
         // Load recent notes
         loadRecentNotes();
@@ -519,10 +530,134 @@ public class MainContentArea extends StackPane {
         return panel;
     }
     
+    private HBox createPendingBanner() {
+        HBox banner = new HBox(8);
+        banner.setAlignment(Pos.CENTER_LEFT);
+        banner.setPadding(new Insets(8, 16, 8, 16));
+        banner.getStyleClass().add("pending-banner");
+        
+        pendingLabel = new Label();
+        pendingLabel.getStyleClass().add("pending-banner-label");
+        
+        Label viewButton = new Label("查看");
+        viewButton.getStyleClass().add("pending-banner-view-button");
+        viewButton.setOnMouseClicked(e -> togglePendingListView());
+        
+        HBox spacer = new HBox();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        
+        banner.getChildren().addAll(pendingLabel, spacer, viewButton);
+        
+        // Reactive binding: 根据 pendingCount 控制显示/隐藏和文案
+        PendingNoteService pendingService = ServiceManager.getInstance().getPendingNoteService();
+        banner.visibleProperty().bind(pendingService.pendingCountProperty().greaterThan(0));
+        banner.managedProperty().bind(banner.visibleProperty());
+        pendingLabel.textProperty().bind(
+                Bindings.concat("📤 ", pendingService.pendingCountProperty().asString(), " 条笔记待发送")
+        );
+        
+        return banner;
+    }
+    
+    private void togglePendingListView() {
+        if (showingPendingList) {
+            // 返回正常 Note 视图
+            showingPendingList = false;
+            noteModePanel.getChildren().set(
+                    noteModePanel.getChildren().indexOf(notesDisplayPanel) >= 0 
+                        ? noteModePanel.getChildren().size() - 1 : 2,
+                    notesDisplayPanel
+            );
+            VBox.setVgrow(notesDisplayPanel, Priority.ALWAYS);
+            loadRecentNotes();
+        } else {
+            // 显示 pending notes 列表
+            showingPendingList = true;
+            showPendingNotesList();
+        }
+    }
+    
+    private void showPendingNotesList() {
+        VBox pendingListView = new VBox(8);
+        pendingListView.setPadding(new Insets(8, 16, 16, 16));
+        VBox.setVgrow(pendingListView, Priority.ALWAYS);
+        
+        // 返回按钮 — 复用现有 back-button CSS class
+        Label backButton = new Label("← 返回");
+        backButton.getStyleClass().add("back-button");
+        backButton.setOnMouseClicked(e -> {
+            showingPendingList = false;
+            int idx = noteModePanel.getChildren().size() - 1;
+            noteModePanel.getChildren().set(idx, notesDisplayPanel);
+            VBox.setVgrow(notesDisplayPanel, Priority.ALWAYS);
+            loadRecentNotes();
+        });
+        
+        Label title = new Label("待发送笔记");
+        title.getStyleClass().add("search-pane-title");
+        
+        HBox header = new HBox(12);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.getChildren().addAll(backButton, title);
+        
+        pendingListView.getChildren().add(header);
+        
+        // 加载 pending notes
+        java.util.List<LocalCacheService.PendingNoteData> pendingNotes = 
+                ServiceManager.getInstance().getPendingNoteService().getPendingNotes();
+        
+        if (pendingNotes.isEmpty()) {
+            Label emptyLabel = new Label("没有待发送的笔记");
+            emptyLabel.getStyleClass().add("search-loading");
+            pendingListView.getChildren().add(emptyLabel);
+        } else {
+            javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane();
+            scrollPane.setFitToWidth(true);
+            scrollPane.getStyleClass().add("content-scroll");
+            VBox.setVgrow(scrollPane, Priority.ALWAYS);
+            
+            VBox cardsContainer = new VBox(12);
+            cardsContainer.setPadding(new Insets(8, 0, 8, 0));
+            cardsContainer.getStyleClass().add("notes-container");
+            
+            for (LocalCacheService.PendingNoteData note : pendingNotes) {
+                // 转换为 NoteData，复用 NoteCardView
+                LocalCacheService.NoteData noteData = new LocalCacheService.NoteData(
+                        note.id, note.content, note.channel, note.createdAt, null
+                );
+                cardsContainer.getChildren().add(new NoteCardView(noteData));
+            }
+            
+            scrollPane.setContent(cardsContainer);
+            pendingListView.getChildren().add(scrollPane);
+        }
+        
+        // 替换 notesDisplayPanel 为 pendingListView
+        int idx = noteModePanel.getChildren().indexOf(notesDisplayPanel);
+        if (idx >= 0) {
+            noteModePanel.getChildren().set(idx, pendingListView);
+        }
+    }
+    
     /**
      * Handle note send action
      */
     private void handleNoteSend(String content) {
+        PendingNoteService pendingService = ServiceManager.getInstance().getPendingNoteService();
+        
+        // 网络不可用：直接暂存到本地
+        if (!pendingService.isNetworkAvailable()) {
+            pendingService.savePendingNote(content, getDesktopChannel());
+            noteInputPanel.showStatus("📤 已暂存到本地，网络恢复后自动发送", false);
+            noteInputPanel.clearInput();
+            new Thread(() -> {
+                try { Thread.sleep(3000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                Platform.runLater(() -> noteInputPanel.hideStatus());
+            }).start();
+            return;
+        }
+        
+        // 网络可用：尝试发送
         noteInputPanel.showStatus("Encrypting and sending...", false);
         noteInputPanel.setSendButtonEnabled(false);
         
@@ -539,21 +674,15 @@ public class MainContentArea extends StackPane {
                     clipboard.setContent(clipContent);
                 }
                 
-                // Note: Don't manually add note here
-                // Wait for WebSocket sync/realtime update to add it automatically
-                // This ensures consistent behavior for all new notes (sent or received)
-                
-                // Hide status after 2 seconds
                 new Thread(() -> {
-                    try {
-                        Thread.sleep(2000);
-                        Platform.runLater(() -> noteInputPanel.hideStatus());
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
+                    try { Thread.sleep(2000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                    Platform.runLater(() -> noteInputPanel.hideStatus());
                 }).start();
             } else {
-                noteInputPanel.showStatus("✗ " + result.message(), true);
+                // 发送失败（超时等）：暂存到本地
+                pendingService.savePendingNote(content, getDesktopChannel());
+                noteInputPanel.showStatus("📤 发送失败，已暂存到本地", true);
+                noteInputPanel.clearInput();
             }
             
             noteInputPanel.setSendButtonEnabled(true);

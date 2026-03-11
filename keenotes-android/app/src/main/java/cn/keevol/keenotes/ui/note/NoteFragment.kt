@@ -43,6 +43,7 @@ class NoteFragment : Fragment() {
         setupSendChannelStatus()
         setupAutoFocusInput()
         setupKeyboardListener()
+        setupPendingBanner()
     }
     
     private fun setupKeyboardListener() {
@@ -68,6 +69,26 @@ class NoteFragment : Fragment() {
         }
     }
     
+    private fun setupPendingBanner() {
+        val app = requireActivity().application as KeeNotesApp
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            app.pendingNoteService.pendingCountFlow.collect { count ->
+                if (_binding != null) {
+                    if (count > 0) {
+                        binding.pendingBanner.visibility = View.VISIBLE
+                        binding.pendingLabel.text = "📤 ${count} 条笔记待发送"
+                        binding.pendingViewButton.setOnClickListener {
+                            findNavController().navigate(R.id.action_note_to_pending)
+                        }
+                    } else {
+                        binding.pendingBanner.visibility = View.GONE
+                    }
+                }
+            }
+        }
+    }
+
     private fun setupAutoFocusInput() {
         val app = requireActivity().application as KeeNotesApp
         
@@ -223,6 +244,19 @@ class NoteFragment : Fragment() {
     private fun saveNote(content: String) {
         val app = requireActivity().application as KeeNotesApp
         
+        // 网络不可用：直接暂存到本地
+        if (!app.pendingNoteService.isNetworkAvailable()) {
+            app.pendingNoteService.savePendingNote(content)
+            binding.noteInput.text?.clear()
+            binding.noteInput.clearFocus()
+            val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
+            com.google.android.material.snackbar.Snackbar.make(
+                binding.root, "📤 已暂存到本地，网络恢复后自动发送", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+            ).show()
+            return
+        }
+        
         // Disable button and show sending state
         binding.btnSend.isEnabled = false
         binding.btnSend.alpha = 0.7f
@@ -263,13 +297,12 @@ class NoteFragment : Fragment() {
                     val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
                     imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
                 } else {
-                    // Show error in button temporarily
-                    binding.sendText.text = "Failed"
-                    binding.btnSend.postDelayed({
-                        if (_binding != null) {
-                            binding.sendText.text = "Send"
-                        }
-                    }, 2000)
+                    // 发送失败：暂存到本地
+                    app.pendingNoteService.savePendingNote(content)
+                    binding.noteInput.text?.clear()
+                    com.google.android.material.snackbar.Snackbar.make(
+                        binding.root, "📤 发送失败，已暂存到本地", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                    ).show()
                 }
                 
                 updateSendButtonState(binding.noteInput.text?.isNotBlank() == true)

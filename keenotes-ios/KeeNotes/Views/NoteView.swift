@@ -9,6 +9,7 @@ struct NoteView: View {
     @State private var showErrorToast = false
     @State private var errorMessage = ""
     @State private var isPosting = false
+    @State private var showingPendingList = false
     @FocusState private var isTextFieldFocused: Bool
     @State private var keyboardVisible = false
     @StateObject private var speechService = SpeechRecognitionService()
@@ -32,7 +33,26 @@ struct NoteView: View {
                 }
 
                 // Main content
+                if showingPendingList {
+                    PendingNotesListView(showingPendingList: $showingPendingList)
+                        .environmentObject(appState)
+                } else {
                 VStack(spacing: isPad ? 24 : 16) {
+                    // Pending notes banner
+                    if appState.databaseService.pendingNoteCount > 0 {
+                        HStack {
+                            Text("📤 \(appState.databaseService.pendingNoteCount) 条笔记待发送")
+                                .font(.system(size: 13))
+                                .foregroundColor(.orange)
+                            Spacer()
+                            Button("查看") { showingPendingList = true }
+                                .font(.system(size: 13))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.orange.opacity(0.12))
+                        .cornerRadius(6)
+                    }
                     // Unified input container with embedded Send Channel and Send button
                     ZStack(alignment: .bottom) {
                         // Note input area (keep border, remove fill background)
@@ -145,6 +165,7 @@ struct NoteView: View {
                     // Tap outside to dismiss keyboard
                     isTextFieldFocused = false
                 }
+                } // end else (not showing pending list)
             }
             .navigationTitle("KeeNotes")
             .navigationBarTitleDisplayMode(.inline)
@@ -263,6 +284,25 @@ struct NoteView: View {
 
         // Stop voice input if active
         speechService.stopRecording()
+        
+        // 网络不可用：直接暂存到本地
+        if appState.webSocketService.connectionState != .connected {
+            let sentContent = noteText
+            appState.pendingNoteService.savePendingNote(content: sentContent)
+            noteText = ""
+            isTextFieldFocused = false
+            
+            errorMessage = "📤 已暂存到本地，网络恢复后自动发送"
+            withAnimation(.spring()) { showErrorToast = true }
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                await MainActor.run {
+                    withAnimation(.spring()) { showErrorToast = false }
+                }
+            }
+            return
+        }
+
         isPosting = true
 
         Task {
@@ -298,20 +338,18 @@ struct NoteView: View {
                         }
                     }
                 } else {
-                    // Keep keyboard visible on failure so user can edit and retry
-                    // Show error toast
-                    errorMessage = result.message
-                    withAnimation(.spring()) {
-                        showErrorToast = true
-                    }
-
-                    // Hide after 3 seconds
+                    // 发送失败：暂存到本地
+                    let sentContent = noteText
+                    appState.pendingNoteService.savePendingNote(content: sentContent)
+                    noteText = ""
+                    isTextFieldFocused = false
+                    
+                    errorMessage = "📤 发送失败，已暂存到本地"
+                    withAnimation(.spring()) { showErrorToast = true }
                     Task {
                         try? await Task.sleep(nanoseconds: 3_000_000_000)
                         await MainActor.run {
-                            withAnimation(.spring()) {
-                                showErrorToast = false
-                            }
+                            withAnimation(.spring()) { showErrorToast = false }
                         }
                     }
                 }
@@ -479,5 +517,63 @@ extension UIResponder {
     
     @objc func captureFirstResponder(_ sender: Any?) {
         UIResponder._currentFirstResponder = self
+    }
+}
+
+// MARK: - Pending Notes List View
+struct PendingNotesListView: View {
+    @EnvironmentObject var appState: AppState
+    @Binding var showingPendingList: Bool
+    @State private var pendingNotes: [PendingNote] = []
+
+    private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header with back button
+            HStack {
+                Button(action: { showingPendingList = false }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("返回")
+                    }
+                    .font(.system(size: 14))
+                }
+                
+                Text("待发送笔记")
+                    .font(.headline)
+                    .padding(.leading, 8)
+                
+                Spacer()
+            }
+            .padding(.horizontal, horizontalPadding)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+            
+            if pendingNotes.isEmpty {
+                Spacer()
+                Text("没有待发送的笔记")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
+                Spacer()
+            } else {
+                List {
+                    ForEach(pendingNotes) { pendingNote in
+                        NoteRow(note: pendingNote.toNote())
+                            .listRowInsets(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .onAppear { loadPendingNotes() }
+    }
+    
+    private func loadPendingNotes() {
+        Task {
+            pendingNotes = (try? await appState.databaseService.getPendingNotes()) ?? []
+        }
     }
 }
