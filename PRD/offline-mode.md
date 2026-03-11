@@ -112,4 +112,4 @@ UI 各处绑定该 property，自动响应变化。
 - [x] 3.2 新建 `PendingNoteService`（Kotlin 实现）
 - [x] 3.3 修改发送逻辑 — 网络检查 + 暂存
 - [x] 3.4 UI: pending 提示条 + pending notes 列表
-- [ ] 3.5 （用户自行用 Android Studio 编译测试）
+- [x] 3.5 （用户自行用 Android Studio 编译测试）

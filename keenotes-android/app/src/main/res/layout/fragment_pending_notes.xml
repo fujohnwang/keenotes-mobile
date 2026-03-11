@@ -25,14 +25,14 @@
             android:clickable="true"
             android:focusable="true"
             app:tint="@color/text_primary"
-            android:contentDescription="返回" />
+            android:contentDescription="Back" />
 
         <TextView
             android:id="@+id/titleText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="待发送笔记"
+            android:text="Pending Notes"
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="@color/text_primary" />
@@ -45,7 +45,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center"
-        android:text="暂无待发送笔记"
+        android:text="No pending notes"
         android:textSize="14sp"
         android:textColor="@color/text_secondary"
         android:visibility="gone" />

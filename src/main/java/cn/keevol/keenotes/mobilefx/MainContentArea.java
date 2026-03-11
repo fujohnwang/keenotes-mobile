@@ -539,7 +539,7 @@ public class MainContentArea extends StackPane {
         pendingLabel = new Label();
         pendingLabel.getStyleClass().add("pending-banner-label");
         
-        Label viewButton = new Label("查看");
+        Label viewButton = new Label("View");
         viewButton.getStyleClass().add("pending-banner-view-button");
         viewButton.setOnMouseClicked(e -> togglePendingListView());
         
@@ -553,7 +553,7 @@ public class MainContentArea extends StackPane {
         banner.visibleProperty().bind(pendingService.pendingCountProperty().greaterThan(0));
         banner.managedProperty().bind(banner.visibleProperty());
         pendingLabel.textProperty().bind(
-                Bindings.concat("📤 ", pendingService.pendingCountProperty().asString(), " 条笔记待发送")
+                Bindings.concat("📤 ", pendingService.pendingCountProperty().asString(), " note(s) pending")
         );
         
         return banner;
@@ -583,7 +583,7 @@ public class MainContentArea extends StackPane {
         VBox.setVgrow(pendingListView, Priority.ALWAYS);
         
         // 返回按钮 — 复用现有 back-button CSS class
-        Label backButton = new Label("← 返回");
+        Label backButton = new Label("← Back");
         backButton.getStyleClass().add("back-button");
         backButton.setOnMouseClicked(e -> {
             showingPendingList = false;
@@ -593,7 +593,7 @@ public class MainContentArea extends StackPane {
             loadRecentNotes();
         });
         
-        Label title = new Label("待发送笔记");
+        Label title = new Label("Pending Notes");
         title.getStyleClass().add("search-pane-title");
         
         HBox header = new HBox(12);
@@ -607,7 +607,7 @@ public class MainContentArea extends StackPane {
                 ServiceManager.getInstance().getPendingNoteService().getPendingNotes();
         
         if (pendingNotes.isEmpty()) {
-            Label emptyLabel = new Label("没有待发送的笔记");
+            Label emptyLabel = new Label("No pending notes");
             emptyLabel.getStyleClass().add("search-loading");
             pendingListView.getChildren().add(emptyLabel);
         } else {
@@ -648,7 +648,7 @@ public class MainContentArea extends StackPane {
         // 网络不可用：直接暂存到本地
         if (!pendingService.isNetworkAvailable()) {
             pendingService.savePendingNote(content, getDesktopChannel());
-            noteInputPanel.showStatus("📤 已暂存到本地，网络恢复后自动发送", false);
+            noteInputPanel.showStatus("📤 Saved locally, will auto-send when network restores", false);
             noteInputPanel.clearInput();
             new Thread(() -> {
                 try { Thread.sleep(3000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
@@ -681,8 +681,12 @@ public class MainContentArea extends StackPane {
             } else {
                 // 发送失败（超时等）：暂存到本地
                 pendingService.savePendingNote(content, getDesktopChannel());
-                noteInputPanel.showStatus("📤 发送失败，已暂存到本地", true);
+                noteInputPanel.showStatus("📤 Send failed, saved locally", true);
                 noteInputPanel.clearInput();
+                new Thread(() -> {
+                    try { Thread.sleep(3000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                    Platform.runLater(() -> noteInputPanel.hideStatus());
+                }).start();
             }
             
             noteInputPanel.setSendButtonEnabled(true);

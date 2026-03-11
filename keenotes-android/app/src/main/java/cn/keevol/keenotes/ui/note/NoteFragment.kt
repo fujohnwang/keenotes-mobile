@@ -77,7 +77,7 @@ class NoteFragment : Fragment() {
                 if (_binding != null) {
                     if (count > 0) {
                         binding.pendingBanner.visibility = View.VISIBLE
-                        binding.pendingLabel.text = "📤 ${count} 条笔记待发送"
+                        binding.pendingLabel.text = "📤 ${count} note(s) pending"
                         binding.pendingViewButton.setOnClickListener {
                             findNavController().navigate(R.id.action_note_to_pending)
                         }
@@ -252,7 +252,7 @@ class NoteFragment : Fragment() {
             val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
             imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
             com.google.android.material.snackbar.Snackbar.make(
-                binding.root, "📤 已暂存到本地，网络恢复后自动发送", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                binding.root, "📤 Saved locally, will auto-send when network restores", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
             ).show()
             return
         }
@@ -301,7 +301,7 @@ class NoteFragment : Fragment() {
                     app.pendingNoteService.savePendingNote(content)
                     binding.noteInput.text?.clear()
                     com.google.android.material.snackbar.Snackbar.make(
-                        binding.root, "📤 发送失败，已暂存到本地", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                        binding.root, "📤 Send failed, saved locally", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
                     ).show()
                 }
                 

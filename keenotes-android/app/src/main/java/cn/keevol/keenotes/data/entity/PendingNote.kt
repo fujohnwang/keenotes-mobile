@@ -14,4 +14,12 @@ data class PendingNote(
     val content: String,
     val channel: String = "mobile-android",
     val createdAt: String
-)
+) {
+    /** 转换为 Note 以复用 NotesAdapter / item_note.xml */
+    fun toNote() = Note(
+        id = id,
+        content = content,
+        channel = channel,
+        createdAt = createdAt
+    )
+}

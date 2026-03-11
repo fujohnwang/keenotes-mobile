@@ -47,8 +47,11 @@ Desktop 端还存在 theme 切换不响应的问题（硬编码颜色）。
 - [x] `fragment_note.xml` 中 banner 的硬编码颜色改为引用 theme/color 资源
 - [x] `bg_pending_banner.xml` 背景色使用 theme 资源
 
-### 3.2 Pending Notes 列表 — 复用 item_note.xml + NotesAdapter 模式
-- [x] `item_pending_note.xml` 复用 `item_note.xml` 的卡片样式（CardView + 相同的 corner radius、elevation、padding）
+### 3.2 Pending Notes 列表 — 直接复用 NotesAdapter + item_note.xml
+- [x] 删除自定义的 `PendingNotesAdapter.kt` 和 `item_pending_note.xml`
+- [x] `PendingNote` 添加 `toNote()` 转换方法
+- [x] `PendingNotesFragment` 直接使用 `NotesAdapter`，通过 `map { it.toNote() }` 转换数据
+- [x] 点击复制、长按选择等交互自动继承自 `NotesAdapter`
 - [x] `PendingNotesFragment` 的 toolbar 样式与其他 Fragment 保持一致
 
 ### 3.3 验证
