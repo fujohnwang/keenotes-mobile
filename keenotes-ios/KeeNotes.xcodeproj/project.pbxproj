@@ -29,9 +29,9 @@
 		B2C3D4E5F6A7182930415C6D /* WizardCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D3C4B5A6978081920B4C5E /* WizardCard.swift */; };
 		B3C4D5E6F7A8293041526E8B /* WizardInlineCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D4C5B6A7980819210C6F9C /* WizardInlineCard.swift */; };
 		BB1B2C3D4E5F60718293AB02 /* SpeechRecognitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F60718293AB01 /* SpeechRecognitionService.swift */; };
-		CC1B2C3D4E5F60718293AB03 /* PendingNoteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1B2C3D4E5F60718293AB04 /* PendingNoteService.swift */; };
 		C0AE7EC02E4C49132B40A4A0 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 149970AB595EDA07A0940B31 /* GRDB */; };
 		C3D4E5F6A7B8293041526D7F /* OnboardingWizardOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */; };
+		CC1B2C3D4E5F60718293AB03 /* PendingNoteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1B2C3D4E5F60718293AB04 /* PendingNoteService.swift */; };
 		DA5DD2A22882D996C37B27EF /* argon2.c in Sources */ = {isa = PBXBuildFile; fileRef = 6D467341E90F4D144FCEC974 /* argon2.c */; };
 		E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC48816DBEEFEE56707E5302 /* NoteView.swift */; };
 		E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9040A9739D8D0416CE13A31 /* MainTabView.swift */; };
@@ -71,13 +71,13 @@
 		D34FAB7AB6D6F412B2AD704B /* KeeNotes-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "KeeNotes-Bridging-Header.h"; sourceTree = "<group>"; };
 		D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWizardOverlay.swift; sourceTree = "<group>"; };
 		D6B16CD3673E6F843DF0CC2C /* blake2-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blake2-impl.h"; sourceTree = "<group>"; };
+		DD1B2C3D4E5F60718293AB04 /* PendingNoteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingNoteService.swift; sourceTree = "<group>"; };
 		DF16E09CF759358B4C94BCBD /* DeviceType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceType.swift; sourceTree = "<group>"; };
 		DFE252BFDC15087E4D34EB51 /* WebSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketService.swift; sourceTree = "<group>"; };
 		E2D3C4B5A6978081920B4C5E /* WizardCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardCard.swift; sourceTree = "<group>"; };
 		E3D4C5B6A7980819210C6F9C /* WizardInlineCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardInlineCard.swift; sourceTree = "<group>"; };
 		E71854385AA7C1EECC7F20F2 /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
 		EAA89252DC520456A6A43EEC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		DD1B2C3D4E5F60718293AB04 /* PendingNoteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingNoteService.swift; sourceTree = "<group>"; };
 		EC56614EF00CDBBE7B740F99 /* SettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsService.swift; sourceTree = "<group>"; };
 		F1E2D3C4B5A6978081920A3B /* WizardStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -403,7 +403,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3.12;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
@@ -425,7 +425,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3.12;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
