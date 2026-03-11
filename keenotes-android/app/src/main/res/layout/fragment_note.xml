@@ -57,6 +57,39 @@
             android:id="@+id/overviewCardInclude"
             layout="@layout/view_overview_card" />
 
+        <!-- Pending notes banner (hidden by default) -->
+        <LinearLayout
+            android:id="@+id/pendingBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_pending_banner"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/pendingLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="13sp"
+                android:textColor="#FFB74D" />
+
+            <TextView
+                android:id="@+id/pendingViewButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="查看"
+                android:textSize="13sp"
+                android:textColor="@color/primary"
+                android:clickable="true"
+                android:focusable="true" />
+
+        </LinearLayout>
+
         <!-- Unified input container - fills remaining space -->
         <LinearLayout
             android:layout_width="match_parent"

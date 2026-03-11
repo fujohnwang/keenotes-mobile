@@ -5,6 +5,7 @@ import cn.keevol.keenotes.crypto.CryptoService
 import cn.keevol.keenotes.data.database.AppDatabase
 import cn.keevol.keenotes.data.repository.SettingsRepository
 import cn.keevol.keenotes.network.ApiService
+import cn.keevol.keenotes.network.PendingNoteService
 import cn.keevol.keenotes.network.WebSocketService
 import cn.keevol.keenotes.util.DebugLogger
 import kotlinx.coroutines.runBlocking
@@ -27,6 +28,9 @@ class KeeNotesApp : Application() {
         private set
     
     lateinit var webSocketService: WebSocketService
+        private set
+    
+    lateinit var pendingNoteService: PendingNoteService
         private set
     
     override fun onCreate() {
@@ -65,10 +69,18 @@ class KeeNotesApp : Application() {
             database.noteDao(),
             database.syncStateDao()
         )
+        
+        pendingNoteService = PendingNoteService(
+            database.pendingNoteDao(),
+            apiService,
+            webSocketService
+        )
+        pendingNoteService.startRetryScheduler()
     }
     
     override fun onTerminate() {
         super.onTerminate()
+        pendingNoteService.shutdown()
         webSocketService.shutdown()
     }
 }

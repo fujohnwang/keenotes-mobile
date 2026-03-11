@@ -55,6 +55,14 @@ class DatabaseService: ObservableObject {
             
             // Create index on createdAt for faster sorting/querying
             try db.create(index: "idx_notes_createdAt", on: Note.databaseTableName, columns: ["createdAt"], ifNotExists: true)
+            
+            // Create pending_notes table for offline cache
+            try db.create(table: PendingNote.databaseTableName, ifNotExists: true) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("content", .text).notNull()
+                t.column("channel", .text).notNull().defaults(to: "mobile-ios")
+                t.column("createdAt", .text).notNull()
+            }
         }
         
         // Update note count
@@ -273,6 +281,51 @@ class DatabaseService: ObservableObject {
         }
         try await dbQueue.write { db in
             try SyncState.deleteAll(db)
+        }
+    }
+    
+    // MARK: - Pending Notes (Offline Cache)
+    
+    @Published var pendingNoteCount: Int = 0
+    
+    func insertPendingNote(content: String, channel: String = "mobile-ios") async throws {
+        guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
+        let now = ISO8601DateFormatter().string(from: Date())
+        var note = PendingNote(content: content, channel: channel, createdAt: now)
+        try await dbQueue.write { db in
+            try note.insert(db)
+        }
+        await refreshPendingNoteCount()
+    }
+    
+    func getPendingNotes() async throws -> [PendingNote] {
+        guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
+        return try await dbQueue.read { db in
+            try PendingNote.order(PendingNote.Columns.createdAt.asc).fetchAll(db)
+        }
+    }
+    
+    func deletePendingNote(id: Int64) async throws {
+        guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
+        try await dbQueue.write { db in
+            try db.execute(sql: "DELETE FROM pending_notes WHERE id = ?", arguments: [id])
+        }
+        await refreshPendingNoteCount()
+    }
+    
+    func getPendingNoteCount() async throws -> Int {
+        guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
+        return try await dbQueue.read { db in
+            try PendingNote.fetchCount(db)
+        }
+    }
+    
+    func refreshPendingNoteCount() async {
+        do {
+            let count = try await getPendingNoteCount()
+            await MainActor.run { self.pendingNoteCount = count }
+        } catch {
+            print("[DB] Failed to refresh pendingNoteCount: \(error)")
         }
     }
     

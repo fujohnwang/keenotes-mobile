@@ -218,6 +218,15 @@ public class LocalCacheService {
             stmt.executeUpdate(
                     "INSERT OR IGNORE INTO sync_state (id, last_sync_id) VALUES (1, -1)");
 
+            // 离线暂存表：网络不可用时暂存未发送的笔记
+            stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS pending_notes (" +
+                            "  id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                            "  content TEXT NOT NULL, " +
+                            "  channel TEXT DEFAULT 'desktop', " +
+                            "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                            ")");
+
             stmt.close();
             initStep = "completed";
             initLog.append("Database init completed OK");
@@ -562,6 +571,86 @@ public class LocalCacheService {
             refreshNoteCount();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to clear cache data", e);
+        }
+    }
+
+    // ==================== Pending Notes (离线暂存) ====================
+
+    // Reactive property for pending note count
+    private final IntegerProperty pendingNoteCountProperty = new SimpleIntegerProperty(0);
+
+    public IntegerProperty pendingNoteCountProperty() {
+        return pendingNoteCountProperty;
+    }
+
+    private void refreshPendingNoteCount() {
+        int count = getPendingNoteCount();
+        Platform.runLater(() -> pendingNoteCountProperty.set(count));
+    }
+
+    public void insertPendingNote(String content, String channel) throws SQLException {
+        ensureInitialized();
+        String sql = "INSERT INTO pending_notes (content, channel) VALUES (?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, content);
+            pstmt.setString(2, channel);
+            pstmt.executeUpdate();
+        }
+        refreshPendingNoteCount();
+    }
+
+    public List<PendingNoteData> getPendingNotes() {
+        ensureInitialized();
+        List<PendingNoteData> notes = new ArrayList<>();
+        String sql = "SELECT id, content, channel, created_at FROM pending_notes ORDER BY created_at ASC";
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                notes.add(new PendingNoteData(
+                        rs.getLong("id"),
+                        rs.getString("content"),
+                        rs.getString("channel"),
+                        rs.getString("created_at")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return notes;
+    }
+
+    public void deletePendingNote(long id) throws SQLException {
+        ensureInitialized();
+        String sql = "DELETE FROM pending_notes WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setLong(1, id);
+            pstmt.executeUpdate();
+        }
+        refreshPendingNoteCount();
+    }
+
+    public int getPendingNoteCount() {
+        ensureInitialized();
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM pending_notes")) {
+            if (rs.next()) return rs.getInt(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public static class PendingNoteData {
+        public final long id;
+        public final String content;
+        public final String channel;
+        public final String createdAt;
+
+        public PendingNoteData(long id, String content, String channel, String createdAt) {
+            this.id = id;
+            this.content = content;
+            this.channel = channel;
+            this.createdAt = createdAt;
         }
     }
 

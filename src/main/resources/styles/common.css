@@ -609,3 +609,19 @@
 .status-footer-bar .status-label {
     -fx-font-size: 12px;
 }
+
+/* Pending Notes Banner */
+.pending-banner {
+    -fx-background-radius: 6;
+    -fx-padding: 8 16;
+}
+
+.pending-banner-label {
+    -fx-font-size: 13px;
+}
+
+.pending-banner-view-button {
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-underline: true;
+}
