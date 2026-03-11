@@ -41,11 +41,11 @@ struct NoteView: View {
                     // Pending notes banner
                     if appState.databaseService.pendingNoteCount > 0 {
                         HStack {
-                            Text("📤 \(appState.databaseService.pendingNoteCount) 条笔记待发送")
+                            Text("📤 \(appState.databaseService.pendingNoteCount) note(s) pending")
                                 .font(.system(size: 13))
                                 .foregroundColor(.orange)
                             Spacer()
-                            Button("查看") { showingPendingList = true }
+                            Button("View") { showingPendingList = true }
                                 .font(.system(size: 13))
                         }
                         .padding(.horizontal, 16)
@@ -244,8 +244,8 @@ struct NoteView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
-            .overlay(alignment: .top) {
-                // Error message overlay (top right)
+            .overlay(alignment: .center) {
+                // Error message overlay (center of screen)
                 if showErrorToast {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.circle.fill")
@@ -259,9 +259,8 @@ struct NoteView: View {
                     .padding(.vertical, 10)
                     .background(Color.red)
                     .cornerRadius(10)
-                    .padding(.top, 60)
                     .padding(.horizontal, 16)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.scale.combined(with: .opacity))
                 }
             }
         }
@@ -292,7 +291,7 @@ struct NoteView: View {
             noteText = ""
             isTextFieldFocused = false
             
-            errorMessage = "📤 已暂存到本地，网络恢复后自动发送"
+            errorMessage = "📤 Saved locally, will auto-send when network restores"
             withAnimation(.spring()) { showErrorToast = true }
             Task {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -344,7 +343,7 @@ struct NoteView: View {
                     noteText = ""
                     isTextFieldFocused = false
                     
-                    errorMessage = "📤 发送失败，已暂存到本地"
+                    errorMessage = "📤 Send failed, saved locally"
                     withAnimation(.spring()) { showErrorToast = true }
                     Task {
                         try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -535,12 +534,12 @@ struct PendingNotesListView: View {
                 Button(action: { showingPendingList = false }) {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
-                        Text("返回")
+                        Text("Back")
                     }
                     .font(.system(size: 14))
                 }
                 
-                Text("待发送笔记")
+                Text("Pending Notes")
                     .font(.headline)
                     .padding(.leading, 8)
                 
@@ -552,7 +551,7 @@ struct PendingNotesListView: View {
             
             if pendingNotes.isEmpty {
                 Spacer()
-                Text("没有待发送的笔记")
+                Text("No pending notes")
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity)
                 Spacer()
