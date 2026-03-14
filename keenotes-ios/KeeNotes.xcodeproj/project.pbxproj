@@ -10,6 +10,7 @@
 		1522A18793715A66AF3C5B1E /* encoding.c in Sources */ = {isa = PBXBuildFile; fileRef = CD8A13501AA7A7CAB9DD2D6B /* encoding.c */; };
 		185B386682B6638BD824635B /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516619C5BAA926CB01F4B456 /* DatabaseService.swift */; };
 		1AE2B3C4D5F6A78091023B4C /* ConfettiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE3C4D5F6A78091023B4C5D /* ConfettiView.swift */; };
+		1BE3C4D5E6F7A89012345678 /* EnlargedNoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE4D5E6F7A89012345678AB /* EnlargedNoteView.swift */; };
 		1FFF7BD4F1D6ED72F2E2FA18 /* OverviewCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FC4DD3D4698E0F2A59FF2 /* OverviewCardView.swift */; };
 		2BF45F4BF51073D8B254736C /* DeviceType.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF16E09CF759358B4C94BCBD /* DeviceType.swift */; };
 		2FAF71FD90FB24A293D9C1DC /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = 599C37F5BE3DA3E0B0E48AD9 /* core.c */; };
@@ -45,6 +46,7 @@
 		0CCFBB1C4E585233C8949042 /* ApiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiService.swift; sourceTree = "<group>"; };
 		0F0DB648B1399AF3B170E27B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2AE3C4D5F6A78091023B4C5D /* ConfettiView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiView.swift; sourceTree = "<group>"; };
+		2BE4D5E6F7A89012345678AB /* EnlargedNoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnlargedNoteView.swift; sourceTree = "<group>"; };
 		12CB0C7E4D18D06ED6D1966A /* thread.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = thread.c; sourceTree = "<group>"; };
 		1575BB23A63EC55E1FFE55B3 /* blake2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = blake2.h; sourceTree = "<group>"; };
 		2770ABCD494AC650EFA448AD /* thread.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = thread.h; sourceTree = "<group>"; };
@@ -109,6 +111,7 @@
 			children = (
 				2AE3C4D5F6A78091023B4C5D /* ConfettiView.swift */,
 				E71854385AA7C1EECC7F20F2 /* DebugView.swift */,
+				2BE4D5E6F7A89012345678AB /* EnlargedNoteView.swift */,
 				A9040A9739D8D0416CE13A31 /* MainTabView.swift */,
 				BC48816DBEEFEE56707E5302 /* NoteView.swift */,
 				D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */,
@@ -297,6 +300,7 @@
 				1AE2B3C4D5F6A78091023B4C /* ConfettiView.swift in Sources */,
 				85535D4D227727012D31DE0F /* CryptoService.swift in Sources */,
 				185B386682B6638BD824635B /* DatabaseService.swift in Sources */,
+				1BE3C4D5E6F7A89012345678 /* EnlargedNoteView.swift in Sources */,
 				3D3A986E86CF4FAC5FBCDA0A /* DebugView.swift in Sources */,
 				2BF45F4BF51073D8B254736C /* DeviceType.swift in Sources */,
 				FBDF52C9E3B0CF6AFF1CAF1A /* KeeNotesApp.swift in Sources */,
