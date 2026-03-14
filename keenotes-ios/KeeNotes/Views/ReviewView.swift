@@ -9,6 +9,7 @@ struct ReviewView: View {
     @State private var selectedPeriod = 0  // 0: 7 days, 1: 30 days, 2: 90 days, 3: All
     @State private var totalCount = 0
     @State private var hasMoreData = true
+    @State private var enlargedNote: Note? = nil
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
@@ -58,8 +59,14 @@ struct ReviewView: View {
                     }
                     .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
 
-                    // Notes list
-                    if isLoading {
+                    // Notes list or enlarged note view
+                    if let enlarged = enlargedNote {
+                        EnlargedNoteView(note: enlarged) {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                enlargedNote = nil
+                            }
+                        }
+                    } else if isLoading {
                         Spacer()
                         ProgressView("Loading...")
                         Spacer()
@@ -76,7 +83,11 @@ struct ReviewView: View {
                     } else {
                         List {
                             ForEach(notes) { note in
-                                NoteRow(note: note)
+                                NoteRow(note: note, onEnlarge: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        enlargedNote = note
+                                    }
+                                })
                                     .listRowInsets(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
                                     .listRowSeparator(.hidden)
                                     .listRowBackground(Color.clear)
@@ -237,6 +248,7 @@ struct ReviewView: View {
 /// Single note card in the list
 struct NoteRow: View {
     let note: Note
+    var onEnlarge: (() -> Void)? = nil
     @State private var showCopiedAlert = false
     @State private var textViewHeight: CGFloat?
 
@@ -269,27 +281,42 @@ struct NoteRow: View {
         VStack(alignment: .leading, spacing: isPad ? 16 : 12) {
             // Header: Date and Channel
             HStack(spacing: isPad ? 10 : 8) {
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                        .font(.caption2)
-                    Text(formattedDate)
-                        .font(.caption)
-                }
-                .foregroundColor(.secondary)
+                HStack(spacing: isPad ? 10 : 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption2)
+                        Text(formattedDate)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
 
-                // Channel info
-                if !note.channel.isEmpty {
-                    Text("•")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(note.channel)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    // Channel info
+                    if !note.channel.isEmpty {
+                        Text("•")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(note.channel)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                copyToClipboard()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    copyToClipboard()
+                }
+                
+                Spacer()
+                
+                if let onEnlarge = onEnlarge {
+                    Button(action: onEnlarge) {
+                        Image(systemName: "arrow.down.left.and.arrow.up.right")
+                            .font(.system(size: isPad ? 16 : 14))
+                            .foregroundColor(.secondary)
+                            .padding(6)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             // Note content with selectable text using UITextView

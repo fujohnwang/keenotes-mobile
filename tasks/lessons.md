@@ -35,3 +35,16 @@
 **规则**:
 1. Canvas 闭包中的坐标计算，确保运算两侧类型一致 — 用 `CGFloat(x)` 显式转换或用 `2.0` 而非 `2`
 2. 特别注意 `size / 2` 这种写法 — 如果 `size` 是 `CGFloat`，除数应写成 `2.0` 而非 `2`
+
+## iOS 新增文件必须注册到 Xcode 项目配置
+
+**问题**: 新建 `.swift` 文件后忘记将其添加到 `project.pbxproj`，导致 Xcode 编译时找不到该文件中的类型定义。
+
+**规则**:
+1. 每次在 iOS 项目中新建 `.swift` 文件，必须同时在 `project.pbxproj` 中注册三处：
+   - `PBXBuildFile` section — 添加 `XXX.swift in Sources` 条目
+   - `PBXFileReference` section — 添加文件引用条目
+   - `PBXGroup` children — 将文件引用加入对应目录的 group（如 Views group）
+   - `PBXSourcesBuildPhase` files — 将 build file 引用加入编译列表
+2. 注册前先搜索同目录下已有文件（如 `ConfettiView.swift`）的注册方式作为模板
+3. 这是一个 checklist 项 — 创建文件后立即执行，不要等到最后
