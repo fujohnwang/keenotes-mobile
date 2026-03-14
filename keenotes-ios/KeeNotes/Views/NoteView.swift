@@ -311,8 +311,10 @@ struct NoteView: View {
                         UIPasteboard.general.string = sentContent
                     }
 
-                    // Trigger confetti (ConfettiView resets isActive automatically)
-                    showSuccessToast = true
+                    // Trigger confetti if enabled (ConfettiView resets isActive automatically)
+                    if appState.settingsService.confettiOnPostSuccess {
+                        showSuccessToast = true
+                    }
                 } else {
                     // 发送失败：暂存到本地
                     let sentContent = noteText

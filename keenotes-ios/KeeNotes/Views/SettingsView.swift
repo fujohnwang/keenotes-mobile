@@ -127,6 +127,11 @@ struct SettingsView: View {
                         get: { appState.settingsService.showKeyboardToolbar },
                         set: { appState.settingsService.showKeyboardToolbar = $0 }
                     ))
+
+                    Toggle("Confetti on post success", isOn: Binding(
+                        get: { appState.settingsService.confettiOnPostSuccess },
+                        set: { appState.settingsService.confettiOnPostSuccess = $0 }
+                    ))
                 }
                 .font(.system(size: isPad ? 17 : 17))
 
