@@ -10,3 +10,11 @@
 3. 新增组件前先问自己：「这个组件在 Review Notes 页面是什么样的？我的实现能不能跟它保持一致？」
 4. 如果需要数据类型转换来复用组件（如 `PendingNote → Note`），添加 `toNote()` 转换方法，不要为了省事自己写一套新 UI
 5. 复用现有组件意味着交互行为（点击复制、长按选择等）也自动继承，不需要重新实现
+
+## Swift 负数范围字面量语法
+
+**问题**: `CGFloat.random(in: -500...-50)` 在 Swift 中会报 "Ambiguous missing whitespace between unary and binary operators"，因为编译器无法区分 `...` 前的 `-` 是一元负号还是二元减号。
+
+**规则**:
+1. Swift 中使用负数范围时，必须给负数加括号：`(-500)...(-50)`
+2. 每次修改 iOS 代码后，必须用 `xcodebuild` 编译验证再交付，不能只靠肉眼检查
