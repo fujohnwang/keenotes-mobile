@@ -18,3 +18,20 @@
 **规则**:
 1. Swift 中使用负数范围时，必须给负数加括号：`(-500)...(-50)`
 2. 每次修改 iOS 代码后，必须用 `xcodebuild` 编译验证再交付，不能只靠肉眼检查
+
+## Android Animator Duration Scale = 0
+
+**问题**: 设备开发者选项中 `Animator duration scale` 设为 0x，导致所有 `ValueAnimator`/`ObjectAnimator` 动画瞬间完成（44ms 而非 2000ms），肉眼完全看不到。
+
+**规则**:
+1. Android 动画不能依赖 `ValueAnimator`/`ObjectAnimator` — 它们受系统 `Animator duration scale` 设置影响
+2. 需要不受系统设置影响的动画时，使用 `Choreographer.postFrameCallback` 手动逐帧驱动
+3. 调试 Android 动画问题时，第一步检查 `Settings > Developer options > Animator duration scale`
+
+## Swift Canvas 中 CGFloat/Double 类型歧义
+
+**问题**: 在 SwiftUI `Canvas` 闭包中做算术运算时，`CGFloat` 和 `Double` 混合运算会导致 `ambiguous use of operator '/'` 编译错误。
+
+**规则**:
+1. Canvas 闭包中的坐标计算，确保运算两侧类型一致 — 用 `CGFloat(x)` 显式转换或用 `2.0` 而非 `2`
+2. 特别注意 `size / 2` 这种写法 — 如果 `size` 是 `CGFloat`，除数应写成 `2.0` 而非 `2`

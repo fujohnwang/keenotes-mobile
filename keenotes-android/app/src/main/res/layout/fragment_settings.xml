@@ -200,6 +200,16 @@
                 android:textSize="14sp"
                 android:padding="12dp" />
 
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/confettiOnPostSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Confetti on post success"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:padding="12dp" />
+
             <!-- Debug Section (hidden by default) -->
             <LinearLayout
                 android:id="@+id/debugSection"

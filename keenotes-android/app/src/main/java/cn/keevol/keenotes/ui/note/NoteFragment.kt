@@ -297,8 +297,10 @@ class NoteFragment : Fragment() {
                     val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
                     imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
                     
-                    // Fire confetti immediately (Choreographer-driven, async)
-                    cn.keevol.keenotes.ui.widget.ConfettiHelper.fire(requireActivity())
+                    // Fire confetti immediately if enabled (Choreographer-driven, async)
+                    if (app.settingsRepository.confettiOnPostSuccess.first()) {
+                        cn.keevol.keenotes.ui.widget.ConfettiHelper.fire(requireActivity())
+                    }
                 } else {
                     // 发送失败：暂存到本地
                     app.pendingNoteService.savePendingNote(content)
