@@ -3,64 +3,71 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_margin="8dp"
-    android:foreground="?attr/selectableItemBackground"
+    android:layout_height="match_parent"
+    android:layout_margin="12dp"
     app:cardBackgroundColor="@color/surface_elevated"
     app:cardCornerRadius="12dp"
-    app:cardElevation="0dp">
+    app:cardElevation="4dp">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="20dp">
 
-        <!-- Header: Date, Channel (left) + Enlarge button (right) -->
+        <!-- Header: Date, Channel (left) + Shrink button (right) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:paddingBottom="12dp">
 
             <TextView
-                android:id="@+id/dateText"
+                android:id="@+id/enlargedDateText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="12sp"
+                android:textSize="14sp"
                 android:textColor="@color/primary" />
 
             <TextView
-                android:id="@+id/channelText"
+                android:id="@+id/enlargedChannelText"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="8dp"
-                android:textSize="12sp"
+                android:textSize="14sp"
                 android:textColor="@color/text_secondary" />
 
             <ImageButton
-                android:id="@+id/enlargeButton"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:id="@+id/shrinkButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_open_in_full"
+                android:src="@drawable/ic_close_fullscreen"
                 android:scaleType="centerInside"
                 android:padding="4dp"
-                android:contentDescription="Enlarge note" />
+                android:contentDescription="Shrink note" />
 
         </LinearLayout>
 
-        <!-- Full content (text selection handled by system) -->
-        <TextView
-            android:id="@+id/contentText"
+        <!-- Scrollable content -->
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textSize="14sp"
-            android:textColor="@color/text_primary"
-            android:lineSpacingExtra="2dp"
-            android:textIsSelectable="true" />
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true">
+
+            <TextView
+                android:id="@+id/enlargedContentText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="20sp"
+                android:textColor="@color/text_primary"
+                android:lineSpacingExtra="4dp"
+                android:textIsSelectable="true" />
+
+        </ScrollView>
 
     </LinearLayout>
 
