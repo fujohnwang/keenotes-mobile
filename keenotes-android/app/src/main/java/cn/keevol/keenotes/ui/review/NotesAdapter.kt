@@ -19,7 +19,9 @@ import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.ItemNoteBinding
 
-class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCallback()) {
+class NotesAdapter(
+    private val onEnlargeClick: ((Note) -> Unit)? = null
+) : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCallback()) {
     
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NoteViewHolder {
         val binding = ItemNoteBinding.inflate(
@@ -27,7 +29,7 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
             parent,
             false
         )
-        return NoteViewHolder(binding)
+        return NoteViewHolder(binding, onEnlargeClick)
     }
     
     override fun onBindViewHolder(holder: NoteViewHolder, position: Int) {
@@ -35,7 +37,8 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
     }
     
     class NoteViewHolder(
-        private val binding: ItemNoteBinding
+        private val binding: ItemNoteBinding,
+        private val onEnlargeClick: ((Note) -> Unit)? = null
     ) : RecyclerView.ViewHolder(binding.root) {
         
         private var currentNote: Note? = null
@@ -56,6 +59,11 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
             
             // Full content
             binding.contentText.text = note.content
+            
+            // Enlarge button
+            binding.enlargeButton.setOnClickListener {
+                currentNote?.let { onEnlargeClick?.invoke(it) }
+            }
             
             // Setup interactions
             setupInteractions()
