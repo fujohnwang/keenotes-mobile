@@ -229,20 +229,9 @@ struct NoteView: View {
                     .background(Color(.systemBackground))
                 }
             }
-            .overlay(alignment: .center) {
-                // Success checkmark overlay (center of screen)
-                if showSuccessToast {
-                    ZStack {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 80, height: 80)
-
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 40, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                    .transition(.scale.combined(with: .opacity))
-                }
+            .overlay {
+                // Confetti overlay on successful send
+                ConfettiView(isActive: $showSuccessToast)
             }
             .overlay(alignment: .center) {
                 // Error message overlay (center of screen)
@@ -322,20 +311,8 @@ struct NoteView: View {
                         UIPasteboard.general.string = sentContent
                     }
 
-                    // Show success checkmark
-                    withAnimation(.spring()) {
-                        showSuccessToast = true
-                    }
-
-                    // Hide after 1 second
-                    Task {
-                        try? await Task.sleep(nanoseconds: 1_000_000_000)
-                        await MainActor.run {
-                            withAnimation(.spring()) {
-                                showSuccessToast = false
-                            }
-                        }
-                    }
+                    // Trigger confetti (ConfettiView resets isActive automatically)
+                    showSuccessToast = true
                 } else {
                     // 发送失败：暂存到本地
                     let sentContent = noteText

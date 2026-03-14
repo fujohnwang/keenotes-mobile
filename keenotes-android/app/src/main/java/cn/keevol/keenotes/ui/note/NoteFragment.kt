@@ -296,6 +296,10 @@ class NoteFragment : Fragment() {
                     // Hide keyboard
                     val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
                     imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
+                    
+                    // Trigger confetti animation
+                    val contentView = requireActivity().findViewById<android.view.ViewGroup>(android.R.id.content)
+                    cn.keevol.keenotes.ui.widget.ConfettiHelper.fire(contentView)
                 } else {
                     // 发送失败：暂存到本地
                     app.pendingNoteService.savePendingNote(content)
