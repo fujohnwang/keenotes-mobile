@@ -30,12 +30,14 @@ public class SettingsService {
     private static final String KEY_THEME = "ui.theme";
     private static final String KEY_NOTE_FONT_SIZE = "note.font.size";
     private static final String KEY_ZOOM_IN_SHORTCUT = "shortcut.zoom.in";
+    private static final String KEY_TAKE_NOTE_SHORTCUT = "shortcut.take.note";
     private static final String KEY_ZOOM_OUT_SHORTCUT = "shortcut.zoom.out";
     private static final String KEY_LOCAL_IMPORT_SERVER_PORT = "local.import.server.port";
     private static final String KEY_MCP_SERVER_PORT = "mcp.server.port";
     private static final String KEY_MCP_SERVER_ENABLED = "mcp.server.enabled";
 
     private static final int DEFAULT_REVIEW_DAYS = 7;
+    private static final String DEFAULT_TAKE_NOTE_SHORTCUT = "Alt+T";
     private static final String DEFAULT_SEARCH_SHORTCUT = "Alt+Shift+S";
     private static final String DEFAULT_SEND_SHORTCUT = "Alt+Enter";
     private static final String DEFAULT_THEME = "dark";
@@ -182,6 +184,14 @@ public class SettingsService {
 
     public void setCopyToClipboardOnPost(boolean enabled) {
         properties.setProperty(KEY_COPY_TO_CLIPBOARD, String.valueOf(enabled));
+    }
+
+    public String getTakeNoteShortcut() {
+        return properties.getProperty(KEY_TAKE_NOTE_SHORTCUT, DEFAULT_TAKE_NOTE_SHORTCUT);
+    }
+
+    public void setTakeNoteShortcut(String shortcut) {
+        properties.setProperty(KEY_TAKE_NOTE_SHORTCUT, shortcut);
     }
 
     public String getSearchShortcut() {

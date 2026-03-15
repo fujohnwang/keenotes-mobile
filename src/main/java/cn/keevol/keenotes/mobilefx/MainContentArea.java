@@ -820,6 +820,11 @@ public class MainContentArea extends StackPane {
                     pendingSearchFocus = false;
                     searchInputPanel.requestSearchFocus();
                 }
+                // Focus note input after animation completes
+                if (targetPanel == noteModePanel && pendingNoteFocus) {
+                    pendingNoteFocus = false;
+                    noteInputPanel.requestInputFocus();
+                }
             });
             
             fadeIn.play();
@@ -831,7 +836,20 @@ public class MainContentArea extends StackPane {
     
     // Flag to track if search focus is pending
     private boolean pendingSearchFocus = false;
+    // Flag to track if note input focus is pending
+    private boolean pendingNoteFocus = false;
     
+    /**
+     * Focus on note input field
+     */
+    public void focusNoteInput() {
+        if (currentPanel == noteModePanel && noteInputPanel != null) {
+            noteInputPanel.requestInputFocus();
+        } else {
+            pendingNoteFocus = true;
+        }
+    }
+
     /**
      * Focus on search input field
      */
