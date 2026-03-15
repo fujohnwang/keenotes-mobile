@@ -40,6 +40,7 @@
 		E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC48816DBEEFEE56707E5302 /* NoteView.swift */; };
 		E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9040A9739D8D0416CE13A31 /* MainTabView.swift */; };
 		E641EC093049E5F7E4D0D094 /* ref.c in Sources */ = {isa = PBXBuildFile; fileRef = 9946B1EE523C44AB196C6446 /* ref.c */; };
+		F1A2B3C4D5E6F70819203456 /* FloatingDockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F70819203457 /* FloatingDockView.swift */; };
 		FBDF52C9E3B0CF6AFF1CAF1A /* KeeNotesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D8A3032850BEA6F1E1698E /* KeeNotesApp.swift */; };
 /* End PBXBuildFile section */
 
@@ -87,6 +88,7 @@
 		EAA89252DC520456A6A43EEC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		EC56614EF00CDBBE7B740F99 /* SettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsService.swift; sourceTree = "<group>"; };
 		EF27F1ADF86A469C5DA5CDCE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		F1A2B3C4D5E6F70819203457 /* FloatingDockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingDockView.swift; sourceTree = "<group>"; };
 		F1E2D3C4B5A6978081920A3B /* WizardStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -116,6 +118,7 @@
 				2AE3C4D5F6A78091023B4C5D /* ConfettiView.swift */,
 				E71854385AA7C1EECC7F20F2 /* DebugView.swift */,
 				2BE4D5E6F7A89012345678AB /* EnlargedNoteView.swift */,
+				F1A2B3C4D5E6F70819203457 /* FloatingDockView.swift */,
 				A9040A9739D8D0416CE13A31 /* MainTabView.swift */,
 				BC48816DBEEFEE56707E5302 /* NoteView.swift */,
 				D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */,
@@ -307,6 +310,7 @@
 				85535D4D227727012D31DE0F /* CryptoService.swift in Sources */,
 				185B386682B6638BD824635B /* DatabaseService.swift in Sources */,
 				1BE3C4D5E6F7A89012345678 /* EnlargedNoteView.swift in Sources */,
+				F1A2B3C4D5E6F70819203456 /* FloatingDockView.swift in Sources */,
 				3D3A986E86CF4FAC5FBCDA0A /* DebugView.swift in Sources */,
 				2BF45F4BF51073D8B254736C /* DeviceType.swift in Sources */,
 				2CF56F5BF62184E9C365847D /* Theme.swift in Sources */,
@@ -419,7 +423,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5.2;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
@@ -441,7 +445,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5.2;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";

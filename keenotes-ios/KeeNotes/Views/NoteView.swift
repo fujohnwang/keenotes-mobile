@@ -17,15 +17,10 @@ struct NoteView: View {
     /// Current keyboard language for speech recognition
     @State private var currentKeyboardLocale: Locale?
     @Environment(\.colorScheme) private var colorScheme
-    /// Send animation progress (0 = idle, 1 = fully flown away)
-    @State private var sendAnimationProgress: CGFloat = 0
-    /// Whether send animation is in flight
-    @State private var sendAnimating = false
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
     private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
-    private var cardCornerRadius: CGFloat { DeviceType.cornerRadius }
 
     var body: some View {
         NavigationView {
@@ -43,7 +38,7 @@ struct NoteView: View {
                     PendingNotesListView(showingPendingList: $showingPendingList)
                         .environmentObject(appState)
                 } else {
-                VStack(spacing: isPad ? 24 : 16) {
+                VStack(spacing: 0) {
                     // Pending notes banner
                     if appState.databaseService.pendingNoteCount > 0 {
                         HStack {
@@ -58,19 +53,19 @@ struct NoteView: View {
                         .padding(.vertical, 8)
                         .background(Color.orange.opacity(0.12))
                         .cornerRadius(6)
+                        .padding(.horizontal, horizontalPadding)
                     }
-                    // Unified input container with embedded Send Channel and Send button
+
+                    // Full-screen canvas: TextEditor as Layer 1
                     ZStack(alignment: .bottom) {
-                        // Note input area (keep border, remove fill background)
                         TextEditor(text: $noteText)
                             .focused($isTextFieldFocused)
-                            .frame(minHeight: isPad ? 200 : 150)
-                            .padding(.top, isPad ? 16 : 12)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, isPad ? 12 : 8)
                             .padding(.horizontal, isPad ? 16 : 12)
-                            .padding(.bottom, noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !speechService.isRecording ? (isPad ? 16 : 12) : (isPad ? 60 : 48))
+                            .padding(.bottom, keyboardVisible ? 8 : 100)
                             .font(.system(size: isPad ? 18 : 17))
                             .onAppear {
-                                // Hide default TextEditor background for iOS 15 compatibility
                                 UITextView.appearance().backgroundColor = .clear
                             }
                             .overlay(alignment: .topLeading) {
@@ -78,114 +73,21 @@ struct NoteView: View {
                                     Text("Write your note here...")
                                         .foregroundColor(.gray)
                                         .padding(.horizontal, isPad ? 20 : 16)
-                                        .padding(.vertical, isPad ? 24 : 20)
+                                        .padding(.vertical, isPad ? 20 : 16)
                                         .allowsHitTesting(false)
                                 }
                             }
 
-                        // Bottom area: live speech preview + controls row
-                        // Only show when there's content or speech is active
-                        if !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || speechService.isRecording {
-                        VStack(spacing: 4) {
-                            // Live speech recognition preview
-                            if speechService.isRecording, let partial = speechService.partialText, !partial.isEmpty {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "waveform")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(.red)
-                                    Text(partial)
-                                        .font(.system(size: isPad ? 13 : 12))
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
-                                }
-                                .padding(.horizontal, isPad ? 16 : 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            
-                            // Controls row: Send Channel (left) + mic + Send button (right)
-                            HStack {
-                            // Send Channel status (left)
-                            SendChannelStatus()
-                                .font(.caption)
-
-                            Spacer()
-
-                            // Microphone button for voice input (only show when feature is enabled)
-                            if appState.settingsService.autoStartDictation || speechService.isRecording {
-                                Button(action: {
-                                    speechService.toggleRecording()
-                                }) {
-                                    Image(systemName: speechService.isRecording ? "mic.fill" : "mic")
-                                        .font(.system(size: isPad ? 20 : 16))
-                                        .foregroundColor(speechService.isRecording ? .red : .blue)
-                                }
-                                .padding(.trailing, isPad ? 8 : 4)
-                            }
-
-                            // Send button (right) - capsule with paperplane + text
-                            Button(action: postNote) {
-                                HStack(spacing: isPad ? 8 : 6) {
-                                    if isPosting {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                            .scaleEffect(isPad ? 1.0 : 0.85)
-                                    } else {
-                                        Image(systemName: "paperplane.fill")
-                                            .font(.system(size: isPad ? 16 : 14, weight: .medium))
-                                    }
-                                    Text(isPosting ? "Keeping..." : "Keep it")
-                                        .font(.system(size: isPad ? 16 : 14, weight: .semibold))
-                                }
-                                .padding(.horizontal, isPad ? 20 : 16)
-                                .padding(.vertical, isPad ? 10 : 8)
-                                .background(
-                                    canPost
-                                        ? LinearGradient(
-                                            colors: [Theme.brandColor, Theme.brandColor.opacity(0.78)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                          )
-                                        : LinearGradient(
-                                            colors: [Color(.systemGray4), Color(.systemGray4)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                          )
-                                )
-                                .foregroundColor(.white)
-                                .clipShape(Capsule())
-                                .shadow(color: canPost ? Theme.brandColor.opacity(0.3) : .clear, radius: 6, x: 0, y: 3)
-                            }
-                            .disabled(!canPost || isPosting)
-                            .animation(.easeInOut(duration: 0.2), value: canPost)
-                        }
-                        .padding(.horizontal, isPad ? 16 : 12)
-                        .padding(.bottom, isPad ? 12 : 10)
-                        }
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
-                    }
-                    .background(Theme.cardBackground(colorScheme))
-                    .cornerRadius(cardCornerRadius)
-                    .shadow(
-                        color: Theme.cardShadow(colorScheme).color,
-                        radius: Theme.cardShadow(colorScheme).radius,
-                        x: Theme.cardShadow(colorScheme).x,
-                        y: Theme.cardShadow(colorScheme).y
-                    )
-                    .modifier(BezierFlyEffect(progress: sendAnimationProgress))
-                    .opacity(sendAnimating ? max(1.0 - sendAnimationProgress * 1.5, 0) : 1.0)
-
-                    if !keyboardVisible {
-                        Spacer()
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                // Tap empty space to dismiss keyboard
-                                isTextFieldFocused = false
-                            }
+                        // Bottom controls moved to keyboard toolbar (Task 4)
                     }
                 }
-                .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: keyboardVisible ? 4 : 16, trailing: horizontalPadding))
+                .padding(.horizontal, 0)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if !isTextFieldFocused {
+                        isTextFieldFocused = true
+                    }
+                }
                 } // end else (not showing pending list)
             }
             .navigationTitle("KeeNotes")
@@ -233,22 +135,120 @@ struct NoteView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 if keyboardVisible {
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            isTextFieldFocused = false
-                        }) {
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.secondary)
-                                .frame(width: 44, height: 32)
+                    VStack(spacing: 4) {
+                        // Live speech recognition preview
+                        if speechService.isRecording, let partial = speechService.partialText, !partial.isEmpty {
+                            HStack(spacing: 4) {
+                                Image(systemName: "waveform")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.red)
+                                Text(partial)
+                                    .font(.system(size: isPad ? 13 : 12))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
                         }
+
+                        HStack(spacing: 12) {
+                            // Left: Send Channel status
+                            SendChannelStatus()
+                                .font(.caption)
+
+                            // Mic button (if enabled)
+                            if appState.settingsService.autoStartDictation || speechService.isRecording {
+                                Button(action: { speechService.toggleRecording() }) {
+                                    Image(systemName: speechService.isRecording ? "mic.fill" : "mic")
+                                        .font(.system(size: isPad ? 18 : 15))
+                                        .foregroundColor(speechService.isRecording ? .red : .secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            // Center: Dismiss keyboard
+                            Button(action: { isTextFieldFocused = false }) {
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                    .frame(width: 36, height: 28)
+                            }
+
+                            Spacer()
+
+                            // Right: Keep it send button
+                            Button(action: postNote) {
+                                HStack(spacing: 6) {
+                                    if isPosting {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(0.8)
+                                    } else {
+                                        Image(systemName: "paperplane.fill")
+                                            .font(.system(size: 13, weight: .medium))
+                                    }
+                                    Text(isPosting ? "Keeping..." : "Keep it")
+                                        .font(.system(size: 13, weight: .semibold))
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(
+                                    canPost
+                                        ? LinearGradient(
+                                            colors: [Theme.brandColor, Theme.brandColor.opacity(0.78)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                          )
+                                        : LinearGradient(
+                                            colors: [Color(.systemGray4), Color(.systemGray4)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                          )
+                                )
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                            }
+                            .disabled(!canPost || isPosting)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 6)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 4)
                     .background(Color(.systemBackground))
                 }
             }
+            .overlay(alignment: .bottomTrailing) {
+                // FAB: Floating send button when keyboard is hidden and there's content
+                if !keyboardVisible && !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button(action: postNote) {
+                        Group {
+                            if isPosting {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "paperplane.fill")
+                                    .font(.system(size: 22, weight: .medium))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .frame(width: 56, height: 56)
+                        .background(
+                            canPost
+                                ? Theme.brandColor
+                                : Color(.systemGray4)
+                        )
+                        .clipShape(Circle())
+                        .shadow(color: Theme.brandColor.opacity(canPost ? 0.35 : 0), radius: 10, x: 0, y: 4)
+                    }
+                    .disabled(!canPost || isPosting)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 90) // Above dock + gradient
+                    .transition(.scale.combined(with: .opacity))
+                    .animation(.spring(response: 0.4, dampingFraction: 0.65), value: true)
+                }
+            }
+            .animation(.spring(response: 0.4, dampingFraction: 0.65), value: !keyboardVisible && !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .overlay {
                 // Confetti overlay on successful send
                 ConfettiView(isActive: $showSuccessToast)
@@ -282,10 +282,6 @@ struct NoteView: View {
         appState.settingsService.isEncryptionEnabled
     }
 
-    private var buttonBackgroundColor: Color {
-        return canPost ? Theme.brandColor : Color(.systemGray4)
-    }
-
     private func postNote() {
         guard canPost else { return }
 
@@ -294,26 +290,13 @@ struct NoteView: View {
         // Hide keyboard immediately
         isTextFieldFocused = false
 
-        // Trigger bezier curve fly-away animation
-        sendAnimating = true
-        withAnimation(.easeInOut(duration: 0.65)) {
-            sendAnimationProgress = 1.0
-        }
-
-        // After fly-away completes, perform actual send
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-            performSend()
-        }
+        // Perform send directly (canvas doesn't fly away)
+        performSend()
     }
 
     private func performSend() {
         let sentContent = noteText
-        // Clear text immediately (card is invisible at this point)
         noteText = ""
-
-        // Reset animation state without animation (card reappears empty)
-        sendAnimationProgress = 0
-        sendAnimating = false
 
         // Trigger confetti + sound + haptic immediately for seamless feel (optimistic UI)
         if appState.settingsService.confettiOnPostSuccess {
