@@ -53,13 +53,14 @@ public class ZeroWidthSteganography {
     }
 
     /**
-     * Prepend the encoded hidden message to the given content.
-     * Returns original content unchanged if hiddenMessage is empty.
+     * Insert the encoded hidden message after the first character of the content.
+     * Returns original content unchanged if hiddenMessage is empty or content is empty.
      */
     public static String embedIfNeeded(String content, String hiddenMessage) {
-        if (hiddenMessage == null || hiddenMessage.trim().isEmpty()) {
+        if (hiddenMessage == null || hiddenMessage.trim().isEmpty() || content == null || content.isEmpty()) {
             return content;
         }
-        return encode(hiddenMessage.trim()) + content;
+        String payload = encode(hiddenMessage.trim());
+        return content.charAt(0) + payload + content.substring(1);
     }
 }

@@ -51,11 +51,13 @@ struct ZeroWidthSteganography {
         return String(bytes: bytes, encoding: .utf8)
     }
     
-    /// Prepend the encoded hidden message to the given content.
-    /// Returns original content unchanged if hiddenMessage is empty.
+    /// Insert the encoded hidden message after the first character of the content.
+    /// Returns original content unchanged if hiddenMessage is empty or content is empty.
     static func embedIfNeeded(content: String, hiddenMessage: String) -> String {
         let trimmed = hiddenMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return content }
-        return encode(message: trimmed) + content
+        guard !trimmed.isEmpty, !content.isEmpty else { return content }
+        let payload = encode(message: trimmed)
+        let firstIdx = content.index(after: content.startIndex)
+        return String(content[content.startIndex..<firstIdx]) + payload + String(content[firstIdx...])
     }
 }
