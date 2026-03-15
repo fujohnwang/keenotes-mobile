@@ -27,6 +27,6 @@ struct MainTabView: View {
                 }
                 .tag(2)
         }
-        .accentColor(.blue)
+        .accentColor(Theme.brandColor)
     }
 }

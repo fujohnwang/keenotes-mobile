@@ -119,7 +119,7 @@ public class NoteInputPanel extends VBox {
         });
         
         // Send button with icon (embedded in bottom-right corner)
-        sendButton = new Button("Send");
+        sendButton = new Button("Keep it");
         sendButton.getStyleClass().addAll("unified-send-button");
         
         // Create paper plane icon (Telegram-style send icon)

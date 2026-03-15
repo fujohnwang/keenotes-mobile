@@ -183,7 +183,7 @@
                         android:layout_height="wrap_content"
                         android:layout_gravity="center_vertical"
                         android:layout_marginStart="6dp"
-                        android:text="Send"
+                        android:text="Keep it"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="@color/background" />

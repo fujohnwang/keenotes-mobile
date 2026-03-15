@@ -252,6 +252,7 @@ struct NoteRow: View {
     @EnvironmentObject var appState: AppState
     @State private var showCopiedAlert = false
     @State private var textViewHeight: CGFloat?
+    @Environment(\.colorScheme) private var colorScheme
 
     private var isPad: Bool { DeviceType.isPad }
     private var cardPadding: CGFloat { isPad ? 24 : 16 }
@@ -336,12 +337,13 @@ struct NoteRow: View {
         .padding(cardPadding)
         .background(
             RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
-                .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
-                .stroke(Color(.systemGray5), lineWidth: 1)
+                .fill(Theme.cardBackground(colorScheme))
+                .shadow(
+                    color: Theme.cardShadow(colorScheme).color,
+                    radius: Theme.cardShadow(colorScheme).radius,
+                    x: Theme.cardShadow(colorScheme).x,
+                    y: Theme.cardShadow(colorScheme).y
+                )
         )
         .overlay(
             Group {

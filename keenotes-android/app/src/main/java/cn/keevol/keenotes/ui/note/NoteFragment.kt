@@ -263,7 +263,7 @@ class NoteFragment : Fragment() {
         binding.btnSend.alpha = 0.7f
         binding.sendIcon.visibility = View.GONE
         binding.sendProgress.visibility = View.VISIBLE
-        binding.sendText.text = "Sending..."
+        binding.sendText.text = "Keeping..."
         
         // Start rotation animation
         val rotateAnimation = android.view.animation.AnimationUtils.loadAnimation(requireContext(), cn.keevol.keenotes.R.anim.rotate_spinner)
@@ -278,7 +278,7 @@ class NoteFragment : Fragment() {
                 binding.sendProgress.clearAnimation()
                 binding.sendProgress.visibility = View.GONE
                 binding.sendIcon.visibility = View.VISIBLE
-                binding.sendText.text = "Send"
+                binding.sendText.text = "Keep it"
                 
                 if (result.success) {
                     // Copy to clipboard if enabled
