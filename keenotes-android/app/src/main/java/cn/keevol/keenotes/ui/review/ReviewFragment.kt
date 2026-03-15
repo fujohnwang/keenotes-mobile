@@ -17,10 +17,12 @@ import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.FragmentReviewBinding
 import cn.keevol.keenotes.network.WebSocketService
+import cn.keevol.keenotes.util.ZeroWidthSteganography
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -376,7 +378,10 @@ class ReviewFragment : Fragment() {
     private fun copyToClipboard(content: String) {
         val context = requireContext()
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("note", content)
+        val hiddenMessage = runBlocking {
+            (context.applicationContext as KeeNotesApp).settingsRepository.getHiddenMessage()
+        }
+        val clip = ClipData.newPlainText("note", ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage))
         clipboard.setPrimaryClip(clip)
         
         val inflater = LayoutInflater.from(context)
