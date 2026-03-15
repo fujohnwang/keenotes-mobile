@@ -232,21 +232,20 @@ struct NoteView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if keyboardVisible && appState.settingsService.showKeyboardToolbar {
+                if keyboardVisible {
                     HStack {
-                        Text("To dismiss keyboard, tap outside or click Done →")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
                         Spacer()
                         Button(action: {
                             isTextFieldFocused = false
                         }) {
-                            Text("Done")
-                                .font(.callout.weight(.medium))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.secondary)
+                                .frame(width: 44, height: 32)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 4)
                     .background(Color(.systemBackground))
                 }
             }
