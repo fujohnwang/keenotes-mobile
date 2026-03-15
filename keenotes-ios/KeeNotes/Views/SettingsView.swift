@@ -15,6 +15,9 @@ struct SettingsView: View {
     @State private var statusMessage = ""
     @State private var isSuccess = true
     
+    // Hidden message draft
+    @State private var hiddenMessageDraft = ""
+    
     // 向导状态
     @State private var showWizard = false
     
@@ -135,6 +138,32 @@ struct SettingsView: View {
                 }
                 .font(.system(size: isPad ? 17 : 17))
 
+                // Hidden Watermark
+                Section(header: Text("Hidden Watermark"), footer: Text("When set, an invisible watermark is embedded into copied note content for traceability.")) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Message")
+                            .font(.system(size: isPad ? 14 : 13))
+                            .foregroundColor(.secondary)
+                        TextField("Enter hidden message...", text: $hiddenMessageDraft)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .font(.system(size: isPad ? 17 : 17))
+                            .submitLabel(.done)
+                            .onSubmit { saveHiddenMessage() }
+                        Button(action: { saveHiddenMessage() }) {
+                            HStack {
+                                Spacer()
+                                Text("Save")
+                                    .font(.system(size: isPad ? 15 : 14))
+                                    .fontWeight(.medium)
+                                Spacer()
+                            }
+                        }
+                        .disabled(hiddenMessageDraft == appState.settingsService.hiddenMessage)
+                    }
+                    .padding(.vertical, 4)
+                }
+
                 // Debug section (hidden by default)
                 if showDebugSection {
                     Section(header: Text("Debug")) {
@@ -195,10 +224,16 @@ struct SettingsView: View {
             token = appState.settingsService.token
             password = appState.settingsService.encryptionPassword
             confirmPassword = appState.settingsService.encryptionPassword
+            hiddenMessageDraft = appState.settingsService.hiddenMessage
             
             // 检查并显示向导
             checkAndShowWizard()
         }
+    }
+
+    private func saveHiddenMessage() {
+        appState.settingsService.hiddenMessage = hiddenMessageDraft
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private func saveSettings() {

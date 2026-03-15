@@ -5,6 +5,7 @@ import SwiftUI
 struct EnlargedNoteView: View {
     let note: Note
     let onDismiss: () -> Void
+    @EnvironmentObject var appState: AppState
     
     @State private var showCopiedAlert = false
     @State private var textViewHeight: CGFloat?
@@ -118,7 +119,10 @@ struct EnlargedNoteView: View {
     }
     
     private func copyToClipboard() {
-        UIPasteboard.general.string = note.content
+        UIPasteboard.general.string = ZeroWidthSteganography.embedIfNeeded(
+            content: note.content,
+            hiddenMessage: appState.settingsService.hiddenMessage
+        )
         showCopiedNotification()
     }
     

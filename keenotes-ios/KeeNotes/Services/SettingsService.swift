@@ -17,6 +17,7 @@ class SettingsService: ObservableObject {
         static let showKeyboardToolbar = "show_keyboard_toolbar"
         static let autoStartDictation = "auto_start_dictation"
         static let confettiOnPostSuccess = "confetti_on_post_success"
+        static let hiddenMessage = "hidden_message"
     }
     
     @Published var endpointUrl: String {
@@ -71,6 +72,12 @@ class SettingsService: ObservableObject {
         }
     }
     
+    @Published var hiddenMessage: String {
+        didSet {
+            defaults.set(hiddenMessage, forKey: Keys.hiddenMessage)
+        }
+    }
+    
     @Published var firstNoteDate: String? {
         didSet {
             print("[SettingsService] firstNoteDate didSet: old=\(oldValue ?? "nil"), new=\(firstNoteDate ?? "nil")")
@@ -97,6 +104,7 @@ class SettingsService: ObservableObject {
         self.showKeyboardToolbar = defaults.object(forKey: Keys.showKeyboardToolbar) == nil ? true : defaults.bool(forKey: Keys.showKeyboardToolbar)
         self.autoStartDictation = defaults.object(forKey: Keys.autoStartDictation) == nil ? false : defaults.bool(forKey: Keys.autoStartDictation)
         self.confettiOnPostSuccess = defaults.object(forKey: Keys.confettiOnPostSuccess) == nil ? true : defaults.bool(forKey: Keys.confettiOnPostSuccess)
+        self.hiddenMessage = defaults.string(forKey: Keys.hiddenMessage) ?? ""
         self.firstNoteDate = defaults.string(forKey: Keys.firstNoteDate)
     }
     
