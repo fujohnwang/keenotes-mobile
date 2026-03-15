@@ -35,6 +35,7 @@ public class SettingsService {
     private static final String KEY_LOCAL_IMPORT_SERVER_PORT = "local.import.server.port";
     private static final String KEY_MCP_SERVER_PORT = "mcp.server.port";
     private static final String KEY_MCP_SERVER_ENABLED = "mcp.server.enabled";
+    private static final String KEY_HIDDEN_MESSAGE = "hidden.message";
 
     private static final int DEFAULT_REVIEW_DAYS = 7;
     private static final String DEFAULT_TAKE_NOTE_SHORTCUT = "Alt+T";
@@ -184,6 +185,14 @@ public class SettingsService {
 
     public void setCopyToClipboardOnPost(boolean enabled) {
         properties.setProperty(KEY_COPY_TO_CLIPBOARD, String.valueOf(enabled));
+    }
+
+    public String getHiddenMessage() {
+        return properties.getProperty(KEY_HIDDEN_MESSAGE, "");
+    }
+
+    public void setHiddenMessage(String message) {
+        properties.setProperty(KEY_HIDDEN_MESSAGE, message != null ? message : "");
     }
 
     public String getTakeNoteShortcut() {
