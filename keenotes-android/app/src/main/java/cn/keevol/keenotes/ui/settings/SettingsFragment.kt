@@ -53,6 +53,7 @@ class SettingsFragment : Fragment() {
         
         setupSaveButtonBinding()
         setupCopyToClipboardToggle()
+        setupHiddenMessage()
         setupSaveButton()
         setupCopyrightEasterEgg()
         loadSettings()
@@ -145,6 +146,52 @@ class SettingsFragment : Fragment() {
             lifecycleScope.launch {
                 app.settingsRepository.setConfettiOnPostSuccess(isChecked)
             }
+        }
+    }
+    
+    private fun setupHiddenMessage() {
+        val app = requireActivity().application as KeeNotesApp
+        
+        // Load initial value
+        lifecycleScope.launch {
+            val saved = app.settingsRepository.getHiddenMessage()
+            withContext(Dispatchers.Main) {
+                binding.hiddenMessageInput.setText(saved)
+            }
+        }
+        
+        // Enable Save button only when text differs from saved value
+        binding.hiddenMessageInput.addTextChangedListener(createTextWatcher { draft ->
+            lifecycleScope.launch {
+                val saved = app.settingsRepository.getHiddenMessage()
+                withContext(Dispatchers.Main) {
+                    binding.btnSaveHiddenMessage.isEnabled = draft != saved
+                }
+            }
+        })
+        
+        // Save button
+        binding.btnSaveHiddenMessage.setOnClickListener {
+            val message = binding.hiddenMessageInput.text?.toString() ?: ""
+            lifecycleScope.launch {
+                app.settingsRepository.setHiddenMessage(message)
+                withContext(Dispatchers.Main) {
+                    binding.btnSaveHiddenMessage.isEnabled = false
+                    // Hide keyboard
+                    val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                    view?.windowToken?.let { token ->
+                        imm.hideSoftInputFromWindow(token, 0)
+                    }
+                }
+            }
+        }
+        
+        // IME Done action also saves
+        binding.hiddenMessageInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                binding.btnSaveHiddenMessage.performClick()
+                true
+            } else false
         }
     }
     

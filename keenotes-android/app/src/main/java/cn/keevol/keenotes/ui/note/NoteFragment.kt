@@ -11,6 +11,7 @@ import androidx.navigation.fragment.findNavController
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentNoteBinding
+import cn.keevol.keenotes.util.ZeroWidthSteganography
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
@@ -282,8 +283,9 @@ class NoteFragment : Fragment() {
                 if (result.success) {
                     // Copy to clipboard if enabled
                     if (app.settingsRepository.getCopyToClipboardOnPost()) {
+                        val hiddenMessage = app.settingsRepository.getHiddenMessage()
                         val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("note", content)
+                        val clip = android.content.ClipData.newPlainText("note", ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage))
                         clipboard.setPrimaryClip(clip)
                     }
                     

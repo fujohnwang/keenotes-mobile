@@ -18,6 +18,9 @@ import androidx.recyclerview.widget.RecyclerView
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.ItemNoteBinding
+import cn.keevol.keenotes.KeeNotesApp
+import cn.keevol.keenotes.util.ZeroWidthSteganography
+import kotlinx.coroutines.runBlocking
 
 class NotesAdapter(
     private val onEnlargeClick: ((Note) -> Unit)? = null
@@ -83,7 +86,10 @@ class NotesAdapter(
             
             // 2. Copy to clipboard
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("note", content)
+            val hiddenMessage = runBlocking {
+                (context.applicationContext as KeeNotesApp).settingsRepository.getHiddenMessage()
+            }
+            val clip = ClipData.newPlainText("note", ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage))
             clipboard.setPrimaryClip(clip)
             
             // 3. Show toast notification
