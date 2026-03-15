@@ -153,9 +153,13 @@ struct NoteView: View {
                         }
 
                         HStack(spacing: 12) {
-                            // Left: Send Channel status
-                            SendChannelStatus()
-                                .font(.caption)
+                            // Left: Dismiss keyboard
+                            Button(action: { isTextFieldFocused = false }) {
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                    .frame(width: 36, height: 28)
+                            }
 
                             // Mic button (if enabled)
                             if appState.settingsService.autoStartDictation || speechService.isRecording {
@@ -164,16 +168,6 @@ struct NoteView: View {
                                         .font(.system(size: isPad ? 18 : 15))
                                         .foregroundColor(speechService.isRecording ? .red : .secondary)
                                 }
-                            }
-
-                            Spacer()
-
-                            // Center: Dismiss keyboard
-                            Button(action: { isTextFieldFocused = false }) {
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(.secondary)
-                                    .frame(width: 36, height: 28)
                             }
 
                             Spacer()
