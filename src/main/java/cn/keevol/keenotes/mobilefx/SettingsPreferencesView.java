@@ -15,6 +15,7 @@ public class SettingsPreferencesView extends VBox {
     private final ToggleSwitch copyToClipboardToggle;
     private final ToggleSwitch showOverviewCardToggle;
     private final ToggleSwitch themeToggle;
+    private final KeyCaptureField takeNoteShortcutField;
     private final KeyCaptureField searchShortcutField;
     private final KeyCaptureField sendShortcutField;
     private final KeyCaptureField zoomInShortcutField;
@@ -46,6 +47,18 @@ public class SettingsPreferencesView extends VBox {
         themeToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
             ThemeService.Theme theme = newVal ? ThemeService.Theme.LIGHT : ThemeService.Theme.DARK;
             ThemeService.getInstance().setTheme(theme);
+        });
+
+        // Take Note shortcut
+        takeNoteShortcutField = new KeyCaptureField();
+        takeNoteShortcutField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            if (wasFocused && !isNowFocused) {
+                String shortcut = takeNoteShortcutField.getShortcut();
+                if (shortcut != null && !shortcut.isEmpty()) {
+                    settings.setTakeNoteShortcut(shortcut);
+                    settings.save();
+                }
+            }
         });
 
         // Search shortcut
@@ -101,6 +114,8 @@ public class SettingsPreferencesView extends VBox {
             createToggleRow("Copy to clipboard on post success", copyToClipboardToggle),
             createToggleRow("Show Overview Card", showOverviewCardToggle),
             createToggleRow("Light Theme", themeToggle),
+            createShortcutRow("Take Note shortcut", takeNoteShortcutField,
+                "Click the field and press your desired key combination (e.g., Alt+T)"),
             createShortcutRow("Search shortcut", searchShortcutField, 
                 "Click the field and press your desired key combination (e.g., Ctrl+Shift+F)"),
             createShortcutRow("Send shortcut", sendShortcutField,
@@ -152,6 +167,7 @@ public class SettingsPreferencesView extends VBox {
         copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
         showOverviewCardToggle.setSelected(settings.getShowOverviewCard());
         themeToggle.setSelected(ThemeService.getInstance().getCurrentTheme() == ThemeService.Theme.LIGHT);
+        takeNoteShortcutField.setShortcut(settings.getTakeNoteShortcut());
         searchShortcutField.setShortcut(settings.getSearchShortcut());
         sendShortcutField.setShortcut(settings.getSendShortcut());
         zoomInShortcutField.setShortcut(settings.getZoomInShortcut());
