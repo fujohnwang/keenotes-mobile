@@ -48,14 +48,6 @@ struct OverviewCardView: View {
         }
         .frame(height: cardHeight)
         .padding(.horizontal, cardPadding)
-        .background(Theme.cardBackground(colorScheme))
-        .cornerRadius(DeviceType.cornerRadius)
-        .shadow(
-            color: Theme.cardShadow(colorScheme).color,
-            radius: Theme.cardShadow(colorScheme).radius,
-            x: Theme.cardShadow(colorScheme).x,
-            y: Theme.cardShadow(colorScheme).y
-        )
         .onAppear {
             updateDaysUsing()
             // Initialize first note date if needed and there are notes
