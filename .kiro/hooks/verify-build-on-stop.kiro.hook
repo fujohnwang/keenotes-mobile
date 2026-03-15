@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "完成工作后编译验证",
+  "description": "当agent完成工作后，自动检查本次修改涉及的项目并验证编译。iOS项目使用xcodebuild，JavaFX项目使用mvn compile，Android项目跳过。",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "请检查本次会话中你修改了哪些文件，然后按以下规则验证编译：\n\n1. 如果修改了 keenotes-ios/ 目录下的文件，运行以下命令验证iOS编译：\n   xcodebuild -project keenotes-ios/KeeNotes.xcodeproj -scheme KeeNotes -destination 'generic/platform=iOS Simulator' build 2>&1 | tail -20\n   如果编译失败，分析错误并尝试修复。\n\n2. 如果修改了根目录 src/ 下的Java文件或 pom.xml，运行以下命令验证JavaFX编译：\n   mvn compile -q\n   如果编译失败，分析错误并尝试修复。\n\n3. 如果只修改了 keenotes-android/ 目录下的文件，跳过编译验证。\n\n4. 如果同时修改了多个项目的文件，分别验证各自的编译。\n\n5. 如果本次只修改了文档、配置等非代码文件，跳过编译验证。"
+  }
+}

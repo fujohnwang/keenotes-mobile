@@ -303,7 +303,10 @@ struct NoteView: View {
 
                     // Copy to clipboard if enabled
                     if appState.settingsService.copyToClipboardOnPost {
-                        UIPasteboard.general.string = sentContent
+                        UIPasteboard.general.string = ZeroWidthSteganography.embedIfNeeded(
+                            content: sentContent,
+                            hiddenMessage: appState.settingsService.hiddenMessage
+                        )
                     }
 
                     // Trigger confetti if enabled (ConfettiView resets isActive automatically)

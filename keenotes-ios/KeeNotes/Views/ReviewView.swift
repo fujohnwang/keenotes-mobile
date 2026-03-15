@@ -249,6 +249,7 @@ struct ReviewView: View {
 struct NoteRow: View {
     let note: Note
     var onEnlarge: (() -> Void)? = nil
+    @EnvironmentObject var appState: AppState
     @State private var showCopiedAlert = false
     @State private var textViewHeight: CGFloat?
 
@@ -367,7 +368,10 @@ struct NoteRow: View {
     }
 
     private func copyToClipboard() {
-        UIPasteboard.general.string = note.content
+        UIPasteboard.general.string = ZeroWidthSteganography.embedIfNeeded(
+            content: note.content,
+            hiddenMessage: appState.settingsService.hiddenMessage
+        )
         showCopiedNotification()
     }
     
@@ -493,6 +497,15 @@ class CustomUITextView: UITextView {
     override func copy(_ sender: Any?) {
         // Let system handle the copy
         super.copy(sender)
+        
+        // Embed hidden message if configured
+        let hiddenMessage = UserDefaults.standard.string(forKey: "hidden_message") ?? ""
+        if !hiddenMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let copied = UIPasteboard.general.string {
+            UIPasteboard.general.string = ZeroWidthSteganography.embedIfNeeded(
+                content: copied, hiddenMessage: hiddenMessage
+            )
+        }
         
         // Deselect text
         selectedTextRange = nil
