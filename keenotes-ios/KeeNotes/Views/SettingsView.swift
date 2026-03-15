@@ -45,6 +45,7 @@ struct SettingsView: View {
     var body: some View {
         ZStack {
             NavigationView {
+                ScrollViewReader { scrollProxy in
                 Form {
                     // Server configuration
                     Section(header: Text("Server Configuration")) {
@@ -126,11 +127,6 @@ struct SettingsView: View {
                         set: { appState.settingsService.autoStartDictation = $0 }
                     ))
 
-                    Toggle("Show keyboard toolbar", isOn: Binding(
-                        get: { appState.settingsService.showKeyboardToolbar },
-                        set: { appState.settingsService.showKeyboardToolbar = $0 }
-                    ))
-
                     Toggle("Confetti on post success", isOn: Binding(
                         get: { appState.settingsService.confettiOnPostSuccess },
                         set: { appState.settingsService.confettiOnPostSuccess = $0 }
@@ -140,29 +136,28 @@ struct SettingsView: View {
 
                 // Hidden Watermark
                 Section(header: Text("Hidden Watermark"), footer: Text("When set, an invisible watermark is embedded into copied note content for traceability.")) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Message")
-                            .font(.system(size: isPad ? 14 : 13))
-                            .foregroundColor(.secondary)
+                    HStack(spacing: 8) {
                         TextField("Enter hidden message...", text: $hiddenMessageDraft)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .font(.system(size: isPad ? 17 : 17))
                             .submitLabel(.done)
                             .onSubmit { saveHiddenMessage() }
+                            .focused($focusedField, equals: "hiddenMessage")
+
                         Button(action: { saveHiddenMessage() }) {
-                            HStack {
-                                Spacer()
-                                Text("Save")
-                                    .font(.system(size: isPad ? 15 : 14))
-                                    .fontWeight(.medium)
-                                Spacer()
-                            }
+                            Text("Save")
+                                .font(.system(size: isPad ? 14 : 13, weight: .medium))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(hiddenMessageDraft == appState.settingsService.hiddenMessage ? Color(.systemGray5) : Theme.brandColor)
+                                .foregroundColor(hiddenMessageDraft == appState.settingsService.hiddenMessage ? .secondary : .white)
+                                .clipShape(Capsule())
                         }
                         .disabled(hiddenMessageDraft == appState.settingsService.hiddenMessage)
                     }
-                    .padding(.vertical, 4)
                 }
+                .id("hiddenWatermark")
 
                 // Debug section (hidden by default)
                 if showDebugSection {
@@ -197,6 +192,16 @@ struct SettingsView: View {
                 .sheet(isPresented: $showDebugView) {
                     DebugView()
                 }
+                .onChange(of: focusedField) { field in
+                    if field == "hiddenMessage" {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            withAnimation {
+                                scrollProxy.scrollTo("hiddenWatermark", anchor: .bottom)
+                            }
+                        }
+                    }
+                }
+                } // ScrollViewReader
             }
             .navigationViewStyle(.stack)
             .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
