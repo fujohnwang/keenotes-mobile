@@ -41,7 +41,6 @@ class NoteFragment : Fragment() {
         setupOverviewCard()
         setupNoteInput()
         setupSendButton()
-        setupSendChannelStatus()
         setupAutoFocusInput()
         setupKeyboardListener()
         setupPendingBanner()
@@ -211,35 +210,6 @@ class NoteFragment : Fragment() {
     private fun updateSendButtonState(enabled: Boolean) {
         binding.btnSend.isEnabled = enabled
         binding.btnSend.alpha = if (enabled) 1.0f else 0.5f
-    }
-    
-    private fun setupSendChannelStatus() {
-        val app = requireActivity().application as KeeNotesApp
-        
-        // Observe settings changes for send channel status - use viewLifecycleOwner
-        viewLifecycleOwner.lifecycleScope.launch {
-            app.settingsRepository.isConfigured.collect { configured ->
-                if (_binding != null) {
-                    updateSendChannelStatus(configured)
-                }
-            }
-        }
-    }
-    
-    private fun updateSendChannelStatus(configured: Boolean) {
-        // Check if view is still attached
-        if (_binding == null || !isAdded) return
-        
-        val (text, color) = if (!configured) {
-            "Not Configured" to requireContext().getColor(R.color.warning)
-        } else {
-            // TODO: Add network connectivity check
-            "✓" to requireContext().getColor(R.color.success)
-        }
-        
-        binding.sendIndicator.setColorFilter(color)
-        binding.sendStatusText.text = text
-        binding.sendStatusText.setTextColor(color)
     }
     
     private fun saveNote(content: String) {
