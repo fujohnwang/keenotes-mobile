@@ -7,50 +7,54 @@ struct OverviewCardView: View {
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
-    private var cardHeight: CGFloat { isPad ? 112 : 88 }
+    private var cardHeight: CGFloat { isPad ? 80 : 60 }
     private var cardPadding: CGFloat { isPad ? 16 : 12 }
-    private var numberFontSize: CGFloat { isPad ? 42 : 32 }
-    private var labelFontSize: CGFloat { isPad ? 10 : 8 }
+    private var numberFontSize: CGFloat { isPad ? 32 : 24 }
+    private var labelFontSize: CGFloat { isPad ? 11 : 9 }
     
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         HStack(spacing: 0) {
             // Total Notes
-            VStack(spacing: 1) {
+            VStack(spacing: 2) {
                 Text("\(appState.databaseService.noteCount)")
-                    .font(.system(size: numberFontSize, weight: .bold))
-                    .foregroundColor(.blue)
+                    .font(Theme.statNumberFont(size: numberFontSize))
+                    .foregroundColor(Theme.brandColor)
 
                 Text("Total Notes")
-                    .font(.system(size: labelFontSize))
+                    .font(Theme.statLabelFont(size: labelFontSize))
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity)
 
             // Divider
             Rectangle()
-                .fill(Color.secondary.opacity(0.2))
+                .fill(Color.secondary.opacity(0.15))
                 .frame(width: 1)
-                .padding(.vertical, 2)
+                .padding(.vertical, 8)
 
             // Days Using
-            VStack(spacing: 1) {
+            VStack(spacing: 2) {
                 Text("\(daysUsing)")
-                    .font(.system(size: numberFontSize, weight: .bold))
-                    .foregroundColor(.blue)
+                    .font(Theme.statNumberFont(size: numberFontSize))
+                    .foregroundColor(Theme.brandColor)
 
                 Text("Days Using")
-                    .font(.system(size: labelFontSize))
+                    .font(Theme.statLabelFont(size: labelFontSize))
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity)
         }
         .frame(height: cardHeight)
         .padding(.horizontal, cardPadding)
-        .background(Color(.systemBackground))
+        .background(Theme.cardBackground(colorScheme))
         .cornerRadius(DeviceType.cornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
-                .stroke(Color(.systemGray4), lineWidth: 1)
+        .shadow(
+            color: Theme.cardShadow(colorScheme).color,
+            radius: Theme.cardShadow(colorScheme).radius,
+            x: Theme.cardShadow(colorScheme).x,
+            y: Theme.cardShadow(colorScheme).y
         )
         .onAppear {
             updateDaysUsing()

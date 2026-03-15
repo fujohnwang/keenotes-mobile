@@ -658,7 +658,7 @@ public class MainContentArea extends StackPane {
         }
         
         // 网络可用：尝试发送
-        noteInputPanel.showStatus("Encrypting and sending...", false);
+        noteInputPanel.showStatus("Encrypting and keeping...", false);
         noteInputPanel.setSendButtonEnabled(false);
         
         apiService.postNote(content).thenAccept(result -> Platform.runLater(() -> {
