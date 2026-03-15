@@ -160,11 +160,6 @@ struct NoteView: View {
                     }
                 }
                 .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: keyboardVisible ? 4 : 16, trailing: horizontalPadding))
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    // Tap outside to dismiss keyboard
-                    isTextFieldFocused = false
-                }
                 } // end else (not showing pending list)
             }
             .navigationTitle("KeeNotes")

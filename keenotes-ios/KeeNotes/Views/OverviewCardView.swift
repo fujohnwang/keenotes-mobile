@@ -58,7 +58,7 @@ struct OverviewCardView: View {
             if appState.databaseService.noteCount > 0 {
                 Task {
                     if let oldestDate = try? await getOldestNoteDate() {
-                        appState.settingsService.firstNoteDate = oldestDate
+                        updateFirstNoteDateIfChanged(oldestDate)
                     }
                 }
             }
@@ -71,7 +71,7 @@ struct OverviewCardView: View {
                     print("[OverviewCard] Querying oldest note date...")
                     if let oldestDate = try? await getOldestNoteDate() {
                         print("[OverviewCard] Found oldest date: \(oldestDate), updating firstNoteDate")
-                        appState.settingsService.firstNoteDate = oldestDate
+                        updateFirstNoteDateIfChanged(oldestDate)
                     } else {
                         print("[OverviewCard] Failed to get oldest date")
                     }
@@ -147,5 +147,13 @@ struct OverviewCardView: View {
         return try await dbQueue.read { db in
             try String.fetchOne(db, sql: "SELECT MIN(createdAt) FROM notes")
         }
+    }
+    
+    /// Only update firstNoteDate when the value actually changes, to avoid
+    /// unnecessary @Published notifications that trigger SwiftUI view re-evaluation
+    /// and can interrupt IME composing sessions.
+    private func updateFirstNoteDateIfChanged(_ newValue: String) {
+        guard appState.settingsService.firstNoteDate != newValue else { return }
+        appState.settingsService.firstNoteDate = newValue
     }
 }
