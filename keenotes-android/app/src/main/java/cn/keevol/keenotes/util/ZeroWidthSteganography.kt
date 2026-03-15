@@ -46,12 +46,12 @@ object ZeroWidthSteganography {
     }
 
     /**
-     * Prepend the encoded hidden message to the given content.
-     * Returns original content unchanged if hiddenMessage is empty.
+     * Insert the encoded hidden message after the first character of the content.
+     * Returns original content unchanged if hiddenMessage is empty or content is empty.
      */
     fun embedIfNeeded(content: String, hiddenMessage: String): String {
         val trimmed = hiddenMessage.trim()
-        if (trimmed.isEmpty()) return content
-        return encode(trimmed) + content
+        if (trimmed.isEmpty() || content.isEmpty()) return content
+        return content[0] + encode(trimmed) + content.substring(1)
     }
 }
