@@ -30,7 +30,7 @@ public class SettingsSubPanel extends VBox {
     }
     
     private void setupButtons() {
-        String[] items = {"General", "Preferences", "AI", "Data Import"};
+        String[] items = {"General", "Preferences", "AI", "Share", "Data Import"};
         
         for (String item : items) {
             Button button = createSubButton(item);

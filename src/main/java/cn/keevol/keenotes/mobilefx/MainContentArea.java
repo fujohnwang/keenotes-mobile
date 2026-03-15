@@ -670,7 +670,8 @@ public class MainContentArea extends StackPane {
                 if (SettingsService.getInstance().getCopyToClipboardOnPost()) {
                     javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
                     javafx.scene.input.ClipboardContent clipContent = new javafx.scene.input.ClipboardContent();
-                    clipContent.putString(content);
+                    String hiddenMessage = SettingsService.getInstance().getHiddenMessage();
+                    clipContent.putString(ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage));
                     clipboard.setContent(clipContent);
                 }
                 

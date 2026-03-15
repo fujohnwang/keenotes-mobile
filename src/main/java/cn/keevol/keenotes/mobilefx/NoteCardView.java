@@ -232,7 +232,8 @@ public class NoteCardView extends StackPane {
             // Copy selection
             Clipboard clipboard = Clipboard.getSystemClipboard();
             ClipboardContent content = new ClipboardContent();
-            content.putString(selected);
+            String hiddenMessage = SettingsService.getInstance().getHiddenMessage();
+            content.putString(ZeroWidthSteganography.embedIfNeeded(selected, hiddenMessage));
             clipboard.setContent(content);
             showCopiedPopup();
             // Deselect text after copy
@@ -247,7 +248,8 @@ public class NoteCardView extends StackPane {
         // Copy entire content to clipboard
         Clipboard clipboard = Clipboard.getSystemClipboard();
         ClipboardContent content = new ClipboardContent();
-        content.putString(noteData.content);
+        String hiddenMessage = SettingsService.getInstance().getHiddenMessage();
+        content.putString(ZeroWidthSteganography.embedIfNeeded(noteData.content, hiddenMessage));
         clipboard.setContent(content);
         
         showCopiedPopup();
