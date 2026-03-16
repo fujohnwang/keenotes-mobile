@@ -135,7 +135,7 @@ public class NoteInputPanel extends VBox {
         statusLabel.getStyleClass().add("unified-status-label");
         statusLabel.setWrapText(true);
         statusLabel.setVisible(false);
-        statusLabel.setMaxWidth(300);
+        statusLabel.setMaxWidth(Double.MAX_VALUE);
         
         // Bottom control bar (flat layout)
         HBox controlBar = new HBox(12);

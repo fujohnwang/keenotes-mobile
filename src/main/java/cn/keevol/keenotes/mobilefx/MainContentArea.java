@@ -514,6 +514,8 @@ public class MainContentArea extends StackPane {
         
         // Pending notes 提示条（reactive binding 控制显示/隐藏）
         pendingBanner = createPendingBanner();
+        // 左右 margin 与 NoteInputPanel 内部 inputContainer 的视觉边缘对齐
+        VBox.setMargin(pendingBanner, new Insets(0, 16, 0, 16));
         
         // Create input panel (height auto-fits content)
         noteInputPanel = new NoteInputPanel(this::handleNoteSend);
