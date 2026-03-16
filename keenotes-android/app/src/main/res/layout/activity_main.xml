@@ -15,116 +15,151 @@
         app:defaultNavHost="true"
         app:navGraph="@navigation/nav_graph"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/customTabBar" />
+        app:layout_constraintBottom_toTopOf="@id/dockContainer" />
 
-    <!-- Custom iOS-style Capsule Tab Bar -->
-    <LinearLayout
-        android:id="@+id/customTabBar"
+    <!-- Floating Dock Container -->
+    <FrameLayout
+        android:id="@+id/dockContainer"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:paddingHorizontal="24dp"
-        android:paddingVertical="8dp"
-        android:background="@color/surface"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="12dp"
+        android:background="@android:color/transparent"
         app:layout_constraintBottom_toBottomOf="parent">
 
-        <!-- Note Tab -->
         <LinearLayout
-            android:id="@+id/tabNote"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
+            android:id="@+id/customTabBar"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
             android:gravity="center"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="4dp"
-            android:background="@drawable/tab_capsule_background"
-            android:clickable="true"
-            android:focusable="true">
+            android:paddingHorizontal="8dp"
+            android:background="@drawable/dock_background"
+            android:elevation="8dp">
 
-            <ImageView
-                android:id="@+id/tabNoteIcon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_note"
-                android:contentDescription="Note" />
+            <!-- Note Tab -->
+            <LinearLayout
+                android:id="@+id/tabNote"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="4dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingVertical="6dp"
+                android:clickable="true"
+                android:focusable="true">
 
-            <TextView
-                android:id="@+id/tabNoteText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Note"
-                android:textSize="11sp"
-                android:textColor="@color/text_secondary" />
+                <ImageView
+                    android:id="@+id/tabNoteIcon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_note"
+                    android:contentDescription="Note" />
+
+                <TextView
+                    android:id="@+id/tabNoteText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Note"
+                    android:textSize="10sp"
+                    android:textColor="@color/text_secondary" />
+
+                <View
+                    android:id="@+id/tabNoteDot"
+                    android:layout_width="4dp"
+                    android:layout_height="4dp"
+                    android:layout_marginTop="3dp"
+                    android:background="@drawable/ic_circle"
+                    android:backgroundTint="@color/primary"
+                    android:visibility="invisible" />
+
+            </LinearLayout>
+
+            <!-- Review Tab -->
+            <LinearLayout
+                android:id="@+id/tabReview"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="4dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingVertical="6dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/tabReviewIcon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_review"
+                    android:contentDescription="Review" />
+
+                <TextView
+                    android:id="@+id/tabReviewText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Review"
+                    android:textSize="10sp"
+                    android:textColor="@color/text_secondary" />
+
+                <View
+                    android:id="@+id/tabReviewDot"
+                    android:layout_width="4dp"
+                    android:layout_height="4dp"
+                    android:layout_marginTop="3dp"
+                    android:background="@drawable/ic_circle"
+                    android:backgroundTint="@color/primary"
+                    android:visibility="invisible" />
+
+            </LinearLayout>
+
+            <!-- Settings Tab -->
+            <LinearLayout
+                android:id="@+id/tabSettings"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="4dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingVertical="6dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/tabSettingsIcon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_settings"
+                    android:contentDescription="Settings" />
+
+                <TextView
+                    android:id="@+id/tabSettingsText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Settings"
+                    android:textSize="10sp"
+                    android:textColor="@color/text_secondary" />
+
+                <View
+                    android:id="@+id/tabSettingsDot"
+                    android:layout_width="4dp"
+                    android:layout_height="4dp"
+                    android:layout_marginTop="3dp"
+                    android:background="@drawable/ic_circle"
+                    android:backgroundTint="@color/primary"
+                    android:visibility="invisible" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
-        <!-- Review Tab -->
-        <LinearLayout
-            android:id="@+id/tabReview"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="4dp"
-            android:background="@drawable/tab_capsule_background"
-            android:clickable="true"
-            android:focusable="true">
-
-            <ImageView
-                android:id="@+id/tabReviewIcon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_review"
-                android:contentDescription="Review" />
-
-            <TextView
-                android:id="@+id/tabReviewText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Review"
-                android:textSize="11sp"
-                android:textColor="@color/text_secondary" />
-
-        </LinearLayout>
-
-        <!-- Settings Tab -->
-        <LinearLayout
-            android:id="@+id/tabSettings"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="4dp"
-            android:background="@drawable/tab_capsule_background"
-            android:clickable="true"
-            android:focusable="true">
-
-            <ImageView
-                android:id="@+id/tabSettingsIcon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_settings"
-                android:contentDescription="Settings" />
-
-            <TextView
-                android:id="@+id/tabSettingsText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Settings"
-                android:textSize="11sp"
-                android:textColor="@color/text_secondary" />
-
-        </LinearLayout>
-
-    </LinearLayout>
+    </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

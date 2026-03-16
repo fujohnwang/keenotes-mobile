@@ -1,7 +1,11 @@
 package cn.keevol.keenotes.ui
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.os.Bundle
+import android.view.View
 import android.view.WindowManager
+import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -89,28 +93,48 @@ class MainActivity : AppCompatActivity() {
     
     private fun selectTab(index: Int) {
         // Reset all tabs
-        resetTab(binding.tabNote, binding.tabNoteIcon, binding.tabNoteText)
-        resetTab(binding.tabReview, binding.tabReviewIcon, binding.tabReviewText)
-        resetTab(binding.tabSettings, binding.tabSettingsIcon, binding.tabSettingsText)
+        resetTab(binding.tabNote, binding.tabNoteIcon, binding.tabNoteText, binding.tabNoteDot)
+        resetTab(binding.tabReview, binding.tabReviewIcon, binding.tabReviewText, binding.tabReviewDot)
+        resetTab(binding.tabSettings, binding.tabSettingsIcon, binding.tabSettingsText, binding.tabSettingsDot)
         
         // Select the target tab
         when (index) {
-            0 -> highlightTab(binding.tabNote, binding.tabNoteIcon, binding.tabNoteText)
-            1 -> highlightTab(binding.tabReview, binding.tabReviewIcon, binding.tabReviewText)
-            2 -> highlightTab(binding.tabSettings, binding.tabSettingsIcon, binding.tabSettingsText)
+            0 -> highlightTab(binding.tabNote, binding.tabNoteIcon, binding.tabNoteText, binding.tabNoteDot)
+            1 -> highlightTab(binding.tabReview, binding.tabReviewIcon, binding.tabReviewText, binding.tabReviewDot)
+            2 -> highlightTab(binding.tabSettings, binding.tabSettingsIcon, binding.tabSettingsText, binding.tabSettingsDot)
         }
     }
     
-    private fun resetTab(tab: LinearLayout, icon: ImageView, text: TextView) {
+    private fun resetTab(tab: LinearLayout, icon: ImageView, text: TextView, dot: View) {
         tab.isSelected = false
         icon.setColorFilter(unselectedColor)
         text.setTextColor(unselectedColor)
+        dot.visibility = View.INVISIBLE
+        // 恢复默认缩放
+        icon.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
     }
     
-    private fun highlightTab(tab: LinearLayout, icon: ImageView, text: TextView) {
+    private fun highlightTab(tab: LinearLayout, icon: ImageView, text: TextView, dot: View) {
         tab.isSelected = true
         icon.setColorFilter(selectedColor)
         text.setTextColor(selectedColor)
+        dot.visibility = View.VISIBLE
+        // 弹性放大动画（overshoot interpolator 模拟物理回弹）
+        animateTabSelection(icon)
+    }
+    
+    /**
+     * 选中 tab 时的弹性缩放动画
+     */
+    private fun animateTabSelection(icon: ImageView) {
+        val scaleX = ObjectAnimator.ofFloat(icon, "scaleX", 0.8f, 1.15f, 1f)
+        val scaleY = ObjectAnimator.ofFloat(icon, "scaleY", 0.8f, 1.15f, 1f)
+        AnimatorSet().apply {
+            playTogether(scaleX, scaleY)
+            duration = 300
+            interpolator = OvershootInterpolator(2f)
+            start()
+        }
     }
     
     /**

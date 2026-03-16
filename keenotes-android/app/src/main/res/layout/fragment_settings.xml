@@ -22,7 +22,8 @@
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:background="@color/surface">
+            android:background="@color/surface"
+            android:elevation="4dp">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -40,222 +41,263 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="24dp">
+            android:padding="16dp">
 
-            <!-- Endpoint URL -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/settings_endpoint"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
-
-            <EditText
-                android:id="@+id/endpointInput"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/bg_input_field"
-                android:hint="https://api.example.com/notes"
-                android:textColorHint="@color/text_secondary"
-                android:textColor="@color/text_primary"
-                android:paddingHorizontal="16dp"
-                android:inputType="textUri"
-                android:maxLines="1" />
-
-            <!-- Token -->
-            <TextView
-                android:id="@+id/tokenLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/settings_token"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
-
-            <EditText
-                android:id="@+id/tokenInput"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/bg_input_field"
-                android:hint="Your API token"
-                android:textColorHint="@color/text_secondary"
-                android:textColor="@color/text_primary"
-                android:paddingHorizontal="16dp"
-                android:inputType="textPassword"
-                android:maxLines="1" />
-
-            <!-- Encryption Password -->
-            <TextView
-                android:id="@+id/passwordLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/settings_password"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
-
-            <EditText
-                android:id="@+id/passwordInput"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/bg_input_field"
-                android:hint="E2E encryption password (required)"
-                android:textColorHint="@color/text_secondary"
-                android:textColor="@color/text_primary"
-                android:paddingHorizontal="16dp"
-                android:inputType="textPassword"
-                android:maxLines="1" />
-
-            <!-- Confirm Password -->
-            <TextView
-                android:id="@+id/confirmPasswordLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/settings_password_confirm"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
-
-            <EditText
-                android:id="@+id/passwordConfirmInput"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/bg_input_field"
-                android:hint="Confirm encryption password"
-                android:textColorHint="@color/text_secondary"
-                android:textColor="@color/text_primary"
-                android:paddingHorizontal="16dp"
-                android:inputType="textPassword"
-                android:maxLines="1" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="⚠️ Remember your password! Without it, notes cannot be decrypted."
-                android:textColor="@color/warning"
-                android:textSize="12sp" />
-
-            <!-- Save Button -->
-            <Button
-                android:id="@+id/btnSave"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="24dp"
-                android:text="@string/settings_save"
-                android:textColor="@color/background"
-                android:backgroundTint="@color/btn_save_background"
-                app:cornerRadius="8dp" />
-
-            <!-- Status Text -->
-            <TextView
-                android:id="@+id/statusText"
+            <!-- ========== Card 1: Connection ========== -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:textSize="14sp"
-                android:textColor="@color/text_secondary" />
+                android:orientation="vertical"
+                android:background="@drawable/bg_settings_card"
+                android:padding="16dp"
+                android:elevation="2dp">
 
-            <!-- Preferences Section -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="Preferences"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Connection"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
-            <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/copyToClipboardSwitch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="Copy to clipboard on post success"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:padding="12dp" />
+                <!-- Endpoint URL -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/settings_endpoint"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
 
-            <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/showOverviewCardSwitch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/overview_show_card"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:padding="12dp" />
+                <EditText
+                    android:id="@+id/endpointInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_input_field"
+                    android:hint="https://api.example.com/notes"
+                    android:textColorHint="@color/text_secondary"
+                    android:textColor="@color/text_primary"
+                    android:paddingHorizontal="16dp"
+                    android:inputType="textUri"
+                    android:maxLines="1" />
 
-            <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/autoFocusInputSwitch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Auto-focus input on launch"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:padding="12dp" />
+                <!-- Token -->
+                <TextView
+                    android:id="@+id/tokenLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_token"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
 
-            <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/confettiOnPostSwitch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Confetti on post success"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:padding="12dp" />
+                <EditText
+                    android:id="@+id/tokenInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_input_field"
+                    android:hint="Your API token"
+                    android:textColorHint="@color/text_secondary"
+                    android:textColor="@color/text_primary"
+                    android:paddingHorizontal="16dp"
+                    android:inputType="textPassword"
+                    android:maxLines="1" />
 
-            <!-- Hidden Watermark Section -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="Hidden Watermark"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                <!-- Encryption Password -->
+                <TextView
+                    android:id="@+id/passwordLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_password"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="When set, an invisible watermark is embedded into copied note content for traceability."
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
+                <EditText
+                    android:id="@+id/passwordInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_input_field"
+                    android:hint="E2E encryption password (required)"
+                    android:textColorHint="@color/text_secondary"
+                    android:textColor="@color/text_primary"
+                    android:paddingHorizontal="16dp"
+                    android:inputType="textPassword"
+                    android:maxLines="1" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:hint="Hidden message"
-                app:boxBackgroundMode="outline"
-                app:boxStrokeColor="@color/text_secondary"
-                app:hintTextColor="@color/text_secondary">
+                <!-- Confirm Password -->
+                <TextView
+                    android:id="@+id/confirmPasswordLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/settings_password_confirm"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/hiddenMessageInput"
+                <EditText
+                    android:id="@+id/passwordConfirmInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_input_field"
+                    android:hint="Confirm encryption password"
+                    android:textColorHint="@color/text_secondary"
+                    android:textColor="@color/text_primary"
+                    android:paddingHorizontal="16dp"
+                    android:inputType="textPassword"
+                    android:maxLines="1" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="⚠️ Remember your password! Without it, notes cannot be decrypted."
+                    android:textColor="@color/warning"
+                    android:textSize="12sp" />
+
+                <!-- Save Button -->
+                <Button
+                    android:id="@+id/btnSave"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="20dp"
+                    android:text="@string/settings_save"
+                    android:textColor="@color/background"
+                    android:backgroundTint="@color/btn_save_background"
+                    app:cornerRadius="12dp" />
+
+                <!-- Status Text -->
+                <TextView
+                    android:id="@+id/statusText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary" />
+
+            </LinearLayout>
+
+            <!-- ========== Card 2: Preferences ========== -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_settings_card"
+                android:padding="16dp"
+                android:elevation="2dp"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Preferences"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    style="@style/Widget.KeeNotes.Switch"
+                    android:id="@+id/copyToClipboardSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Copy to clipboard on post success"
                     android:textColor="@color/text_primary"
                     android:textSize="14sp"
-                    android:inputType="text"
-                    android:imeOptions="actionDone" />
+                    android:padding="12dp" />
 
-            </com.google.android.material.textfield.TextInputLayout>
+                <androidx.appcompat.widget.SwitchCompat
+                    style="@style/Widget.KeeNotes.Switch"
+                    android:id="@+id/showOverviewCardSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/overview_show_card"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:padding="12dp" />
 
-            <Button
-                android:id="@+id/btnSaveHiddenMessage"
+                <androidx.appcompat.widget.SwitchCompat
+                    style="@style/Widget.KeeNotes.Switch"
+                    android:id="@+id/autoFocusInputSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Auto-focus input on launch"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:padding="12dp" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    style="@style/Widget.KeeNotes.Switch"
+                    android:id="@+id/confettiOnPostSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Confetti on post success"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:padding="12dp" />
+
+            </LinearLayout>
+
+            <!-- ========== Card 3: Hidden Watermark ========== -->
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
-                android:text="Save"
-                android:enabled="false"
-                app:cornerRadius="8dp" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_settings_card"
+                android:padding="16dp"
+                android:elevation="2dp"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Hidden Watermark"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="When set, an invisible watermark is embedded into copied note content for traceability."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="Hidden message"
+                    app:boxBackgroundMode="outline"
+                    app:boxStrokeColor="@color/text_secondary"
+                    app:hintTextColor="@color/text_secondary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/hiddenMessageInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:inputType="text"
+                        android:imeOptions="actionDone" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <Button
+                    android:id="@+id/btnSaveHiddenMessage"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
+                    android:text="Save"
+                    android:enabled="false"
+                    app:cornerRadius="12dp" />
+
+            </LinearLayout>
 
             <!-- Debug Section (hidden by default) -->
             <LinearLayout
@@ -263,6 +305,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
+                android:background="@drawable/bg_settings_card"
+                android:padding="16dp"
+                android:elevation="2dp"
                 android:layout_marginTop="16dp"
                 android:visibility="gone">
 
@@ -273,7 +318,7 @@
                     android:text="Debug"
                     android:textColor="@color/text_primary"
                     android:backgroundTint="@color/surface_elevated"
-                    app:cornerRadius="8dp" />
+                    app:cornerRadius="12dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -285,19 +330,14 @@
 
             </LinearLayout>
 
-            <!-- Spacer -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
             <!-- Copyright Footer -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:layout_marginTop="32dp">
+                android:layout_marginTop="32dp"
+                android:layout_marginBottom="16dp">
 
                 <TextView
                     android:id="@+id/copyrightText"

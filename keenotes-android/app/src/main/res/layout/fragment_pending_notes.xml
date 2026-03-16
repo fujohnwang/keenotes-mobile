@@ -11,7 +11,8 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="@color/surface">
+        android:background="@color/surface"
+        android:elevation="4dp">
 
         <ImageView
             android:id="@+id/btnBack"
