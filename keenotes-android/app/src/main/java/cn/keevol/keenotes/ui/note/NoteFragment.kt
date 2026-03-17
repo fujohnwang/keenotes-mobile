@@ -215,74 +215,45 @@ class NoteFragment : Fragment() {
     private fun saveNote(content: String) {
         val app = requireActivity().application as KeeNotesApp
         
+        // Optimistic UI: clear input, confetti, clipboard immediately
+        binding.noteInput.text?.clear()
+        binding.noteInput.clearFocus()
+        val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
+        updateSendButtonState(false)
+        
+        // Copy to clipboard & fire confetti immediately (optimistic UI)
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (app.settingsRepository.getCopyToClipboardOnPost()) {
+                val hiddenMessage = app.settingsRepository.getHiddenMessage()
+                val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("note", ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage))
+                clipboard.setPrimaryClip(clip)
+            }
+            if (app.settingsRepository.confettiOnPostSuccess.first()) {
+                cn.keevol.keenotes.ui.widget.ConfettiHelper.fire(requireActivity())
+            }
+        }
+        
         // 网络不可用：直接暂存到本地
         if (!app.pendingNoteService.isNetworkAvailable()) {
             app.pendingNoteService.savePendingNote(content)
-            binding.noteInput.text?.clear()
-            binding.noteInput.clearFocus()
-            val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-            imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
             com.google.android.material.snackbar.Snackbar.make(
                 binding.root, "📤 Saved locally, will auto-send when network restores", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
             ).show()
             return
         }
         
-        // Disable button and show sending state
-        binding.btnSend.isEnabled = false
-        binding.btnSend.alpha = 0.7f
-        binding.sendIcon.visibility = View.GONE
-        binding.sendProgress.visibility = View.VISIBLE
-        binding.sendText.text = "Keeping..."
-        
-        // Start rotation animation
-        val rotateAnimation = android.view.animation.AnimationUtils.loadAnimation(requireContext(), cn.keevol.keenotes.R.anim.rotate_spinner)
-        binding.sendProgress.startAnimation(rotateAnimation)
-        
+        // Send in background silently
         viewLifecycleOwner.lifecycleScope.launch {
             val result = app.apiService.postNote(content)
             
-            // Check if view still exists before updating UI
-            if (_binding != null) {
-                // Stop animation and restore button state
-                binding.sendProgress.clearAnimation()
-                binding.sendProgress.visibility = View.GONE
-                binding.sendIcon.visibility = View.VISIBLE
-                binding.sendText.text = "Keep it"
-                
-                if (result.success) {
-                    // Copy to clipboard if enabled
-                    if (app.settingsRepository.getCopyToClipboardOnPost()) {
-                        val hiddenMessage = app.settingsRepository.getHiddenMessage()
-                        val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("note", ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage))
-                        clipboard.setPrimaryClip(clip)
-                    }
-                    
-                    // Clear input on success
-                    binding.noteInput.text?.clear()
-                    
-                    // Clear focus to restore overview card if enabled
-                    binding.noteInput.clearFocus()
-                    
-                    // Hide keyboard
-                    val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                    imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
-                    
-                    // Fire confetti immediately if enabled (Choreographer-driven, async)
-                    if (app.settingsRepository.confettiOnPostSuccess.first()) {
-                        cn.keevol.keenotes.ui.widget.ConfettiHelper.fire(requireActivity())
-                    }
-                } else {
-                    // 发送失败：暂存到本地
-                    app.pendingNoteService.savePendingNote(content)
-                    binding.noteInput.text?.clear()
-                    com.google.android.material.snackbar.Snackbar.make(
-                        binding.root, "📤 Send failed, saved locally", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
-                    ).show()
-                }
-                
-                updateSendButtonState(binding.noteInput.text?.isNotBlank() == true)
+            if (_binding != null && !result.success) {
+                // 发送失败：暂存到本地
+                app.pendingNoteService.savePendingNote(content)
+                com.google.android.material.snackbar.Snackbar.make(
+                    binding.root, "📤 Send failed, saved locally", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                ).show()
             }
         }
     }
