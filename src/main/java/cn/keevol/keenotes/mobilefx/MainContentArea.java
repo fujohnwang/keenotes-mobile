@@ -28,6 +28,7 @@ public class MainContentArea extends StackPane {
     // Note mode components
     private NoteInputPanel noteInputPanel;
     private NotesDisplayPanel notesDisplayPanel;
+    private ConfettiOverlay confettiOverlay;
     
     // Search mode components
     private SearchInputPanel searchInputPanel;
@@ -276,6 +277,10 @@ public class MainContentArea extends StackPane {
         
         // Add all panels (initially hidden)
         getChildren().addAll(noteModePanel, searchModePanel, reviewModePanel, settingsModePanel);
+        
+        // Confetti overlay on top of everything
+        confettiOverlay = new ConfettiOverlay();
+        getChildren().add(confettiOverlay);
         
         // Hide all except note mode
         noteModePanel.setVisible(true);
@@ -653,30 +658,27 @@ public class MainContentArea extends StackPane {
 
         PendingNoteService pendingService = ServiceManager.getInstance().getPendingNoteService();
         
-        // 先清空输入，消除重复触发的时间窗口
+        // Optimistic UI: 立即清空输入 + 播放 confetti（如果启用）
         noteInputPanel.clearInput();
         noteInputPanel.setSendButtonEnabled(false);
+        if (SettingsService.getInstance().getConfettiOnPost()) {
+            confettiOverlay.fire();
+        }
         
-        // 网络不可用：直接暂存到本地
+        // 网络不可用：静默存入 pending
         if (!pendingService.isNetworkAvailable()) {
             pendingService.savePendingNote(content, getDesktopChannel());
-            noteInputPanel.showStatus("📤 Saved locally, will auto-send when network restores", false);
             noteInputPanel.setSendButtonEnabled(true);
             sending.set(false);
-            new Thread(() -> {
-                try { Thread.sleep(3000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-                Platform.runLater(() -> noteInputPanel.hideStatus());
-            }).start();
             return;
         }
         
-        // 网络可用：尝试发送
-        noteInputPanel.showStatus("Encrypting and keeping...", false);
+        // 网络可用：后台静默发送 (fire-and-forget)
+        noteInputPanel.setSendButtonEnabled(true);
+        sending.set(false);
         
         apiService.postNote(content).thenAccept(result -> Platform.runLater(() -> {
             if (result.success()) {
-                noteInputPanel.showStatus("✓ " + result.message(), false);
-                
                 // Copy to clipboard if enabled
                 if (SettingsService.getInstance().getCopyToClipboardOnPost()) {
                     javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
@@ -685,23 +687,10 @@ public class MainContentArea extends StackPane {
                     clipContent.putString(ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage));
                     clipboard.setContent(clipContent);
                 }
-                
-                new Thread(() -> {
-                    try { Thread.sleep(2000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-                    Platform.runLater(() -> noteInputPanel.hideStatus());
-                }).start();
             } else {
-                // 发送失败（超时等）：暂存到本地
+                // 发送失败：静默存入 pending
                 pendingService.savePendingNote(content, getDesktopChannel());
-                noteInputPanel.showStatus("📤 Send failed, saved locally", true);
-                new Thread(() -> {
-                    try { Thread.sleep(3000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-                    Platform.runLater(() -> noteInputPanel.hideStatus());
-                }).start();
             }
-            
-            noteInputPanel.setSendButtonEnabled(true);
-            sending.set(false);
         }));
     }
     
