@@ -48,3 +48,11 @@
    - `PBXSourcesBuildPhase` files — 将 build file 引用加入编译列表
 2. 注册前先搜索同目录下已有文件（如 `ConfettiView.swift`）的注册方式作为模板
 3. 这是一个 checklist 项 — 创建文件后立即执行，不要等到最后
+
+## 并发防重入一律用 AtomicBoolean
+
+**问题**: 用 `volatile boolean` 做 check-then-act 防重入，存在竞态条件（两个线程同时读到 false 后都进入临界区）。第一次修复时 `PendingNoteService` 用了 `AtomicBoolean`，但 `MainContentArea` 用了 `volatile boolean`，风格不一致。
+
+**规则**:
+1. 所有 check-then-act 防重入场景，统一使用 `AtomicBoolean.compareAndSet(false, true)`，不用 `volatile boolean`
+2. 同一个项目中相同模式的实现方式必须保持一致，不要一处用 AtomicBoolean 另一处用 volatile boolean
