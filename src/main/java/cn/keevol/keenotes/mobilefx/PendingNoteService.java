@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 /**
@@ -24,7 +25,7 @@ public class PendingNoteService {
 
     private final LocalCacheService localCache;
     private ScheduledExecutorService retryScheduler;
-    private volatile boolean retrying = false;
+    private final AtomicBoolean retrying = new AtomicBoolean(false);
 
     private PendingNoteService() {
         this.localCache = LocalCacheService.getInstance();
@@ -98,8 +99,7 @@ public class PendingNoteService {
      * 逐条重试发送 pending notes（按 created_at 顺序）
      */
     private void retryPendingNotes() {
-        if (retrying) return;
-        retrying = true;
+        if (!retrying.compareAndSet(false, true)) return;
 
         try {
             List<LocalCacheService.PendingNoteData> pendingNotes = localCache.getPendingNotes();
@@ -130,7 +130,7 @@ public class PendingNoteService {
                 }
             }
         } finally {
-            retrying = false;
+            retrying.set(false);
         }
     }
 

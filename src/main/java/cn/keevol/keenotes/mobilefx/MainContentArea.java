@@ -12,6 +12,8 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /**
  * Main content area that switches between different modes
  */
@@ -42,6 +44,7 @@ public class MainContentArea extends StackPane {
     private ApiServiceV2 apiService;
     private LocalCacheService localCache;
     private WebSocketClientService webSocketService;
+    private final AtomicBoolean sending = new AtomicBoolean(false);
     
     // Current visible panel
     private VBox currentPanel;
@@ -645,13 +648,21 @@ public class MainContentArea extends StackPane {
      * Handle note send action
      */
     private void handleNoteSend(String content) {
+        // 防重入：阻止快速连续触发导致重复提交
+        if (!sending.compareAndSet(false, true)) return;
+
         PendingNoteService pendingService = ServiceManager.getInstance().getPendingNoteService();
+        
+        // 先清空输入，消除重复触发的时间窗口
+        noteInputPanel.clearInput();
+        noteInputPanel.setSendButtonEnabled(false);
         
         // 网络不可用：直接暂存到本地
         if (!pendingService.isNetworkAvailable()) {
             pendingService.savePendingNote(content, getDesktopChannel());
             noteInputPanel.showStatus("📤 Saved locally, will auto-send when network restores", false);
-            noteInputPanel.clearInput();
+            noteInputPanel.setSendButtonEnabled(true);
+            sending.set(false);
             new Thread(() -> {
                 try { Thread.sleep(3000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
                 Platform.runLater(() -> noteInputPanel.hideStatus());
@@ -661,12 +672,10 @@ public class MainContentArea extends StackPane {
         
         // 网络可用：尝试发送
         noteInputPanel.showStatus("Encrypting and keeping...", false);
-        noteInputPanel.setSendButtonEnabled(false);
         
         apiService.postNote(content).thenAccept(result -> Platform.runLater(() -> {
             if (result.success()) {
                 noteInputPanel.showStatus("✓ " + result.message(), false);
-                noteInputPanel.clearInput();
                 
                 // Copy to clipboard if enabled
                 if (SettingsService.getInstance().getCopyToClipboardOnPost()) {
@@ -685,7 +694,6 @@ public class MainContentArea extends StackPane {
                 // 发送失败（超时等）：暂存到本地
                 pendingService.savePendingNote(content, getDesktopChannel());
                 noteInputPanel.showStatus("📤 Send failed, saved locally", true);
-                noteInputPanel.clearInput();
                 new Thread(() -> {
                     try { Thread.sleep(3000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
                     Platform.runLater(() -> noteInputPanel.hideStatus());
@@ -693,6 +701,7 @@ public class MainContentArea extends StackPane {
             }
             
             noteInputPanel.setSendButtonEnabled(true);
+            sending.set(false);
         }));
     }
     
