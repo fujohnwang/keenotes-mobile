@@ -23,6 +23,7 @@ public class SettingsService {
     private static final String KEY_REVIEW_DAYS = "review.days";
     private static final String KEY_ENCRYPTION_PASSWORD = "encryption.password";
     private static final String KEY_COPY_TO_CLIPBOARD = "copy.to.clipboard.on.post";
+    private static final String KEY_CONFETTI_ON_POST = "confetti.on.post";
     private static final String KEY_SEARCH_SHORTCUT = "shortcut.search";
     private static final String KEY_SEND_SHORTCUT = "shortcut.send";
     private static final String KEY_SHOW_OVERVIEW_CARD = "show.overview.card";
@@ -185,6 +186,14 @@ public class SettingsService {
 
     public void setCopyToClipboardOnPost(boolean enabled) {
         properties.setProperty(KEY_COPY_TO_CLIPBOARD, String.valueOf(enabled));
+    }
+
+    public boolean getConfettiOnPost() {
+        return Boolean.parseBoolean(properties.getProperty(KEY_CONFETTI_ON_POST, "true"));
+    }
+
+    public void setConfettiOnPost(boolean enabled) {
+        properties.setProperty(KEY_CONFETTI_ON_POST, String.valueOf(enabled));
     }
 
     public String getHiddenMessage() {
