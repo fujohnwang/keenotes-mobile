@@ -388,7 +388,9 @@ public class NoteCardView extends StackPane {
             @Override
             public void handle(long now) {
                 double elapsed = (now - borderStartNanos) / 1_000_000_000.0;
-                double progress = Math.min(elapsed / BORDER_ANIM_DURATION, 1.0);
+                double t = Math.min(elapsed / BORDER_ANIM_DURATION, 1.0);
+                // ease-out cubic: 前段快、后段慢，让用户立刻感受到反馈
+                double progress = 1.0 - Math.pow(1.0 - t, 3);
                 drawBorderProgress(progress);
             }
         };
