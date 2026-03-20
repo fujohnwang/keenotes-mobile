@@ -13,7 +13,6 @@ public class SettingsPreferencesView extends VBox {
     
     private final SettingsService settings;
     private final ToggleSwitch copyToClipboardToggle;
-    private final ToggleSwitch confettiOnPostToggle;
     private final ToggleSwitch showOverviewCardToggle;
     private final ToggleSwitch themeToggle;
     private final KeyCaptureField takeNoteShortcutField;
@@ -33,13 +32,6 @@ public class SettingsPreferencesView extends VBox {
         copyToClipboardToggle = new ToggleSwitch();
         copyToClipboardToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
             settings.setCopyToClipboardOnPost(newVal);
-            settings.save();
-        });
-
-        // Confetti on post toggle
-        confettiOnPostToggle = new ToggleSwitch();
-        confettiOnPostToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            settings.setConfettiOnPost(newVal);
             settings.save();
         });
 
@@ -120,7 +112,6 @@ public class SettingsPreferencesView extends VBox {
         // Build UI
         getChildren().addAll(
             createToggleRow("Copy to clipboard on post success", copyToClipboardToggle),
-            createToggleRow("Confetti on post success", confettiOnPostToggle),
             createToggleRow("Show Overview Card", showOverviewCardToggle),
             createToggleRow("Light Theme", themeToggle),
             createShortcutRow("Take Note shortcut", takeNoteShortcutField,
@@ -174,7 +165,6 @@ public class SettingsPreferencesView extends VBox {
     
     private void loadSettings() {
         copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
-        confettiOnPostToggle.setSelected(settings.getConfettiOnPost());
         showOverviewCardToggle.setSelected(settings.getShowOverviewCard());
         themeToggle.setSelected(ThemeService.getInstance().getCurrentTheme() == ThemeService.Theme.LIGHT);
         takeNoteShortcutField.setShortcut(settings.getTakeNoteShortcut());

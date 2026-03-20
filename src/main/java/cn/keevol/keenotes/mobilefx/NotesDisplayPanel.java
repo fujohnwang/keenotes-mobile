@@ -807,4 +807,31 @@ public class NotesDisplayPanel extends VBox {
     public VBox getNotesContainer() {
         return notesContainer;
     }
+
+    /**
+     * 反向动画移除卡片（addNoteAtTop 的逆向）
+     */
+    public void removeNoteWithAnimation(NoteCardView card, Runnable onFinished) {
+        javafx.animation.FadeTransition fadeOut = new javafx.animation.FadeTransition(
+                javafx.util.Duration.millis(300), card);
+        fadeOut.setToValue(0);
+
+        javafx.animation.ScaleTransition scaleOut = new javafx.animation.ScaleTransition(
+                javafx.util.Duration.millis(300), card);
+        scaleOut.setToX(0.8);
+        scaleOut.setToY(0.8);
+
+        javafx.animation.TranslateTransition slideOut = new javafx.animation.TranslateTransition(
+                javafx.util.Duration.millis(300), card);
+        slideOut.setToY(-30);
+
+        javafx.animation.ParallelTransition popOut = new javafx.animation.ParallelTransition(
+                fadeOut, scaleOut, slideOut);
+        popOut.setOnFinished(e -> {
+            notesContainer.getChildren().remove(card);
+            displayedCount--;
+            if (onFinished != null) onFinished.run();
+        });
+        popOut.play();
+    }
 }
