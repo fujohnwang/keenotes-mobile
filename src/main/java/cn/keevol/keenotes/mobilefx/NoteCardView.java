@@ -1,9 +1,12 @@
 package cn.keevol.keenotes.mobilefx;
 
+import javafx.animation.AnimationTimer;
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
@@ -17,6 +20,7 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.util.Duration;
@@ -33,6 +37,14 @@ public class NoteCardView extends StackPane {
     private final TextArea contentArea;
     private final SettingsService settings;
     private final Text textMeasure; // Hidden text node for measuring height
+    
+    // Border progress animation
+    private Canvas borderCanvas;
+    private AnimationTimer borderTimer;
+    private long borderStartNanos;
+    private static final double BORDER_ANIM_DURATION = 10.0; // max seconds for one full loop
+    private static final double BORDER_LINE_WIDTH = 3.0;
+    private static final double BORDER_RADIUS = 12.0;
     
     public NoteCardView(LocalCacheService.NoteData noteData) {
         this.noteData = noteData;
@@ -181,6 +193,18 @@ public class NoteCardView extends StackPane {
         StackPane.setMargin(copiedPopup, new Insets(8, 8, 0, 0));
         
         getChildren().addAll(contentBox, copiedPopup);
+        
+        // Border animation canvas (on top, mouse transparent, does not affect layout)
+        borderCanvas = new Canvas();
+        borderCanvas.setMouseTransparent(true);
+        borderCanvas.setManaged(false); // 不参与布局计算
+        getChildren().add(borderCanvas);
+        
+        // Canvas 尺寸跟随卡片实际尺寸，但不影响 preferred size
+        layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
+            borderCanvas.setWidth(newBounds.getWidth());
+            borderCanvas.setHeight(newBounds.getHeight());
+        });
         
         // Click anywhere on card (outside TextArea) to copy all
         setOnMouseClicked(e -> {
@@ -351,5 +375,173 @@ public class NoteCardView extends StackPane {
         );
         // Update text measure font
         textMeasure.setFont(Font.font("MiSans", fontSize));
+    }
+
+    /**
+     * 启动边缘色条动画：从左上角顺时针沿圆角矩形边缘增长。
+     * 色条颜色使用主题的 primary color（dark: #00D4FF, light: #0969DA）。
+     */
+    public void startBorderAnimation() {
+        borderStartNanos = System.nanoTime();
+        if (borderTimer != null) borderTimer.stop();
+        borderTimer = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                double elapsed = (now - borderStartNanos) / 1_000_000_000.0;
+                double progress = Math.min(elapsed / BORDER_ANIM_DURATION, 1.0);
+                drawBorderProgress(progress);
+            }
+        };
+        borderTimer.start();
+    }
+
+    /**
+     * 远程同步到达，完成边缘动画闭环后停止。
+     */
+    public void completeBorderAnimation() {
+        if (borderTimer != null) {
+            borderTimer.stop();
+        }
+        // 直接画满一圈，然后淡出
+        drawBorderProgress(1.0);
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(600), borderCanvas);
+        fadeOut.setFromValue(1.0);
+        fadeOut.setToValue(0.0);
+        fadeOut.setOnFinished(e -> {
+            borderCanvas.setOpacity(1.0);
+            clearBorderCanvas();
+        });
+        fadeOut.play();
+    }
+
+    /**
+     * 发送失败，停止动画并清除画布。
+     */
+    public void cancelBorderAnimation() {
+        if (borderTimer != null) {
+            borderTimer.stop();
+            borderTimer = null;
+        }
+        clearBorderCanvas();
+    }
+
+    /**
+     * 在 canvas 上绘制顺时针边缘进度条（从左上角开始）。
+     * 将圆角矩形周长按 progress 比例绘制。
+     */
+    private void drawBorderProgress(double progress) {
+        double w = borderCanvas.getWidth();
+        double h = borderCanvas.getHeight();
+        if (w <= 0 || h <= 0) return;
+
+        GraphicsContext gc = borderCanvas.getGraphicsContext2D();
+        gc.clearRect(0, 0, w, h);
+
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        Color color = isDark ? Color.web("#00D4FF") : Color.web("#0969DA");
+        gc.setStroke(color);
+        gc.setLineWidth(BORDER_LINE_WIDTH);
+        gc.setLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
+
+        double r = BORDER_RADIUS;
+        // 圆角矩形周长：4条直边 + 4个90°圆弧
+        double straightTop = w - 2 * r;
+        double straightRight = h - 2 * r;
+        double straightBottom = w - 2 * r;
+        double straightLeft = h - 2 * r;
+        double arcLen = 0.5 * Math.PI * r; // 每个90°圆弧长度
+        double totalPerimeter = straightTop + straightRight + straightBottom + straightLeft + 4 * arcLen;
+        double drawLen = progress * totalPerimeter;
+
+        // 起点：左上角圆弧的顶部中点（即 top-left corner 的弧顶）
+        // 顺时针8段：topEdge, trArc, rightEdge, brArc, bottomEdge, blArc, leftEdge, tlArc
+        double[] segLengths = {
+                straightTop, arcLen, straightRight, arcLen,
+                straightBottom, arcLen, straightLeft, arcLen
+        };
+
+        gc.beginPath();
+        double remaining = drawLen;
+        double cx = r, cy = BORDER_LINE_WIDTH / 2; // 起始点：top-left圆弧结束处
+
+        gc.moveTo(cx, cy);
+
+        for (int seg = 0; seg < 8 && remaining > 0; seg++) {
+            double segLen = segLengths[seg];
+            double draw = Math.min(remaining, segLen);
+            double frac = draw / segLen;
+
+            switch (seg) {
+                case 0: // top edge: left to right
+                    gc.lineTo(cx + draw, cy);
+                    cx += draw;
+                    break;
+                case 1: // top-right arc
+                    drawArcSegment(gc, w - r, r, r, -90, frac * 90);
+                    cx = w - BORDER_LINE_WIDTH / 2;
+                    cy = r - r * Math.cos(Math.toRadians(frac * 90));
+                    break;
+                case 2: // right edge: top to bottom
+                    cx = w - BORDER_LINE_WIDTH / 2;
+                    gc.moveTo(cx, r + (straightRight > 0 ? 0 : 0));
+                    double rightStart = r;
+                    gc.moveTo(cx, rightStart);
+                    gc.lineTo(cx, rightStart + draw);
+                    cy = rightStart + draw;
+                    break;
+                case 3: // bottom-right arc
+                    drawArcSegment(gc, w - r, h - r, r, 0, frac * 90);
+                    cx = w - r + r * Math.cos(Math.toRadians(90 - frac * 90));
+                    cy = h - BORDER_LINE_WIDTH / 2;
+                    break;
+                case 4: // bottom edge: right to left
+                    double bStartX = w - r;
+                    gc.moveTo(bStartX, h - BORDER_LINE_WIDTH / 2);
+                    gc.lineTo(bStartX - draw, h - BORDER_LINE_WIDTH / 2);
+                    cx = bStartX - draw;
+                    break;
+                case 5: // bottom-left arc
+                    drawArcSegment(gc, r, h - r, r, 90, frac * 90);
+                    cx = BORDER_LINE_WIDTH / 2;
+                    cy = h - r + r * Math.cos(Math.toRadians(frac * 90));
+                    break;
+                case 6: // left edge: bottom to top
+                    double lStartY = h - r;
+                    gc.moveTo(BORDER_LINE_WIDTH / 2, lStartY);
+                    gc.lineTo(BORDER_LINE_WIDTH / 2, lStartY - draw);
+                    cy = lStartY - draw;
+                    break;
+                case 7: // top-left arc
+                    drawArcSegment(gc, r, r, r, 180, frac * 90);
+                    break;
+            }
+            remaining -= draw;
+        }
+        gc.stroke();
+    }
+
+    /**
+     * 在指定圆心绘制一段圆弧。
+     */
+    private void drawArcSegment(GraphicsContext gc, double centerX, double centerY,
+                                 double radius, double startAngle, double sweepAngle) {
+        int steps = Math.max(8, (int) (sweepAngle / 2));
+        double startRad = Math.toRadians(startAngle);
+        double sweepRad = Math.toRadians(sweepAngle);
+
+        for (int i = 0; i <= steps; i++) {
+            double angle = startRad + sweepRad * i / steps;
+            double x = centerX + radius * Math.cos(angle);
+            double y = centerY + radius * Math.sin(angle);
+            if (i == 0) {
+                gc.moveTo(x, y);
+            } else {
+                gc.lineTo(x, y);
+            }
+        }
+    }
+
+    private void clearBorderCanvas() {
+        borderCanvas.getGraphicsContext2D().clearRect(0, 0, borderCanvas.getWidth(), borderCanvas.getHeight());
     }
 }

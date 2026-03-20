@@ -28,7 +28,9 @@ public class MainContentArea extends StackPane {
     // Note mode components
     private NoteInputPanel noteInputPanel;
     private NotesDisplayPanel notesDisplayPanel;
-    private ConfettiOverlay confettiOverlay;
+    
+    // Optimistic UI: 追踪正在发送中的临时卡片（content+ts → card）
+    private NoteCardView optimisticCard;
     
     // Search mode components
     private SearchInputPanel searchInputPanel;
@@ -234,6 +236,20 @@ public class MainContentArea extends StackPane {
             return;
         }
         
+        // 匹配 optimistic card：内容 + 时间戳（秒级）
+        if (optimisticCard != null) {
+            LocalCacheService.NoteData tempData = optimisticCard.getNoteData();
+            if (tempData.content.equals(note.content) 
+                    && tempData.createdAt != null && note.createdAt != null
+                    && tempData.createdAt.equals(note.createdAt)) {
+                System.out.println("[MainContentArea] Matched optimistic card for note " + note.id + ", completing border animation");
+                optimisticCard.completeBorderAnimation();
+                optimisticCard = null;
+                displayedNoteIds.add(note.id);
+                return;
+            }
+        }
+        
         System.out.println("[MainContentArea] Adding new note " + note.id + " to UI with animation");
         
         // Clear empty state if this is the first note
@@ -277,10 +293,6 @@ public class MainContentArea extends StackPane {
         
         // Add all panels (initially hidden)
         getChildren().addAll(noteModePanel, searchModePanel, reviewModePanel, settingsModePanel);
-        
-        // Confetti overlay on top of everything
-        confettiOverlay = new ConfettiOverlay();
-        getChildren().add(confettiOverlay);
         
         // Hide all except note mode
         noteModePanel.setVisible(true);
@@ -657,27 +669,42 @@ public class MainContentArea extends StackPane {
         if (!sending.compareAndSet(false, true)) return;
 
         PendingNoteService pendingService = ServiceManager.getInstance().getPendingNoteService();
+        String ts = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String channel = getDesktopChannel();
         
-        // Optimistic UI: 立即清空输入 + 播放 confetti（如果启用）
+        // Optimistic UI: 立即清空输入 + 插入临时卡片 + 启动边缘动画
         noteInputPanel.clearInput();
         noteInputPanel.setSendButtonEnabled(false);
-        if (SettingsService.getInstance().getConfettiOnPost()) {
-            confettiOverlay.fire();
+        
+        LocalCacheService.NoteData tempNote = new LocalCacheService.NoteData(
+                -1, content, channel, ts, null);
+        
+        if (displayedNoteIds.isEmpty()) {
+            notesDisplayPanel.clearEmptyState();
+        }
+        notesDisplayPanel.addNoteAtTop(tempNote);
+        
+        // 获取刚插入的卡片并启动边缘动画
+        var container = notesDisplayPanel.getNotesContainer();
+        if (!container.getChildren().isEmpty() 
+                && container.getChildren().get(0) instanceof NoteCardView card) {
+            optimisticCard = card;
+            optimisticCard.startBorderAnimation();
         }
         
-        // 网络不可用：静默存入 pending
-        if (!pendingService.isNetworkAvailable()) {
-            pendingService.savePendingNote(content, getDesktopChannel());
-            noteInputPanel.setSendButtonEnabled(true);
-            sending.set(false);
-            return;
-        }
-        
-        // 网络可用：后台静默发送 (fire-and-forget)
         noteInputPanel.setSendButtonEnabled(true);
         sending.set(false);
         
-        apiService.postNote(content).thenAccept(result -> Platform.runLater(() -> {
+        // 网络不可用：存入 pending，取消动画，反向移除卡片
+        if (!pendingService.isNetworkAvailable()) {
+            pendingService.savePendingNote(content, channel);
+            removeOptimisticCard();
+            return;
+        }
+        
+        // 网络可用：后台发送
+        apiService.postNote(content, channel, ts).thenAccept(result -> Platform.runLater(() -> {
             if (result.success()) {
                 // Copy to clipboard if enabled
                 if (SettingsService.getInstance().getCopyToClipboardOnPost()) {
@@ -687,11 +714,24 @@ public class MainContentArea extends StackPane {
                     clipContent.putString(ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage));
                     clipboard.setContent(clipContent);
                 }
+                // 边缘动画会在 handleNewNoteFromDb 匹配到远程同步数据时完成
             } else {
-                // 发送失败：静默存入 pending
-                pendingService.savePendingNote(content, getDesktopChannel());
+                // 发送失败：存入 pending，取消动画，反向移除卡片
+                pendingService.savePendingNote(content, channel);
+                removeOptimisticCard();
             }
         }));
+    }
+    
+    /**
+     * 取消 optimistic card 的边缘动画并反向动画移除
+     */
+    private void removeOptimisticCard() {
+        if (optimisticCard != null) {
+            optimisticCard.cancelBorderAnimation();
+            notesDisplayPanel.removeNoteWithAnimation(optimisticCard, null);
+            optimisticCard = null;
+        }
     }
     
     /**
