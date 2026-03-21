@@ -420,7 +420,7 @@ public class NotesDisplayPanel extends VBox {
                     fadeIn.setToValue(1);
                     fadeIn.setOnFinished(e -> {
                         if (notesContainer.getOpacity() < 1.0) {
-                            logger.warning("notesContainer fadeIn finished but opacity=" 
+                            logger.warning("notesContainer fadeIn finished but opacity="
                                 + notesContainer.getOpacity() + ", forcing to 1.0");
                             notesContainer.setOpacity(1.0);
                         }
@@ -512,10 +512,17 @@ public class NotesDisplayPanel extends VBox {
         );
         fadeIn.setFromValue(0);
         fadeIn.setToValue(1);
+        fadeIn.setOnFinished(e -> {
+            if (notesContainer.getOpacity() < 1.0) {
+                logger.warning("notesContainer fadeIn finished but opacity="
+                    + notesContainer.getOpacity() + ", forcing to 1.0");
+                notesContainer.setOpacity(1.0);
+            }
+        });
         fadeIn.play();
     }
 
-    
+
     /**
      * Load more notes when scrolling to bottom
      */

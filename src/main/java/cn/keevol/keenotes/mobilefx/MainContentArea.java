@@ -858,13 +858,12 @@ public class MainContentArea extends StackPane {
             FadeTransition fadeIn = new FadeTransition(Duration.millis(150), targetPanel);
             fadeIn.setFromValue(0.0);
             fadeIn.setToValue(1.0);
-            
-            // Reload Note list when entering Note mode
-            if (targetPanel == noteModePanel) {
-                loadRecentNotes();
-            }
-            
+
             fadeIn.setOnFinished(ev -> {
+                // Reload Note list after fade in animation completes
+                if (targetPanel == noteModePanel) {
+                    loadRecentNotes();
+                }
                 // 兜底：确保 opacity 为 1.0（防止动画异常未完成）
                 if (targetPanel.getOpacity() < 1.0) {
                     logger.warning("fadeIn finished but opacity=" 
