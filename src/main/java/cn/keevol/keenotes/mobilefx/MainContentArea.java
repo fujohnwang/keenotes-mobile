@@ -13,11 +13,14 @@ import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Logger;
 
 /**
  * Main content area that switches between different modes
  */
 public class MainContentArea extends StackPane {
+    
+    private static final Logger logger = AppLogger.getLogger(MainContentArea.class);
     
     // Mode panels
     private VBox noteModePanel;
@@ -77,7 +80,7 @@ public class MainContentArea extends StackPane {
         // Listen to account switch events to re-register WebSocket listener
         ServiceManager.getInstance().accountSwitchedProperty().addListener((obs, oldVal, newVal) -> {
             Platform.runLater(() -> {
-                System.out.println("[MainContentArea] Account switched, re-registering WebSocket listener");
+                logger.info("Account switched, re-registering WebSocket listener");
                 // Get new WebSocket service instance
                 webSocketService = ServiceManager.getInstance().getWebSocketService();
                 // Re-register listener
@@ -98,7 +101,7 @@ public class MainContentArea extends StackPane {
                     
                     // If Note mode is visible and no notes displayed yet, load them
                     if (currentPanel == noteModePanel && displayedNoteIds.isEmpty()) {
-                        System.out.println("[MainContentArea] Cache ready, loading notes");
+                        logger.info("Cache ready, loading notes");
                         loadRecentNotes();
                     }
                 });
@@ -112,7 +115,7 @@ public class MainContentArea extends StackPane {
      * Register WebSocket listener for sync events
      */
     private void registerWebSocketListener() {
-        System.out.println("[MainContentArea] Registering WebSocket listener");
+        logger.info("Registering WebSocket listener");
         // Listen to WebSocket events for sync status display only
         // Note: UI updates are now driven by LocalCacheService change listeners
         webSocketService.addListener(new WebSocketClientService.SyncListener() {
@@ -217,7 +220,7 @@ public class MainContentArea extends StackPane {
         });
         
         localCacheListenerRegistered = true;
-        System.out.println("[MainContentArea] LocalCacheService change listener registered");
+        logger.info("LocalCacheService change listener registered");
     }
     
     /**
@@ -226,13 +229,13 @@ public class MainContentArea extends StackPane {
     private void handleNewNoteFromDb(LocalCacheService.NoteData note) {
         // Only update UI if Note mode is visible
         if (currentPanel != noteModePanel) {
-            System.out.println("[MainContentArea] Note mode not visible, skipping UI update for note " + note.id);
+            logger.fine("Note mode not visible, skipping UI update for note " + note.id);
             return;
         }
         
         // Check if already displayed (avoid duplicates)
         if (displayedNoteIds.contains(note.id)) {
-            System.out.println("[MainContentArea] Note " + note.id + " already displayed, skipping");
+            logger.fine("Note " + note.id + " already displayed, skipping");
             return;
         }
         
@@ -242,7 +245,7 @@ public class MainContentArea extends StackPane {
             if (tempData.content.equals(note.content) 
                     && tempData.createdAt != null && note.createdAt != null
                     && tempData.createdAt.equals(note.createdAt)) {
-                System.out.println("[MainContentArea] Matched optimistic card for note " + note.id + ", completing border animation");
+                logger.info("Matched optimistic card for note " + note.id + ", completing border animation");
                 optimisticCard.completeBorderAnimation();
                 optimisticCard = null;
                 displayedNoteIds.add(note.id);
@@ -250,7 +253,7 @@ public class MainContentArea extends StackPane {
             }
         }
         
-        System.out.println("[MainContentArea] Adding new note " + note.id + " to UI with animation");
+        logger.info("Adding new note " + note.id + " to UI with animation");
         
         // Clear empty state if this is the first note
         if (displayedNoteIds.isEmpty()) {
@@ -268,13 +271,13 @@ public class MainContentArea extends StackPane {
     private void handleBatchNotesFromDb(java.util.List<LocalCacheService.NoteData> notes) {
         // Update UI based on current panel
         if (currentPanel == noteModePanel) {
-            System.out.println("[MainContentArea] Batch sync completed with " + notes.size() + " notes, reloading Note list");
+            logger.info("Batch sync completed with " + notes.size() + " notes, reloading Note list");
             loadRecentNotes();
         } else if (currentPanel == reviewModePanel) {
-            System.out.println("[MainContentArea] Batch sync completed with " + notes.size() + " notes, reloading Review list");
+            logger.info("Batch sync completed with " + notes.size() + " notes, reloading Review list");
             loadReviewNotes(currentReviewPeriod);
         } else {
-            System.out.println("[MainContentArea] Batch sync completed but current panel is not Note/Review mode, skipping UI update");
+            logger.fine("Batch sync completed but current panel is not Note/Review mode, skipping UI update");
         }
     }
     
@@ -369,7 +372,7 @@ public class MainContentArea extends StackPane {
      * Load review notes for a specific period
      */
     public void loadReviewNotes(String period) {
-        System.out.println("[MainContentArea] loadReviewNotes called with period: " + period);
+        logger.info("loadReviewNotes called with period: " + period);
         currentReviewPeriod = period;
         Platform.runLater(() -> reviewNotesPanel.showLoading("Loading notes"));
         
@@ -388,7 +391,7 @@ public class MainContentArea extends StackPane {
                         default -> 7;
                     };
                     
-                    System.out.println("[MainContentArea] Loading notes for " + days + " days");
+                    logger.info("Loading notes for " + days + " days");
                     
                     int totalCount = localCache.getNotesCountForReview(days);
                     
@@ -401,7 +404,7 @@ public class MainContentArea extends StackPane {
                         default -> "Last 7 days";
                     };
                     
-                    System.out.println("[MainContentArea] Period info: " + periodInfo + ", notes count: " + totalCount);
+                    logger.info("Period info: " + periodInfo + ", notes count: " + totalCount);
                     
                     Platform.runLater(() -> {
                         if (totalCount == 0) {
@@ -770,6 +773,9 @@ public class MainContentArea extends StackPane {
                 
                 // If cache not ready yet, show empty state (global init will handle it)
                 if (localCache == null || !localCache.isInitialized()) {
+                    logger.warning("loadRecentNotes: cache not ready (localCache=" 
+                        + (localCache == null ? "null" : "notNull") + ", initialized=" 
+                        + (localCache != null && localCache.isInitialized()) + ")");
                     Platform.runLater(() -> {
                         notesDisplayPanel.showEmptyState("Waiting for data sync...");
                     });
@@ -780,6 +786,7 @@ public class MainContentArea extends StackPane {
                 Platform.runLater(this::registerLocalCacheListener);
                 
                 int totalCount = localCache.getLocalNoteCount();
+                logger.info("loadRecentNotes: totalCount=" + totalCount);
                 
                 // Track displayed note IDs for incremental updates
                 displayedNoteIds.clear();
@@ -796,7 +803,9 @@ public class MainContentArea extends StackPane {
                                 }
                             });
                     }
-                    System.out.println("[MainContentArea] Note list loaded with " + totalCount + " total notes, tracking " + displayedNoteIds.size() + " IDs");
+                    logger.info("Note list loaded with " + totalCount + " total notes, tracking " + displayedNoteIds.size() + " IDs"
+                        + ", noteModePanel.opacity=" + noteModePanel.getOpacity()
+                        + ", noteModePanel.visible=" + noteModePanel.isVisible());
                 });
             } catch (Exception e) {
                 e.printStackTrace();
@@ -856,6 +865,12 @@ public class MainContentArea extends StackPane {
             }
             
             fadeIn.setOnFinished(ev -> {
+                // 兜底：确保 opacity 为 1.0（防止动画异常未完成）
+                if (targetPanel.getOpacity() < 1.0) {
+                    logger.warning("fadeIn finished but opacity=" 
+                        + targetPanel.getOpacity() + ", forcing to 1.0");
+                    targetPanel.setOpacity(1.0);
+                }
                 // Focus search input after animation completes
                 if (targetPanel == searchModePanel && pendingSearchFocus) {
                     pendingSearchFocus = false;
