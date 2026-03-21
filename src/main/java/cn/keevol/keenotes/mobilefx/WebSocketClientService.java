@@ -793,23 +793,30 @@ public class WebSocketClientService {
      * 简单日志包装
      */
     static class Logger {
+        private final java.util.logging.Logger delegate;
+
+        private Logger(java.util.logging.Logger delegate) {
+            this.delegate = delegate;
+        }
+
         public static Logger getLogger(String name) {
-            return new Logger();
+            return new Logger(AppLogger.getLogger(name));
         }
 
         public void info(String msg) {
-            System.out.println("[INFO] " + msg);
+            delegate.info(msg);
         }
 
         public void warning(String msg) {
-            System.err.println("[WARN] " + msg);
+            delegate.warning(msg);
         }
 
         public void severe(String msg) {
-            System.err.println("[ERROR] " + msg);
+            delegate.severe(msg);
         }
 
         public void fine(String msg) {
-            /* debug level, skip */ }
+            delegate.fine(msg);
+        }
     }
 }

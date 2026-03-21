@@ -17,6 +17,7 @@ import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * Panel for displaying a list of notes
@@ -25,6 +26,8 @@ import java.util.List;
  * Includes Sync Channel status and Sync Indicator
  */
 public class NotesDisplayPanel extends VBox {
+    
+    private static final Logger logger = AppLogger.getLogger(NotesDisplayPanel.class);
     
     private final VBox notesContainer;
     private final ScrollPane scrollPane;
@@ -383,6 +386,9 @@ public class NotesDisplayPanel extends VBox {
                     notes = localCache.getNotesPaged(0, INITIAL_LOAD_COUNT);
                 }
                 
+                logger.info("loadInitialNotesFromDb: loaded " + notes.size() 
+                    + " notes from DB (totalNoteCount=" + totalNoteCount + ")");
+                
                 // Notify callback
                 if (noteLoadCallback != null) {
                     noteLoadCallback.accept(notes);
@@ -412,9 +418,22 @@ public class NotesDisplayPanel extends VBox {
                     );
                     fadeIn.setFromValue(0);
                     fadeIn.setToValue(1);
+                    fadeIn.setOnFinished(e -> {
+                        if (notesContainer.getOpacity() < 1.0) {
+                            logger.warning("notesContainer fadeIn finished but opacity=" 
+                                + notesContainer.getOpacity() + ", forcing to 1.0");
+                            notesContainer.setOpacity(1.0);
+                        }
+                    });
                     fadeIn.play();
+                    
+                    logger.info("loadInitialNotesFromDb: rendered " + notes.size() 
+                        + " cards, notesContainer.children=" + notesContainer.getChildren().size()
+                        + ", notesContainer.opacity=" + notesContainer.getOpacity());
                 });
             } catch (Exception e) {
+                logger.severe("loadInitialNotesFromDb ERROR: " + e.getMessage());
+                e.printStackTrace();
                 Platform.runLater(() -> showError("Error loading notes: " + e.getMessage()));
             }
         }, "LoadInitialNotes").start();
