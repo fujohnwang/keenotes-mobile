@@ -60,15 +60,21 @@ public class NotesDisplayPanel extends VBox {
     private LocalCacheService localCache = null;
     private int reviewDays = 0; // For review pagination
     private java.util.function.Consumer<java.util.List<LocalCacheService.NoteData>> noteLoadCallback = null;
-    
+
+    // Listener references for cleanup
+    private WebSocketClientService.SyncListener syncListener;
+    private javafx.beans.value.ChangeListener<ThemeService.Theme> themeChangeListener;
+    private javafx.beans.value.ChangeListener<Number> scrollListener;
+
     public NotesDisplayPanel() {
         getStyleClass().add("notes-display-panel");
         setSpacing(0);
-        
+
         // Listen to theme changes
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+        themeChangeListener = (obs, oldTheme, newTheme) -> {
             Platform.runLater(this::updateThemeColors);
-        });
+        };
+        ThemeService.getInstance().currentThemeProperty().addListener(themeChangeListener);
         
         // Fixed header container (stays at top, doesn't scroll)
         fixedHeaderContainer = new VBox();
@@ -89,18 +95,19 @@ public class NotesDisplayPanel extends VBox {
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
         
         // Listen to scroll position for lazy loading
-        scrollPane.vvalueProperty().addListener((obs, oldVal, newVal) -> {
+        scrollListener = (obs, oldVal, newVal) -> {
             if (newVal.doubleValue() >= 0.9 && !isLoadingMore) {
                 // Check if there's more data based on pagination mode
-                boolean hasMore = useTruePagination 
-                    ? (displayedCount < totalNoteCount) 
+                boolean hasMore = useTruePagination
+                    ? (displayedCount < totalNoteCount)
                     : (displayedCount < allNotes.size());
-                
+
                 if (hasMore) {
                     loadMoreNotes();
                 }
             }
-        });
+        };
+        scrollPane.vvalueProperty().addListener(scrollListener);
         
         // Status label (for loading/empty states)
         statusLabel = new Label();
@@ -119,8 +126,8 @@ public class NotesDisplayPanel extends VBox {
      */
     private void setupSyncStatusListener() {
         WebSocketClientService webSocketService = ServiceManager.getInstance().getWebSocketService();
-        
-        webSocketService.addListener(new WebSocketClientService.SyncListener() {
+
+        syncListener = new WebSocketClientService.SyncListener() {
             @Override
             public void onConnectionStatus(boolean connected) {
                 Platform.runLater(() -> updateSyncChannelStatus(connected));
@@ -157,8 +164,9 @@ public class NotesDisplayPanel extends VBox {
             public void onOffline() {
                 Platform.runLater(() -> showSyncChannelOffline());
             }
-        });
-        
+        };
+        webSocketService.addListener(syncListener);
+
         // Initial status
         updateSyncChannelStatus(webSocketService.isConnected());
     }
@@ -859,5 +867,34 @@ public class NotesDisplayPanel extends VBox {
             if (onFinished != null) onFinished.run();
         });
         popOut.play();
+    }
+
+    /**
+     * Cleanup resources when component is destroyed
+     */
+    public void dispose() {
+        // Remove WebSocket listener
+        if (syncListener != null) {
+            WebSocketClientService webSocketService = ServiceManager.getInstance().getWebSocketService();
+            if (webSocketService != null) {
+                webSocketService.removeListener(syncListener);
+            }
+            syncListener = null;
+        }
+
+        // Remove theme listener
+        if (themeChangeListener != null) {
+            ThemeService.getInstance().currentThemeProperty().removeListener(themeChangeListener);
+            themeChangeListener = null;
+        }
+
+        // Remove scroll listener
+        if (scrollListener != null) {
+            scrollPane.vvalueProperty().removeListener(scrollListener);
+            scrollListener = null;
+        }
+
+        // Stop animations
+        stopDotsAnimation();
     }
 }

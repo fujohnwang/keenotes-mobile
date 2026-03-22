@@ -176,12 +176,12 @@ public class LocalCacheService {
             
             // 通过 PRAGMA 语句设置 SQLite 优化参数（而不是在 URL 中拼接）
             initStep = "setting SQLite pragmas";
-            Statement pragmaStmt = connection.createStatement();
-            pragmaStmt.execute("PRAGMA journal_mode=WAL");
-            pragmaStmt.execute("PRAGMA synchronous=NORMAL");
-            pragmaStmt.execute("PRAGMA cache_size=10000");
-            pragmaStmt.execute("PRAGMA busy_timeout=30000");
-            pragmaStmt.close();
+            try (Statement pragmaStmt = connection.createStatement()) {
+                pragmaStmt.execute("PRAGMA journal_mode=WAL");
+                pragmaStmt.execute("PRAGMA synchronous=NORMAL");
+                pragmaStmt.execute("PRAGMA cache_size=10000");
+                pragmaStmt.execute("PRAGMA busy_timeout=30000");
+            }
 
 
             if (connection == null || connection.isClosed()) {
@@ -192,42 +192,41 @@ public class LocalCacheService {
 
             // 创建表
             initStep = "creating tables";
-            Statement stmt = connection.createStatement();
-            stmt.setQueryTimeout(30);
+            try (Statement stmt = connection.createStatement()) {
+                stmt.setQueryTimeout(30);
 
-            stmt.executeUpdate(
-                    "CREATE TABLE IF NOT EXISTS notes_cache (" +
-                            "  id INTEGER PRIMARY KEY, " +
-                            "  content TEXT NOT NULL, " +
-                            "  channel TEXT DEFAULT 'mobile', " +
-                            "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                            "  encrypted_content TEXT, " +
-                            "  is_dirty INTEGER DEFAULT 0" +
-                            ")");
+                stmt.executeUpdate(
+                        "CREATE TABLE IF NOT EXISTS notes_cache (" +
+                                "  id INTEGER PRIMARY KEY, " +
+                                "  content TEXT NOT NULL, " +
+                                "  channel TEXT DEFAULT 'mobile', " +
+                                "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                                "  encrypted_content TEXT, " +
+                                "  is_dirty INTEGER DEFAULT 0" +
+                                ")");
 
-            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cache_created_at ON notes_cache(created_at)");
-            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cache_content ON notes_cache(content)");
+                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cache_created_at ON notes_cache(created_at)");
+                stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cache_content ON notes_cache(content)");
 
-            stmt.executeUpdate(
-                    "CREATE TABLE IF NOT EXISTS sync_state (" +
-                            "  id INTEGER PRIMARY KEY, " +
-                            "  last_sync_id INTEGER DEFAULT -1, " +
-                            "  last_sync_time DATETIME" +
-                            ")");
+                stmt.executeUpdate(
+                        "CREATE TABLE IF NOT EXISTS sync_state (" +
+                                "  id INTEGER PRIMARY KEY, " +
+                                "  last_sync_id INTEGER DEFAULT -1, " +
+                                "  last_sync_time DATETIME" +
+                                ")");
 
-            stmt.executeUpdate(
-                    "INSERT OR IGNORE INTO sync_state (id, last_sync_id) VALUES (1, -1)");
+                stmt.executeUpdate(
+                        "INSERT OR IGNORE INTO sync_state (id, last_sync_id) VALUES (1, -1)");
 
-            // 离线暂存表：网络不可用时暂存未发送的笔记
-            stmt.executeUpdate(
-                    "CREATE TABLE IF NOT EXISTS pending_notes (" +
-                            "  id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                            "  content TEXT NOT NULL, " +
-                            "  channel TEXT DEFAULT 'desktop', " +
-                            "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
-                            ")");
-
-            stmt.close();
+                // 离线暂存表：网络不可用时暂存未发送的笔记
+                stmt.executeUpdate(
+                        "CREATE TABLE IF NOT EXISTS pending_notes (" +
+                                "  id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                                "  content TEXT NOT NULL, " +
+                                "  channel TEXT DEFAULT 'desktop', " +
+                                "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                                ")");
+            }
             initStep = "completed";
             initLog.append("Database init completed OK");
 

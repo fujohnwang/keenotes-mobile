@@ -16,6 +16,11 @@ import java.util.function.Consumer;
  */
 public class SidebarView extends VBox {
     
+    // Static constant for app icon to ensure it's loaded only once and cached globally
+    private static final javafx.scene.image.Image APP_ICON = new javafx.scene.image.Image(
+        SidebarView.class.getResource("/icons/app-icon.png").toExternalForm()
+    );
+    
     private final Consumer<DesktopMainView.ViewMode> onNavigationChanged;
     
     // Navigation buttons
@@ -182,27 +187,16 @@ public class SidebarView extends VBox {
         logoArea.setAlignment(Pos.CENTER_LEFT);
         logoArea.setPadding(new Insets(0, 0, 16, 0)); // Increased bottom padding
         
-        // Load KeeNotes icon from resources
-        try {
-            javafx.scene.image.Image iconImage = new javafx.scene.image.Image(
-                getClass().getResourceAsStream("/icons/app-icon.png")
-            );
-            javafx.scene.image.ImageView iconView = new javafx.scene.image.ImageView(iconImage);
-            iconView.setFitWidth(32); // Slightly larger icon
-            iconView.setFitHeight(32);
-            iconView.setPreserveRatio(true);
-            
-            Label logoText = new Label("KeeNotes");
-            logoText.getStyleClass().add("sidebar-logo-text");
-            
-            logoArea.getChildren().addAll(iconView, logoText);
-        } catch (Exception e) {
-            // Fallback if icon not found
-            System.err.println("Could not load app icon: " + e.getMessage());
-            Label logoText = new Label("KeeNotes");
-            logoText.getStyleClass().add("sidebar-logo-text");
-            logoArea.getChildren().add(logoText);
-        }
+        // Use the globally cached app icon
+        javafx.scene.image.ImageView iconView = new javafx.scene.image.ImageView(APP_ICON);
+        iconView.setFitWidth(32); // Slightly larger icon
+        iconView.setFitHeight(32);
+        iconView.setPreserveRatio(true);
+        
+        Label logoText = new Label("KeeNotes");
+        logoText.getStyleClass().add("sidebar-logo-text");
+        
+        logoArea.getChildren().addAll(iconView, logoText);
         
         return logoArea;
     }

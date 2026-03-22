@@ -60,11 +60,15 @@ public class MainContentArea extends StackPane {
     
     // Flag to prevent duplicate listener registration
     private boolean localCacheListenerRegistered = false;
-    
+
     // Pending notes UI components
     private HBox pendingBanner;
     private Label pendingLabel;
     private boolean showingPendingList = false;
+
+    // Listener references for cleanup
+    private WebSocketClientService.SyncListener webSocketListener;
+    private LocalCacheService.NoteChangeListener localCacheListener;
     
     public MainContentArea() {
         getStyleClass().add("main-content-area");
@@ -116,9 +120,13 @@ public class MainContentArea extends StackPane {
      */
     private void registerWebSocketListener() {
         logger.info("Registering WebSocket listener");
+        // Remove old listener if exists
+        if (webSocketListener != null && webSocketService != null) {
+            webSocketService.removeListener(webSocketListener);
+        }
         // Listen to WebSocket events for sync status display only
         // Note: UI updates are now driven by LocalCacheService change listeners
-        webSocketService.addListener(new WebSocketClientService.SyncListener() {
+        webSocketListener = new WebSocketClientService.SyncListener() {
             @Override
             public void onConnectionStatus(boolean connected) {
                 // Not needed here
@@ -181,7 +189,8 @@ public class MainContentArea extends StackPane {
                     }
                 });
             }
-        });
+        };
+        webSocketService.addListener(webSocketListener);
     }
     
     /**
@@ -203,21 +212,22 @@ public class MainContentArea extends StackPane {
             return;
         }
         
-        localCache.addChangeListener(new LocalCacheService.NoteChangeListener() {
+        localCacheListener = new LocalCacheService.NoteChangeListener() {
             @Override
             public void onNoteInserted(LocalCacheService.NoteData note) {
                 // Single note inserted (realtime update)
                 // This is already on JavaFX thread (Platform.runLater in LocalCacheService)
                 handleNewNoteFromDb(note);
             }
-            
+
             @Override
             public void onNotesInserted(java.util.List<LocalCacheService.NoteData> notes) {
                 // Batch notes inserted (sync complete)
                 // This is already on JavaFX thread (Platform.runLater in LocalCacheService)
                 handleBatchNotesFromDb(notes);
             }
-        });
+        };
+        localCache.addChangeListener(localCacheListener);
         
         localCacheListenerRegistered = true;
         logger.info("LocalCacheService change listener registered");
@@ -923,5 +933,34 @@ public class MainContentArea extends StackPane {
      */
     public SettingsView getSettingsView() {
         return settingsView;
+    }
+
+    /**
+     * Cleanup resources when component is destroyed
+     */
+    public void dispose() {
+        // Remove WebSocket listener
+        if (webSocketListener != null && webSocketService != null) {
+            webSocketService.removeListener(webSocketListener);
+            webSocketListener = null;
+        }
+
+        // Remove LocalCache listener
+        if (localCacheListener != null && localCache != null) {
+            localCache.removeChangeListener(localCacheListener);
+            localCacheListener = null;
+        }
+        localCacheListenerRegistered = false;
+
+        // Cleanup child panels
+        if (notesDisplayPanel != null) {
+            notesDisplayPanel.dispose();
+        }
+        if (searchResultsPanel != null) {
+            searchResultsPanel.dispose();
+        }
+        if (reviewNotesPanel != null) {
+            reviewNotesPanel.dispose();
+        }
     }
 }
