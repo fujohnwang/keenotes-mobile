@@ -13,6 +13,8 @@ import javafx.stage.Stage;
 public class Main extends Application {
 
     private DesktopMainView mainView;
+    private ServiceManager.ServiceStatusListener serviceStatusListener;
+    private javafx.beans.value.ChangeListener<ThemeService.Theme> themeChangeListener;
 
     @Override
     public void start(Stage stage) {
@@ -40,9 +42,10 @@ public class Main extends Application {
         loadThemeCSS(scene);
 
         // Listen for theme changes
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+        themeChangeListener = (obs, oldTheme, newTheme) -> {
             Platform.runLater(() -> loadThemeCSS(scene));
-        });
+        };
+        ThemeService.getInstance().currentThemeProperty().addListener(themeChangeListener);
 
         stage.setTitle("KeeNotes (" + cn.keevol.keenotes.mobilefx.generated.BuildInfo.VERSION + ")");
         stage.setScene(scene);
@@ -60,6 +63,11 @@ public class Main extends Application {
         // 居中显示窗口，确保titlebar可见
         stage.setX(screenBounds.getMinX() + (screenBounds.getWidth() - sceneWidth) / 2);
         stage.setY(screenBounds.getMinY() + (screenBounds.getHeight() - sceneHeight) / 2);
+
+        // Setup close handler for cleanup
+        stage.setOnCloseRequest(event -> {
+            cleanup();
+        });
 
         // 显示UI - 这是最重要的，用户应该立即看到界面
         stage.show();
@@ -113,10 +121,11 @@ public class Main extends Application {
             ServiceManager.getInstance().getLocalCacheService();
 
             // 2. 添加服务状态监听器
-            ServiceManager.getInstance().addListener((status, message) -> {
+            serviceStatusListener = (status, message) -> {
                 System.out.println("[Service Status] " + status + ": " + message);
                 updateServiceStatusUI(status, message);
-            });
+            };
+            ServiceManager.getInstance().addListener(serviceStatusListener);
 
             // 3. 延迟连接WebSocket（在异步线程）
             Thread connectThread = new Thread(() -> {
@@ -169,9 +178,12 @@ public class Main extends Application {
     public void stop() {
         System.out.println("Application stopping...");
         try {
+            // Cleanup resources
+            cleanup();
+
             // Stop MCP Server
             cn.keevol.keenotes.mcp.SimpleMcpServer.stop();
-            
+
             // Stop other services
             ServiceManager.getInstance().shutdown();
         } catch (Exception e) {
@@ -179,6 +191,28 @@ public class Main extends Application {
             e.printStackTrace();
         }
         System.out.println("Application stopped.");
+    }
+
+    /**
+     * Cleanup resources and listeners
+     */
+    private void cleanup() {
+        // Remove service status listener
+        if (serviceStatusListener != null) {
+            ServiceManager.getInstance().removeListener(serviceStatusListener);
+            serviceStatusListener = null;
+        }
+
+        // Remove theme change listener
+        if (themeChangeListener != null) {
+            ThemeService.getInstance().currentThemeProperty().removeListener(themeChangeListener);
+            themeChangeListener = null;
+        }
+
+        // Cleanup main view
+        if (mainView != null) {
+            mainView.dispose();
+        }
     }
 
     private void loadCustomFont() {

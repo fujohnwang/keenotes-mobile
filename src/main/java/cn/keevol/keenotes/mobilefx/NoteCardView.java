@@ -45,22 +45,28 @@ public class NoteCardView extends StackPane {
     private static final double BORDER_ANIM_DURATION = 10.0; // max seconds for one full loop
     private static final double BORDER_LINE_WIDTH = 3.0;
     private static final double BORDER_RADIUS = 12.0;
-    
+
+    // Listener references for cleanup
+    private javafx.beans.value.ChangeListener<ThemeService.Theme> themeChangeListener;
+    private javafx.beans.value.ChangeListener<Number> fontSizeChangeListener;
+
     public NoteCardView(LocalCacheService.NoteData noteData) {
         this.noteData = noteData;
         this.settings = SettingsService.getInstance();
-        
+
         getStyleClass().add("search-result-card");
-        
+
         // Listen to theme changes
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+        themeChangeListener = (obs, oldTheme, newTheme) -> {
             javafx.application.Platform.runLater(this::updateThemeColors);
-        });
-        
+        };
+        ThemeService.getInstance().currentThemeProperty().addListener((javafx.beans.value.ChangeListener<ThemeService.Theme>) themeChangeListener);
+
         // Listen to font size changes
-        settings.noteFontSizeProperty().addListener((obs, oldSize, newSize) -> {
+        fontSizeChangeListener = (obs, oldSize, newSize) -> {
             javafx.application.Platform.runLater(() -> updateFontSize(newSize.intValue()));
-        });
+        };
+        settings.noteFontSizeProperty().addListener(fontSizeChangeListener);
         
         // Main content container
         VBox contentBox = new VBox(8);
@@ -545,5 +551,25 @@ public class NoteCardView extends StackPane {
 
     private void clearBorderCanvas() {
         borderCanvas.getGraphicsContext2D().clearRect(0, 0, borderCanvas.getWidth(), borderCanvas.getHeight());
+    }
+
+    /**
+     * Cleanup resources when component is destroyed
+     */
+    public void dispose() {
+        // Stop animation timer
+        cancelBorderAnimation();
+
+        // Remove theme listener
+        if (themeChangeListener != null) {
+            ThemeService.getInstance().currentThemeProperty().removeListener(themeChangeListener);
+            themeChangeListener = null;
+        }
+
+        // Remove font size listener
+        if (fontSizeChangeListener != null) {
+            settings.noteFontSizeProperty().removeListener(fontSizeChangeListener);
+            fontSizeChangeListener = null;
+        }
     }
 }

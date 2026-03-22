@@ -266,4 +266,14 @@ public class DesktopMainView extends BorderPane {
     public SidebarView getSidebar() {
         return sidebar;
     }
+
+    /**
+     * Cleanup resources when component is destroyed
+     */
+    public void dispose() {
+        // Dispose main content area
+        if (mainContent != null) {
+            mainContent.dispose();
+        }
+    }
 }

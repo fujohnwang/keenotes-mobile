@@ -21,18 +21,20 @@ public class KeyCaptureField extends HBox {
     private boolean isRecording = false;
     private String currentShortcut = "";
     private final Set<KeyCode> pressedKeys = new HashSet<>();
-    
+    private javafx.beans.value.ChangeListener<ThemeService.Theme> themeChangeListener;
+
     public KeyCaptureField() {
         getStyleClass().add("key-capture-field");
         setAlignment(Pos.CENTER);
         setPadding(new Insets(8, 12, 8, 12));
         setPrefWidth(200);
         setMaxWidth(200);
-        
+
         // Listen to theme changes
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+        themeChangeListener = (obs, oldTheme, newTheme) -> {
             javafx.application.Platform.runLater(this::updateStyle);
-        });
+        };
+        ThemeService.getInstance().currentThemeProperty().addListener(themeChangeListener);
         
         displayLabel = new Label("Click to set");
         displayLabel.getStyleClass().add("key-capture-label");

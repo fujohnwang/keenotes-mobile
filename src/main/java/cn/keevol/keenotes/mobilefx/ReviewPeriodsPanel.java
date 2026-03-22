@@ -13,18 +13,20 @@ public class ReviewPeriodsPanel extends VBox {
     
     private final Consumer<String> onPeriodSelected;
     private Button selectedButton;
-    
+    private javafx.beans.value.ChangeListener<ThemeService.Theme> themeChangeListener;
+
     public ReviewPeriodsPanel(Consumer<String> onPeriodSelected) {
         this.onPeriodSelected = onPeriodSelected;
-        
+
         getStyleClass().add("review-periods-panel");
         setPadding(new Insets(8, 0, 8, 12));
         setSpacing(6);
-        
+
         // Listen to theme changes
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+        themeChangeListener = (obs, oldTheme, newTheme) -> {
             javafx.application.Platform.runLater(this::updateThemeColors);
-        });
+        };
+        ThemeService.getInstance().currentThemeProperty().addListener(themeChangeListener);
         
         setupButtons();
     }

@@ -17,19 +17,21 @@ public class NavigationButton extends Button {
     private final String text;
     private boolean selected;
     private Label textLabel; // Store reference for theme updates
-    
+    private javafx.beans.value.ChangeListener<ThemeService.Theme> themeChangeListener;
+
     public NavigationButton(String text, Node iconNode, boolean selected) {
         this.text = text;
         this.iconNode = iconNode;
         this.selected = selected;
-        
+
         setupButton();
         updateStyle();
-        
+
         // Listen to theme changes
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
+        themeChangeListener = (obs, oldTheme, newTheme) -> {
             javafx.application.Platform.runLater(this::updateStyle);
-        });
+        };
+        ThemeService.getInstance().currentThemeProperty().addListener(themeChangeListener);
     }
     
     private void setupButton() {
