@@ -16,6 +16,7 @@ class ApiService {
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(identifier: "UTC")
         return formatter
     }()
     
@@ -44,6 +45,7 @@ class ApiService {
         do {
             // Encrypt content
             let encrypted = try cryptoService.encrypt(content)
+            // Get current date and convert to UTC for formatting
             let ts = dateFormatter.string(from: Date())
             
             // Build JSON body - match JavaFX format exactly

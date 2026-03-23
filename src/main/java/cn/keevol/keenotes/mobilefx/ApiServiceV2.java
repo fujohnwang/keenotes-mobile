@@ -1,5 +1,6 @@
 package cn.keevol.keenotes.mobilefx;
 
+import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
 import okhttp3.*;
 
 import javax.net.ssl.*;
@@ -85,8 +86,7 @@ public class ApiServiceV2 {
     }
 
     public CompletableFuture<ApiResult> postNote(String content, String channel) {
-        String ts = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
-                .format(TS_FORMATTER);
+        String ts = DateTimeUtil.getCurrentUtcTimestamp();
         return postNote(content, channel, ts);
     }
 
@@ -141,40 +141,10 @@ public class ApiServiceV2 {
     }
 
     /**
-     * Standardize date string to \"yyyy-MM-dd HH:mm:ss\" in UTC
+     * Standardize date string to "yyyy-MM-dd HH:mm:ss" in UTC
      */
     private String normalizeDate(String input) {
-        if (input == null || input.isBlank()) {
-            return java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).format(TS_FORMATTER);
-        }
-
-        try {
-            // 1. Try ISO-8601 (T and Z)
-            java.time.OffsetDateTime odt;
-            try {
-                odt = java.time.OffsetDateTime.parse(input);
-            } catch (java.time.format.DateTimeParseException e) {
-                // Try ISO_INSTANT or other ISO variations
-                odt = java.time.Instant.parse(input).atOffset(java.time.ZoneOffset.UTC);
-            }
-            // Ensure we are working with UTC
-            odt = odt.withOffsetSameInstant(java.time.ZoneOffset.UTC);
-            return odt.format(TS_FORMATTER);
-        } catch (Exception e) {
-            // 2. Try standard SQLite format (yyyy-MM-dd HH:mm:ss) or fallback
-            try {
-                String sanitized = input.replace(" ", "T");
-                if (!sanitized.contains("T")) {
-                    sanitized += "T00:00:00";
-                }
-                // LocalDateTime parse requires T
-                java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(sanitized);
-                return ldt.format(TS_FORMATTER);
-            } catch (Exception e2) {
-                // If all fails, return current UTC time
-                return java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).format(TS_FORMATTER);
-            }
-        }
+        return DateTimeUtil.normalizeToUtc(input);
     }
     
     /**

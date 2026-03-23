@@ -6,6 +6,8 @@ import cn.keevol.keenotes.data.entity.PendingNote
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /**
@@ -60,7 +62,12 @@ class PendingNoteService(
     fun savePendingNote(content: String, channel: String = "mobile-android") {
         scope.launch {
             try {
-                val now = LocalDateTime.now().format(TS_FORMATTER)
+                // Generate UTC timestamp: local time -> UTC -> format
+                val now = LocalDateTime.now()
+                    .atZone(ZoneId.systemDefault())
+                    .toOffsetDateTime()
+                    .withOffsetSameInstant(ZoneOffset.UTC)
+                    .format(TS_FORMATTER)
                 pendingNoteDao.insert(PendingNote(content = content, channel = channel, createdAt = now))
                 Log.i(TAG, "Note saved to pending")
             } catch (e: Exception) {
