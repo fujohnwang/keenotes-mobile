@@ -15,7 +15,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
-        <javafx.version>26</javafx.version>
+        <javafx.version>25.0.2</javafx.version>
         <javafx.platform>mac-aarch64</javafx.platform>
         <gluonfx.plugin.version>1.0.25</gluonfx.plugin.version>
         <attach.version>4.0.21</attach.version>
