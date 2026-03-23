@@ -37,11 +37,11 @@ jobs:
           APP_VERSION=$(echo $VERSION | cut -d. -f1-3)
           echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Setup Java 25
+      - name: Setup Java 21 # github 更高jdk不支持
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '25'
+          java-version: '21'
 
       - name: Generate BuildInfo
         shell: bash
