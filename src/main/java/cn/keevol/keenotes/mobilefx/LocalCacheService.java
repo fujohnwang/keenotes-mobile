@@ -173,7 +173,7 @@ public class LocalCacheService {
             // Desktop: 使用标准 DriverManager
             Class.forName("org.sqlite.JDBC");
             connection = DriverManager.getConnection(jdbcUrl);
-            
+
             // 通过 PRAGMA 语句设置 SQLite 优化参数（而不是在 URL 中拼接）
             initStep = "setting SQLite pragmas";
             Statement pragmaStmt = connection.createStatement();
@@ -486,19 +486,20 @@ public class LocalCacheService {
             pstmt.setInt(1, days);
             pstmt.setInt(2, limit);
             pstmt.setInt(3, offset);
-            ResultSet rs = pstmt.executeQuery();
-
-            while (rs.next()) {
-                results.add(new NoteData(
-                        rs.getLong("id"),
-                        rs.getString("content"),
-                        rs.getString("channel"),
-                        rs.getString("created_at"),
-                        null
-                ));
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    results.add(new NoteData(
+                            rs.getLong("id"),
+                            rs.getString("content"),
+                            rs.getString("channel"),
+                            rs.getString("created_at"),
+                            null
+                    ));
+                }
             }
         } catch (SQLException e) {
             // Get paged review notes failed
+            e.printStackTrace();
         }
         return results;
     }
@@ -515,10 +516,10 @@ public class LocalCacheService {
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setInt(1, days);
-            ResultSet rs = pstmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
             }
         } catch (SQLException e) {
             // Get review notes count failed
