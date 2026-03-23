@@ -273,7 +273,12 @@ class DatabaseService: ObservableObject {
     
     func insertPendingNote(content: String, channel: String = "mobile-ios") async throws {
         guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
-        let now = ISO8601DateFormatter().string(from: Date())
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(abbreviation: "UTC")
+        let now = formatter.string(from: Date())
+        
         _ = try await dbQueue.write { db in
             var note = PendingNote(content: content, channel: channel, createdAt: now)
             try note.insert(db)
