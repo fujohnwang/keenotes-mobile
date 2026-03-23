@@ -31,13 +31,15 @@ import javafx.util.Duration;
  * Select text with mouse, right-click or Ctrl+C to copy selection
  */
 public class NoteCardView extends StackPane {
-    
-    private final LocalCacheService.NoteData noteData;
+
+    private LocalCacheService.NoteData noteData;
     private final Label copiedPopup;
     private final TextArea contentArea;
     private final SettingsService settings;
-    private final Text textMeasure; // Hidden text node for measuring height
-    
+    private final Text textMeasure;
+    private final Label dateLabel;
+    private final Label channelLabel;
+
     // Border progress animation
     private Canvas borderCanvas;
     private AnimationTimer borderTimer;
@@ -45,76 +47,77 @@ public class NoteCardView extends StackPane {
     private static final double BORDER_ANIM_DURATION = 10.0; // max seconds for one full loop
     private static final double BORDER_LINE_WIDTH = 3.0;
     private static final double BORDER_RADIUS = 12.0;
-    
+
     public NoteCardView(LocalCacheService.NoteData noteData) {
         this.noteData = noteData;
         this.settings = SettingsService.getInstance();
-        
+
         getStyleClass().add("search-result-card");
-        
+        setCache(false);
+        setCacheShape(false);
+
         // Listen to theme changes
         ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
             javafx.application.Platform.runLater(this::updateThemeColors);
         });
-        
+
         // Listen to font size changes
         settings.noteFontSizeProperty().addListener((obs, oldSize, newSize) -> {
             javafx.application.Platform.runLater(() -> updateFontSize(newSize.intValue()));
         });
-        
+
         // Main content container
         VBox contentBox = new VBox(8);
         contentBox.setPadding(new Insets(16));
-        
+
         // Header row: date and channel
         HBox headerRow = new HBox(12);
         headerRow.setAlignment(Pos.CENTER_LEFT);
-        
-        Label dateLabel = new Label(noteData.createdAt);
+
+        dateLabel = new Label(noteData.createdAt);
         dateLabel.getStyleClass().add("note-date");
-        
+
         // Channel/source label
-        String channelText = (noteData.channel != null && !noteData.channel.isEmpty()) 
-            ? noteData.channel 
-            : "default";
-        Label channelLabel = new Label("• " + channelText);
+        String channelText = (noteData.channel != null && !noteData.channel.isEmpty())
+                ? noteData.channel
+                : "default";
+        channelLabel = new Label("• " + channelText);
         channelLabel.getStyleClass().add("note-channel");
-        
+
         boolean isDark = ThemeService.getInstance().isDarkTheme();
         String secondaryColor = isDark ? "#8B949E" : "#57606A";
         channelLabel.setStyle("-fx-text-fill: " + secondaryColor + "; -fx-font-size: 12px;");
-        
+
         headerRow.getChildren().addAll(dateLabel, channelLabel);
-        
+
         // Full content using TextArea (read-only, selectable)
         contentArea = new TextArea(noteData.content);
         contentArea.setEditable(false);
         contentArea.setWrapText(true);
         contentArea.getStyleClass().add("note-content-area");
-        
+
         String textColor = isDark ? "#E6EDF3" : "#24292F";
         int fontSize = settings.getNoteFontSize();
         contentArea.setStyle(
-            "-fx-control-inner-background: transparent; " +
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: " + textColor + "; " +
-            "-fx-font-size: " + fontSize + "px; " +
-            "-fx-border-width: 0; " +
-            "-fx-focus-color: transparent; " +
-            "-fx-faint-focus-color: transparent; " +
-            "-fx-cursor: hand;"
-        );
-        
+                "-fx-control-inner-background: transparent; " +
+                        "-fx-background-color: transparent; " +
+                        "-fx-text-fill: " + textColor + "; " +
+                        "-fx-font-size: " + fontSize + "px; " +
+                        "-fx-border-width: 0; " +
+                        "-fx-focus-color: transparent; " +
+                        "-fx-faint-focus-color: transparent; " +
+                        "-fx-cursor: hand;");
+
         // Disable scrollbars completely
         contentArea.setScrollTop(0);
         contentArea.setScrollLeft(0);
-        
+
         // Create hidden Text node for accurate height measurement
         textMeasure = new Text();
         textMeasure.setFont(Font.font("MiSans", fontSize)); // Use same font family
         textMeasure.setWrappingWidth(500); // Will be updated based on actual width
         textMeasure.textProperty().bind(contentArea.textProperty());
-        
+
         // Bind TextArea height to Text measurement
         textMeasure.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
             double textHeight = newBounds.getHeight();
@@ -125,7 +128,7 @@ public class NoteCardView extends StackPane {
             // Re-hide scrollbars after height change
             javafx.application.Platform.runLater(this::hideScrollBars);
         });
-        
+
         // Update wrapping width when card width changes
         widthProperty().addListener((obs, oldWidth, newWidth) -> {
             if (newWidth.doubleValue() > 64) { // Ensure we have valid width
@@ -134,7 +137,7 @@ public class NoteCardView extends StackPane {
                 textMeasure.setWrappingWidth(wrappingWidth);
             }
         });
-        
+
         // Initial wrapping width setup after layout
         javafx.application.Platform.runLater(() -> {
             if (getWidth() > 64) {
@@ -142,7 +145,7 @@ public class NoteCardView extends StackPane {
             }
             hideScrollBars();
         });
-        
+
         // Custom context menu for copy
         ContextMenu contextMenu = new ContextMenu();
         contextMenu.getStyleClass().add("note-context-menu");
@@ -152,7 +155,7 @@ public class NoteCardView extends StackPane {
         copyAllItem.setOnAction(e -> handleCopy());
         contextMenu.getItems().addAll(copyItem, copyAllItem);
         contentArea.setContextMenu(contextMenu);
-        
+
         // Keyboard shortcut Ctrl+C / Cmd+C for copy
         contentArea.setOnKeyPressed(e -> {
             if (new KeyCodeCombination(KeyCode.C, KeyCombination.SHORTCUT_DOWN).match(e)) {
@@ -160,7 +163,7 @@ public class NoteCardView extends StackPane {
                 e.consume();
             }
         });
-        
+
         // Click on TextArea (when no text selected) to copy all
         contentArea.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 1) {
@@ -170,42 +173,41 @@ public class NoteCardView extends StackPane {
                 }
             }
         });
-        
+
         contentBox.getChildren().addAll(headerRow, contentArea);
-        
+
         // Copied popup (positioned at top-right)
         copiedPopup = new Label("✓ Copied");
         copiedPopup.getStyleClass().add("copied-popup");
-        
+
         boolean isDarkPopup = ThemeService.getInstance().isDarkTheme();
         String primaryColor = isDarkPopup ? "#00D4FF" : "#0969DA";
         String popupBg = isDarkPopup ? "rgba(0, 212, 255, 0.2)" : "rgba(9, 105, 218, 0.2)";
         copiedPopup.setStyle(
-            "-fx-background-color: " + popupBg + "; " +
-            "-fx-text-fill: " + primaryColor + "; " +
-            "-fx-padding: 4 8; " +
-            "-fx-background-radius: 4; " +
-            "-fx-font-size: 11px;"
-        );
+                "-fx-background-color: " + popupBg + "; " +
+                        "-fx-text-fill: " + primaryColor + "; " +
+                        "-fx-padding: 4 8; " +
+                        "-fx-background-radius: 4; " +
+                        "-fx-font-size: 11px;");
         copiedPopup.setVisible(false);
         copiedPopup.setOpacity(0);
         StackPane.setAlignment(copiedPopup, Pos.TOP_RIGHT);
         StackPane.setMargin(copiedPopup, new Insets(8, 8, 0, 0));
-        
+
         getChildren().addAll(contentBox, copiedPopup);
-        
+
         // Border animation canvas (on top, mouse transparent, does not affect layout)
         borderCanvas = new Canvas();
         borderCanvas.setMouseTransparent(true);
         borderCanvas.setManaged(false); // 不参与布局计算
         getChildren().add(borderCanvas);
-        
+
         // Canvas 尺寸跟随卡片实际尺寸，但不影响 preferred size
         layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
             borderCanvas.setWidth(newBounds.getWidth());
             borderCanvas.setHeight(newBounds.getHeight());
         });
-        
+
         // Click anywhere on card (outside TextArea) to copy all
         setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY) {
@@ -213,7 +215,7 @@ public class NoteCardView extends StackPane {
             }
         });
         setCursor(javafx.scene.Cursor.HAND);
-        
+
         // Hover effect on card
         setOnMouseEntered(e -> {
             setStyle("-fx-background-color: rgba(255, 255, 255, 0.05); " +
@@ -221,12 +223,12 @@ public class NoteCardView extends StackPane {
                     "-fx-border-radius: 6; " +
                     "-fx-background-radius: 6;");
         });
-        
+
         setOnMouseExited(e -> {
             setStyle("");
         });
     }
-    
+
     /**
      * Hide scrollbars from TextArea
      */
@@ -246,7 +248,7 @@ public class NoteCardView extends StackPane {
             hbar.setManaged(false);
         }
     }
-    
+
     /**
      * Copy selected text, or all content if nothing selected
      */
@@ -267,7 +269,7 @@ public class NoteCardView extends StackPane {
             handleCopy();
         }
     }
-    
+
     private void handleCopy() {
         // Copy entire content to clipboard
         Clipboard clipboard = Clipboard.getSystemClipboard();
@@ -275,22 +277,22 @@ public class NoteCardView extends StackPane {
         String hiddenMessage = SettingsService.getInstance().getHiddenMessage();
         content.putString(ZeroWidthSteganography.embedIfNeeded(noteData.content, hiddenMessage));
         clipboard.setContent(content);
-        
+
         showCopiedPopup();
         // Deselect text after copy
         contentArea.deselect();
     }
-    
+
     private void showCopiedPopup() {
         // Show popup with fade in/out animation
         copiedPopup.setVisible(true);
-        
+
         // Fade in
         FadeTransition fadeIn = new FadeTransition(Duration.millis(150), copiedPopup);
         fadeIn.setFromValue(0);
         fadeIn.setToValue(1);
         fadeIn.play();
-        
+
         // Fade out after delay
         PauseTransition pause = new PauseTransition(Duration.millis(1200));
         pause.setOnFinished(e -> {
@@ -304,11 +306,23 @@ public class NoteCardView extends StackPane {
         });
         pause.play();
     }
-    
+
     public LocalCacheService.NoteData getNoteData() {
         return noteData;
     }
-    
+
+    /**
+     * Update card with new data (for cell reuse in ListView)
+     */
+    public void update(LocalCacheService.NoteData newData) {
+        this.noteData = newData;
+        dateLabel.setText(newData.createdAt);
+        String ch = (newData.channel != null && !newData.channel.isEmpty()) ? newData.channel : "default";
+        channelLabel.setText("• " + ch);
+        contentArea.setText(newData.content);
+        cancelBorderAnimation();
+    }
+
     /**
      * Update colors based on current theme
      */
@@ -318,7 +332,7 @@ public class NoteCardView extends StackPane {
         String textColor = isDark ? "#E6EDF3" : "#24292F";
         String primaryColor = isDark ? "#00D4FF" : "#0969DA";
         String popupBg = isDark ? "rgba(0, 212, 255, 0.2)" : "rgba(9, 105, 218, 0.2)";
-        
+
         // Update channel label color
         if (getChildren().size() > 0 && getChildren().get(0) instanceof VBox) {
             VBox contentBox = (VBox) getChildren().get(0);
@@ -332,31 +346,29 @@ public class NoteCardView extends StackPane {
                 }
             }
         }
-        
+
         // Update content area text color
         int fontSize = settings.getNoteFontSize();
         contentArea.setStyle(
-            "-fx-control-inner-background: transparent; " +
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: " + textColor + "; " +
-            "-fx-font-size: " + fontSize + "px; " +
-            "-fx-border-width: 0; " +
-            "-fx-focus-color: transparent; " +
-            "-fx-faint-focus-color: transparent; " +
-            "-fx-cursor: hand;"
-        );
-        
+                "-fx-control-inner-background: transparent; " +
+                        "-fx-background-color: transparent; " +
+                        "-fx-text-fill: " + textColor + "; " +
+                        "-fx-font-size: " + fontSize + "px; " +
+                        "-fx-border-width: 0; " +
+                        "-fx-focus-color: transparent; " +
+                        "-fx-faint-focus-color: transparent; " +
+                        "-fx-cursor: hand;");
+
         // Update copied popup colors
         copiedPopup.setStyle(
-            "-fx-background-color: " + popupBg + "; " +
-            "-fx-text-fill: " + primaryColor + "; " +
-            "-fx-padding: 4 8; " +
-            "-fx-background-radius: 4; " +
-            "-fx-font-size: 11px; " +
-            "-fx-font-weight: bold;"
-        );
+                "-fx-background-color: " + popupBg + "; " +
+                        "-fx-text-fill: " + primaryColor + "; " +
+                        "-fx-padding: 4 8; " +
+                        "-fx-background-radius: 4; " +
+                        "-fx-font-size: 11px; " +
+                        "-fx-font-weight: bold;");
     }
-    
+
     /**
      * Update font size for content area
      */
@@ -364,15 +376,14 @@ public class NoteCardView extends StackPane {
         boolean isDark = ThemeService.getInstance().isDarkTheme();
         String textColor = isDark ? "#E6EDF3" : "#24292F";
         contentArea.setStyle(
-            "-fx-control-inner-background: transparent; " +
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: " + textColor + "; " +
-            "-fx-font-size: " + fontSize + "px; " +
-            "-fx-border-width: 0; " +
-            "-fx-focus-color: transparent; " +
-            "-fx-faint-focus-color: transparent; " +
-            "-fx-cursor: hand;"
-        );
+                "-fx-control-inner-background: transparent; " +
+                        "-fx-background-color: transparent; " +
+                        "-fx-text-fill: " + textColor + "; " +
+                        "-fx-font-size: " + fontSize + "px; " +
+                        "-fx-border-width: 0; " +
+                        "-fx-focus-color: transparent; " +
+                        "-fx-faint-focus-color: transparent; " +
+                        "-fx-cursor: hand;");
         // Update text measure font
         textMeasure.setFont(Font.font("MiSans", fontSize));
     }
@@ -383,7 +394,8 @@ public class NoteCardView extends StackPane {
      */
     public void startBorderAnimation() {
         borderStartNanos = System.nanoTime();
-        if (borderTimer != null) borderTimer.stop();
+        if (borderTimer != null)
+            borderTimer.stop();
         borderTimer = new AnimationTimer() {
             @Override
             public void handle(long now) {
@@ -434,7 +446,8 @@ public class NoteCardView extends StackPane {
     private void drawBorderProgress(double progress) {
         double w = borderCanvas.getWidth();
         double h = borderCanvas.getHeight();
-        if (w <= 0 || h <= 0) return;
+        if (w <= 0 || h <= 0)
+            return;
 
         GraphicsContext gc = borderCanvas.getGraphicsContext2D();
         gc.clearRect(0, 0, w, h);
@@ -526,7 +539,7 @@ public class NoteCardView extends StackPane {
      * 在指定圆心绘制一段圆弧。
      */
     private void drawArcSegment(GraphicsContext gc, double centerX, double centerY,
-                                 double radius, double startAngle, double sweepAngle) {
+            double radius, double startAngle, double sweepAngle) {
         int steps = Math.max(8, (int) (sweepAngle / 2));
         double startRad = Math.toRadians(startAngle);
         double sweepRad = Math.toRadians(sweepAngle);
