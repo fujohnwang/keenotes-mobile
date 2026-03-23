@@ -150,15 +150,14 @@ class ReviewFragment : Fragment() {
     private fun loadInitialNotes() {
         val app = requireActivity().application as KeeNotesApp
         val days = getDaysForPeriod(currentPeriod)
-        val since = getSinceDate(days)
         
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 // Get total count
-                val totalCount = app.database.noteDao().getNotesCountForReview(since)
+                val totalCount = app.database.noteDao().getNotesCountForReview(days)
                 
                 // Load first page
-                val notes = app.database.noteDao().getNotesForReviewPaged(since, pageSize, 0)
+                val notes = app.database.noteDao().getNotesForReviewPaged(days, pageSize, 0)
                 
                 loadedNotes.clear()
                 loadedNotes.addAll(notes)
@@ -181,7 +180,6 @@ class ReviewFragment : Fragment() {
     private fun loadNewNotesAtTop(previousCount: Int, newCount: Int) {
         val app = requireActivity().application as KeeNotesApp
         val days = getDaysForPeriod(currentPeriod)
-        val since = getSinceDate(days)
         
         viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -189,7 +187,7 @@ class ReviewFragment : Fragment() {
                 val newNotesCount = newCount - previousCount
                 
                 // Load the newest notes (they should be at the top)
-                val newNotes = app.database.noteDao().getNotesForReviewPaged(since, newNotesCount, 0)
+                val newNotes = app.database.noteDao().getNotesForReviewPaged(days, newNotesCount, 0)
                 
                 if (newNotes.isNotEmpty()) {
                     // Filter out notes that are already in the list
@@ -207,7 +205,7 @@ class ReviewFragment : Fragment() {
                         }
                         
                         // Update count
-                        val totalCount = app.database.noteDao().getNotesCountForReview(since)
+                        val totalCount = app.database.noteDao().getNotesCountForReview(days)
                         updateCountText(totalCount, currentPeriod)
                     }
                 }
@@ -223,12 +221,11 @@ class ReviewFragment : Fragment() {
         isLoadingMore = true
         val app = requireActivity().application as KeeNotesApp
         val days = getDaysForPeriod(currentPeriod)
-        val since = getSinceDate(days)
         
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val notes = app.database.noteDao().getNotesForReviewPaged(
-                    since, 
+                    days, 
                     pageSize, 
                     loadedNotes.size
                 )
@@ -254,10 +251,6 @@ class ReviewFragment : Fragment() {
             "All" -> 3650
             else -> 7
         }
-    }
-    
-    private fun getSinceDate(days: Int): String {
-        return Instant.now().minus(days.toLong(), ChronoUnit.DAYS).toString()
     }
     
     private fun updateSyncChannelStatus(state: WebSocketService.ConnectionState) {

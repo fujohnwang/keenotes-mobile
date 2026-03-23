@@ -267,19 +267,12 @@ struct SettingsView: View {
         print("[Settings] Configuration: endpoint=\(endpointChanged), token=\(tokenChanged), password=\(passwordChanged)")
 
         // Save settings
-        do {
-            appState.settingsService.saveSettings(
-                endpoint: endpointUrl,
-                token: token,
-                password: password
-            )
-            print("[Settings] Settings saved successfully")
-        } catch {
-            print("[Settings] ERROR saving settings: \(error)")
-            statusMessage = "Failed to save: \(error.localizedDescription)"
-            isSuccess = false
-            return
-        }
+        appState.settingsService.saveSettings(
+            endpoint: endpointUrl,
+            token: token,
+            password: password
+        )
+        print("[Settings] Settings saved successfully")
 
         // Update status message
         let msg = password.isEmpty ? "Settings saved ✓" : "Settings saved ✓ (E2E encryption enabled)"
