@@ -1,5 +1,6 @@
 package cn.keevol.keenotes.mobilefx;
 
+import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
 import javafx.application.Platform;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -591,10 +592,11 @@ public class LocalCacheService {
 
     public void insertPendingNote(String content, String channel) throws SQLException {
         ensureInitialized();
-        String sql = "INSERT INTO pending_notes (content, channel) VALUES (?, ?)";
+        String sql = "INSERT INTO pending_notes (content, channel, created_at) VALUES (?, ?, ?)";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, content);
             pstmt.setString(2, channel);
+            pstmt.setString(3, DateTimeUtil.getCurrentUtcTimestamp());
             pstmt.executeUpdate();
         }
         refreshPendingNoteCount();
