@@ -1,5 +1,6 @@
 package cn.keevol.keenotes.mobilefx;
 
+import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
 import javafx.animation.AnimationTimer;
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
@@ -74,7 +75,7 @@ public class NoteCardView extends StackPane {
         HBox headerRow = new HBox(12);
         headerRow.setAlignment(Pos.CENTER_LEFT);
 
-        dateLabel = new Label(noteData.createdAt);
+        dateLabel = new Label(DateTimeUtil.utcToLocalDisplay(noteData.createdAt));
         dateLabel.getStyleClass().add("note-date");
 
         // Channel/source label
@@ -316,7 +317,7 @@ public class NoteCardView extends StackPane {
      */
     public void update(LocalCacheService.NoteData newData) {
         this.noteData = newData;
-        dateLabel.setText(newData.createdAt);
+        dateLabel.setText(DateTimeUtil.utcToLocalDisplay(newData.createdAt));
         String ch = (newData.channel != null && !newData.channel.isEmpty()) ? newData.channel : "default";
         channelLabel.setText("• " + ch);
         contentArea.setText(newData.content);

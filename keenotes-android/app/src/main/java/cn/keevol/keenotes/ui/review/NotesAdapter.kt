@@ -19,6 +19,7 @@ import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.ItemNoteBinding
 import cn.keevol.keenotes.KeeNotesApp
+import cn.keevol.keenotes.util.DateTimeUtil
 import cn.keevol.keenotes.util.ZeroWidthSteganography
 import kotlinx.coroutines.runBlocking
 
@@ -48,13 +49,9 @@ class NotesAdapter(
         
         fun bind(note: Note) {
             currentNote = note
-            
-            // Date and time
-            binding.dateText.text = if (note.createdAt.length >= 19) {
-                note.createdAt.take(19)
-            } else {
-                note.createdAt
-            }
+
+            // Date and time - convert UTC to local timezone for display
+            binding.dateText.text = DateTimeUtil.utcToLocalDisplay(note.createdAt)
             
             // Channel with bullet separator
             val channelText = if (note.channel.isNotEmpty()) note.channel else "default"

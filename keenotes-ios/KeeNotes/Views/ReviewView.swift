@@ -259,19 +259,26 @@ struct NoteRow: View {
     private var messageFontSize: CGFloat { isPad ? 18 : 17 }
 
     private var formattedDate: String {
-        // Simply return the first 19 characters (yyyy-MM-dd HH:mm:ss)
-        // Most notes already have this format from the server
-        if note.createdAt.count >= 19 {
-            return String(note.createdAt.prefix(19))
-        }
+        // Parse UTC time and convert to local timezone for display
+        let inputFormatter = DateFormatter()
+        inputFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        inputFormatter.timeZone = TimeZone(identifier: "UTC")
 
-        // Fallback: try to parse and format
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-
-        if let date = dateFormatter.date(from: note.createdAt) {
+        if let date = inputFormatter.date(from: note.createdAt) {
             let displayFormatter = DateFormatter()
             displayFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            displayFormatter.timeZone = TimeZone.current // Use system local timezone
+            return displayFormatter.string(from: date)
+        }
+
+        // Fallback: try ISO format
+        inputFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        inputFormatter.timeZone = TimeZone(identifier: "UTC")
+
+        if let date = inputFormatter.date(from: note.createdAt) {
+            let displayFormatter = DateFormatter()
+            displayFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            displayFormatter.timeZone = TimeZone.current
             return displayFormatter.string(from: date)
         }
 

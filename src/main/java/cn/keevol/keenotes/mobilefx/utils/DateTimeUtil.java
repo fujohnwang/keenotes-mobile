@@ -219,4 +219,56 @@ public class DateTimeUtil {
         }
         return offsetDateTime.withOffsetSameInstant(ZoneOffset.UTC).format(TS_FORMATTER);
     }
+
+    /**
+     * 将 UTC 时间字符串转换为本地时区显示字符串
+     * 用于 UI 显示：数据库中存储的是 UTC，显示时转为本地时区
+     *
+     * @param utcString UTC 时间字符串 (yyyy-MM-dd HH:mm:ss)
+     * @return 本地时区格式字符串，解析失败返回原字符串
+     */
+    public static String utcToLocalDisplay(String utcString) {
+        if (utcString == null || utcString.isBlank()) {
+            return utcString;
+        }
+
+        try {
+            // 解析 UTC 时间
+            LocalDateTime utcDateTime = LocalDateTime.parse(utcString, TS_FORMATTER);
+            // 转为带 UTC 时区的 OffsetDateTime
+            OffsetDateTime utc = utcDateTime.atOffset(ZoneOffset.UTC);
+            // 转为系统本地时区
+            OffsetDateTime local = utc.withOffsetSameInstant(
+                    ZoneId.systemDefault().getRules().getOffset(utc.toInstant()));
+            // 格式化为显示格式
+            return local.format(TS_FORMATTER);
+        } catch (Exception e) {
+            // 解析失败，返回原字符串
+            return utcString;
+        }
+    }
+
+    /**
+     * 将 UTC 时间字符串转换为本地时区显示字符串（带时区偏移信息）
+     * 用于需要显示时区信息的场景
+     *
+     * @param utcString UTC 时间字符串
+     * @return 本地时区格式字符串（如：2025-12-04 13:21:19 +08:00），解析失败返回原字符串
+     */
+    public static String utcToLocalDisplayWithOffset(String utcString) {
+        if (utcString == null || utcString.isBlank()) {
+            return utcString;
+        }
+
+        try {
+            LocalDateTime utcDateTime = LocalDateTime.parse(utcString, TS_FORMATTER);
+            OffsetDateTime utc = utcDateTime.atOffset(ZoneOffset.UTC);
+            OffsetDateTime local = utc.withOffsetSameInstant(
+                    ZoneId.systemDefault().getRules().getOffset(utc.toInstant()));
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss XXX");
+            return local.format(formatter);
+        } catch (Exception e) {
+            return utcString;
+        }
+    }
 }
