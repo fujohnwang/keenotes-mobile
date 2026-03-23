@@ -18,15 +18,15 @@
 | **发送 Note (ApiServiceV2)** | `yyyy-MM-dd HH:mm:ss` | 使用 `DateTimeFormatter` 生成当前时间 | `ApiServiceV2.java:19,93` |
 | **Import Note (DataImportService)** | 接受 `created_at` 或 `ts` 字段 | 仅验证字段存在性，**不验证格式**，直接透传 | `DataImportService.java:94-100,174-176` |
 | **MCP AddNoteTool** | `yyyy-MM-dd HH:mm:ss` | 生成当前时间戳 | `AddNoteTool.java:16-17,43` |
-| **WebSocket 发送** | `LocalDateTime.now().toString()` | 使用默认 ISO 格式（**与 HTTP API 不同！**） | `WebSocketClientService.java:310` |
 | **WebSocket 接收** | 透传服务器返回的 `created_at` | 直接存储，**无格式验证** | `WebSocketClientService.java:404,489` |
+
+> **注意**：`WebSocketClientService.sendNewNote` 方法虽然存在（使用 `LocalDateTime.now().toString()`），但**实际未被调用**。所有发送操作均通过 HTTP API 进行。
 | **本地缓存 (SQLite)** | 字符串存储 | `DATETIME` 类型，使用 SQLite 的 `CURRENT_TIMESTAMP` | `LocalCacheService.java:203,227` |
 
 ### JavaFX 问题发现
 
-1. **HTTP API 和 WebSocket 使用不同格式**：HTTP 使用 `yyyy-MM-dd HH:mm:ss`，WebSocket 使用 `LocalDateTime.toString()`（ISO 格式）
-2. **Import 时不验证日期格式**：仅检查字段存在性，不验证格式是否正确
-3. **ForwardHandler 使用 `created_at` 字段名**：与其他组件使用的 `ts` 字段名不一致
+1. **Import 时不验证日期格式**：仅检查字段存在性，不验证格式是否正确
+2. **ForwardHandler 使用 `created_at` 字段名**：与其他组件使用的 `ts` 字段名不一致
 
 ---
 
@@ -81,7 +81,6 @@
 
 ```
 JavaFX HTTP API:  yyyy-MM-dd HH:mm:ss
-JavaFX WebSocket: LocalDateTime.toString() (ISO-like)
 Android HTTP API: Instant.now().toString() (ISO 8601)
 iOS HTTP API:     yyyy-MM-dd HH:mm:ss
 ```
@@ -89,7 +88,6 @@ iOS HTTP API:     yyyy-MM-dd HH:mm:ss
 ### 问题 2：同一端内不同组件格式不一致
 
 ```
-JavaFX: HTTP API vs WebSocket 使用不同格式
 Android: ApiService vs PendingNoteService 使用不同格式
 iOS: ApiService vs PendingNoteService 使用不同格式
 ```
@@ -156,8 +154,8 @@ iOS: ApiService vs PendingNoteService 使用不同格式
 // ApiServiceV2.java:19
 private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-// WebSocketClientService.java:310
-.put("timestamp", LocalDateTime.now().toString());
+// ApiServiceV2.java:93
+return postNote(content, channel, LocalDateTime.now().format(TS_FORMATTER));
 ```
 
 ### Android
