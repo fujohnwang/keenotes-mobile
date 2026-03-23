@@ -10,26 +10,26 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE content LIKE '%' || :query || '%' ORDER BY id DESC LIMIT 100")
     suspend fun searchNotes(query: String): List<Note>
     
-    @Query("SELECT * FROM notes WHERE createdAt >= :since ORDER BY id DESC")
-    suspend fun getNotesForReview(since: String): List<Note>
+    @Query("SELECT * FROM notes WHERE createdAt >= datetime('now', '-' || :days || ' days') ORDER BY id DESC")
+    suspend fun getNotesForReview(days: Int): List<Note>
     
     /**
      * Flow version - auto-updates when database changes
      */
-    @Query("SELECT * FROM notes WHERE createdAt >= :since ORDER BY id DESC")
-    fun getNotesForReviewFlow(since: String): Flow<List<Note>>
+    @Query("SELECT * FROM notes WHERE createdAt >= datetime('now', '-' || :days || ' days') ORDER BY id DESC")
+    fun getNotesForReviewFlow(days: Int): Flow<List<Note>>
     
     /**
      * Paginated version for memory optimization
      */
-    @Query("SELECT * FROM notes WHERE createdAt >= :since ORDER BY id DESC LIMIT :limit OFFSET :offset")
-    suspend fun getNotesForReviewPaged(since: String, limit: Int, offset: Int): List<Note>
+    @Query("SELECT * FROM notes WHERE createdAt >= datetime('now', '-' || :days || ' days') ORDER BY id DESC LIMIT :limit OFFSET :offset")
+    suspend fun getNotesForReviewPaged(days: Int, limit: Int, offset: Int): List<Note>
     
     /**
      * Get count of notes for review period
      */
-    @Query("SELECT COUNT(*) FROM notes WHERE createdAt >= :since")
-    suspend fun getNotesCountForReview(since: String): Int
+    @Query("SELECT COUNT(*) FROM notes WHERE createdAt >= datetime('now', '-' || :days || ' days')")
+    suspend fun getNotesCountForReview(days: Int): Int
     
     @Query("SELECT * FROM notes ORDER BY id DESC LIMIT :limit")
     suspend fun getRecentNotes(limit: Int = 100): List<Note>
