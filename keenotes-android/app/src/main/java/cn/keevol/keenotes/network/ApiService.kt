@@ -81,7 +81,8 @@ class ApiService(
             
             // Encrypt content
             val encrypted = cryptoService.encrypt(content)
-            val ts = java.time.Instant.now().toString()
+            val ts = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
             
             // Build JSON body - match JavaFX format exactly
             val json = JSONObject().apply {

@@ -5,7 +5,6 @@ import okhttp3.*;
 import javax.net.ssl.*;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -40,43 +39,39 @@ public class ApiServiceV2 {
                 }
             };
 
-            SSLContext sslContext = SSLContext.getInstance("TLS");
+            SSLContext sslContext = SSLContext.getInstance("SSL");
             sslContext.init(null, trustAll, new SecureRandom());
 
             return new OkHttpClient.Builder()
-                    .proxySelector(new java.net.ProxySelector() {
-                        @Override
-                        public java.util.List<java.net.Proxy> select(java.net.URI uri) {
-                            return java.util.Collections.singletonList(java.net.Proxy.NO_PROXY);
-                        }
-                        @Override
-                        public void connectFailed(java.net.URI uri, java.net.SocketAddress sa, java.io.IOException ioe) {}
-                    })
-                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager) trustAll[0])
+                    .hostnameVerifier((hostname, session) -> true)
+                    .connectTimeout(10, TimeUnit.SECONDS)
                     .readTimeout(30, TimeUnit.SECONDS)
                     .writeTimeout(30, TimeUnit.SECONDS)
-                    .sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager) trustAll[0])
-                    .hostnameVerifier((h, s) -> true)
                     .build();
         } catch (Exception e) {
-            System.err.println("[ApiServiceV2] SSL config failed: " + e.getMessage());
-            return new OkHttpClient.Builder()
-                    .proxySelector(new java.net.ProxySelector() {
-                        @Override
-                        public java.util.List<java.net.Proxy> select(java.net.URI uri) {
-                            return java.util.Collections.singletonList(java.net.Proxy.NO_PROXY);
-                        }
-                        @Override
-                        public void connectFailed(java.net.URI uri, java.net.SocketAddress sa, java.io.IOException ioe) {}
-                    })
-                    .connectTimeout(30, TimeUnit.SECONDS)
-                    .readTimeout(30, TimeUnit.SECONDS)
-                    .writeTimeout(30, TimeUnit.SECONDS)
-                    .build();
+            return new OkHttpClient();
         }
     }
 
-    public record ApiResult(boolean success, String message, String echoContent, Long noteId) {
+    public static class ApiResult {
+        private final boolean success;
+        private final String message;
+        private final String echoContent;
+        private final Long noteId;
+
+        public ApiResult(boolean success, String message, String echoContent, Long noteId) {
+            this.success = success;
+            this.message = message;
+            this.echoContent = echoContent;
+            this.noteId = noteId;
+        }
+
+        public boolean success() { return success; }
+        public String message() { return message; }
+        public String echoContent() { return echoContent; }
+        public Long noteId() { return noteId; }
+
         public static ApiResult success(String echoContent, Long noteId) {
             return new ApiResult(true, "Note saved successfully!", echoContent, noteId);
         }
@@ -90,7 +85,9 @@ public class ApiServiceV2 {
     }
 
     public CompletableFuture<ApiResult> postNote(String content, String channel) {
-        return postNote(content, channel, LocalDateTime.now().format(TS_FORMATTER));
+        String ts = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
+                .format(TS_FORMATTER);
+        return postNote(content, channel, ts);
     }
 
     public CompletableFuture<ApiResult> postNote(String content, String channel, String ts) {
@@ -110,6 +107,7 @@ public class ApiServiceV2 {
             return CompletableFuture.completedFuture(ApiResult.failure("PIN code not set."));
         }
 
+        final String normalizedTs = normalizeDate(ts);
         final String originalContent = content;
 
         return CompletableFuture.supplyAsync(() -> {
@@ -117,7 +115,7 @@ public class ApiServiceV2 {
                 String encrypted = cryptoService.encrypt(content);
                 String json = String.format(
                     "{\"channel\":\"%s\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":true}",
-                    channel, escapeJson(encrypted), ts
+                    channel, escapeJson(encrypted), normalizedTs
                 );
 
                 Request request = new Request.Builder()
@@ -140,6 +138,43 @@ public class ApiServiceV2 {
                 return ApiResult.failure("Network error: " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * Standardize date string to \"yyyy-MM-dd HH:mm:ss\" in UTC
+     */
+    private String normalizeDate(String input) {
+        if (input == null || input.isBlank()) {
+            return java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).format(TS_FORMATTER);
+        }
+
+        try {
+            // 1. Try ISO-8601 (T and Z)
+            java.time.OffsetDateTime odt;
+            try {
+                odt = java.time.OffsetDateTime.parse(input);
+            } catch (java.time.format.DateTimeParseException e) {
+                // Try ISO_INSTANT or other ISO variations
+                odt = java.time.Instant.parse(input).atOffset(java.time.ZoneOffset.UTC);
+            }
+            // Ensure we are working with UTC
+            odt = odt.withOffsetSameInstant(java.time.ZoneOffset.UTC);
+            return odt.format(TS_FORMATTER);
+        } catch (Exception e) {
+            // 2. Try standard SQLite format (yyyy-MM-dd HH:mm:ss) or fallback
+            try {
+                String sanitized = input.replace(" ", "T");
+                if (!sanitized.contains("T")) {
+                    sanitized += "T00:00:00";
+                }
+                // LocalDateTime parse requires T
+                java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(sanitized);
+                return ldt.format(TS_FORMATTER);
+            } catch (Exception e2) {
+                // If all fails, return current UTC time
+                return java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).format(TS_FORMATTER);
+            }
+        }
     }
     
     /**
@@ -214,11 +249,13 @@ public class ApiServiceV2 {
             return CompletableFuture.completedFuture(ApiResult.failure("Note content cannot be empty."));
         }
 
+        final String normalizedTs = normalizeDate(ts);
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String json = String.format(
                     "{\"channel\":\"%s\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":true}",
-                    channel, escapeJson(encryptedContent), ts
+                    channel, escapeJson(encryptedContent), normalizedTs
                 );
 
                 Request request = new Request.Builder()
