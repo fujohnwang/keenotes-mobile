@@ -523,17 +523,6 @@ public class NotesDisplayPanel extends VBox {
     }
 
     /**
-     * Complete the optimistic note's border animation (remote sync confirmed)
-     */
-    public void completeOptimisticNote() {
-        if (optimisticCard != null) {
-            optimisticCard.completeBorderAnimation();
-        }
-        optimisticNoteData = null;
-        optimisticCard = null;
-    }
-
-    /**
      * Remove the optimistic note (send failed)
      */
     public void removeOptimisticNote() {
@@ -543,6 +532,28 @@ public class NotesDisplayPanel extends VBox {
         if (optimisticNoteData != null) {
             noteItems.remove(optimisticNoteData);
         }
+        optimisticNoteData = null;
+        optimisticCard = null;
+    }
+
+    /**
+     * Replace the optimistic note with the real note data from database.
+     * This updates the temp note (with id=-1) to the real note (with actual id),
+     * and completes the border animation.
+     */
+    public void replaceOptimisticNoteWithReal(LocalCacheService.NoteData realNote) {
+        if (optimisticNoteData != null) {
+            int index = noteItems.indexOf(optimisticNoteData);
+            if (index >= 0) {
+                // Replace the optimistic note data with real note data
+                noteItems.set(index, realNote);
+            }
+        }
+        // Complete the border animation on the card
+        if (optimisticCard != null) {
+            optimisticCard.completeBorderAnimation();
+        }
+        // Clear optimistic tracking
         optimisticNoteData = null;
         optimisticCard = null;
     }

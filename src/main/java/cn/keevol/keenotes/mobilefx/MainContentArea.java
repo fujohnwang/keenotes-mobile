@@ -238,17 +238,15 @@ public class MainContentArea extends StackPane {
             return;
         }
 
-        // 匹配 optimistic card：内容 + 时间戳（秒级）
+        // 匹配 optimistic card：通过内容匹配（时间戳可能不一致，因为服务器可能使用不同的时间）
         LocalCacheService.NoteData optData = notesDisplayPanel.getOptimisticNoteData();
-        if (optData != null) {
-            if (optData.content.equals(note.content)
-                    && optData.createdAt != null && note.createdAt != null
-                    && optData.createdAt.equals(note.createdAt)) {
-                logger.info("Matched optimistic card for note " + note.id + ", completing border animation");
-                notesDisplayPanel.completeOptimisticNote();
-                displayedNoteIds.add(note.id);
-                return;
-            }
+        if (optData != null && optData.content.equals(note.content)) {
+            logger.info("Matched optimistic card for note " + note.id + " by content, completing border animation");
+            // Replace optimistic note with real note and complete animation
+            // This replaces the temp note (-1 id) with the real one from DB
+            notesDisplayPanel.replaceOptimisticNoteWithReal(note);
+            displayedNoteIds.add(note.id);
+            return;
         }
 
         logger.info("Adding new note " + note.id + " to UI with animation");
