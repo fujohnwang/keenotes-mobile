@@ -12,6 +12,7 @@ public class NoteListCell extends ListCell<LocalCacheService.NoteData> {
 
     private final NotesDisplayPanel panel;
     private NoteCardView card;
+    private boolean wasOptimistic = false;
 
     public NoteListCell(NotesDisplayPanel panel) {
         this.panel = panel;
@@ -23,6 +24,11 @@ public class NoteListCell extends ListCell<LocalCacheService.NoteData> {
         super.updateItem(item, empty);
         if (empty || item == null) {
             setGraphic(null);
+            // Cancel any ongoing animation when cell is emptied
+            if (wasOptimistic && card != null) {
+                card.cancelBorderAnimation();
+                wasOptimistic = false;
+            }
         } else {
             if (card == null) {
                 card = new NoteCardView(item);
@@ -30,10 +36,22 @@ public class NoteListCell extends ListCell<LocalCacheService.NoteData> {
                 card.update(item);
             }
             setGraphic(card);
-            // Start border animation for optimistic note
-            if (item == panel.getOptimisticNoteData()) {
-                card.startBorderAnimation();
-                panel.setOptimisticCard(card);
+
+            // Handle optimistic note animation
+            boolean isOptimistic = (item == panel.getOptimisticNoteData());
+            if (isOptimistic) {
+                // Only start animation when transitioning from non-optimistic to optimistic
+                // This prevents animation from resetting when scrolling through the list
+                if (!wasOptimistic) {
+                    card.startBorderAnimation();
+                    panel.setOptimisticCard(card);
+                    wasOptimistic = true;
+                }
+            } else if (wasOptimistic) {
+                // Cell was showing optimistic note but now shows different note
+                // Cancel animation to prevent it continuing on wrong item
+                card.cancelBorderAnimation();
+                wasOptimistic = false;
             }
         }
     }
