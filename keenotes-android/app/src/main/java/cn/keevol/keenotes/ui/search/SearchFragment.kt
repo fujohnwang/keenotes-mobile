@@ -105,6 +105,7 @@ class SearchFragment : Fragment() {
         lifecycleScope.launch {
             app.settingsRepository.showSyncChannelStatus.collectLatest { show ->
                 binding.syncIndicator.visibility = if (show) View.VISIBLE else View.GONE
+                binding.syncChannelLabel.visibility = if (show) View.VISIBLE else View.GONE
                 binding.syncStatusText.visibility = if (show) View.VISIBLE else View.GONE
             }
         }
