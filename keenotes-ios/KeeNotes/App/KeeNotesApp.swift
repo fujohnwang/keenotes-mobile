@@ -76,6 +76,18 @@ class AppState: ObservableObject {
         return service
     }()
     
+    lazy var pendingNoteService: PendingNoteService = {
+        let service = PendingNoteService(
+            databaseService: databaseService,
+            apiService: apiService,
+            webSocketService: webSocketService
+        )
+        service.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+        return service
+    }()
+    
     private var cancellables = Set<AnyCancellable>()
     
     init() {
@@ -110,6 +122,12 @@ class AppState: ObservableObject {
             if !settingsService.endpointUrl.isEmpty && !settingsService.token.isEmpty {
                 webSocketService.connect()
             }
+            
+            // Start pending note retry scheduler
+            pendingNoteService.startRetryScheduler()
+            
+            // Refresh pending note count
+            Task { await databaseService.refreshPendingNoteCount() }
             
             isInitialized = true
         } catch {

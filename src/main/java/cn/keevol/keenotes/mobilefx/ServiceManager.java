@@ -38,6 +38,7 @@ public class ServiceManager {
     private volatile ApiServiceV2 apiService;
     private volatile WebSocketClientService webSocketService;
     private volatile SettingsService settingsService;
+    private volatile PendingNoteService pendingNoteService;
 
     // 服务状态监听器
     private final CopyOnWriteArrayList<ServiceStatusListener> listeners = new CopyOnWriteArrayList<>();
@@ -155,6 +156,10 @@ public class ServiceManager {
                     if (connected) {
                         servicesReady = true;
                         notifyStatusChanged("websocket_connected", "WebSocket已连接");
+                        // 网络恢复，触发 pending notes 重试
+                        if (pendingNoteService != null) {
+                            pendingNoteService.onNetworkRestored();
+                        }
                     } else {
                         notifyStatusChanged("websocket_disconnected", "WebSocket已断开");
                     }
@@ -182,6 +187,14 @@ public class ServiceManager {
             });
         }
         return webSocketService;
+    }
+
+    public synchronized PendingNoteService getPendingNoteService() {
+        if (pendingNoteService == null) {
+            pendingNoteService = PendingNoteService.getInstance();
+            pendingNoteService.startRetryScheduler();
+        }
+        return pendingNoteService;
     }
 
     /**
@@ -281,7 +294,10 @@ public class ServiceManager {
         // 1. 触发缓存初始化
         getLocalCacheService();
         
-        // 2. 连接 WebSocket
+        // 2. 初始化 PendingNoteService
+        getPendingNoteService();
+        
+        // 3. 连接 WebSocket
         connectWebSocketIfNeeded();
         
         System.out.println("[ServiceManager] Service initialization completed");
@@ -417,6 +433,12 @@ public class ServiceManager {
         if (apiService != null) {
             // ApiServiceV2 如果有需要关闭的资源，在这里处理
             System.out.println("[ServiceManager] API service shutdown complete");
+        }
+
+        // 关闭 PendingNoteService
+        if (pendingNoteService != null) {
+            System.out.println("[ServiceManager] Shutting down pending note service...");
+            pendingNoteService.shutdown();
         }
 
         System.out.println("[ServiceManager] All services shutdown complete");

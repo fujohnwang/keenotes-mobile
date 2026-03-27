@@ -9,6 +9,7 @@ struct ReviewView: View {
     @State private var selectedPeriod = 0  // 0: 7 days, 1: 30 days, 2: 90 days, 3: All
     @State private var totalCount = 0
     @State private var hasMoreData = true
+    @State private var enlargedNote: Note? = nil
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
@@ -58,8 +59,14 @@ struct ReviewView: View {
                     }
                     .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
 
-                    // Notes list
-                    if isLoading {
+                    // Notes list or enlarged note view
+                    if let enlarged = enlargedNote {
+                        EnlargedNoteView(note: enlarged) {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                enlargedNote = nil
+                            }
+                        }
+                    } else if isLoading {
                         Spacer()
                         ProgressView("Loading...")
                         Spacer()
@@ -76,7 +83,11 @@ struct ReviewView: View {
                     } else {
                         List {
                             ForEach(notes) { note in
-                                NoteRow(note: note)
+                                NoteRow(note: note, onEnlarge: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        enlargedNote = note
+                                    }
+                                })
                                     .listRowInsets(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
                                     .listRowSeparator(.hidden)
                                     .listRowBackground(Color.clear)
@@ -237,27 +248,37 @@ struct ReviewView: View {
 /// Single note card in the list
 struct NoteRow: View {
     let note: Note
+    var onEnlarge: (() -> Void)? = nil
+    @EnvironmentObject var appState: AppState
     @State private var showCopiedAlert = false
     @State private var textViewHeight: CGFloat?
+    @Environment(\.colorScheme) private var colorScheme
 
     private var isPad: Bool { DeviceType.isPad }
     private var cardPadding: CGFloat { isPad ? 24 : 16 }
     private var messageFontSize: CGFloat { isPad ? 18 : 17 }
 
     private var formattedDate: String {
-        // Simply return the first 19 characters (yyyy-MM-dd HH:mm:ss)
-        // Most notes already have this format from the server
-        if note.createdAt.count >= 19 {
-            return String(note.createdAt.prefix(19))
-        }
+        // Parse UTC time and convert to local timezone for display
+        let inputFormatter = DateFormatter()
+        inputFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        inputFormatter.timeZone = TimeZone(identifier: "UTC")
 
-        // Fallback: try to parse and format
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-
-        if let date = dateFormatter.date(from: note.createdAt) {
+        if let date = inputFormatter.date(from: note.createdAt) {
             let displayFormatter = DateFormatter()
             displayFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            displayFormatter.timeZone = TimeZone.current // Use system local timezone
+            return displayFormatter.string(from: date)
+        }
+
+        // Fallback: try ISO format
+        inputFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        inputFormatter.timeZone = TimeZone(identifier: "UTC")
+
+        if let date = inputFormatter.date(from: note.createdAt) {
+            let displayFormatter = DateFormatter()
+            displayFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            displayFormatter.timeZone = TimeZone.current
             return displayFormatter.string(from: date)
         }
 
@@ -269,27 +290,42 @@ struct NoteRow: View {
         VStack(alignment: .leading, spacing: isPad ? 16 : 12) {
             // Header: Date and Channel
             HStack(spacing: isPad ? 10 : 8) {
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                        .font(.caption2)
-                    Text(formattedDate)
-                        .font(.caption)
-                }
-                .foregroundColor(.secondary)
+                HStack(spacing: isPad ? 10 : 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption2)
+                        Text(formattedDate)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
 
-                // Channel info
-                if !note.channel.isEmpty {
-                    Text("•")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(note.channel)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    // Channel info
+                    if !note.channel.isEmpty {
+                        Text("•")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(note.channel)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                copyToClipboard()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    copyToClipboard()
+                }
+                
+                Spacer()
+                
+                if let onEnlarge = onEnlarge {
+                    Button(action: onEnlarge) {
+                        Image(systemName: "arrow.down.left.and.arrow.up.right")
+                            .font(.system(size: isPad ? 16 : 14))
+                            .foregroundColor(.secondary)
+                            .padding(6)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             // Note content with selectable text using UITextView
@@ -308,12 +344,13 @@ struct NoteRow: View {
         .padding(cardPadding)
         .background(
             RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
-                .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
-                .stroke(Color(.systemGray5), lineWidth: 1)
+                .fill(Theme.cardBackground(colorScheme))
+                .shadow(
+                    color: Theme.cardShadow(colorScheme).color,
+                    radius: Theme.cardShadow(colorScheme).radius,
+                    x: Theme.cardShadow(colorScheme).x,
+                    y: Theme.cardShadow(colorScheme).y
+                )
         )
         .overlay(
             Group {
@@ -340,7 +377,10 @@ struct NoteRow: View {
     }
 
     private func copyToClipboard() {
-        UIPasteboard.general.string = note.content
+        UIPasteboard.general.string = ZeroWidthSteganography.embedIfNeeded(
+            content: note.content,
+            hiddenMessage: appState.settingsService.hiddenMessage
+        )
         showCopiedNotification()
     }
     
@@ -466,6 +506,15 @@ class CustomUITextView: UITextView {
     override func copy(_ sender: Any?) {
         // Let system handle the copy
         super.copy(sender)
+        
+        // Embed hidden message if configured
+        let hiddenMessage = UserDefaults.standard.string(forKey: "hidden_message") ?? ""
+        if !hiddenMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let copied = UIPasteboard.general.string {
+            UIPasteboard.general.string = ZeroWidthSteganography.embedIfNeeded(
+                content: copied, hiddenMessage: hiddenMessage
+            )
+        }
         
         // Deselect text
         selectedTextRange = nil

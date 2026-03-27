@@ -11,7 +11,8 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="@color/surface">
+        android:background="@color/surface"
+        android:elevation="4dp">
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
@@ -57,14 +58,46 @@
             android:id="@+id/overviewCardInclude"
             layout="@layout/view_overview_card" />
 
+        <!-- Pending notes banner (hidden by default) -->
+        <LinearLayout
+            android:id="@+id/pendingBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_pending_banner"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/pendingLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="13sp"
+                android:textColor="#FFB74D" />
+
+            <TextView
+                android:id="@+id/pendingViewButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="View"
+                android:textSize="13sp"
+                android:textColor="@color/primary"
+                android:clickable="true"
+                android:focusable="true" />
+
+        </LinearLayout>
+
         <!-- Unified input container - fills remaining space -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:background="@drawable/bg_note_input"
-            android:padding="12dp">
+            android:padding="4dp">
 
             <!-- Note Input - fills all available space -->
             <EditText
@@ -80,7 +113,7 @@
                 android:inputType="textMultiLine"
                 android:scrollbars="vertical" />
 
-            <!-- Bottom row: Send Channel (left) + Send button (right) -->
+            <!-- Bottom row: Send button (right-aligned) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -88,32 +121,11 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
-                <!-- Send Channel status (left) -->
-                <ImageView
-                    android:id="@+id/sendIndicator"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:src="@drawable/ic_circle"
-                    app:tint="@color/warning" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:text="Send Channel:"
-                    android:textSize="11sp"
-                    android:textColor="@color/text_secondary" />
-
-                <TextView
-                    android:id="@+id/sendStatusText"
+                <!-- Spacer -->
+                <View
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:text="Not Configured"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/warning" />
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
 
                 <!-- Send button (right) - shows icon + text, or spinner + "Sending..." when posting -->
                 <LinearLayout
@@ -150,7 +162,7 @@
                         android:layout_height="wrap_content"
                         android:layout_gravity="center_vertical"
                         android:layout_marginStart="6dp"
-                        android:text="Send"
+                        android:text="Keep it"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="@color/background" />

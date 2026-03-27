@@ -65,6 +65,14 @@ public class DesktopMainView extends BorderPane {
                 newScene.setOnKeyPressed(event -> {
                     SettingsService settings = SettingsService.getInstance();
                     
+                    // Take Note shortcut
+                    KeyCodeCombination takeNoteShortcut = parseShortcut(settings.getTakeNoteShortcut());
+                    if (takeNoteShortcut != null && takeNoteShortcut.match(event)) {
+                        event.consume();
+                        switchToNoteAndFocus();
+                        return;
+                    }
+                    
                     // Search shortcut
                     KeyCodeCombination searchShortcut = parseShortcut(settings.getSearchShortcut());
                     if (searchShortcut != null && searchShortcut.match(event)) {
@@ -135,6 +143,16 @@ public class DesktopMainView extends BorderPane {
         }
     }
     
+    /**
+     * Switch to note mode and focus on note input
+     */
+    public void switchToNoteAndFocus() {
+        switchToMode(ViewMode.NOTE);
+        javafx.application.Platform.runLater(() -> {
+            mainContent.focusNoteInput();
+        });
+    }
+
     /**
      * Switch to search mode and focus on search input
      */

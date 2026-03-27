@@ -8,8 +8,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
 import javafx.scene.shape.SVGPath;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
@@ -30,10 +28,6 @@ public class NoteInputPanel extends VBox {
     private final Consumer<String> onSendNote;
     private final Text textMeasure; // For auto-expand height calculation
     
-    // Send channel status
-    private final Circle sendChannelIndicator;
-    private final Label sendChannelLabel;
-    
     // Dots animation
     private PauseTransition dotsAnimation;
     private String baseStatusText;
@@ -44,11 +38,6 @@ public class NoteInputPanel extends VBox {
         getStyleClass().add("note-input-panel");
         setSpacing(0); // Remove internal spacing
         setPadding(new Insets(16, 16, 16, 16)); // Uniform padding on all sides
-        
-        // Listen to theme changes
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
-            javafx.application.Platform.runLater(this::updateThemeColors);
-        });
         
         // Create the unified input container (VBox for flat layout)
         inputContainer = new VBox();
@@ -119,7 +108,7 @@ public class NoteInputPanel extends VBox {
         });
         
         // Send button with icon (embedded in bottom-right corner)
-        sendButton = new Button("Send");
+        sendButton = new Button("Keep it");
         sendButton.getStyleClass().addAll("unified-send-button");
         
         // Create paper plane icon (Telegram-style send icon)
@@ -137,17 +126,6 @@ public class NoteInputPanel extends VBox {
         sendButton.setOnAction(e -> handleSend());
         sendButton.disableProperty().bind(noteInput.textProperty().isEmpty());
         
-        // Send Channel status indicator
-        sendChannelIndicator = new Circle(4);
-        sendChannelIndicator.setFill(Color.web("#3FB950")); // Green by default
-        
-        sendChannelLabel = new Label("Send Channel: ✓");
-        sendChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #3FB950;");
-        
-        HBox sendChannelBox = new HBox(6, sendChannelIndicator, sendChannelLabel);
-        sendChannelBox.setAlignment(Pos.CENTER_LEFT);
-        sendChannelBox.getStyleClass().add("send-channel-status");
-        
         // Spacer to push send button to the right
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -157,13 +135,13 @@ public class NoteInputPanel extends VBox {
         statusLabel.getStyleClass().add("unified-status-label");
         statusLabel.setWrapText(true);
         statusLabel.setVisible(false);
-        statusLabel.setMaxWidth(300);
+        statusLabel.setMaxWidth(Double.MAX_VALUE);
         
         // Bottom control bar (flat layout)
         HBox controlBar = new HBox(12);
         controlBar.setAlignment(Pos.CENTER);
         controlBar.setPadding(new Insets(8, 12, 8, 12));
-        controlBar.getChildren().addAll(sendChannelBox, spacer, statusLabel, sendButton);
+        controlBar.getChildren().addAll(spacer, statusLabel, sendButton);
         
         // Assemble container
         VBox.setVgrow(noteInput, Priority.ALWAYS);
@@ -174,11 +152,7 @@ public class NoteInputPanel extends VBox {
         // Allow container to grow with content
         VBox.setVgrow(inputContainer, Priority.ALWAYS);
         
-        // Listen to API service status (simplified - check periodically or on action)
-        setupSendChannelListener();
-        
-        // Initialize theme colors
-        updateThemeColors();
+
     }
     
     /**
@@ -199,45 +173,6 @@ public class NoteInputPanel extends VBox {
             hbar.setVisible(false);
             hbar.setManaged(false);
         }
-    }
-    
-    /**
-     * Setup listener for send channel status
-     */
-    private void setupSendChannelListener() {
-        // Check if settings are configured
-        boolean configured = SettingsService.getInstance().isConfigured();
-        updateSendChannelStatus(configured);
-    }
-    
-    /**
-     * Update send channel status display
-     */
-    public void updateSendChannelStatus(boolean connected) {
-        javafx.application.Platform.runLater(() -> {
-            boolean isDark = ThemeService.getInstance().isDarkTheme();
-            String successColor = isDark ? "#3FB950" : "#1A7F37";
-            String errorColor = isDark ? "#F85149" : "#CF222E";
-            
-            if (connected) {
-                sendChannelIndicator.setFill(Color.web(successColor));
-                sendChannelLabel.setText("Send Channel: ✓");
-                sendChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + successColor + ";");
-            } else {
-                sendChannelIndicator.setFill(Color.web(errorColor));
-                sendChannelLabel.setText("Send Channel: ✗");
-                sendChannelLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + errorColor + ";");
-            }
-        });
-    }
-    
-    /**
-     * Update colors based on current theme
-     */
-    private void updateThemeColors() {
-        // Re-apply current connection status with new theme colors
-        boolean isConnected = SettingsService.getInstance().isConfigured();
-        updateSendChannelStatus(isConnected);
     }
     
     private void handleSend() {

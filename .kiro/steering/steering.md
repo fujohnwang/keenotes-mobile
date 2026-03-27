@@ -16,7 +16,7 @@ inclusion: always
 
 参看 #[[file:api-spec.md]]
 
-## 对于JavaFX程序来说
+## 对于JavaFX程序来说的最佳实践
 
 - 多个地方的状态更新与同步，尽量使用Property这种reactive的方式完成，不要用传统命令式的方式完成（这种会导致代码难以维护）
 - 对于后台任务，建议使用JavaFX提供的Worker/Task/Service支持。 不牵扯UI的后台任务，则可以使用传统线程模型。

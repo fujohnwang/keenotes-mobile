@@ -11,7 +11,7 @@
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="colorError">@color/error</item>
         <item name="android:statusBarColor">@color/surface</item>
-        <item name="android:navigationBarColor">@color/surface</item>
+        <item name="android:navigationBarColor">@color/background</item>
     </style>
 
     <!-- Bottom Navigation Text Styles -->
@@ -31,5 +31,20 @@
         <item name="itemRippleColor">@android:color/transparent</item>
         <item name="itemPaddingTop">0dp</item>
         <item name="itemPaddingBottom">0dp</item>
+    </style>
+
+    <!-- Period Toggle Button: 克制的暗色风格 -->
+    <style name="Widget.KeeNotes.ToggleButton" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="backgroundTint">@color/toggle_button_bg_color</item>
+        <item name="strokeColor">@color/toggle_button_stroke_color</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:textColor">@color/toggle_button_text_color</item>
+        <item name="rippleColor">@color/primary_muted</item>
+    </style>
+
+    <!-- SwitchCompat: 自定义 track/thumb 颜色 -->
+    <style name="Widget.KeeNotes.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="thumbTint">@color/switch_thumb_color</item>
+        <item name="trackTint">@color/switch_track_color</item>
     </style>
 </resources>

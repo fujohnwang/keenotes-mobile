@@ -803,3 +803,25 @@
 .import-section {
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 8, 0, 0, 2);
 }
+
+/* Pending Notes Banner */
+.pending-banner {
+    -fx-background-color: rgba(255, 152, 0, 0.15);
+    -fx-background-radius: 6;
+}
+
+.pending-banner-label {
+    -fx-text-fill: #FFB74D;
+    -fx-font-size: 13px;
+}
+
+.pending-banner-view-button {
+    -fx-text-fill: -fx-primary;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-underline: true;
+}
+
+.pending-banner-view-button:hover {
+    -fx-text-fill: -fx-text-primary;
+}

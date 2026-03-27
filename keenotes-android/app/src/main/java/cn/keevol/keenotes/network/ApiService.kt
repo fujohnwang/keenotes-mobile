@@ -12,6 +12,8 @@ import org.json.JSONObject
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
@@ -81,7 +83,12 @@ class ApiService(
             
             // Encrypt content
             val encrypted = cryptoService.encrypt(content)
-            val ts = LocalDateTime.now().format(TS_FORMATTER)
+            // Generate UTC timestamp: local time -> UTC -> format
+            val ts = LocalDateTime.now()
+                .atZone(ZoneId.systemDefault())
+                .toOffsetDateTime()
+                .withOffsetSameInstant(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
             
             // Build JSON body - match JavaFX format exactly
             val json = JSONObject().apply {
