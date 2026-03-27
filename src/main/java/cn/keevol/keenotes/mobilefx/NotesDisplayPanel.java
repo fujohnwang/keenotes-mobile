@@ -171,6 +171,11 @@ public class NotesDisplayPanel extends VBox {
             public void onOffline() {
                 Platform.runLater(() -> showSyncChannelOffline());
             }
+
+            @Override
+            public void onReconnecting(int attempt, int maxAttempts) {
+                Platform.runLater(() -> showSyncChannelReconnecting(attempt, maxAttempts));
+            }
         });
 
         // Initial status
@@ -221,7 +226,7 @@ public class NotesDisplayPanel extends VBox {
         syncChannelBox.setOnMouseClicked(e -> {
             WebSocketClientService ws = ServiceManager.getInstance().getWebSocketService();
             if (!ws.isConnected()) {
-                showSyncChannelReconnecting();
+                showSyncChannelReconnecting(0, 10);  // 手动重连，显示为第0次尝试
                 ws.manualReconnect();
             }
         });
@@ -281,14 +286,14 @@ public class NotesDisplayPanel extends VBox {
     /**
      * 显示重连中过渡状态
      */
-    private void showSyncChannelReconnecting() {
+    private void showSyncChannelReconnecting(int attempt, int maxAttempts) {
         if (syncChannelIndicator == null || syncChannelLabel == null) {
             return;
         }
         boolean isDark = ThemeService.getInstance().isDarkTheme();
         String reconnectingColor = isDark ? "#D29922" : "#BF8700";
         syncChannelIndicator.setFill(Color.web(reconnectingColor));
-        syncChannelLabel.setText("Sync Channel: reconnecting...");
+        syncChannelLabel.setText("Sync Channel: reconnecting (" + attempt + "/" + maxAttempts + ")");
         syncChannelLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + reconnectingColor + ";");
     }
 
