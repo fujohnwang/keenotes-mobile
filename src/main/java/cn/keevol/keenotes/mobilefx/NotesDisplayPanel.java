@@ -45,6 +45,7 @@ public class NotesDisplayPanel extends VBox {
     // Sync Channel status (long-term)
     private Circle syncChannelIndicator;
     private Label syncChannelLabel;
+    private HBox syncChannelBox;  // Container for sync channel status
 
     // Sync Indicator (transient)
     private ProgressIndicator syncSpinner;
@@ -214,7 +215,7 @@ public class NotesDisplayPanel extends VBox {
         syncChannelLabel = new Label("Sync Channel: ✓");
         syncChannelLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #3FB950;");
 
-        HBox syncChannelBox = new HBox(6, syncChannelIndicator, syncChannelLabel);
+        syncChannelBox = new HBox(6, syncChannelIndicator, syncChannelLabel);
         syncChannelBox.setAlignment(Pos.CENTER);
         syncChannelBox.setCursor(javafx.scene.Cursor.HAND);
         syncChannelBox.setOnMouseClicked(e -> {
@@ -224,6 +225,11 @@ public class NotesDisplayPanel extends VBox {
                 ws.manualReconnect();
             }
         });
+
+        // Bind visibility to settings property
+        SettingsService settings = SettingsService.getInstance();
+        syncChannelBox.visibleProperty().bind(settings.showSyncChannelStatusProperty());
+        syncChannelBox.managedProperty().bind(settings.showSyncChannelStatusProperty());
 
         headerRow.getChildren().addAll(countLabel, syncIndicatorBox, spacer, syncChannelBox);
 

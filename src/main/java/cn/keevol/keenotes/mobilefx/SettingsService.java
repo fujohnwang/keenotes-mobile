@@ -37,6 +37,7 @@ public class SettingsService {
     private static final String KEY_MCP_SERVER_PORT = "mcp.server.port";
     private static final String KEY_MCP_SERVER_ENABLED = "mcp.server.enabled";
     private static final String KEY_HIDDEN_MESSAGE = "hidden.message";
+    private static final String KEY_SHOW_SYNC_CHANNEL_STATUS = "show.sync.channel.status";
 
     private static final int DEFAULT_REVIEW_DAYS = 7;
     private static final String DEFAULT_TAKE_NOTE_SHORTCUT = "Alt+T";
@@ -58,6 +59,7 @@ public class SettingsService {
     // JavaFX Property for reactive binding
     private final BooleanProperty showOverviewCardProperty = new SimpleBooleanProperty(true);
     private final IntegerProperty noteFontSizeProperty = new SimpleIntegerProperty(DEFAULT_NOTE_FONT_SIZE);
+    private final BooleanProperty showSyncChannelStatusProperty = new SimpleBooleanProperty(false);
 
     private SettingsService() {
         properties = new Properties();
@@ -66,6 +68,7 @@ public class SettingsService {
         // Initialize property from loaded settings
         showOverviewCardProperty.set(getShowOverviewCard());
         noteFontSizeProperty.set(getNoteFontSize());
+        showSyncChannelStatusProperty.set(getShowSyncChannelStatus());
     }
 
     public static synchronized SettingsService getInstance() {
@@ -328,5 +331,19 @@ public class SettingsService {
 
     public void setMcpServerEnabled(boolean enabled) {
         properties.setProperty(KEY_MCP_SERVER_ENABLED, String.valueOf(enabled));
+    }
+
+    // Sync Channel Status visibility settings
+    public boolean getShowSyncChannelStatus() {
+        return Boolean.parseBoolean(properties.getProperty(KEY_SHOW_SYNC_CHANNEL_STATUS, "false"));
+    }
+
+    public void setShowSyncChannelStatus(boolean enabled) {
+        properties.setProperty(KEY_SHOW_SYNC_CHANNEL_STATUS, String.valueOf(enabled));
+        showSyncChannelStatusProperty.set(enabled);
+    }
+
+    public BooleanProperty showSyncChannelStatusProperty() {
+        return showSyncChannelStatusProperty;
     }
 }

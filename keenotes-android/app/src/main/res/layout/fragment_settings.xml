@@ -240,6 +240,16 @@
                     android:textSize="14sp"
                     android:padding="12dp" />
 
+                <androidx.appcompat.widget.SwitchCompat
+                    style="@style/Widget.KeeNotes.Switch"
+                    android:id="@+id/showSyncChannelStatusSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Show Sync Channel Status"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:padding="12dp" />
+
             </LinearLayout>
 
             <!-- ========== Card 3: Hidden Watermark ========== -->
