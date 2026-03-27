@@ -101,6 +101,14 @@ class SearchFragment : Fragment() {
     private fun setupSyncChannelStatus() {
         val app = requireActivity().application as KeeNotesApp
         
+        // Observe settings to control visibility
+        lifecycleScope.launch {
+            app.settingsRepository.showSyncChannelStatus.collectLatest { show ->
+                binding.syncIndicator.visibility = if (show) View.VISIBLE else View.GONE
+                binding.syncStatusText.visibility = if (show) View.VISIBLE else View.GONE
+            }
+        }
+        
         // Observe WebSocket connection state
         lifecycleScope.launch {
             app.webSocketService.connectionState.collectLatest { state ->

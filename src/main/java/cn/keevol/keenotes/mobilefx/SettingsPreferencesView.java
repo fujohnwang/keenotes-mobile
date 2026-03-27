@@ -14,6 +14,7 @@ public class SettingsPreferencesView extends VBox {
     private final SettingsService settings;
     private final ToggleSwitch copyToClipboardToggle;
     private final ToggleSwitch showOverviewCardToggle;
+    private final ToggleSwitch showSyncChannelStatusToggle;
     private final ToggleSwitch themeToggle;
     private final KeyCaptureField takeNoteShortcutField;
     private final KeyCaptureField searchShortcutField;
@@ -39,6 +40,13 @@ public class SettingsPreferencesView extends VBox {
         showOverviewCardToggle = new ToggleSwitch();
         showOverviewCardToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
             settings.setShowOverviewCard(newVal);
+            settings.save();
+        });
+
+        // Show Sync Channel Status toggle
+        showSyncChannelStatusToggle = new ToggleSwitch();
+        showSyncChannelStatusToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            settings.setShowSyncChannelStatus(newVal);
             settings.save();
         });
 
@@ -113,6 +121,7 @@ public class SettingsPreferencesView extends VBox {
         getChildren().addAll(
             createToggleRow("Copy to clipboard on post success", copyToClipboardToggle),
             createToggleRow("Show Overview Card", showOverviewCardToggle),
+            createToggleRow("Show Sync Channel Status", showSyncChannelStatusToggle),
             createToggleRow("Light Theme", themeToggle),
             createShortcutRow("Take Note shortcut", takeNoteShortcutField,
                 "Click the field and press your desired key combination (e.g., Alt+T)"),
@@ -166,6 +175,7 @@ public class SettingsPreferencesView extends VBox {
     private void loadSettings() {
         copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
         showOverviewCardToggle.setSelected(settings.getShowOverviewCard());
+        showSyncChannelStatusToggle.setSelected(settings.getShowSyncChannelStatus());
         themeToggle.setSelected(ThemeService.getInstance().getCurrentTheme() == ThemeService.Theme.LIGHT);
         takeNoteShortcutField.setShortcut(settings.getTakeNoteShortcut());
         searchShortcutField.setShortcut(settings.getSearchShortcut());

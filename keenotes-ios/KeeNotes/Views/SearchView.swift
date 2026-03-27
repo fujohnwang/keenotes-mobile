@@ -31,20 +31,22 @@ struct SearchView: View {
 
                     Spacer()
 
-                    // Sync Channel status (right)
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(syncChannelColor)
-                            .frame(width: 8, height: 8)
+                    // Sync Channel status (right) - conditionally visible
+                    if appState.settingsService.showSyncChannelStatus {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(syncChannelColor)
+                                .frame(width: 8, height: 8)
 
-                        Text("Sync Channel:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            Text("Sync Channel:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
 
-                        Text(syncChannelText)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(syncChannelColor)
+                            Text(syncChannelText)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(syncChannelColor)
+                        }
                     }
                 }
                 .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))

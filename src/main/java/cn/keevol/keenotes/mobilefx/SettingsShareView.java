@@ -6,7 +6,10 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 
 /**
  * Share settings view — Hidden Watermark configuration.
@@ -26,11 +29,29 @@ public class SettingsShareView extends VBox {
 
         // Section title
         Label sectionTitle = new Label("Hidden Watermark");
-        sectionTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-text-primary;");
+        sectionTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-text-primary;");
 
-        Label sectionHint = new Label("When set, an invisible watermark is embedded into copied note content for traceability.");
-        sectionHint.getStyleClass().add("field-hint");
-        sectionHint.setWrapText(true);
+//        Label sectionHint = new Label("When set, an invisible watermark is embedded into copied note content for traceability.");
+//        sectionHint.getStyleClass().add("field-hint");
+//        sectionHint.setWrapText(true);
+
+        // Verification tool info
+
+        Hyperlink verifyLink = new Hyperlink("When set, an invisible watermark is embedded into copied note content for traceability. Validate with => https://www.promptfoo.dev/blog/invisible-unicode-threats/");
+        verifyLink.getStyleClass().add("field-hint");
+        verifyLink.setStyle("-fx-padding: 0; -fx-border-width: 0;");
+        verifyLink.setWrapText(true);
+        verifyLink.setOnAction(e -> {
+            try {
+                java.awt.Desktop.getDesktop().browse(
+                    new java.net.URI("https://www.promptfoo.dev/blog/invisible-unicode-threats/")
+                );
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+
+        HBox infoRow = createFieldRow("", verifyLink);
 
         // Hidden message field
         hiddenMessageField = new TextField();
@@ -68,12 +89,12 @@ public class SettingsShareView extends VBox {
         HBox statusRow = new HBox(16, statusSpacer, statusLabel);
         statusRow.setAlignment(Pos.CENTER_LEFT);
 
-        getChildren().addAll(sectionTitle, sectionHint, fieldRow, saveRow, statusRow);
+        getChildren().addAll(sectionTitle, infoRow, fieldRow, saveRow, statusRow);
 
         loadSettings();
     }
 
-    private HBox createFieldRow(String labelText, Control field) {
+    private HBox createFieldRow(String labelText, Region field) {
         Label label = new Label(labelText);
         label.getStyleClass().add("field-label");
         label.setMinWidth(259);
