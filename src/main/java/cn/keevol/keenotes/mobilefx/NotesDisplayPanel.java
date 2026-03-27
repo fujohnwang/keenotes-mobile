@@ -45,6 +45,7 @@ public class NotesDisplayPanel extends VBox {
     // Sync Channel status (long-term)
     private Circle syncChannelIndicator;
     private Label syncChannelLabel;
+    private HBox syncChannelBox;  // Container for sync channel status
 
     // Sync Indicator (transient)
     private ProgressIndicator syncSpinner;
@@ -170,6 +171,11 @@ public class NotesDisplayPanel extends VBox {
             public void onOffline() {
                 Platform.runLater(() -> showSyncChannelOffline());
             }
+
+            @Override
+            public void onReconnecting(int attempt, int maxAttempts) {
+                Platform.runLater(() -> showSyncChannelReconnecting(attempt, maxAttempts));
+            }
         });
 
         // Initial status
@@ -214,16 +220,21 @@ public class NotesDisplayPanel extends VBox {
         syncChannelLabel = new Label("Sync Channel: ✓");
         syncChannelLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #3FB950;");
 
-        HBox syncChannelBox = new HBox(6, syncChannelIndicator, syncChannelLabel);
+        syncChannelBox = new HBox(6, syncChannelIndicator, syncChannelLabel);
         syncChannelBox.setAlignment(Pos.CENTER);
         syncChannelBox.setCursor(javafx.scene.Cursor.HAND);
         syncChannelBox.setOnMouseClicked(e -> {
             WebSocketClientService ws = ServiceManager.getInstance().getWebSocketService();
             if (!ws.isConnected()) {
-                showSyncChannelReconnecting();
+                showSyncChannelReconnecting(0, 10);  // 手动重连，显示为第0次尝试
                 ws.manualReconnect();
             }
         });
+
+        // Bind visibility to settings property
+        SettingsService settings = SettingsService.getInstance();
+        syncChannelBox.visibleProperty().bind(settings.showSyncChannelStatusProperty());
+        syncChannelBox.managedProperty().bind(settings.showSyncChannelStatusProperty());
 
         headerRow.getChildren().addAll(countLabel, syncIndicatorBox, spacer, syncChannelBox);
 
@@ -275,14 +286,14 @@ public class NotesDisplayPanel extends VBox {
     /**
      * 显示重连中过渡状态
      */
-    private void showSyncChannelReconnecting() {
+    private void showSyncChannelReconnecting(int attempt, int maxAttempts) {
         if (syncChannelIndicator == null || syncChannelLabel == null) {
             return;
         }
         boolean isDark = ThemeService.getInstance().isDarkTheme();
         String reconnectingColor = isDark ? "#D29922" : "#BF8700";
         syncChannelIndicator.setFill(Color.web(reconnectingColor));
-        syncChannelLabel.setText("Sync Channel: reconnecting...");
+        syncChannelLabel.setText("Sync Channel: reconnecting (" + attempt + "/" + maxAttempts + ")");
         syncChannelLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + reconnectingColor + ";");
     }
 

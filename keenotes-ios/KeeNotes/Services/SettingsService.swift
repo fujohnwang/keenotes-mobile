@@ -18,6 +18,7 @@ class SettingsService: ObservableObject {
         static let autoStartDictation = "auto_start_dictation"
         static let confettiOnPostSuccess = "confetti_on_post_success"
         static let hiddenMessage = "hidden_message"
+        static let showSyncChannelStatus = "show_sync_channel_status"
     }
     
     @Published var endpointUrl: String {
@@ -72,6 +73,12 @@ class SettingsService: ObservableObject {
         }
     }
     
+    @Published var showSyncChannelStatus: Bool {
+        didSet {
+            defaults.set(showSyncChannelStatus, forKey: Keys.showSyncChannelStatus)
+        }
+    }
+    
     @Published var firstNoteDate: String? {
         didSet {
             print("[SettingsService] firstNoteDate didSet: old=\(oldValue ?? "nil"), new=\(firstNoteDate ?? "nil")")
@@ -98,6 +105,7 @@ class SettingsService: ObservableObject {
         self.autoStartDictation = defaults.object(forKey: Keys.autoStartDictation) == nil ? false : defaults.bool(forKey: Keys.autoStartDictation)
         self.confettiOnPostSuccess = defaults.object(forKey: Keys.confettiOnPostSuccess) == nil ? true : defaults.bool(forKey: Keys.confettiOnPostSuccess)
         self.hiddenMessage = defaults.string(forKey: Keys.hiddenMessage) ?? ""
+        self.showSyncChannelStatus = defaults.object(forKey: Keys.showSyncChannelStatus) == nil ? false : defaults.bool(forKey: Keys.showSyncChannelStatus)
         self.firstNoteDate = defaults.string(forKey: Keys.firstNoteDate)
     }
     

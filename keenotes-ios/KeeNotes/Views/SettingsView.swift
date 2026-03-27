@@ -131,6 +131,11 @@ struct SettingsView: View {
                         get: { appState.settingsService.confettiOnPostSuccess },
                         set: { appState.settingsService.confettiOnPostSuccess = $0 }
                     ))
+
+                    Toggle("Show Sync Channel Status", isOn: Binding(
+                        get: { appState.settingsService.showSyncChannelStatus },
+                        set: { appState.settingsService.showSyncChannelStatus = $0 }
+                    ))
                 }
                 .font(.system(size: isPad ? 17 : 17))
 

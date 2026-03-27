@@ -623,6 +623,9 @@ public class WebSocketClientService {
         logger.info("Scheduling reconnect in " + delay + "ms (attempt " + reconnectAttempts + "/"
                 + MAX_RECONNECT_ATTEMPTS + ")");
 
+        // 通知 UI 进入重连状态
+        notifyReconnecting(reconnectAttempts, MAX_RECONNECT_ATTEMPTS);
+
         if (reconnectScheduler == null) {
             reconnectScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "WebSocket-Reconnect");
@@ -759,6 +762,10 @@ public class WebSocketClientService {
         listeners.forEach(SyncListener::onOffline);
     }
 
+    private void notifyReconnecting(int attempt, int maxAttempts) {
+        listeners.forEach(l -> l.onReconnecting(attempt, maxAttempts));
+    }
+
     public boolean isConnected() {
         return isConnected.get();
     }
@@ -787,6 +794,9 @@ public class WebSocketClientService {
 
         /** 重连耗尽后进入离线状态 */
         default void onOffline() {}
+
+        /** 正在重连中 */
+        default void onReconnecting(int attempt, int maxAttempts) {}
     }
 
     /**
