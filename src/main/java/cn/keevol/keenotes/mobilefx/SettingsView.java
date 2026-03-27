@@ -14,7 +14,7 @@ public class SettingsView extends BorderPane {
 
     private final Runnable onBack;
     private final StackPane contentArea;
-    
+
     // Sub views
     private VBox generalView;
     private VBox preferencesView;
@@ -22,7 +22,7 @@ public class SettingsView extends BorderPane {
     private VBox shareView;
     private VBox dataImportView;
     private VBox debugView;
-    
+
     private VBox currentView;
 
     public SettingsView(Runnable onBack) {
@@ -33,7 +33,7 @@ public class SettingsView extends BorderPane {
 
         // Content area (stack pane for view switching)
         contentArea = new StackPane();
-        
+
         // Create sub views
         generalView = new SettingsGeneralView(this::handleSaveSuccess);
         preferencesView = new SettingsPreferencesView();
@@ -41,10 +41,10 @@ public class SettingsView extends BorderPane {
         shareView = new SettingsShareView();
         dataImportView = new DataImportView();
         debugView = createDebugView();
-        
+
         // Add all views to content area
-        contentArea.getChildren().addAll(generalView, preferencesView, aiView, shareView, dataImportView, debugView);
-        
+        contentArea.getChildren().addAll(generalView, preferencesView, aiView, dataImportView, shareView, debugView);
+
         // Initially show general view
         generalView.setVisible(true);
         preferencesView.setVisible(false);
@@ -52,9 +52,9 @@ public class SettingsView extends BorderPane {
         shareView.setVisible(false);
         dataImportView.setVisible(false);
         debugView.setVisible(false);
-        
+
         currentView = generalView;
-        
+
         ScrollPane scrollPane = new ScrollPane(contentArea);
         scrollPane.setFitToWidth(true);
         scrollPane.getStyleClass().add("content-scroll");
@@ -63,7 +63,7 @@ public class SettingsView extends BorderPane {
         // Footer
         setBottom(createFooter());
     }
-    
+
     /**
      * Switch to a sub view
      */
@@ -76,32 +76,32 @@ public class SettingsView extends BorderPane {
             case "Data Import" -> dataImportView;
             default -> generalView;
         };
-        
+
         if (targetView == currentView) {
             return;
         }
-        
+
         // Fade out current view
         FadeTransition fadeOut = new FadeTransition(Duration.millis(150), currentView);
         fadeOut.setFromValue(1.0);
         fadeOut.setToValue(0.0);
         fadeOut.setOnFinished(e -> {
             currentView.setVisible(false);
-            
+
             // Fade in target view
             targetView.setVisible(true);
             targetView.setOpacity(0.0);
-            
+
             FadeTransition fadeIn = new FadeTransition(Duration.millis(150), targetView);
             fadeIn.setFromValue(0.0);
             fadeIn.setToValue(1.0);
             fadeIn.play();
-            
+
             currentView = targetView;
         });
         fadeOut.play();
     }
-    
+
     private VBox createFooter() {
         // Copyright footer
         Label copyrightLabel = new Label("©2025 王福强(Fuqiang Wang)  All Rights Reserved");
@@ -122,14 +122,14 @@ public class SettingsView extends BorderPane {
                 // Switch to debug view
                 debugView.setVisible(true);
                 debugView.setOpacity(0.0);
-                
+
                 currentView.setVisible(false);
-                
+
                 FadeTransition fadeIn = new FadeTransition(Duration.millis(150), debugView);
                 fadeIn.setFromValue(0.0);
                 fadeIn.setToValue(1.0);
                 fadeIn.play();
-                
+
                 currentView = debugView;
             }
         });
@@ -142,10 +142,10 @@ public class SettingsView extends BorderPane {
         footer.setAlignment(Pos.CENTER);
         footer.setPadding(new Insets(12, 0, 12, 0));
         footer.getStyleClass().add("footer-fixed");
-        
+
         return footer;
     }
-    
+
     private VBox createDebugView() {
         VBox debugSection = new VBox(12);
         debugSection.setAlignment(Pos.CENTER);
@@ -158,16 +158,16 @@ public class SettingsView extends BorderPane {
         clearDataButton.getStyleClass().addAll("action-button");
         clearDataButton.setMaxWidth(300);
         clearDataButton.setOnAction(e -> clearLocalData());
-        
+
         Label statusLabel = new Label();
         statusLabel.getStyleClass().add("status-label");
 
         debugSection.getChildren().addAll(debugLabel, clearDataButton, statusLabel);
         debugSection.setUserData(statusLabel); // Store reference for clearLocalData
-        
+
         return debugSection;
     }
-    
+
     private void clearLocalData() {
         Label statusLabel = (Label) debugView.getUserData();
         statusLabel.setText("Clearing local data...");
@@ -206,7 +206,7 @@ public class SettingsView extends BorderPane {
             }
         }, "ClearLocalData").start();
     }
-    
+
     private void handleSaveSuccess() {
         onBack.run();
     }
