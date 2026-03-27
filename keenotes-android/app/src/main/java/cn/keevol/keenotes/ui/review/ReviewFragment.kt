@@ -110,6 +110,16 @@ class ReviewFragment : Fragment() {
     private fun setupSyncChannelStatus() {
         val app = requireActivity().application as KeeNotesApp
         
+        // Observe settings to control visibility
+        viewLifecycleOwner.lifecycleScope.launch {
+            app.settingsRepository.showSyncChannelStatus.collectLatest { show ->
+                if (_binding != null) {
+                    binding.syncIndicator.visibility = if (show) View.VISIBLE else View.GONE
+                    binding.syncStatusText.visibility = if (show) View.VISIBLE else View.GONE
+                }
+            }
+        }
+        
         // Observe WebSocket connection state
         viewLifecycleOwner.lifecycleScope.launch {
             app.webSocketService.connectionState.collectLatest { state ->
