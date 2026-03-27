@@ -115,6 +115,7 @@ class ReviewFragment : Fragment() {
             app.settingsRepository.showSyncChannelStatus.collectLatest { show ->
                 if (_binding != null) {
                     binding.syncIndicator.visibility = if (show) View.VISIBLE else View.GONE
+                    binding.syncChannelLabel.visibility = if (show) View.VISIBLE else View.GONE
                     binding.syncStatusText.visibility = if (show) View.VISIBLE else View.GONE
                 }
             }
