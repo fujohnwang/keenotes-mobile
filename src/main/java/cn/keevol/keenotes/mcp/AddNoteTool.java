@@ -1,9 +1,8 @@
 package cn.keevol.keenotes.mcp;
 
 import cn.keevol.keenotes.mobilefx.ApiServiceV2;
+import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -12,10 +11,7 @@ import java.util.concurrent.CompletableFuture;
  * MCP Tool for adding notes to KeeNotes
  */
 public class AddNoteTool {
-    
-    private static final DateTimeFormatter TIMESTAMP_FORMATTER = 
-        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    
+
     private final ApiServiceV2 apiService;
     
     public AddNoteTool(ApiServiceV2 apiService) {
@@ -39,8 +35,8 @@ public class AddNoteTool {
             );
         }
         
-        // Generate timestamp
-        String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMATTER);
+        // Generate timestamp (UTC)
+        String timestamp = DateTimeUtil.getCurrentUtcTimestamp();
         
         try {
             CompletableFuture<ApiServiceV2.ApiResult> future;

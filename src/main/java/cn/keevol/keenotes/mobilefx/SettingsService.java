@@ -23,6 +23,7 @@ public class SettingsService {
     private static final String KEY_REVIEW_DAYS = "review.days";
     private static final String KEY_ENCRYPTION_PASSWORD = "encryption.password";
     private static final String KEY_COPY_TO_CLIPBOARD = "copy.to.clipboard.on.post";
+
     private static final String KEY_SEARCH_SHORTCUT = "shortcut.search";
     private static final String KEY_SEND_SHORTCUT = "shortcut.send";
     private static final String KEY_SHOW_OVERVIEW_CARD = "show.overview.card";
@@ -30,12 +31,15 @@ public class SettingsService {
     private static final String KEY_THEME = "ui.theme";
     private static final String KEY_NOTE_FONT_SIZE = "note.font.size";
     private static final String KEY_ZOOM_IN_SHORTCUT = "shortcut.zoom.in";
+    private static final String KEY_TAKE_NOTE_SHORTCUT = "shortcut.take.note";
     private static final String KEY_ZOOM_OUT_SHORTCUT = "shortcut.zoom.out";
     private static final String KEY_LOCAL_IMPORT_SERVER_PORT = "local.import.server.port";
     private static final String KEY_MCP_SERVER_PORT = "mcp.server.port";
     private static final String KEY_MCP_SERVER_ENABLED = "mcp.server.enabled";
+    private static final String KEY_HIDDEN_MESSAGE = "hidden.message";
 
     private static final int DEFAULT_REVIEW_DAYS = 7;
+    private static final String DEFAULT_TAKE_NOTE_SHORTCUT = "Alt+T";
     private static final String DEFAULT_SEARCH_SHORTCUT = "Alt+Shift+S";
     private static final String DEFAULT_SEND_SHORTCUT = "Alt+Enter";
     private static final String DEFAULT_THEME = "dark";
@@ -182,6 +186,24 @@ public class SettingsService {
 
     public void setCopyToClipboardOnPost(boolean enabled) {
         properties.setProperty(KEY_COPY_TO_CLIPBOARD, String.valueOf(enabled));
+    }
+
+
+
+    public String getHiddenMessage() {
+        return properties.getProperty(KEY_HIDDEN_MESSAGE, "");
+    }
+
+    public void setHiddenMessage(String message) {
+        properties.setProperty(KEY_HIDDEN_MESSAGE, message != null ? message : "");
+    }
+
+    public String getTakeNoteShortcut() {
+        return properties.getProperty(KEY_TAKE_NOTE_SHORTCUT, DEFAULT_TAKE_NOTE_SHORTCUT);
+    }
+
+    public void setTakeNoteShortcut(String shortcut) {
+        properties.setProperty(KEY_TAKE_NOTE_SHORTCUT, shortcut);
     }
 
     public String getSearchShortcut() {

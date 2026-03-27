@@ -7,58 +7,54 @@ struct OverviewCardView: View {
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
-    private var cardHeight: CGFloat { isPad ? 112 : 88 }
+    private var cardHeight: CGFloat { isPad ? 80 : 60 }
     private var cardPadding: CGFloat { isPad ? 16 : 12 }
-    private var numberFontSize: CGFloat { isPad ? 42 : 32 }
-    private var labelFontSize: CGFloat { isPad ? 10 : 8 }
+    private var numberFontSize: CGFloat { isPad ? 32 : 24 }
+    private var labelFontSize: CGFloat { isPad ? 11 : 9 }
     
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         HStack(spacing: 0) {
             // Total Notes
-            VStack(spacing: 1) {
+            VStack(spacing: 2) {
                 Text("\(appState.databaseService.noteCount)")
-                    .font(.system(size: numberFontSize, weight: .bold))
-                    .foregroundColor(.blue)
+                    .font(Theme.statNumberFont(size: numberFontSize))
+                    .foregroundColor(Theme.brandColor)
 
                 Text("Total Notes")
-                    .font(.system(size: labelFontSize))
+                    .font(Theme.statLabelFont(size: labelFontSize))
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity)
 
             // Divider
             Rectangle()
-                .fill(Color.secondary.opacity(0.2))
+                .fill(Color.secondary.opacity(0.15))
                 .frame(width: 1)
-                .padding(.vertical, 2)
+                .padding(.vertical, 8)
 
             // Days Using
-            VStack(spacing: 1) {
+            VStack(spacing: 2) {
                 Text("\(daysUsing)")
-                    .font(.system(size: numberFontSize, weight: .bold))
-                    .foregroundColor(.blue)
+                    .font(Theme.statNumberFont(size: numberFontSize))
+                    .foregroundColor(Theme.brandColor)
 
                 Text("Days Using")
-                    .font(.system(size: labelFontSize))
+                    .font(Theme.statLabelFont(size: labelFontSize))
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity)
         }
         .frame(height: cardHeight)
         .padding(.horizontal, cardPadding)
-        .background(Color(.systemBackground))
-        .cornerRadius(DeviceType.cornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
-                .stroke(Color(.systemGray4), lineWidth: 1)
-        )
         .onAppear {
             updateDaysUsing()
             // Initialize first note date if needed and there are notes
             if appState.databaseService.noteCount > 0 {
                 Task {
                     if let oldestDate = try? await getOldestNoteDate() {
-                        appState.settingsService.firstNoteDate = oldestDate
+                        updateFirstNoteDateIfChanged(oldestDate)
                     }
                 }
             }
@@ -71,7 +67,7 @@ struct OverviewCardView: View {
                     print("[OverviewCard] Querying oldest note date...")
                     if let oldestDate = try? await getOldestNoteDate() {
                         print("[OverviewCard] Found oldest date: \(oldestDate), updating firstNoteDate")
-                        appState.settingsService.firstNoteDate = oldestDate
+                        updateFirstNoteDateIfChanged(oldestDate)
                     } else {
                         print("[OverviewCard] Failed to get oldest date")
                     }
@@ -147,5 +143,13 @@ struct OverviewCardView: View {
         return try await dbQueue.read { db in
             try String.fetchOne(db, sql: "SELECT MIN(createdAt) FROM notes")
         }
+    }
+    
+    /// Only update firstNoteDate when the value actually changes, to avoid
+    /// unnecessary @Published notifications that trigger SwiftUI view re-evaluation
+    /// and can interrupt IME composing sessions.
+    private func updateFirstNoteDateIfChanged(_ newValue: String) {
+        guard appState.settingsService.firstNoteDate != newValue else { return }
+        appState.settingsService.firstNoteDate = newValue
     }
 }

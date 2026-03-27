@@ -1,5 +1,6 @@
 package cn.keevol.keenotes.mobilefx;
 
+import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
 import javafx.application.Platform;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -173,7 +174,7 @@ public class LocalCacheService {
             // Desktop: 使用标准 DriverManager
             Class.forName("org.sqlite.JDBC");
             connection = DriverManager.getConnection(jdbcUrl);
-            
+
             // 通过 PRAGMA 语句设置 SQLite 优化参数（而不是在 URL 中拼接）
             initStep = "setting SQLite pragmas";
             Statement pragmaStmt = connection.createStatement();
@@ -217,6 +218,15 @@ public class LocalCacheService {
 
             stmt.executeUpdate(
                     "INSERT OR IGNORE INTO sync_state (id, last_sync_id) VALUES (1, -1)");
+
+            // 离线暂存表：网络不可用时暂存未发送的笔记
+            stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS pending_notes (" +
+                            "  id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                            "  content TEXT NOT NULL, " +
+                            "  channel TEXT DEFAULT 'desktop', " +
+                            "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                            ")");
 
             stmt.close();
             initStep = "completed";
@@ -477,19 +487,20 @@ public class LocalCacheService {
             pstmt.setInt(1, days);
             pstmt.setInt(2, limit);
             pstmt.setInt(3, offset);
-            ResultSet rs = pstmt.executeQuery();
-
-            while (rs.next()) {
-                results.add(new NoteData(
-                        rs.getLong("id"),
-                        rs.getString("content"),
-                        rs.getString("channel"),
-                        rs.getString("created_at"),
-                        null
-                ));
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    results.add(new NoteData(
+                            rs.getLong("id"),
+                            rs.getString("content"),
+                            rs.getString("channel"),
+                            rs.getString("created_at"),
+                            null
+                    ));
+                }
             }
         } catch (SQLException e) {
             // Get paged review notes failed
+            e.printStackTrace();
         }
         return results;
     }
@@ -506,10 +517,10 @@ public class LocalCacheService {
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setInt(1, days);
-            ResultSet rs = pstmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
             }
         } catch (SQLException e) {
             // Get review notes count failed
@@ -562,6 +573,87 @@ public class LocalCacheService {
             refreshNoteCount();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to clear cache data", e);
+        }
+    }
+
+    // ==================== Pending Notes (离线暂存) ====================
+
+    // Reactive property for pending note count
+    private final IntegerProperty pendingNoteCountProperty = new SimpleIntegerProperty(0);
+
+    public IntegerProperty pendingNoteCountProperty() {
+        return pendingNoteCountProperty;
+    }
+
+    private void refreshPendingNoteCount() {
+        int count = getPendingNoteCount();
+        Platform.runLater(() -> pendingNoteCountProperty.set(count));
+    }
+
+    public void insertPendingNote(String content, String channel) throws SQLException {
+        ensureInitialized();
+        String sql = "INSERT INTO pending_notes (content, channel, created_at) VALUES (?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, content);
+            pstmt.setString(2, channel);
+            pstmt.setString(3, DateTimeUtil.getCurrentUtcTimestamp());
+            pstmt.executeUpdate();
+        }
+        refreshPendingNoteCount();
+    }
+
+    public List<PendingNoteData> getPendingNotes() {
+        ensureInitialized();
+        List<PendingNoteData> notes = new ArrayList<>();
+        String sql = "SELECT id, content, channel, created_at FROM pending_notes ORDER BY created_at ASC";
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                notes.add(new PendingNoteData(
+                        rs.getLong("id"),
+                        rs.getString("content"),
+                        rs.getString("channel"),
+                        rs.getString("created_at")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return notes;
+    }
+
+    public void deletePendingNote(long id) throws SQLException {
+        ensureInitialized();
+        String sql = "DELETE FROM pending_notes WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setLong(1, id);
+            pstmt.executeUpdate();
+        }
+        refreshPendingNoteCount();
+    }
+
+    public int getPendingNoteCount() {
+        ensureInitialized();
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM pending_notes")) {
+            if (rs.next()) return rs.getInt(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public static class PendingNoteData {
+        public final long id;
+        public final String content;
+        public final String channel;
+        public final String createdAt;
+
+        public PendingNoteData(long id, String content, String channel, String createdAt) {
+            this.id = id;
+            this.content = content;
+            this.channel = channel;
+            this.createdAt = createdAt;
         }
     }
 

@@ -24,6 +24,7 @@ public class WebSocketClientService {
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
     private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
     private final AtomicBoolean isInitialized = new AtomicBoolean(false);
+    private final AtomicBoolean isOffline = new AtomicBoolean(false);
 
     // 服务依赖
     private final LocalCacheService localCache;
@@ -40,6 +41,13 @@ public class WebSocketClientService {
     // 重连定时器
     private ScheduledExecutorService reconnectScheduler;
     private ScheduledFuture<?> reconnectTask;
+
+    // 心跳
+    private static final int HEARTBEAT_INTERVAL_SEC = 30;
+    private static final int HEARTBEAT_TIMEOUT_SEC = 75; // 超过此时间没收到任何消息则判定为僵尸连接
+    private ScheduledExecutorService heartbeatScheduler;
+    private ScheduledFuture<?> heartbeatTask;
+    private volatile long lastMessageTime = 0;
 
     // 回调监听器
     private final List<SyncListener> listeners = new CopyOnWriteArrayList<>();
@@ -67,13 +75,19 @@ public class WebSocketClientService {
         logger.info("Initializing OkHttp...");
 
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
-                .connectTimeout(3, TimeUnit.SECONDS) // 连接超时3秒
-                .readTimeout(5, TimeUnit.SECONDS) // 读取超时5秒
-                .writeTimeout(5, TimeUnit.SECONDS) // 写入超时5秒
-                // 禁用协议层ping/pong，使用服务器的应用层心跳
-                // .pingInterval(30, TimeUnit.SECONDS) // 禁用：Armeria服务器不支持自动回复
-                .retryOnConnectionFailure(false) // 我们自己处理重连逻辑
-                .connectionPool(new ConnectionPool(0, 5, TimeUnit.SECONDS)); // 无空闲连接，5秒清理
+                .proxySelector(new java.net.ProxySelector() {
+                    @Override
+                    public java.util.List<java.net.Proxy> select(java.net.URI uri) {
+                        return java.util.Collections.singletonList(java.net.Proxy.NO_PROXY);
+                    }
+                    @Override
+                    public void connectFailed(java.net.URI uri, java.net.SocketAddress sa, java.io.IOException ioe) {}
+                })
+                .connectTimeout(3, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.SECONDS)
+                .writeTimeout(5, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(false)
+                .connectionPool(new ConnectionPool(0, 5, TimeUnit.SECONDS));
 
         if (ssl) {
             // 信任所有证书（仅用于开发/测试环境）
@@ -185,11 +199,10 @@ public class WebSocketClientService {
                 reconnectAttempts = 0;
 
                 sendHandshake();
-                // 保留应用层ping/pong响应能力，但不主动发送ping
-                // 服务器会主动发送ping，我们只需要响应pong
+                startHeartbeat();
                 notifyConnectionStatus(true);
 
-                logger.info("WebSocket connected successfully (application-level ping/pong)");
+                logger.info("WebSocket connected successfully");
             }
 
             @Override
@@ -264,6 +277,17 @@ public class WebSocketClientService {
         }
         cleanup();
     }
+    /**
+     * 手动重连 - 用户主动触发，重置重试计数器后发起连接
+     */
+    public void manualReconnect() {
+        if (isShuttingDown.get()) {
+            return;
+        }
+        reconnectAttempts = 0;
+        isOffline.set(false);
+        connect();
+    }
 
     /**
      * 发送新笔记到服务器
@@ -306,6 +330,9 @@ public class WebSocketClientService {
         try {
             logger.info("Received message: " + message);
 
+            // 每次收到消息都更新时间戳，用于心跳超时检测
+            lastMessageTime = System.currentTimeMillis();
+
             JsonObject json = new JsonObject(message);
             String type = json.getString("type");
 
@@ -335,7 +362,7 @@ public class WebSocketClientService {
                     }
                     break;
                 case "pong":
-                    // 服务器对我们ping的响应（实际不会发生，因为服务器不主动ping）
+                    // 服务器对我们ping的响应，lastMessageTime已在上面更新
                     logger.fine("Received pong from server");
                     break;
                 case "error":
@@ -506,6 +533,69 @@ public class WebSocketClientService {
     }
 
     /**
+     * 启动应用层心跳：每30秒发一次ping，超过75秒没收到任何消息则判定僵尸连接并重连
+     */
+    private void startHeartbeat() {
+        stopHeartbeat();
+        lastMessageTime = System.currentTimeMillis();
+
+        if (heartbeatScheduler == null || heartbeatScheduler.isShutdown()) {
+            heartbeatScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "WebSocket-Heartbeat");
+                t.setDaemon(true);
+                return t;
+            });
+        }
+
+        heartbeatTask = heartbeatScheduler.scheduleAtFixedRate(() -> {
+            if (isShuttingDown.get() || !isConnected.get()) return;
+
+            long silentMs = System.currentTimeMillis() - lastMessageTime;
+            if (silentMs > HEARTBEAT_TIMEOUT_SEC * 1000L) {
+                logger.warning("Heartbeat timeout (" + silentMs + "ms silent), forcing reconnect...");
+                forceReconnect();
+                return;
+            }
+
+            // 发送应用层ping
+            WebSocket ws = webSocket;
+            if (ws != null) {
+                boolean sent = ws.send("{\"type\":\"ping\"}");
+                logger.fine("Sent heartbeat ping (silent " + silentMs + "ms)");
+                if (!sent) {
+                    logger.warning("Failed to send heartbeat ping, forcing reconnect...");
+                    forceReconnect();
+                }
+            }
+        }, HEARTBEAT_INTERVAL_SEC, HEARTBEAT_INTERVAL_SEC, TimeUnit.SECONDS);
+
+        logger.info("Heartbeat started");
+    }
+
+    private void stopHeartbeat() {
+        if (heartbeatTask != null) {
+            heartbeatTask.cancel(true);
+            heartbeatTask = null;
+        }
+    }
+
+    /**
+     * 强制断开并触发重连（用于僵尸连接检测）
+     */
+    private void forceReconnect() {
+        WebSocket ws = webSocket;
+        if (ws != null) {
+            ws.cancel();
+            webSocket = null;
+        }
+        isConnected.set(false);
+        isConnecting.set(false);
+        notifyConnectionStatus(false);
+        cleanup();
+        scheduleReconnect();
+    }
+
+    /**
      * 安排重连 - 使用ScheduledExecutorService
      */
     private void scheduleReconnect() {
@@ -515,8 +605,9 @@ public class WebSocketClientService {
         }
 
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            logger.warning("Max reconnect attempts reached");
-            notifyError("Max reconnect attempts reached");
+            logger.warning("Max reconnect attempts reached, entering offline mode");
+            isOffline.set(true);
+            notifyOffline();
             return;
         }
 
@@ -553,6 +644,8 @@ public class WebSocketClientService {
      * 清理资源
      */
     private void cleanup() {
+        stopHeartbeat();
+
         if (reconnectTask != null) {
             reconnectTask.cancel(true);
             reconnectTask = null;
@@ -576,6 +669,12 @@ public class WebSocketClientService {
         isConnected.set(false);
 
         // 2. 立即取消定时任务（不等待）
+        stopHeartbeat();
+        if (heartbeatScheduler != null) {
+            heartbeatScheduler.shutdownNow();
+            heartbeatScheduler = null;
+        }
+
         if (reconnectTask != null) {
             reconnectTask.cancel(true); // 中断正在执行的任务
             reconnectTask = null;
@@ -656,12 +755,20 @@ public class WebSocketClientService {
         listeners.forEach(l -> l.onError(message));
     }
 
+    private void notifyOffline() {
+        listeners.forEach(SyncListener::onOffline);
+    }
+
     public boolean isConnected() {
         return isConnected.get();
     }
 
     public boolean isSyncing() {
         return isSyncing.get();
+    }
+
+    public boolean isOffline() {
+        return isOffline.get();
     }
 
     /**
@@ -677,29 +784,39 @@ public class WebSocketClientService {
         void onRealtimeUpdate(long id, String content);
 
         void onError(String message);
+
+        /** 重连耗尽后进入离线状态 */
+        default void onOffline() {}
     }
 
     /**
      * 简单日志包装
      */
     static class Logger {
+        private final java.util.logging.Logger delegate;
+
+        private Logger(java.util.logging.Logger delegate) {
+            this.delegate = delegate;
+        }
+
         public static Logger getLogger(String name) {
-            return new Logger();
+            return new Logger(AppLogger.getLogger(name));
         }
 
         public void info(String msg) {
-            System.out.println("[INFO] " + msg);
+            delegate.info(msg);
         }
 
         public void warning(String msg) {
-            System.err.println("[WARN] " + msg);
+            delegate.warning(msg);
         }
 
         public void severe(String msg) {
-            System.err.println("[ERROR] " + msg);
+            delegate.severe(msg);
         }
 
         public void fine(String msg) {
-            /* debug level, skip */ }
+            delegate.fine(msg);
+        }
     }
 }

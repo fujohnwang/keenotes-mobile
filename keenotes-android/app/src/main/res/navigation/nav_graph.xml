@@ -15,6 +15,13 @@
             app:exitAnim="@anim/slide_out_left"
             app:popEnterAnim="@anim/slide_in_left"
             app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_note_to_pending"
+            app:destination="@id/pendingNotesFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
     </fragment>
 
     <fragment
@@ -57,5 +64,10 @@
         android:id="@+id/searchFragment"
         android:name="cn.keevol.keenotes.ui.search.SearchFragment"
         android:label="Search" />
+
+    <fragment
+        android:id="@+id/pendingNotesFragment"
+        android:name="cn.keevol.keenotes.ui.note.PendingNotesFragment"
+        android:label="Pending Notes" />
 
 </navigation>

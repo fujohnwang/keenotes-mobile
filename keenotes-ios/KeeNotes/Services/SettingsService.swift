@@ -14,8 +14,10 @@ class SettingsService: ObservableObject {
         static let showOverviewCard = "show_overview_card"
         static let firstNoteDate = "first_note_date"
         static let autoFocusInputOnLaunch = "auto_focus_input_on_launch"
-        static let showKeyboardToolbar = "show_keyboard_toolbar"
+
         static let autoStartDictation = "auto_start_dictation"
+        static let confettiOnPostSuccess = "confetti_on_post_success"
+        static let hiddenMessage = "hidden_message"
     }
     
     @Published var endpointUrl: String {
@@ -52,15 +54,21 @@ class SettingsService: ObservableObject {
         }
     }
     
-    @Published var showKeyboardToolbar: Bool {
-        didSet {
-            defaults.set(showKeyboardToolbar, forKey: Keys.showKeyboardToolbar)
-        }
-    }
-    
     @Published var autoStartDictation: Bool {
         didSet {
             defaults.set(autoStartDictation, forKey: Keys.autoStartDictation)
+        }
+    }
+    
+    @Published var confettiOnPostSuccess: Bool {
+        didSet {
+            defaults.set(confettiOnPostSuccess, forKey: Keys.confettiOnPostSuccess)
+        }
+    }
+    
+    @Published var hiddenMessage: String {
+        didSet {
+            defaults.set(hiddenMessage, forKey: Keys.hiddenMessage)
         }
     }
     
@@ -87,8 +95,9 @@ class SettingsService: ObservableObject {
         self.copyToClipboardOnPost = defaults.bool(forKey: Keys.copyToClipboardOnPost)
         self.showOverviewCard = defaults.object(forKey: Keys.showOverviewCard) == nil ? true : defaults.bool(forKey: Keys.showOverviewCard)
         self.autoFocusInputOnLaunch = defaults.object(forKey: Keys.autoFocusInputOnLaunch) == nil ? false : defaults.bool(forKey: Keys.autoFocusInputOnLaunch)
-        self.showKeyboardToolbar = defaults.object(forKey: Keys.showKeyboardToolbar) == nil ? true : defaults.bool(forKey: Keys.showKeyboardToolbar)
         self.autoStartDictation = defaults.object(forKey: Keys.autoStartDictation) == nil ? false : defaults.bool(forKey: Keys.autoStartDictation)
+        self.confettiOnPostSuccess = defaults.object(forKey: Keys.confettiOnPostSuccess) == nil ? true : defaults.bool(forKey: Keys.confettiOnPostSuccess)
+        self.hiddenMessage = defaults.string(forKey: Keys.hiddenMessage) ?? ""
         self.firstNoteDate = defaults.string(forKey: Keys.firstNoteDate)
     }
     

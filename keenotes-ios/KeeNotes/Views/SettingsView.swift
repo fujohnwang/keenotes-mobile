@@ -15,6 +15,9 @@ struct SettingsView: View {
     @State private var statusMessage = ""
     @State private var isSuccess = true
     
+    // Hidden message draft
+    @State private var hiddenMessageDraft = ""
+    
     // 向导状态
     @State private var showWizard = false
     
@@ -42,6 +45,7 @@ struct SettingsView: View {
     var body: some View {
         ZStack {
             NavigationView {
+                ScrollViewReader { scrollProxy in
                 Form {
                     // Server configuration
                     Section(header: Text("Server Configuration")) {
@@ -123,12 +127,37 @@ struct SettingsView: View {
                         set: { appState.settingsService.autoStartDictation = $0 }
                     ))
 
-                    Toggle("Show keyboard toolbar", isOn: Binding(
-                        get: { appState.settingsService.showKeyboardToolbar },
-                        set: { appState.settingsService.showKeyboardToolbar = $0 }
+                    Toggle("Confetti on post success", isOn: Binding(
+                        get: { appState.settingsService.confettiOnPostSuccess },
+                        set: { appState.settingsService.confettiOnPostSuccess = $0 }
                     ))
                 }
                 .font(.system(size: isPad ? 17 : 17))
+
+                // Hidden Watermark
+                Section(header: Text("Hidden Watermark"), footer: Text("When set, an invisible watermark is embedded into copied note content for traceability.")) {
+                    HStack(spacing: 8) {
+                        TextField("Enter hidden message...", text: $hiddenMessageDraft)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .font(.system(size: isPad ? 17 : 17))
+                            .submitLabel(.done)
+                            .onSubmit { saveHiddenMessage() }
+                            .focused($focusedField, equals: "hiddenMessage")
+
+                        Button(action: { saveHiddenMessage() }) {
+                            Text("Save")
+                                .font(.system(size: isPad ? 14 : 13, weight: .medium))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(hiddenMessageDraft == appState.settingsService.hiddenMessage ? Color(.systemGray5) : Theme.brandColor)
+                                .foregroundColor(hiddenMessageDraft == appState.settingsService.hiddenMessage ? .secondary : .white)
+                                .clipShape(Capsule())
+                        }
+                        .disabled(hiddenMessageDraft == appState.settingsService.hiddenMessage)
+                    }
+                }
+                .id("hiddenWatermark")
 
                 // Debug section (hidden by default)
                 if showDebugSection {
@@ -163,6 +192,16 @@ struct SettingsView: View {
                 .sheet(isPresented: $showDebugView) {
                     DebugView()
                 }
+                .onChange(of: focusedField) { field in
+                    if field == "hiddenMessage" {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            withAnimation {
+                                scrollProxy.scrollTo("hiddenWatermark", anchor: .bottom)
+                            }
+                        }
+                    }
+                }
+                } // ScrollViewReader
             }
             .navigationViewStyle(.stack)
             .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
@@ -190,10 +229,16 @@ struct SettingsView: View {
             token = appState.settingsService.token
             password = appState.settingsService.encryptionPassword
             confirmPassword = appState.settingsService.encryptionPassword
+            hiddenMessageDraft = appState.settingsService.hiddenMessage
             
             // 检查并显示向导
             checkAndShowWizard()
         }
+    }
+
+    private func saveHiddenMessage() {
+        appState.settingsService.hiddenMessage = hiddenMessageDraft
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private func saveSettings() {
@@ -222,19 +267,12 @@ struct SettingsView: View {
         print("[Settings] Configuration: endpoint=\(endpointChanged), token=\(tokenChanged), password=\(passwordChanged)")
 
         // Save settings
-        do {
-            appState.settingsService.saveSettings(
-                endpoint: endpointUrl,
-                token: token,
-                password: password
-            )
-            print("[Settings] Settings saved successfully")
-        } catch {
-            print("[Settings] ERROR saving settings: \(error)")
-            statusMessage = "Failed to save: \(error.localizedDescription)"
-            isSuccess = false
-            return
-        }
+        appState.settingsService.saveSettings(
+            endpoint: endpointUrl,
+            token: token,
+            password: password
+        )
+        print("[Settings] Settings saved successfully")
 
         // Update status message
         let msg = password.isEmpty ? "Settings saved ✓" : "Settings saved ✓ (E2E encryption enabled)"

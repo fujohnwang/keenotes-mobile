@@ -22,6 +22,8 @@ class SettingsRepository(private val context: Context) {
         private val KEY_SHOW_OVERVIEW_CARD = stringPreferencesKey("show_overview_card")
         private val KEY_FIRST_NOTE_DATE = stringPreferencesKey("first_note_date")
         private val KEY_AUTO_FOCUS_INPUT = stringPreferencesKey("auto_focus_input_on_launch")
+        private val KEY_CONFETTI_ON_POST = stringPreferencesKey("confetti_on_post_success")
+        private val KEY_HIDDEN_MESSAGE = stringPreferencesKey("hidden_message")
     }
     
     val endpointUrl: Flow<String> = context.dataStore.data.map { it[KEY_ENDPOINT] ?: "https://kns.afoo.me" }
@@ -31,6 +33,8 @@ class SettingsRepository(private val context: Context) {
     val showOverviewCard: Flow<Boolean> = context.dataStore.data.map { it[KEY_SHOW_OVERVIEW_CARD]?.toBoolean() ?: true }
     val firstNoteDate: Flow<String?> = context.dataStore.data.map { it[KEY_FIRST_NOTE_DATE] }
     val autoFocusInputOnLaunch: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_FOCUS_INPUT]?.toBoolean() ?: false }
+    val confettiOnPostSuccess: Flow<Boolean> = context.dataStore.data.map { it[KEY_CONFETTI_ON_POST]?.toBoolean() ?: true }
+    val hiddenMessage: Flow<String> = context.dataStore.data.map { it[KEY_HIDDEN_MESSAGE] ?: "" }
     
     val isConfigured: Flow<Boolean> = context.dataStore.data.map { prefs ->
         // 检查所有必填字段是否都已配置（不为空）
@@ -78,6 +82,20 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAutoFocusInputOnLaunch(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_AUTO_FOCUS_INPUT] = enabled.toString()
+        }
+    }
+    
+    suspend fun setConfettiOnPostSuccess(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_CONFETTI_ON_POST] = enabled.toString()
+        }
+    }
+    
+    suspend fun getHiddenMessage(): String = hiddenMessage.first()
+    
+    suspend fun setHiddenMessage(message: String) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_HIDDEN_MESSAGE] = message
         }
     }
     

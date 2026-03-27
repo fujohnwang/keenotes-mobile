@@ -18,8 +18,14 @@ import androidx.recyclerview.widget.RecyclerView
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.ItemNoteBinding
+import cn.keevol.keenotes.KeeNotesApp
+import cn.keevol.keenotes.util.DateTimeUtil
+import cn.keevol.keenotes.util.ZeroWidthSteganography
+import kotlinx.coroutines.runBlocking
 
-class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCallback()) {
+class NotesAdapter(
+    private val onEnlargeClick: ((Note) -> Unit)? = null
+) : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCallback()) {
     
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NoteViewHolder {
         val binding = ItemNoteBinding.inflate(
@@ -27,7 +33,7 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
             parent,
             false
         )
-        return NoteViewHolder(binding)
+        return NoteViewHolder(binding, onEnlargeClick)
     }
     
     override fun onBindViewHolder(holder: NoteViewHolder, position: Int) {
@@ -35,20 +41,17 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
     }
     
     class NoteViewHolder(
-        private val binding: ItemNoteBinding
+        private val binding: ItemNoteBinding,
+        private val onEnlargeClick: ((Note) -> Unit)? = null
     ) : RecyclerView.ViewHolder(binding.root) {
         
         private var currentNote: Note? = null
         
         fun bind(note: Note) {
             currentNote = note
-            
-            // Date and time
-            binding.dateText.text = if (note.createdAt.length >= 19) {
-                note.createdAt.take(19)
-            } else {
-                note.createdAt
-            }
+
+            // Date and time - convert UTC to local timezone for display
+            binding.dateText.text = DateTimeUtil.utcToLocalDisplay(note.createdAt)
             
             // Channel with bullet separator
             val channelText = if (note.channel.isNotEmpty()) note.channel else "default"
@@ -56,6 +59,11 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
             
             // Full content
             binding.contentText.text = note.content
+            
+            // Enlarge button
+            binding.enlargeButton.setOnClickListener {
+                currentNote?.let { onEnlargeClick?.invoke(it) }
+            }
             
             // Setup interactions
             setupInteractions()
@@ -75,7 +83,10 @@ class NotesAdapter : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCall
             
             // 2. Copy to clipboard
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("note", content)
+            val hiddenMessage = runBlocking {
+                (context.applicationContext as KeeNotesApp).settingsRepository.getHiddenMessage()
+            }
+            val clip = ClipData.newPlainText("note", ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage))
             clipboard.setPrimaryClip(clip)
             
             // 3. Show toast notification

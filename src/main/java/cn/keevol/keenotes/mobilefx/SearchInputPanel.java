@@ -5,6 +5,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -74,6 +75,14 @@ public class SearchInputPanel extends VBox {
         searchField.setOnAction(e -> {
             searchDebounce.stop();
             performSearch();
+        });
+
+        // Use ESC key to clear search input
+        searchField.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) {
+                clearSearch();
+                e.consume();
+            }
         });
     }
     

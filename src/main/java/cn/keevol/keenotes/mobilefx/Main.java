@@ -223,6 +223,15 @@ public class Main extends Application {
     }
 
     public static void main(String[] args) {
+        // Maven 启动时会读取系统代理并写入 JVM 属性，需要在应用启动前清除
+        // 避免翻墙软件的 SOCKS 代理影响应用网络连接
+        System.setProperty("java.net.useSystemProxies", "false");
+        System.clearProperty("socksProxyHost");
+        System.clearProperty("socksProxyPort");
+        System.clearProperty("http.proxyHost");
+        System.clearProperty("http.proxyPort");
+        System.clearProperty("https.proxyHost");
+        System.clearProperty("https.proxyPort");
         launch(args);
     }
 }

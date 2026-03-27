@@ -39,7 +39,7 @@ public class ForwardHandler implements HttpHandler {
             JsonObject json = new JsonObject(new String(requestBody, StandardCharsets.UTF_8));
             String content = json.getString("content");
             String channel = json.getString("channel");
-            String ts = json.getString("created_at");
+            String ts = normalizeDate(json.getString("created_at"));
             
             // 2. Check if data is already encrypted
             Boolean encrypted = json.getBoolean("encrypted", false);
@@ -60,33 +60,6 @@ public class ForwardHandler implements HttpHandler {
                 throw new Exception(result.message());
             }
 
-
-            // 2. 构建转发请求 (同步阻塞)
-//            HttpRequest forwardRequest = HttpRequest.newBuilder()
-//                    .uri(URI.create(TARGET_URL))
-//                    .header("Content-Type", "application/json") // 根据实际情况调整 Header
-//                    .POST(HttpRequest.BodyPublishers.ofByteArray(requestBody))
-//                    .timeout(Duration.ofSeconds(10)) // 读取超时
-//                    .build();
-//
-//            // 3. 发送并等待结果 (Blocking)
-//            // 这里会阻塞住唯一的那个线程，直到目标返回，正好符合你的“等待前一个结束”的需求
-//            HttpResponse<String> targetResponse = client.send(forwardRequest, HttpResponse.BodyHandlers.ofString());
-//
-//            // 4. 将目标服务器的结果返回给本地客户端
-//            String responseBody = targetResponse.body();
-//            byte[] responseBytes = responseBody.getBytes(StandardCharsets.UTF_8);
-//
-//            // 发送响应头 (200 OK)
-//            exchange.sendResponseHeaders(200, responseBytes.length);
-//
-//            // 写入响应体
-//            try (OutputStream os = exchange.getResponseBody()) {
-//                os.write(responseBytes);
-//            }
-//
-//            System.out.println("<<< Forward success: " + responseBody);
-
         } catch (Exception e) {
             // 发生异常，返回 500
             String errorMsg = "Forward Error: " + e.getMessage();
@@ -96,6 +69,34 @@ public class ForwardHandler implements HttpHandler {
             }
         } finally {
             exchange.close(); // 必须关闭 exchange
+        }
+    }
+
+    /**
+     * Standardize date string to "yyyy-MM-dd HH:mm:ss"
+     */
+    private String normalizeDate(String input) {
+        if (input == null || input.isBlank()) return null;
+        
+        try {
+            // 1. Try ISO-8601 (T and Z)
+            java.time.OffsetDateTime odt;
+            try {
+                odt = java.time.OffsetDateTime.parse(input);
+            } catch (java.time.format.DateTimeParseException e) {
+                // Try ISO_INSTANT or other ISO variations
+                odt = java.time.Instant.parse(input).atOffset(java.time.ZoneOffset.UTC);
+            }
+            return odt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        } catch (Exception e) {
+            // 2. Try standard SQLite format (yyyy-MM-dd HH:mm:ss) or fallback
+            try {
+                java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(input.replace(" ", "T"));
+                return ldt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            } catch (Exception e2) {
+                // If all fails, return raw input as last resort (SQLite might handle it)
+                return input;
+            }
         }
     }
 }
