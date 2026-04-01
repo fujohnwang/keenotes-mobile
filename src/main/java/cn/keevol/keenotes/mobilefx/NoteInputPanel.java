@@ -59,41 +59,40 @@ public class NoteInputPanel extends VBox {
             "-fx-background-color: transparent; " +
             "-fx-control-inner-background: transparent;");
         
-        // Listen to layout changes to hide scrollbars
-        noteInput.layoutBoundsProperty().addListener((obs, oldVal, newVal) -> {
-            hideScrollBars();
-        });
-        
         // Create hidden Text node for accurate height measurement
         textMeasure = new Text();
         textMeasure.setFont(Font.font("MiSans", 15)); // Match TextArea font
         textMeasure.setWrappingWidth(500); // Will be updated based on actual width
         textMeasure.textProperty().bind(noteInput.textProperty());
         
-        // Bind TextArea height to Text measurement
+        // Bind TextArea height to Text measurement (with guard to avoid redundant layout requests)
         textMeasure.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
             double textHeight = newBounds.getHeight();
             double padding = 30; // Account for TextArea internal padding
             double minHeight = 100;
             double maxHeight = 400; // Limit max height
             double height = Math.max(minHeight, Math.min(maxHeight, textHeight + padding));
-            noteInput.setPrefHeight(height);
-            noteInput.setMinHeight(height);
-        });
-        
-        // Update wrapping width when TextArea width changes (more accurate)
-        noteInput.widthProperty().addListener((obs, oldWidth, newWidth) -> {
-            if (newWidth.doubleValue() > 24) { // Account for TextArea padding
-                textMeasure.setWrappingWidth(newWidth.doubleValue() - 24);
+            if (Math.abs(noteInput.getPrefHeight() - height) > 0.5) {
+                noteInput.setPrefHeight(height);
+                noteInput.setMinHeight(height);
             }
         });
         
-        // Initial setup and hide scrollbars
+        // Update wrapping width when TextArea width changes (with guard to avoid redundant layout)
+        noteInput.widthProperty().addListener((obs, oldWidth, newWidth) -> {
+            if (newWidth.doubleValue() > 24) { // Account for TextArea padding
+                double wrappingWidth = newWidth.doubleValue() - 24;
+                if (Math.abs(textMeasure.getWrappingWidth() - wrappingWidth) > 0.5) {
+                    textMeasure.setWrappingWidth(wrappingWidth);
+                }
+            }
+        });
+        
+        // Initial setup
         javafx.application.Platform.runLater(() -> {
             if (noteInput.getWidth() > 24) {
                 textMeasure.setWrappingWidth(noteInput.getWidth() - 24);
             }
-            hideScrollBars();
         });
         
         // Add keyboard shortcut handler for Send
@@ -153,26 +152,6 @@ public class NoteInputPanel extends VBox {
         VBox.setVgrow(inputContainer, Priority.ALWAYS);
         
 
-    }
-    
-    /**
-     * Hide scrollbars from TextArea
-     */
-    private void hideScrollBars() {
-        javafx.scene.Node scrollPane = noteInput.lookup(".scroll-pane");
-        if (scrollPane != null) {
-            scrollPane.setStyle("-fx-background-color: transparent;");
-        }
-        javafx.scene.Node vbar = noteInput.lookup(".scroll-bar:vertical");
-        javafx.scene.Node hbar = noteInput.lookup(".scroll-bar:horizontal");
-        if (vbar != null) {
-            vbar.setVisible(false);
-            vbar.setManaged(false);
-        }
-        if (hbar != null) {
-            hbar.setVisible(false);
-            hbar.setManaged(false);
-        }
     }
     
     private void handleSend() {

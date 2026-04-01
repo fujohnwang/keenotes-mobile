@@ -56,6 +56,13 @@ public class WebSocketClientService {
     private int expectedBatches = 0;
     private int receivedBatches = 0;
 
+    // 专用线程：解密 + DB 写入（避免阻塞 OkHttp WebSocket 线程）
+    private final ExecutorService cryptoExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "WebSocket-CryptoDB");
+        t.setDaemon(true);
+        return t;
+    });
+
     public WebSocketClientService() {
         this.localCache = LocalCacheService.getInstance();
         this.cryptoService = new CryptoService();
@@ -391,12 +398,25 @@ public class WebSocketClientService {
         }
 
         JsonArray notes = json.getJsonArray("notes");
-        if (notes != null) {
+        if (notes == null) {
+            receivedBatches++;
+            notifySyncProgress(receivedBatches, totalBatches);
+            logger.info("Received empty batch " + batchId + "/" + totalBatches);
+            return;
+        }
+
+        // Snapshot note data from JSON (lightweight, on OkHttp thread)
+        List<JsonObject> noteSnapshots = new ArrayList<>(notes.size());
+        for (int i = 0; i < notes.size(); i++) {
+            noteSnapshots.add(notes.getJsonObject(i));
+        }
+
+        // Decrypt + DB write on dedicated thread (avoid blocking OkHttp WebSocket thread)
+        cryptoExecutor.submit(() -> {
             List<LocalCacheService.NoteData> batchNotes = new ArrayList<>();
             long maxNoteId = -1;
 
-            for (int i = 0; i < notes.size(); i++) {
-                JsonObject note = notes.getJsonObject(i);
+            for (JsonObject note : noteSnapshots) {
                 try {
                     long id = note.getLong("id");
                     String encryptedContent = note.getString("content");
@@ -410,7 +430,7 @@ public class WebSocketClientService {
                         logger.warning("Failed to decrypt note " + id + ": " + e.getMessage() + ", storing encrypted content");
                         decryptedContent = encryptedContent;
                     }
-                    
+
                     batchNotes.add(new LocalCacheService.NoteData(
                             id, decryptedContent, channel, createdAt, encryptedContent));
                     if (id > maxNoteId) {
@@ -421,7 +441,6 @@ public class WebSocketClientService {
                 }
             }
 
-            // 立即写入 DB（增量持久化）
             if (!batchNotes.isEmpty()) {
                 try {
                     localCache.batchInsertNotes(batchNotes);
@@ -431,7 +450,6 @@ public class WebSocketClientService {
                 }
             }
 
-            // 更新 last_sync_id 为该 batch 中最大的 note ID（断点续传）
             if (maxNoteId > 0) {
                 try {
                     localCache.updateLastSyncId(maxNoteId);
@@ -441,7 +459,7 @@ public class WebSocketClientService {
                     logger.warning("Failed to update lastSyncId after batch " + batchId + ": " + e.getMessage());
                 }
             }
-        }
+        });
 
         receivedBatches++;
         notifySyncProgress(receivedBatches, totalBatches);
@@ -482,40 +500,42 @@ public class WebSocketClientService {
             return;
         }
 
-        try {
-            long id = noteJson.getLong("id");
-            String encryptedContent = noteJson.getString("content");
-            String channel = noteJson.getString("channel");
-            String createdAt = noteJson.getString("created_at");
-
-            logger.info("Parsed note - id: " + id + ", channel: " + channel + ", createdAt: " + createdAt);
-
-            String decryptedContent;
+        // Decrypt + DB write on dedicated thread (avoid blocking OkHttp WebSocket thread)
+        cryptoExecutor.submit(() -> {
             try {
-                decryptedContent = cryptoService.decrypt(encryptedContent);
-                logger.info("Decrypted content: " + decryptedContent);
+                long id = noteJson.getLong("id");
+                String encryptedContent = noteJson.getString("content");
+                String channel = noteJson.getString("channel");
+                String createdAt = noteJson.getString("created_at");
+
+                logger.info("Parsed note - id: " + id + ", channel: " + channel + ", createdAt: " + createdAt);
+
+                String decryptedContent;
+                try {
+                    decryptedContent = cryptoService.decrypt(encryptedContent);
+                    logger.info("Decrypted content: " + decryptedContent);
+                } catch (Exception e) {
+                    logger.warning("Failed to decrypt note " + id + ": " + e.getMessage() + ", storing encrypted content");
+                    decryptedContent = encryptedContent;
+                }
+
+                LocalCacheService.NoteData note = new LocalCacheService.NoteData(
+                        id, decryptedContent, channel, createdAt, encryptedContent);
+                localCache.insertNote(note);
+
+                if (id > lastSyncId) {
+                    lastSyncId = id;
+                    localCache.updateLastSyncId(lastSyncId);
+                    logger.info("Updated lastSyncId to " + lastSyncId + " after realtime update");
+                }
+
+                notifyRealtimeUpdate(id, decryptedContent);
+                logger.info("Realtime update for note " + id + " completed successfully");
             } catch (Exception e) {
-                logger.warning("Failed to decrypt note " + id + ": " + e.getMessage() + ", storing encrypted content");
-                decryptedContent = encryptedContent;
+                logger.warning("Failed to process realtime update: " + e.getMessage());
+                e.printStackTrace();
             }
-
-            LocalCacheService.NoteData note = new LocalCacheService.NoteData(
-                    id, decryptedContent, channel, createdAt, encryptedContent);
-            localCache.insertNote(note);
-
-            // 关键修复：实时同步后更新lastSyncId，避免下次重复同步
-            if (id > lastSyncId) {
-                lastSyncId = id;
-                localCache.updateLastSyncId(lastSyncId);
-                logger.info("Updated lastSyncId to " + lastSyncId + " after realtime update");
-            }
-
-            notifyRealtimeUpdate(id, decryptedContent);
-            logger.info("Realtime update for note " + id + " completed successfully");
-        } catch (Exception e) {
-            logger.warning("Failed to process realtime update: " + e.getMessage());
-            e.printStackTrace();
-        }
+        });
     }
 
     private void handleNewNoteAck(JsonObject json) {
@@ -687,6 +707,9 @@ public class WebSocketClientService {
             reconnectScheduler.shutdownNow();
             reconnectScheduler = null;
         }
+
+        // 关闭解密专用线程
+        cryptoExecutor.shutdownNow();
 
         // 3. 立即强制关闭OkHttp底层资源（这会强制断开所有连接）
         if (httpClient != null) {

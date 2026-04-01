@@ -119,23 +119,25 @@ public class NoteCardView extends StackPane {
         textMeasure.setWrappingWidth(500); // Will be updated based on actual width
         textMeasure.textProperty().bind(contentArea.textProperty());
 
-        // Bind TextArea height to Text measurement
+        // Bind TextArea height to Text measurement (with guard to avoid redundant layout requests)
         textMeasure.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
             double textHeight = newBounds.getHeight();
             double padding = 20; // Minimal padding
             double height = Math.max(30, textHeight + padding);
-            contentArea.setPrefHeight(height);
-            contentArea.setMinHeight(height);
-            // Re-hide scrollbars after height change
-            javafx.application.Platform.runLater(this::hideScrollBars);
+            if (Math.abs(contentArea.getPrefHeight() - height) > 0.5) {
+                contentArea.setPrefHeight(height);
+                contentArea.setMinHeight(height);
+            }
         });
 
-        // Update wrapping width when card width changes
+        // Update wrapping width when card width changes (with guard to avoid redundant layout)
         widthProperty().addListener((obs, oldWidth, newWidth) -> {
             if (newWidth.doubleValue() > 64) { // Ensure we have valid width
                 // Card padding (16*2) + content box padding (16*2) = 64
                 double wrappingWidth = newWidth.doubleValue() - 64;
-                textMeasure.setWrappingWidth(wrappingWidth);
+                if (Math.abs(textMeasure.getWrappingWidth() - wrappingWidth) > 0.5) {
+                    textMeasure.setWrappingWidth(wrappingWidth);
+                }
             }
         });
 
@@ -144,7 +146,6 @@ public class NoteCardView extends StackPane {
             if (getWidth() > 64) {
                 textMeasure.setWrappingWidth(getWidth() - 64);
             }
-            hideScrollBars();
         });
 
         // Custom context menu for copy
@@ -228,26 +229,6 @@ public class NoteCardView extends StackPane {
         setOnMouseExited(e -> {
             setStyle("");
         });
-    }
-
-    /**
-     * Hide scrollbars from TextArea
-     */
-    private void hideScrollBars() {
-        javafx.scene.Node scrollPane = contentArea.lookup(".scroll-pane");
-        if (scrollPane != null) {
-            scrollPane.setStyle("-fx-background-color: transparent;");
-        }
-        javafx.scene.Node vbar = contentArea.lookup(".scroll-bar:vertical");
-        javafx.scene.Node hbar = contentArea.lookup(".scroll-bar:horizontal");
-        if (vbar != null) {
-            vbar.setVisible(false);
-            vbar.setManaged(false);
-        }
-        if (hbar != null) {
-            hbar.setVisible(false);
-            hbar.setManaged(false);
-        }
     }
 
     /**
