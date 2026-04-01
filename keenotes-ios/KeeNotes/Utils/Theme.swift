@@ -30,6 +30,13 @@ enum Theme {
         colorScheme == .dark ? Color(.systemBackground) : Color(red: 0.97, green: 0.97, blue: 0.98) // #F7F8FA
     }
 
+    // MARK: - Separators
+
+    /// Thin separator color for flat layouts
+    static func separatorColor(_ colorScheme: ColorScheme) -> Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
+    }
+
     // MARK: - Typography
 
     /// Rounded bold font for stat numbers
@@ -40,5 +47,26 @@ enum Theme {
     /// Stat label font
     static func statLabelFont(size: CGFloat) -> Font {
         .system(size: size, weight: .medium, design: .rounded)
+    }
+
+    // MARK: - Section Header Style
+
+    /// Section header modifier for premium flat UI
+    struct SectionHeaderStyle: ViewModifier {
+        func body(content: Content) -> some View {
+            content
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Color.secondary.opacity(0.7))
+                .textCase(.uppercase)
+        }
+    }
+
+    /// Section footer modifier for premium flat UI
+    struct SectionFooterStyle: ViewModifier {
+        func body(content: Content) -> some View {
+            content
+                .font(.system(size: 12))
+                .foregroundColor(Color.secondary.opacity(0.5))
+        }
     }
 }

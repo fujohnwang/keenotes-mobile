@@ -10,6 +10,7 @@ struct ReviewView: View {
     @State private var totalCount = 0
     @State private var hasMoreData = true
     @State private var enlargedNote: Note? = nil
+    @Environment(\.colorScheme) private var colorScheme
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
@@ -22,22 +23,35 @@ struct ReviewView: View {
     var body: some View {
         NavigationView {
             ZStack {
+                Theme.pageBackground(colorScheme).ignoresSafeArea()
+
                 VStack(spacing: 0) {
-                    // Period selector
-                    Picker("Period", selection: $selectedPeriod) {
+                    // Period selector - custom tab style
+                    HStack(spacing: isPad ? 24 : 16) {
                         ForEach(0..<periods.count, id: \.self) { index in
-                            Text(periods[index]).tag(index)
+                            Button(action: { selectedPeriod = index }) {
+                                VStack(spacing: 6) {
+                                    Text(periods[index])
+                                        .font(.system(size: isPad ? 15 : 14, weight: selectedPeriod == index ? .semibold : .regular))
+                                        .foregroundColor(selectedPeriod == index ? Theme.brandColor : .secondary)
+
+                                    Rectangle()
+                                        .fill(selectedPeriod == index ? Theme.brandColor : Color.clear)
+                                        .frame(height: 2)
+                                        .cornerRadius(1)
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
+                        Spacer()
                     }
-                    .pickerStyle(.segmented)
-                    .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
+                    .padding(EdgeInsets(top: 12, leading: horizontalPadding, bottom: 4, trailing: horizontalPadding))
 
                     // Header row: Notes count (left) + Sync Channel status (right)
                     HStack {
-                        // Notes count with period info (left)
-                        Text(notesCountText)
+                        // Notes count with period info (left) - number highlighted
+                        notesCountView
                             .font(.caption)
-                            .foregroundColor(.secondary)
 
                         Spacer()
 
@@ -85,7 +99,7 @@ struct ReviewView: View {
                                             enlargedNote = note
                                         }
                                     })
-                                        .listRowInsets(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
+                                        .listRowInsets(EdgeInsets(top: 0, leading: horizontalPadding, bottom: 0, trailing: horizontalPadding))
                                         .listRowSeparator(.hidden)
                                         .listRowBackground(Color.clear)
                                         .onAppear {
@@ -110,8 +124,16 @@ struct ReviewView: View {
                                     .listRowSeparator(.hidden)
                                     .listRowBackground(Color.clear)
                                 }
+
+                                // Bottom safe area spacer
+                                Color.clear
+                                    .frame(height: 80)
+                                    .listRowInsets(EdgeInsets())
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
                             }
                             .listStyle(.plain)
+                            .modifier(ListBackgroundModifier())
                             .refreshable {
                                 await loadNotes()
                             }
@@ -260,6 +282,25 @@ struct ReviewView: View {
 
         return "\(count) note(s)\(periodInfo)"
     }
+
+    /// Notes count view with highlighted number
+    @ViewBuilder
+    private var notesCountView: some View {
+        let count = totalCount > 0 ? totalCount : notes.count
+        let periodInfo = periodSuffix
+        (Text("\(count)").foregroundColor(Theme.brandColor).fontWeight(.semibold) +
+         Text(periodInfo).foregroundColor(.secondary))
+    }
+
+    private var periodSuffix: String {
+        switch selectedPeriod {
+        case 0: return " note(s) - Last 7 days"
+        case 1: return " note(s) - Last 30 days"
+        case 2: return " note(s) - Last 90 days"
+        case 3: return " note(s) - All"
+        default: return " note(s)"
+        }
+    }
 }
 
 /// Single note card in the list
@@ -272,7 +313,7 @@ struct NoteRow: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var isPad: Bool { DeviceType.isPad }
-    private var cardPadding: CGFloat { isPad ? 24 : 16 }
+    private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
     private var messageFontSize: CGFloat { isPad ? 18 : 17 }
 
     private var formattedDate: String {
@@ -284,7 +325,7 @@ struct NoteRow: View {
         if let date = inputFormatter.date(from: note.createdAt) {
             let displayFormatter = DateFormatter()
             displayFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            displayFormatter.timeZone = TimeZone.current // Use system local timezone
+            displayFormatter.timeZone = TimeZone.current
             return displayFormatter.string(from: date)
         }
 
@@ -308,22 +349,18 @@ struct NoteRow: View {
             // Header: Date and Channel
             HStack(spacing: isPad ? 10 : 8) {
                 HStack(spacing: isPad ? 10 : 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock")
-                            .font(.caption2)
-                        Text(formattedDate)
-                            .font(.caption)
-                    }
-                    .foregroundColor(.secondary)
+                    Text(formattedDate)
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(.systemGray2))
 
-                    // Channel info
+                    // Channel info - more subtle
                     if !note.channel.isEmpty {
-                        Text("•")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        Text("·")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(.systemGray3))
                         Text(note.channel)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(.systemGray2))
                     }
                 }
                 .contentShape(Rectangle())
@@ -336,8 +373,8 @@ struct NoteRow: View {
                 if let onEnlarge = onEnlarge {
                     Button(action: onEnlarge) {
                         Image(systemName: "arrow.down.left.and.arrow.up.right")
-                            .font(.system(size: isPad ? 16 : 14))
-                            .foregroundColor(.secondary)
+                            .font(.system(size: isPad ? 14 : 12))
+                            .foregroundColor(Color(.systemGray2))
                             .padding(6)
                             .contentShape(Rectangle())
                     }
@@ -358,16 +395,12 @@ struct NoteRow: View {
             .frame(height: textViewHeight)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(cardPadding)
-        .background(
-            RoundedRectangle(cornerRadius: DeviceType.cornerRadius)
-                .fill(Theme.cardBackground(colorScheme))
-                .shadow(
-                    color: Theme.cardShadow(colorScheme).color,
-                    radius: Theme.cardShadow(colorScheme).radius,
-                    x: Theme.cardShadow(colorScheme).x,
-                    y: Theme.cardShadow(colorScheme).y
-                )
+        .padding(.vertical, isPad ? 20 : 16)
+        .overlay(
+            Rectangle()
+                .fill(Theme.separatorColor(colorScheme))
+                .frame(height: 1),
+            alignment: .bottom
         )
         .overlay(
             Group {
@@ -422,7 +455,7 @@ struct NoteRow: View {
     private func calculateHeight(for text: String, width: CGFloat?, fontSize: CGFloat) -> CGFloat {
         // Use a reasonable default width for height calculation
         // The actual width will be constrained by GeometryReader
-        let calculationWidth = width ?? (UIScreen.main.bounds.width - (isPad ? 48 : 32) - (cardPadding * 2))
+        let calculationWidth = width ?? (UIScreen.main.bounds.width - (isPad ? 48 : 32) - (horizontalPadding * 2))
         
         let font = UIFont.systemFont(ofSize: fontSize)
         let textStorage = NSTextStorage(string: text)
@@ -566,5 +599,16 @@ class CustomUITextView: UITextView {
         
         // Notify SwiftUI to show copied alert
         copyActionCallback?()
+    }
+}
+
+/// Modifier to hide List default background (iOS 16+) with fallback
+struct ListBackgroundModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content.scrollContentBackground(.hidden)
+        } else {
+            content
+        }
     }
 }
