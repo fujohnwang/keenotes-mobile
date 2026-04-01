@@ -212,7 +212,7 @@ struct SettingsView: View {
             .onPreferenceChange(FieldFramePreferenceKey.self) { frames in
                 // 将 frame 信息保存到 state
                 self.fieldFrames = frames
-                print("[SettingsView] Captured frames: \(frames)")
+                // print("[SettingsView] Captured frames: \(frames)")
             }
             
             // 向导覆盖层
