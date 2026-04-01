@@ -6,6 +6,7 @@ struct SettingsView: View {
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var endpointUrl = ""
     @State private var token = ""
@@ -48,12 +49,13 @@ struct SettingsView: View {
                 ScrollViewReader { scrollProxy in
                 Form {
                     // Server configuration
-                    Section(header: Text("Server Configuration")) {
+                    Section(header: Text("Server Configuration").modifier(Theme.SectionHeaderStyle())) {
                     TextField("Endpoint URL", text: $endpointUrl)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                         .font(.system(size: isPad ? 17 : 17))
+                        .listRowBackground(Color.clear)
 
                     SecureField("Token", text: $token)
                         .textContentType(.init(rawValue: ""))
@@ -62,10 +64,14 @@ struct SettingsView: View {
                         .font(.system(size: isPad ? 17 : 17))
                         .captureFrame(fieldId: "token")
                         .focused($focusedField, equals: "token")
+                        .listRowBackground(Color.clear)
                 }
 
                 // Encryption
-                Section(header: Text("Encryption"), footer: Text("E2E encryption password. Must match across all devices.")) {
+                Section(header: Text("Encryption").modifier(Theme.SectionHeaderStyle()),
+                        footer: Text("E2E encryption password. Must match across all devices.")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(.systemGray3))) {
                     SecureField("Password", text: $password)
                         .textContentType(.init(rawValue: ""))
                         .autocorrectionDisabled()
@@ -73,6 +79,7 @@ struct SettingsView: View {
                         .font(.system(size: isPad ? 17 : 17))
                         .captureFrame(fieldId: "encryptionPassword")
                         .focused($focusedField, equals: "encryptionPassword")
+                        .listRowBackground(Color.clear)
 
                     SecureField("Confirm Password", text: $confirmPassword)
                         .textContentType(.init(rawValue: ""))
@@ -81,66 +88,89 @@ struct SettingsView: View {
                         .font(.system(size: isPad ? 17 : 17))
                         .captureFrame(fieldId: "confirmPassword")
                         .focused($focusedField, equals: "confirmPassword")
+                        .listRowBackground(Color.clear)
                 }
 
-                // Save button
-                Section {
+                // Save button — visually belongs to the config above, so less top spacing, more bottom
+                Section(footer: Spacer().frame(height: 24)) {
                     Button(action: saveSettings) {
-                        HStack {
-                            Spacer()
-                            Text("Save Settings")
-                                .fontWeight(.semibold)
-                                .font(.system(size: isPad ? 18 : 17))
-                            Spacer()
-                        }
+                        Text("Save Settings")
+                            .fontWeight(.semibold)
+                            .font(.system(size: isPad ? 18 : 17))
+                            .foregroundColor(Color.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
                     }
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(isSaveEnabled ? Theme.brandColor : Color(.systemGray4))
+                    )
                     .disabled(!isSaveEnabled)
 
                     // Status message
                     if !statusMessage.isEmpty {
                         Text(statusMessage)
                             .font(.system(size: (isPad ? 14 : 13)))
-                            .foregroundColor(isSuccess ? .green : .red)
+                            .foregroundColor(isSuccess ? Theme.brandColor : .red)
                             .frame(maxWidth: .infinity, alignment: .center)
+                            .listRowBackground(Color.clear)
                     }
                 }
 
                 // Preferences
-                Section(header: Text("Preferences")) {
+                Section(header: Text("Preferences").modifier(Theme.SectionHeaderStyle())) {
                     Toggle("Copy to clipboard on post success", isOn: Binding(
                         get: { appState.settingsService.copyToClipboardOnPost },
                         set: { appState.settingsService.copyToClipboardOnPost = $0 }
                     ))
+                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 6)
 
                     Toggle("Show Overview Card", isOn: Binding(
                         get: { appState.settingsService.showOverviewCard },
                         set: { appState.settingsService.showOverviewCard = $0 }
                     ))
+                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 6)
 
                     Toggle("Auto-focus input on launch", isOn: Binding(
                         get: { appState.settingsService.autoFocusInputOnLaunch },
                         set: { appState.settingsService.autoFocusInputOnLaunch = $0 }
                     ))
+                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 6)
 
                     Toggle("Auto-start voice input on launch", isOn: Binding(
                         get: { appState.settingsService.autoStartDictation },
                         set: { appState.settingsService.autoStartDictation = $0 }
                     ))
+                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 6)
 
                     Toggle("Confetti on post success", isOn: Binding(
                         get: { appState.settingsService.confettiOnPostSuccess },
                         set: { appState.settingsService.confettiOnPostSuccess = $0 }
                     ))
+                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 6)
 
                     Toggle("Show Sync Channel Status", isOn: Binding(
                         get: { appState.settingsService.showSyncChannelStatus },
                         set: { appState.settingsService.showSyncChannelStatus = $0 }
                     ))
+                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 6)
                 }
                 .font(.system(size: isPad ? 17 : 17))
+                .toggleStyle(SwitchToggleStyle(tint: Theme.brandColor))
 
                 // Hidden Watermark
-                Section(header: Text("Hidden Watermark"), footer: Text("When set, an invisible watermark is embedded into copied note content for traceability.")) {
+                Section(header: Text("Hidden Watermark").modifier(Theme.SectionHeaderStyle()),
+                        footer: Text("When set, an invisible watermark is embedded into copied note content for traceability.")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(.systemGray3))) {
                     HStack(spacing: 8) {
                         TextField("Enter hidden message...", text: $hiddenMessageDraft)
                             .textInputAutocapitalization(.never)
@@ -161,21 +191,23 @@ struct SettingsView: View {
                         }
                         .disabled(hiddenMessageDraft == appState.settingsService.hiddenMessage)
                     }
+                    .listRowBackground(Color.clear)
                 }
                 .id("hiddenWatermark")
 
                 // Debug section (hidden by default)
                 if showDebugSection {
-                    Section(header: Text("Debug")) {
+                    Section(header: Text("Debug").modifier(Theme.SectionHeaderStyle())) {
                         Button("Open Debug View") {
                             showDebugView = true
                         }
                         .font(.system(size: isPad ? 17 : 17))
+                        .listRowBackground(Color.clear)
                     }
                 }
 
                 // Copyright with easter egg
-                Section {
+                Section(footer: Spacer().frame(height: 60)) {
                     VStack(spacing: 4) {
                         Text("©2025 王福强(Fuqiang Wang) All Rights Reserved")
                             .font(.system(size: isPad ? 13 : 12))
@@ -189,8 +221,10 @@ struct SettingsView: View {
                     .onTapGesture {
                         handleCopyrightTap()
                     }
+                    .listRowBackground(Color.clear)
                 }
                 }
+                .modifier(FormBackgroundModifier(colorScheme: colorScheme))
                 .navigationTitle("KeeNotes Settings")
                 .navigationBarTitleDisplayMode(.inline)
                 .onAppear(perform: loadSettings)
@@ -379,6 +413,21 @@ struct SettingsView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 showWizard = true
             }
+        }
+    }
+}
+
+/// Modifier to hide Form default background (iOS 16+) with fallback
+struct FormBackgroundModifier: ViewModifier {
+    let colorScheme: ColorScheme
+
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content
+                .scrollContentBackground(.hidden)
+                .background(Theme.pageBackground(colorScheme))
+        } else {
+            content
         }
     }
 }
