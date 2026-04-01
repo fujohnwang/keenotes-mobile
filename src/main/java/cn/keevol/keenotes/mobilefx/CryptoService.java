@@ -14,6 +14,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 增强的加密服务 - 使用Argon2 + HKDF派生加密密钥
@@ -46,6 +48,16 @@ public class CryptoService {
     private static final byte[] HKDF_INFO = "KeeNotes-E2E-Encryption-v2".getBytes(StandardCharsets.UTF_8);
 
     private final SettingsService settings;
+
+    // LRU cache: salt(Base64) → derived SecretKey, avoids repeated Argon2 (64MB alloc per call)
+    private static final int KEY_CACHE_SIZE = 256;
+    private final Map<String, SecretKey> keyCache = new LinkedHashMap<>(KEY_CACHE_SIZE, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, SecretKey> eldest) {
+            return size() > KEY_CACHE_SIZE;
+        }
+    };
+    private String cachedPassword; // track password to invalidate cache on change
 
     public CryptoService() {
         this.settings = SettingsService.getInstance();
@@ -181,6 +193,19 @@ public class CryptoService {
      * 使用Argon2id + HKDF派生AES密钥
      */
     private SecretKey deriveKeyArgon2HKDF(String password, byte[] salt) {
+        // Invalidate cache if password changed
+        if (cachedPassword == null || !cachedPassword.equals(password)) {
+            keyCache.clear();
+            cachedPassword = password;
+        }
+
+        // Check cache first
+        String saltKey = Base64.getEncoder().encodeToString(salt);
+        SecretKey cached = keyCache.get(saltKey);
+        if (cached != null) {
+            return cached;
+        }
+
         // Step 1: Argon2id
         Argon2Parameters.Builder builder = new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
                 .withVersion(Argon2Parameters.ARGON2_VERSION_13)
@@ -203,7 +228,9 @@ public class CryptoService {
         byte[] derivedKey = new byte[KEY_LENGTH];
         hkdf.generateBytes(derivedKey, 0, KEY_LENGTH);
 
-        return new SecretKeySpec(derivedKey, "AES");
+        SecretKey key = new SecretKeySpec(derivedKey, "AES");
+        keyCache.put(saltKey, key);
+        return key;
     }
 
     /**
