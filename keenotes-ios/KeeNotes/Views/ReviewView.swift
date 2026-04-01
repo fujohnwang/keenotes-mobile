@@ -61,14 +61,8 @@ struct ReviewView: View {
                     }
                     .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
 
-                    // Notes list or enlarged note view
-                    if let enlarged = enlargedNote {
-                        EnlargedNoteView(note: enlarged) {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                enlargedNote = nil
-                            }
-                        }
-                    } else if isLoading {
+                    // Notes list or enlarged note view (overlay preserves scroll position)
+                    if isLoading {
                         Spacer()
                         ProgressView("Loading...")
                         Spacer()
@@ -83,42 +77,55 @@ struct ReviewView: View {
                         }
                         Spacer()
                     } else {
-                        List {
-                            ForEach(notes) { note in
-                                NoteRow(note: note, onEnlarge: {
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        enlargedNote = note
-                                    }
-                                })
-                                    .listRowInsets(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
-                                    .listRowSeparator(.hidden)
-                                    .listRowBackground(Color.clear)
-                                    .onAppear {
-                                        // Load more when approaching the end
-                                        if note.id == notes.last?.id && hasMoreData && !isLoadingMore {
-                                            Task {
-                                                await loadMoreNotes()
+                        ZStack {
+                            List {
+                                ForEach(notes) { note in
+                                    NoteRow(note: note, onEnlarge: {
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            enlargedNote = note
+                                        }
+                                    })
+                                        .listRowInsets(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
+                                        .listRowSeparator(.hidden)
+                                        .listRowBackground(Color.clear)
+                                        .onAppear {
+                                            // Load more when approaching the end
+                                            if note.id == notes.last?.id && hasMoreData && !isLoadingMore {
+                                                Task {
+                                                    await loadMoreNotes()
+                                                }
                                             }
                                         }
-                                    }
-                            }
-
-                            // Loading indicator at bottom
-                            if isLoadingMore {
-                                HStack {
-                                    Spacer()
-                                    ProgressView()
-                                        .padding()
-                                    Spacer()
                                 }
-                                .listRowInsets(EdgeInsets())
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
+
+                                // Loading indicator at bottom
+                                if isLoadingMore {
+                                    HStack {
+                                        Spacer()
+                                        ProgressView()
+                                            .padding()
+                                        Spacer()
+                                    }
+                                    .listRowInsets(EdgeInsets())
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                                }
                             }
-                        }
-                        .listStyle(.plain)
-                        .refreshable {
-                            await loadNotes()
+                            .listStyle(.plain)
+                            .refreshable {
+                                await loadNotes()
+                            }
+                            .opacity(enlargedNote == nil ? 1 : 0)
+                            .allowsHitTesting(enlargedNote == nil)
+
+                            // Enlarged note overlay (List stays alive underneath, preserving scroll position)
+                            if let enlarged = enlargedNote {
+                                EnlargedNoteView(note: enlarged) {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        enlargedNote = nil
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -142,12 +149,20 @@ struct ReviewView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .navigationViewStyle(.stack)
-        .onAppear {
-            Task { await loadNotes() }
+        .task {
+            // Only load on first appearance (notes is empty)
+            if notes.isEmpty {
+                await loadNotes()
+            }
         }
         .task(id: appState.databaseService.noteCount) {
-            // Reload when noteCount changes
-            await loadNotes()
+            // Reload when noteCount changes, but only if we already have data
+            // (avoids resetting scroll position on app resume with no actual changes)
+            guard !notes.isEmpty else { return }
+            let currentCount = try? await appState.databaseService.getNotesCountByPeriod(days: periodDays[selectedPeriod])
+            if let currentCount = currentCount, currentCount != totalCount {
+                await loadNotes()
+            }
         }
         .task(id: appState.webSocketService.syncStatus) {
             // Reload when sync completes
@@ -460,12 +475,40 @@ struct SelectableTextView: UIViewRepresentable {
         uiView.font = .systemFont(ofSize: fontSize)
         uiView.copyActionCallback = context.coordinator.handleCopyAction
         
-        // Defer height calculation to next runloop to avoid modifying state during view update
-        // and to allow UITextView to recalculate its content size
-        DispatchQueue.main.async {
-            let height = uiView.contentSize.height
-            onHeightChange(height)
+        // Force layout so contentSize reflects the new text immediately,
+        // preventing stale heights when List recycles rows at pagination boundaries.
+        uiView.setNeedsLayout()
+        uiView.layoutIfNeeded()
+        
+        let height = uiView.contentSize.height
+        if height > 0 {
+            DispatchQueue.main.async {
+                onHeightChange(height)
+            }
+        } else {
+            // Fallback: UITextView hasn't laid out yet (e.g. zero-width frame),
+            // use NSLayoutManager to calculate height from text directly.
+            DispatchQueue.main.async {
+                let fallback = Self.calculateTextHeight(
+                    text: uiView.text ?? "",
+                    font: uiView.font ?? .systemFont(ofSize: fontSize),
+                    width: uiView.bounds.width > 0 ? uiView.bounds.width : UIScreen.main.bounds.width - 80
+                )
+                onHeightChange(max(fallback, 20))
+            }
         }
+    }
+    
+    /// Standalone text height calculation using NSLayoutManager (no UITextView dependency)
+    private static func calculateTextHeight(text: String, font: UIFont, width: CGFloat) -> CGFloat {
+        let textStorage = NSTextStorage(string: text, attributes: [.font: font])
+        let textContainer = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
+        let layoutManager = NSLayoutManager()
+        textContainer.lineFragmentPadding = 0
+        layoutManager.addTextContainer(textContainer)
+        textStorage.addLayoutManager(layoutManager)
+        layoutManager.glyphRange(for: textContainer)
+        return ceil(layoutManager.usedRect(for: textContainer).height)
     }
     
     func makeCoordinator() -> Coordinator {
