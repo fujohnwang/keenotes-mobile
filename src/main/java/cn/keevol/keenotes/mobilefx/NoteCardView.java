@@ -95,6 +95,7 @@ public class NoteCardView extends StackPane {
         contentArea = new TextArea(noteData.content);
         contentArea.setEditable(false);
         contentArea.setWrapText(true);
+        contentArea.setMaxWidth(Double.MAX_VALUE);
         contentArea.getStyleClass().add("note-content-area");
 
         String textColor = isDark ? "#E6EDF3" : "#24292F";
@@ -128,6 +129,8 @@ public class NoteCardView extends StackPane {
                 contentArea.setPrefHeight(height);
                 contentArea.setMinHeight(height);
             }
+            // Ensure scrollbars stay hidden after any layout change
+            javafx.application.Platform.runLater(this::hideScrollBars);
         });
 
         // Update wrapping width when card width changes (with guard to avoid redundant layout)
@@ -232,6 +235,22 @@ public class NoteCardView extends StackPane {
     }
 
     /**
+     * Hide scrollbars from TextArea (called once after skin is loaded)
+     */
+    private void hideScrollBars() {
+        javafx.scene.Node vbar = contentArea.lookup(".scroll-bar:vertical");
+        javafx.scene.Node hbar = contentArea.lookup(".scroll-bar:horizontal");
+        if (vbar != null) {
+            vbar.setVisible(false);
+            vbar.setManaged(false);
+        }
+        if (hbar != null) {
+            hbar.setVisible(false);
+            hbar.setManaged(false);
+        }
+    }
+
+    /**
      * Copy selected text, or all content if nothing selected
      */
     private void copySelectedOrAll() {
@@ -303,6 +322,7 @@ public class NoteCardView extends StackPane {
         channelLabel.setText("• " + ch);
         contentArea.setText(newData.content);
         cancelBorderAnimation();
+        hideScrollBars();
     }
 
     /**

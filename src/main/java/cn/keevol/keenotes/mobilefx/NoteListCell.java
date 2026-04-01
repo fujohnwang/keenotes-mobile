@@ -17,6 +17,8 @@ public class NoteListCell extends ListCell<LocalCacheService.NoteData> {
     public NoteListCell(NotesDisplayPanel panel) {
         this.panel = panel;
         setStyle("-fx-padding: 0 0 12 0; -fx-background-color: transparent;");
+        // Let cell width be determined by ListView, not by content
+        setPrefWidth(0);
     }
 
     @Override

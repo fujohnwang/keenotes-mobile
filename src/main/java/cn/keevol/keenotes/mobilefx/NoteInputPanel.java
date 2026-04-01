@@ -94,6 +94,16 @@ public class NoteInputPanel extends VBox {
                 textMeasure.setWrappingWidth(noteInput.getWidth() - 24);
             }
         });
+
+        // Hide scrollbars once after first layout (scrollbar nodes need layout pass to exist)
+        noteInput.layoutBoundsProperty().addListener(new javafx.beans.value.ChangeListener<javafx.geometry.Bounds>() {
+            @Override
+            public void changed(javafx.beans.value.ObservableValue<? extends javafx.geometry.Bounds> obs,
+                                javafx.geometry.Bounds oldVal, javafx.geometry.Bounds newVal) {
+                hideScrollBars();
+                noteInput.layoutBoundsProperty().removeListener(this);
+            }
+        });
         
         // Add keyboard shortcut handler for Send
         noteInput.setOnKeyPressed(event -> {
@@ -154,6 +164,22 @@ public class NoteInputPanel extends VBox {
 
     }
     
+    /**
+     * Hide scrollbars from TextArea (called once after skin is loaded)
+     */
+    private void hideScrollBars() {
+        javafx.scene.Node vbar = noteInput.lookup(".scroll-bar:vertical");
+        javafx.scene.Node hbar = noteInput.lookup(".scroll-bar:horizontal");
+        if (vbar != null) {
+            vbar.setVisible(false);
+            vbar.setManaged(false);
+        }
+        if (hbar != null) {
+            hbar.setVisible(false);
+            hbar.setManaged(false);
+        }
+    }
+
     private void handleSend() {
         String content = noteInput.getText().trim();
         if (!content.isEmpty() && onSendNote != null) {
