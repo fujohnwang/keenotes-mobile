@@ -3,6 +3,8 @@ package cn.keevol.keenotes.ui
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.os.Bundle
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
@@ -20,16 +22,27 @@ import cn.keevol.keenotes.databinding.ActivityMainBinding
 import cn.keevol.keenotes.network.WebSocketService
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
     
     private lateinit var binding: ActivityMainBinding
     private lateinit var navController: NavController
+    private lateinit var swipeGestureDetector: GestureDetector
     
     // Selected color (primary/accent)
     private val selectedColor by lazy { ContextCompat.getColor(this, R.color.primary) }
     // Unselected color
     private val unselectedColor by lazy { ContextCompat.getColor(this, R.color.text_secondary) }
+    
+    /** Current main tab index (0=Note, 1=Review, 2=Settings), -1 for sub-pages */
+    private var currentTabIndex = 0
+    private val tabCount = 3
+    
+    /** Destination IDs of the 3 main tabs, ordered by index */
+    private val mainTabDestinations by lazy {
+        listOf(R.id.noteFragment, R.id.reviewFragment, R.id.settingsFragment)
+    }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,6 +51,7 @@ class MainActivity : AppCompatActivity() {
         
         setupNavigation()
         setupCustomTabBar()
+        setupSwipeGesture()
         checkConfigurationAndNavigate()
         connectWebSocket()
         observeSyncStateForScreenWake()
@@ -66,9 +80,10 @@ class MainActivity : AppCompatActivity() {
         // Listen to navigation changes to update tab selection
         navController.addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
-                R.id.noteFragment -> selectTab(0)
-                R.id.reviewFragment -> selectTab(1)
-                R.id.settingsFragment -> selectTab(2)
+                R.id.noteFragment -> { currentTabIndex = 0; selectTab(0) }
+                R.id.reviewFragment -> { currentTabIndex = 1; selectTab(1) }
+                R.id.settingsFragment -> { currentTabIndex = 2; selectTab(2) }
+                else -> currentTabIndex = -1 // sub-page, disable swipe
             }
         }
     }
@@ -89,6 +104,52 @@ class MainActivity : AppCompatActivity() {
         
         // Select first tab by default
         selectTab(0)
+    }
+    
+    /**
+     * 在主内容区域添加左右滑动手势，用于在 dock tab 之间切换。
+     * 通过 Activity 级别的 dispatchTouchEvent 拦截，避免被 Fragment 内部的
+     * ScrollView/RecyclerView 消费掉触摸事件。
+     */
+    private fun setupSwipeGesture() {
+        swipeGestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            private val SWIPE_THRESHOLD = 100
+            private val SWIPE_VELOCITY_THRESHOLD = 100
+
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                if (e1 == null) return false
+                if (currentTabIndex < 0) return false
+
+                val diffX = e2.x - e1.x
+                val diffY = e2.y - e1.y
+                if (abs(diffX) <= abs(diffY) * 1.5) return false
+                if (abs(diffX) < SWIPE_THRESHOLD || abs(velocityX) < SWIPE_VELOCITY_THRESHOLD) return false
+
+                val targetIndex = if (diffX < 0) {
+                    (currentTabIndex + 1).coerceAtMost(tabCount - 1)
+                } else {
+                    (currentTabIndex - 1).coerceAtLeast(0)
+                }
+
+                if (targetIndex != currentTabIndex) {
+                    navController.navigate(mainTabDestinations[targetIndex])
+                }
+                return true
+            }
+        })
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        // Let the gesture detector see every touch event before fragments handle it
+        if (::swipeGestureDetector.isInitialized) {
+            swipeGestureDetector.onTouchEvent(ev)
+        }
+        return super.dispatchTouchEvent(ev)
     }
     
     private fun selectTab(index: Int) {
