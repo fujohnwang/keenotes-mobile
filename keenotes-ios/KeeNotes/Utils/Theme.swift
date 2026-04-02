@@ -37,6 +37,46 @@ enum Theme {
         colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
     }
 
+    // MARK: - Date Formatting
+
+    /// Format a note's createdAt string, respecting compact/full preference
+    static func formatNoteDate(_ createdAt: String, compact: Bool) -> String {
+        let inputFormatter = DateFormatter()
+        inputFormatter.timeZone = TimeZone(identifier: "UTC")
+
+        // Try standard format first, then ISO format
+        for format in ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss"] {
+            inputFormatter.dateFormat = format
+            if let date = inputFormatter.date(from: createdAt) {
+                return compact ? compactDate(date) : fullDate(date)
+            }
+        }
+        return createdAt
+    }
+
+    private static func fullDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        f.timeZone = TimeZone.current
+        return f.string(from: date)
+    }
+
+    private static func compactDate(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let f = DateFormatter()
+        f.timeZone = TimeZone.current
+        if calendar.isDateInToday(date) {
+            f.dateFormat = "HH:mm"
+            return "Today \(f.string(from: date))"
+        } else if calendar.isDateInYesterday(date) {
+            f.dateFormat = "HH:mm"
+            return "Yesterday \(f.string(from: date))"
+        } else {
+            f.dateFormat = "MM-dd HH:mm"
+            return f.string(from: date)
+        }
+    }
+
     // MARK: - Typography
 
     /// Rounded bold font for stat numbers

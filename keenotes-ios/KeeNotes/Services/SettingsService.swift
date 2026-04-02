@@ -19,6 +19,7 @@ class SettingsService: ObservableObject {
         static let confettiOnPostSuccess = "confetti_on_post_success"
         static let hiddenMessage = "hidden_message"
         static let showSyncChannelStatus = "show_sync_channel_status"
+        static let compactDateFormat = "compact_date_format"
     }
     
     @Published var endpointUrl: String {
@@ -78,6 +79,12 @@ class SettingsService: ObservableObject {
             defaults.set(showSyncChannelStatus, forKey: Keys.showSyncChannelStatus)
         }
     }
+
+    @Published var compactDateFormat: Bool {
+        didSet {
+            defaults.set(compactDateFormat, forKey: Keys.compactDateFormat)
+        }
+    }
     
     @Published var firstNoteDate: String? {
         didSet {
@@ -106,6 +113,7 @@ class SettingsService: ObservableObject {
         self.confettiOnPostSuccess = defaults.object(forKey: Keys.confettiOnPostSuccess) == nil ? true : defaults.bool(forKey: Keys.confettiOnPostSuccess)
         self.hiddenMessage = defaults.string(forKey: Keys.hiddenMessage) ?? ""
         self.showSyncChannelStatus = defaults.object(forKey: Keys.showSyncChannelStatus) == nil ? false : defaults.bool(forKey: Keys.showSyncChannelStatus)
+        self.compactDateFormat = defaults.object(forKey: Keys.compactDateFormat) == nil ? true : defaults.bool(forKey: Keys.compactDateFormat)
         self.firstNoteDate = defaults.string(forKey: Keys.firstNoteDate)
     }
     
