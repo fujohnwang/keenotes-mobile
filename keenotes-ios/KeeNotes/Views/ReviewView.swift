@@ -317,31 +317,7 @@ struct NoteRow: View {
     private var messageFontSize: CGFloat { isPad ? 18 : 17 }
 
     private var formattedDate: String {
-        // Parse UTC time and convert to local timezone for display
-        let inputFormatter = DateFormatter()
-        inputFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        inputFormatter.timeZone = TimeZone(identifier: "UTC")
-
-        if let date = inputFormatter.date(from: note.createdAt) {
-            let displayFormatter = DateFormatter()
-            displayFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            displayFormatter.timeZone = TimeZone.current
-            return displayFormatter.string(from: date)
-        }
-
-        // Fallback: try ISO format
-        inputFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        inputFormatter.timeZone = TimeZone(identifier: "UTC")
-
-        if let date = inputFormatter.date(from: note.createdAt) {
-            let displayFormatter = DateFormatter()
-            displayFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            displayFormatter.timeZone = TimeZone.current
-            return displayFormatter.string(from: date)
-        }
-
-        // If all else fails, return as-is
-        return note.createdAt
+        Theme.formatNoteDate(note.createdAt, compact: appState.settingsService.compactDateFormat)
     }
 
     var body: some View {

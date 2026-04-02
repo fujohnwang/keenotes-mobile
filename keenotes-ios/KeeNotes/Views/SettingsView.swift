@@ -162,6 +162,13 @@ struct SettingsView: View {
                     ))
                     .listRowBackground(Color.clear)
                     .padding(.vertical, 6)
+
+                    Toggle("Compact date format", isOn: Binding(
+                        get: { appState.settingsService.compactDateFormat },
+                        set: { appState.settingsService.compactDateFormat = $0 }
+                    ))
+                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 6)
                 }
                 .font(.system(size: isPad ? 17 : 17))
                 .toggleStyle(SwitchToggleStyle(tint: Theme.brandColor))
