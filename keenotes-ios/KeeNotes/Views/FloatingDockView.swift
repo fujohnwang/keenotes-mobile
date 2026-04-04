@@ -41,6 +41,8 @@ struct DockTabButton: View {
 /// Floating capsule dock that hovers above content (Layer 3)
 struct FloatingDockView: View {
     @Binding var selectedTab: Int
+    /// Called with the tapped index so the parent can determine transition direction
+    var onTabSelected: (Int) -> Void
     @Environment(\.colorScheme) private var colorScheme
 
     private let items: [DockItem] = [
@@ -53,9 +55,7 @@ struct FloatingDockView: View {
         HStack(spacing: 0) {
             ForEach(items, id: \.index) { item in
                 DockTabButton(item: item, isSelected: selectedTab == item.index) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedTab = item.index
-                    }
+                    onTabSelected(item.index)
                 }
             }
         }
