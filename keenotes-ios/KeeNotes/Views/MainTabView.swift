@@ -74,8 +74,14 @@ struct MainTabView: View {
             }
 
             // Layer 3: Floating Dock
-            FloatingDockView(selectedTab: $appState.selectedTab)
-                .padding(.bottom, 16)
+            FloatingDockView(selectedTab: $appState.selectedTab) { targetIndex in
+                guard targetIndex != appState.selectedTab else { return }
+                swipeDirection = targetIndex > appState.selectedTab ? .left : .right
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    appState.selectedTab = targetIndex
+                }
+            }
+            .padding(.bottom, 16)
         }
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
