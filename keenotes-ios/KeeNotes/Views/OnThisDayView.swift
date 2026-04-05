@@ -78,7 +78,7 @@ struct OnThisDayView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: topIconSize, weight: .medium))
                     .foregroundColor(.primary)
-                    .frame(width: topButtonSize, height: topButtonSize)
+                    .frame(width: topButtonSize, height: topButtonSize, alignment: .leading)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
