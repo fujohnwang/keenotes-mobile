@@ -186,6 +186,68 @@ class DatabaseService: ObservableObject {
         }
     }
     
+    func getNotesOnThisDay() async throws -> [Note] {
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        // Use local calendar to get today's month-day, then convert to UTC range for each past year.
+        // DB stores UTC strings; we query by UTC date ranges that correspond to "today in local time".
+        let calendar = Calendar.current
+        let today = calendar.dateComponents([.year, .month, .day], from: Date())
+        guard let month = today.month, let day = today.day, let currentYear = today.year else {
+            return []
+        }
+
+        let monthDay = String(format: "%02d-%02d", month, day)
+
+        // Build UTC start/end for each past year's local "today"
+        // Local midnight → UTC, local end-of-day → UTC
+        var conditions: [String] = []
+        var arguments: [DatabaseValueConvertible] = []
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(abbreviation: "UTC")
+
+        let localTZ = TimeZone.current
+        // Earliest year in DB is unlikely before 2000; scan from 2000 to last year
+        for year in 2000..<currentYear {
+            var startComponents = DateComponents()
+            startComponents.year = year
+            startComponents.month = month
+            startComponents.day = day
+            startComponents.hour = 0
+            startComponents.minute = 0
+            startComponents.second = 0
+            startComponents.timeZone = localTZ
+
+            var endComponents = startComponents
+            endComponents.hour = 23
+            endComponents.minute = 59
+            endComponents.second = 59
+
+            guard let startLocal = Calendar.current.date(from: startComponents),
+                  let endLocal = Calendar.current.date(from: endComponents) else { continue }
+
+            let startUTC = formatter.string(from: startLocal)
+            let endUTC = formatter.string(from: endLocal)
+
+            conditions.append("(createdAt >= ? AND createdAt <= ?)")
+            arguments.append(startUTC)
+            arguments.append(endUTC)
+        }
+
+        guard !conditions.isEmpty else { return [] }
+
+        let sql = conditions.joined(separator: " OR ")
+        return try await dbQueue.read { db in
+            try Note
+                .filter(sql: sql, arguments: StatementArguments(arguments))
+                .order(Note.Columns.createdAt.desc)
+                .fetchAll(db)
+        }
+    }
+
     func searchNotes(query: String) async throws -> [Note] {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized

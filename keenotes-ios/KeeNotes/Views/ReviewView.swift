@@ -359,16 +359,23 @@ struct NoteRow: View {
             }
 
             // Note content with selectable text using UITextView
-            SelectableTextView(
+            GeometryReader { geo in
+                SelectableTextView(
+                    text: note.content,
+                    fontSize: messageFontSize,
+                    availableWidth: geo.size.width,
+                    onTap: copyToClipboard,
+                    onCopyMenuAction: showCopiedNotification,
+                    onHeightChange: { height in
+                        textViewHeight = height
+                    }
+                )
+            }
+            .frame(height: textViewHeight ?? SelectableTextView.estimatedHeight(
                 text: note.content,
                 fontSize: messageFontSize,
-                onTap: copyToClipboard,
-                onCopyMenuAction: showCopiedNotification,
-                onHeightChange: { height in
-                    textViewHeight = height
-                }
-            )
-            .frame(height: textViewHeight)
+                width: UIScreen.main.bounds.width - (isPad ? 48 : 32)
+            ))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, isPad ? 20 : 16)
@@ -454,10 +461,16 @@ struct NoteRow: View {
 struct SelectableTextView: UIViewRepresentable {
     let text: String
     let fontSize: CGFloat
+    var availableWidth: CGFloat = 0
     let onTap: () -> Void
     let onCopyMenuAction: () -> Void
     let onHeightChange: (CGFloat) -> Void
-    
+
+    /// Synchronous height estimate using NSLayoutManager — used for first-frame sizing
+    static func estimatedHeight(text: String, fontSize: CGFloat, width: CGFloat) -> CGFloat {
+        calculateTextHeight(text: text, font: .systemFont(ofSize: fontSize), width: width)
+    }
+
     func makeUIView(context: Context) -> CustomUITextView {
         let textView = CustomUITextView()
         textView.isEditable = false
@@ -470,12 +483,12 @@ struct SelectableTextView: UIViewRepresentable {
         textView.textColor = .label
         textView.bounces = false  // Disable bouncing to hide scrolling behavior
         textView.copyActionCallback = context.coordinator.handleCopyAction
-        
+
         // Add tap gesture for copy
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
         tapGesture.delegate = context.coordinator
         textView.addGestureRecognizer(tapGesture)
-        
+
         return textView
     }
     
@@ -495,13 +508,14 @@ struct SelectableTextView: UIViewRepresentable {
                 onHeightChange(height)
             }
         } else {
-            // Fallback: UITextView hasn't laid out yet (e.g. zero-width frame),
-            // use NSLayoutManager to calculate height from text directly.
+            // Fallback: use availableWidth if provided, otherwise estimate from screen width
+            let width = availableWidth > 0 ? availableWidth
+                      : (uiView.bounds.width > 0 ? uiView.bounds.width : UIScreen.main.bounds.width - 80)
             DispatchQueue.main.async {
                 let fallback = Self.calculateTextHeight(
                     text: uiView.text ?? "",
                     font: uiView.font ?? .systemFont(ofSize: fontSize),
-                    width: uiView.bounds.width > 0 ? uiView.bounds.width : UIScreen.main.bounds.width - 80
+                    width: width
                 )
                 onHeightChange(max(fallback, 20))
             }

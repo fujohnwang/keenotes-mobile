@@ -9,84 +9,110 @@ struct SearchView: View {
     @State private var isLoading = false
     @State private var searchTask: Task<Void, Never>?
     @FocusState private var isSearchFocused: Bool
+    @State private var enlargedNote: Note? = nil
+    @Environment(\.colorScheme) private var colorScheme
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
     private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Search bar
-            SearchBar(text: $searchText, isPad: isPad)
-                .focused($isSearchFocused)
-                .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 4, trailing: horizontalPadding))
+        ZStack {
+            Theme.pageBackground(colorScheme).ignoresSafeArea()
 
-            // Header row: Notes count (left) + Sync Channel status (right)
-            if !searchText.isEmpty {
-                HStack {
-                    // Notes count
-                    Text("\(notes.count) note(s) - Search results")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+            VStack(spacing: 0) {
+                // Search bar
+                SearchBar(text: $searchText, isPad: isPad)
+                    .focused($isSearchFocused)
+                    .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 4, trailing: horizontalPadding))
 
+                // Header row: Notes count (left) + Sync Channel status (right)
+                if !searchText.isEmpty {
+                    HStack {
+                        (Text("\(notes.count)").foregroundColor(Theme.brandColor).fontWeight(.semibold) +
+                         Text(" note(s) - Search results").foregroundColor(.secondary))
+                            .font(.caption)
+
+                        Spacer()
+
+                        if appState.settingsService.showSyncChannelStatus {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(syncChannelColor)
+                                    .frame(width: 8, height: 8)
+                                Text("Sync Channel:")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(syncChannelText)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(syncChannelColor)
+                            }
+                        }
+                    }
+                    .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
+                }
+
+                // Search results
+                if searchText.isEmpty {
                     Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 48))
+                            .foregroundColor(.gray)
+                        Text("Enter keywords to search notes")
+                            .foregroundColor(.gray)
+                    }
+                    Spacer()
+                } else if isLoading {
+                    Spacer()
+                    ProgressView("Searching...")
+                    Spacer()
+                } else if notes.isEmpty {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 48))
+                            .foregroundColor(.gray)
+                        Text("No results found")
+                            .foregroundColor(.gray)
+                    }
+                    Spacer()
+                } else {
+                    ZStack {
+                        List {
+                            ForEach(notes) { note in
+                                NoteRow(note: note, onEnlarge: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        enlargedNote = note
+                                    }
+                                })
+                                .listRowInsets(EdgeInsets(top: 0, leading: horizontalPadding, bottom: 0, trailing: horizontalPadding))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                            }
 
-                    // Sync Channel status (right) - conditionally visible
-                    if appState.settingsService.showSyncChannelStatus {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(syncChannelColor)
-                                .frame(width: 8, height: 8)
+                            // Bottom safe area spacer
+                            Color.clear
+                                .frame(height: 80)
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        }
+                        .listStyle(.plain)
+                        .modifier(ListBackgroundModifier())
+                        .opacity(enlargedNote == nil ? 1 : 0)
+                        .allowsHitTesting(enlargedNote == nil)
 
-                            Text("Sync Channel:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-
-                            Text(syncChannelText)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(syncChannelColor)
+                        if let enlarged = enlargedNote {
+                            EnlargedNoteView(note: enlarged) {
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    enlargedNote = nil
+                                }
+                            }
                         }
                     }
                 }
-                .padding(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
-            }
-            
-            // Search results
-            if searchText.isEmpty {
-                Spacer()
-                VStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 48))
-                        .foregroundColor(.gray)
-                    Text("Enter keywords to search notes")
-                        .foregroundColor(.gray)
-                }
-                Spacer()
-            } else if isLoading {
-                Spacer()
-                ProgressView("Searching...")
-                Spacer()
-            } else if notes.isEmpty {
-                Spacer()
-                VStack(spacing: 12) {
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 48))
-                        .foregroundColor(.gray)
-                    Text("No results found")
-                        .foregroundColor(.gray)
-                }
-                Spacer()
-            } else {
-                List {
-                    ForEach(notes) { note in
-                        NoteRow(note: note)
-                            .listRowInsets(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                    }
-                }
-                .listStyle(.plain)
             }
         }
         .navigationTitle("Search")

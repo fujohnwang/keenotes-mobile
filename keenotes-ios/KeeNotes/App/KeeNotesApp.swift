@@ -52,6 +52,7 @@ struct KeeNotesApp: App {
 class AppState: ObservableObject {
     @Published var isInitialized = false
     @Published var selectedTab = 0  // 0: Note, 1: Review, 2: Settings
+    @Published var onThisDayNotes: [Note] = []
     
     // Services
     let settingsService = SettingsService()
@@ -129,6 +130,9 @@ class AppState: ObservableObject {
             // Refresh pending note count
             Task { await databaseService.refreshPendingNoteCount() }
             
+            // Query "On this day" notes (once at launch)
+            Task { await loadOnThisDayNotes() }
+            
             isInitialized = true
         } catch {
             print("Failed to initialize: \(error)")
@@ -173,6 +177,16 @@ class AppState: ObservableObject {
         }
     }
     
+    private func loadOnThisDayNotes() async {
+        do {
+            let notes = try await databaseService.getNotesOnThisDay()
+            print("[AppState] On this day: \(notes.count) note(s)")
+            onThisDayNotes = notes
+        } catch {
+            print("[AppState] Failed to load on-this-day notes: \(error)")
+        }
+    }
+
     func reconnect() {
         webSocketService.disconnect()
         webSocketService.resetState()
