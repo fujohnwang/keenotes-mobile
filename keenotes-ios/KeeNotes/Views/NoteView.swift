@@ -11,6 +11,8 @@ struct NoteView: View {
     @State private var errorMessage = ""
     @State private var isPosting = false
     @State private var showingPendingList = false
+    @State private var showingSearch = false
+    @State private var showingOnThisDay = false
     @FocusState private var isTextFieldFocused: Bool
     @State private var keyboardVisible = false
     @StateObject private var speechService = SpeechRecognitionService()
@@ -124,15 +126,29 @@ struct NoteView: View {
                 removeKeyboardObservers()
                 speechService.stopRecording()
             }
-            .toolbar {
-                // Search button (right)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: SearchView().environmentObject(appState)) {
-                        Image(systemName: "magnifyingglass")
+            .navigationBarItems(
+                leading: Group {
+                    if !appState.onThisDayNotes.isEmpty {
+                        Image(systemName: "sparkles")
                             .font(.system(size: 17))
+                            .foregroundColor(.primary)
+                            .contentShape(Rectangle())
+                            .onTapGesture { showingOnThisDay = true }
                     }
+                },
+                trailing: Image(systemName: "magnifyingglass")
+                    .font(.system(size: 17))
+                    .foregroundColor(.primary)
+                    .contentShape(Rectangle())
+                    .onTapGesture { showingSearch = true }
+            )
+            .background(
+                Group {
+                    NavigationLink(destination: OnThisDayView().environmentObject(appState), isActive: $showingOnThisDay) { EmptyView() }
+                    NavigationLink(destination: SearchView().environmentObject(appState), isActive: $showingSearch) { EmptyView() }
                 }
-            }
+                .hidden()
+            )
             .safeAreaInset(edge: .bottom) {
                 if keyboardVisible {
                     VStack(spacing: 4) {
