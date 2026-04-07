@@ -8,7 +8,6 @@ struct EnlargedNoteView: View {
     @EnvironmentObject var appState: AppState
     
     @State private var showCopiedAlert = false
-    @State private var textViewHeight: CGFloat?
     
     private var isPad: Bool { DeviceType.isPad }
     private var cardPadding: CGFloat { isPad ? 32 : 20 }
@@ -57,16 +56,16 @@ struct EnlargedNoteView: View {
             
             // Note content — scrollable, selectable, tap to copy
             ScrollView {
-                SelectableTextView(
-                    text: note.content,
-                    fontSize: messageFontSize,
-                    onTap: copyToClipboard,
-                    onCopyMenuAction: showCopiedNotification,
-                    onHeightChange: { height in
-                        textViewHeight = height
+                Text(note.content)
+                    .font(.system(size: messageFontSize))
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        copyToClipboard()
                     }
-                )
-                .frame(height: textViewHeight)
                 .padding(.horizontal, cardPadding)
                 .padding(.bottom, cardPadding)
             }
