@@ -709,6 +709,12 @@
     -fx-text-fill: -fx-primary;
 }
 
+.sidebar-quick-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
 /* Sidebar Status Area */
 .sidebar-status-area {
     -fx-background-color: transparent;

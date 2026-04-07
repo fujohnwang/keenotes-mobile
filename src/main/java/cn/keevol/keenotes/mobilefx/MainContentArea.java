@@ -3,6 +3,7 @@ package cn.keevol.keenotes.mobilefx;
 import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -26,6 +27,7 @@ public class MainContentArea extends StackPane {
     private VBox noteModePanel;
     private VBox searchModePanel;
     private VBox reviewModePanel;
+    private VBox onThisDayModePanel;
     private VBox settingsModePanel;
 
     // Note mode components
@@ -39,6 +41,7 @@ public class MainContentArea extends StackPane {
     // Review mode components
     private NotesDisplayPanel reviewNotesPanel;
     private String currentReviewPeriod = "7 days";
+    private NotesDisplayPanel onThisDayNotesPanel;
 
     // Settings mode components
     private SettingsView settingsView;
@@ -272,8 +275,11 @@ public class MainContentArea extends StackPane {
         } else if (currentPanel == reviewModePanel) {
             logger.info("Batch sync completed with " + notes.size() + " notes, reloading Review list");
             loadReviewNotes(currentReviewPeriod);
+        } else if (currentPanel == onThisDayModePanel) {
+            logger.info("Batch sync completed with " + notes.size() + " notes, reloading On This Day list");
+            loadOnThisDayNotes();
         } else {
-            logger.fine("Batch sync completed but current panel is not Note/Review mode, skipping UI update");
+            logger.fine("Batch sync completed but current panel is not Note/Review/OnThisDay mode, skipping UI update");
         }
     }
 
@@ -287,16 +293,20 @@ public class MainContentArea extends StackPane {
         // Review mode panel
         reviewModePanel = createReviewModePanel();
 
+        // On This Day mode panel
+        onThisDayModePanel = createOnThisDayModePanel();
+
         // Settings mode panel
         settingsModePanel = createSettingsModePanel();
 
         // Add all panels (initially hidden)
-        getChildren().addAll(noteModePanel, searchModePanel, reviewModePanel, settingsModePanel);
+        getChildren().addAll(noteModePanel, searchModePanel, reviewModePanel, onThisDayModePanel, settingsModePanel);
 
         // Hide all except note mode
         noteModePanel.setVisible(true);
         searchModePanel.setVisible(false);
         reviewModePanel.setVisible(false);
+        onThisDayModePanel.setVisible(false);
         settingsModePanel.setVisible(false);
 
         currentPanel = noteModePanel;
@@ -361,6 +371,22 @@ public class MainContentArea extends StackPane {
 
         panel.getChildren().addAll(titleLabel, reviewNotesPanel);
 
+        return panel;
+    }
+
+    private VBox createOnThisDayModePanel() {
+        VBox panel = new VBox(16);
+        panel.getStyleClass().add("mode-panel");
+        panel.setPadding(new Insets(16));
+
+        Label titleLabel = new Label("On this day in years past");
+        titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-text-primary;");
+        VBox.setMargin(titleLabel, new Insets(0, 0, 0, 16));
+
+        onThisDayNotesPanel = new NotesDisplayPanel();
+        VBox.setVgrow(onThisDayNotesPanel, Priority.ALWAYS);
+
+        panel.getChildren().addAll(titleLabel, onThisDayNotesPanel);
         return panel;
     }
 
@@ -440,6 +466,89 @@ public class MainContentArea extends StackPane {
                 Platform.runLater(() -> reviewNotesPanel.showError("Error loading notes: " + e.getMessage()));
             }
         }).start();
+    }
+
+    public void loadOnThisDayNotes() {
+        if (onThisDayNotesPanel == null) {
+            return;
+        }
+
+        if (!SettingsService.getInstance().getShowOnThisDayInYearsPast()) {
+            Platform.runLater(() -> onThisDayNotesPanel.showEmptyState("On This Day is turned off in Settings."));
+            return;
+        }
+
+        Platform.runLater(() -> onThisDayNotesPanel.showLoading("Loading notes"));
+
+        ServiceManager serviceManager = ServiceManager.getInstance();
+        ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
+
+        if (state == ServiceManager.InitializationState.INITIALIZING) {
+            Platform.runLater(() -> onThisDayNotesPanel.showLoading("Cache is initializing"));
+            new Thread(() -> {
+                try {
+                    Thread.sleep(2000);
+                    loadOnThisDayNotes();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }, "RetryOnThisDayInit").start();
+            return;
+        }
+
+        if (state == ServiceManager.InitializationState.ERROR) {
+            String errorMsg = serviceManager.getLocalCacheErrorMessage();
+            Platform.runLater(() -> onThisDayNotesPanel.showError("Cache error: " + errorMsg));
+            return;
+        }
+
+        if (state == ServiceManager.InitializationState.NOT_STARTED) {
+            Platform.runLater(() -> onThisDayNotesPanel.showLoading("Initializing cache"));
+            serviceManager.getLocalCacheService();
+            new Thread(() -> {
+                try {
+                    Thread.sleep(1000);
+                    loadOnThisDayNotes();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }, "RetryOnThisDayStart").start();
+            return;
+        }
+
+        Task<java.util.List<LocalCacheService.NoteData>> task = new Task<>() {
+            @Override
+            protected java.util.List<LocalCacheService.NoteData> call() {
+                localCache = serviceManager.getLocalCacheService();
+                if (localCache == null) {
+                    return null;
+                }
+
+                return localCache.getNotesOnThisDay();
+            }
+        };
+
+        task.setOnSucceeded(event -> {
+            java.util.List<LocalCacheService.NoteData> notes = task.getValue();
+
+            if (notes == null) {
+                onThisDayNotesPanel.showError("On This Day notes are unavailable");
+                return;
+            }
+
+            if (notes.isEmpty()) {
+                onThisDayNotesPanel.showEmptyState("No notes from this day in past years yet.");
+            } else {
+                onThisDayNotesPanel.displayNotes(notes, "From past years");
+            }
+        });
+
+        task.setOnFailed(event -> onThisDayNotesPanel.showError(
+                "Error loading On This Day notes: " + task.getException().getMessage()));
+
+        Thread thread = new Thread(task, "LoadOnThisDayNotes");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     /**
@@ -819,6 +928,7 @@ public class MainContentArea extends StackPane {
     public void showMode(DesktopMainView.ViewMode mode) {
         VBox targetPanel = switch (mode) {
             case NOTE -> noteModePanel;
+            case ON_THIS_DAY -> onThisDayModePanel;
             case SEARCH -> searchModePanel;
             case REVIEW -> reviewModePanel;
             case SETTINGS -> settingsModePanel;

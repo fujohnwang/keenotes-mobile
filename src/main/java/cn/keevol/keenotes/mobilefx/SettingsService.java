@@ -38,6 +38,7 @@ public class SettingsService {
     private static final String KEY_MCP_SERVER_ENABLED = "mcp.server.enabled";
     private static final String KEY_HIDDEN_MESSAGE = "hidden.message";
     private static final String KEY_SHOW_SYNC_CHANNEL_STATUS = "show.sync.channel.status";
+    private static final String KEY_SHOW_ON_THIS_DAY_IN_YEARS_PAST = "show.on.this.day.in.years.past";
 
     private static final int DEFAULT_REVIEW_DAYS = 7;
     private static final String DEFAULT_TAKE_NOTE_SHORTCUT = "Alt+T";
@@ -60,6 +61,7 @@ public class SettingsService {
     private final BooleanProperty showOverviewCardProperty = new SimpleBooleanProperty(true);
     private final IntegerProperty noteFontSizeProperty = new SimpleIntegerProperty(DEFAULT_NOTE_FONT_SIZE);
     private final BooleanProperty showSyncChannelStatusProperty = new SimpleBooleanProperty(false);
+    private final BooleanProperty showOnThisDayInYearsPastProperty = new SimpleBooleanProperty(true);
 
     private SettingsService() {
         properties = new Properties();
@@ -69,6 +71,7 @@ public class SettingsService {
         showOverviewCardProperty.set(getShowOverviewCard());
         noteFontSizeProperty.set(getNoteFontSize());
         showSyncChannelStatusProperty.set(getShowSyncChannelStatus());
+        showOnThisDayInYearsPastProperty.set(getShowOnThisDayInYearsPast());
     }
 
     public static synchronized SettingsService getInstance() {
@@ -244,6 +247,19 @@ public class SettingsService {
 
     public BooleanProperty showOverviewCardProperty() {
         return showOverviewCardProperty;
+    }
+
+    public boolean getShowOnThisDayInYearsPast() {
+        return Boolean.parseBoolean(properties.getProperty(KEY_SHOW_ON_THIS_DAY_IN_YEARS_PAST, "true"));
+    }
+
+    public void setShowOnThisDayInYearsPast(boolean enabled) {
+        properties.setProperty(KEY_SHOW_ON_THIS_DAY_IN_YEARS_PAST, String.valueOf(enabled));
+        showOnThisDayInYearsPastProperty.set(enabled);
+    }
+
+    public BooleanProperty showOnThisDayInYearsPastProperty() {
+        return showOnThisDayInYearsPastProperty;
     }
 
     public String getFirstNoteDate() {

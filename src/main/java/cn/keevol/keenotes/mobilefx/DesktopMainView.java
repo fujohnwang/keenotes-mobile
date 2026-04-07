@@ -1,5 +1,6 @@
 package cn.keevol.keenotes.mobilefx;
 
+import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
@@ -7,6 +8,10 @@ import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
+
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Desktop-style main view with sidebar navigation
@@ -16,12 +21,14 @@ public class DesktopMainView extends BorderPane {
     // Components
     private final SidebarView sidebar;
     private final MainContentArea mainContent;
+    private PauseTransition onThisDayMidnightRefreshTimer;
     
     // Current mode
     private ViewMode currentMode = ViewMode.NOTE;
     
     public enum ViewMode {
         NOTE,       // Note input and recent notes
+        ON_THIS_DAY, // Notes from the same month/day in past years
         SEARCH,     // Search notes
         REVIEW,     // Review notes by period
         SETTINGS    // Settings
@@ -39,7 +46,9 @@ public class DesktopMainView extends BorderPane {
         
         // Setup keyboard shortcuts
         setupKeyboardShortcuts();
-        
+        setupOnThisDayDateRefresh();
+        setupOnThisDaySettingObserver();
+
         // Initialize with Note mode
         switchToMode(ViewMode.NOTE);
     }
@@ -99,6 +108,59 @@ public class DesktopMainView extends BorderPane {
                 });
             }
         });
+    }
+
+    private void setupOnThisDayDateRefresh() {
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene == null) {
+                stopOnThisDayDateRefresh();
+                return;
+            }
+            scheduleNextOnThisDayDateRefresh();
+        });
+    }
+
+    private void setupOnThisDaySettingObserver() {
+        SettingsService.getInstance().showOnThisDayInYearsPastProperty().addListener((obs, oldVal, newVal) -> {
+            sidebar.refreshOnThisDayAvailability();
+            if (Boolean.TRUE.equals(newVal)) {
+                scheduleNextOnThisDayDateRefresh();
+            } else {
+                stopOnThisDayDateRefresh();
+                if (currentMode == ViewMode.ON_THIS_DAY) {
+                    switchToMode(ViewMode.NOTE);
+                }
+            }
+        });
+    }
+
+    private void stopOnThisDayDateRefresh() {
+        if (onThisDayMidnightRefreshTimer != null) {
+            onThisDayMidnightRefreshTimer.stop();
+            onThisDayMidnightRefreshTimer = null;
+        }
+    }
+
+    private void scheduleNextOnThisDayDateRefresh() {
+        stopOnThisDayDateRefresh();
+
+        if (!SettingsService.getInstance().getShowOnThisDayInYearsPast()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay();
+        long delayMillis = Math.max(1000, ChronoUnit.MILLIS.between(now, nextMidnight));
+
+        onThisDayMidnightRefreshTimer = new PauseTransition(Duration.millis(delayMillis));
+        onThisDayMidnightRefreshTimer.setOnFinished(event -> {
+            sidebar.refreshOnThisDayAvailability();
+            if (currentMode == ViewMode.ON_THIS_DAY) {
+                mainContent.loadOnThisDayNotes();
+            }
+            scheduleNextOnThisDayDateRefresh();
+        });
+        onThisDayMidnightRefreshTimer.play();
     }
     
     /**
@@ -189,6 +251,10 @@ public class DesktopMainView extends BorderPane {
      * @param loadDefaultData Whether to load default data for the mode
      */
     private void switchToMode(ViewMode mode, boolean loadDefaultData) {
+        if (mode == ViewMode.ON_THIS_DAY && !SettingsService.getInstance().getShowOnThisDayInYearsPast()) {
+            mode = ViewMode.NOTE;
+        }
+
         System.out.println("[DesktopMainView] Switching to mode: " + mode + ", loadDefaultData: " + loadDefaultData);
         currentMode = mode;
         
@@ -199,9 +265,12 @@ public class DesktopMainView extends BorderPane {
         mainContent.showMode(mode);
         
         // Load data for specific modes
-        if (mode == ViewMode.REVIEW && loadDefaultData) {
-            // Load default period (7 days) when entering review mode
-            mainContent.loadReviewNotes("7 days");
+        if (loadDefaultData) {
+            if (mode == ViewMode.REVIEW) {
+                mainContent.loadReviewNotes("7 days");
+            } else if (mode == ViewMode.ON_THIS_DAY) {
+                mainContent.loadOnThisDayNotes();
+            }
         }
     }
     

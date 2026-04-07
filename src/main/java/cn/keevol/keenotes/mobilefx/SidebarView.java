@@ -2,12 +2,16 @@ package cn.keevol.keenotes.mobilefx;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.concurrent.Task;
 import javafx.scene.control.Label;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.SVGPath;
 
 import java.util.function.Consumer;
 
@@ -23,12 +27,15 @@ public class SidebarView extends VBox {
     private NavigationButton searchButton;
     private NavigationButton reviewButton;
     private NavigationButton settingsButton;
+    private ToggleButton onThisDayButton;
+    private SVGPath onThisDayIcon;
     
     // Review periods panel
     private ReviewPeriodsPanel reviewPeriodsPanel;
     
     // Settings sub panel
     private SettingsSubPanel settingsSubPanel;
+    private boolean onThisDayListenerRegistered = false;
     
     public SidebarView(Consumer<DesktopMainView.ViewMode> onNavigationChanged) {
         this.onNavigationChanged = onNavigationChanged;
@@ -38,6 +45,7 @@ public class SidebarView extends VBox {
         setSpacing(16);
         
         setupComponents();
+        setupOnThisDayAvailabilityTracking();
     }
     
     private void setupComponents() {
@@ -52,6 +60,7 @@ public class SidebarView extends VBox {
         SettingsService settings = SettingsService.getInstance();
         overviewCard.visibleProperty().bind(settings.showOverviewCardProperty());
         overviewCard.managedProperty().bind(settings.showOverviewCardProperty());
+        settings.showOnThisDayInYearsPastProperty().addListener((obs, oldVal, newVal) -> refreshOnThisDayButtonVisibility());
         
         // Add more spacing between logo and overview card
         VBox.setMargin(overviewCard, new Insets(8, 0, 0, 0));
@@ -194,17 +203,191 @@ public class SidebarView extends VBox {
             
             Label logoText = new Label("KeeNotes");
             logoText.getStyleClass().add("sidebar-logo-text");
-            
-            logoArea.getChildren().addAll(iconView, logoText);
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            onThisDayButton = createOnThisDayButton();
+
+            logoArea.getChildren().addAll(iconView, logoText, spacer, onThisDayButton);
         } catch (Exception e) {
             // Fallback if icon not found
             System.err.println("Could not load app icon: " + e.getMessage());
             Label logoText = new Label("KeeNotes");
             logoText.getStyleClass().add("sidebar-logo-text");
-            logoArea.getChildren().add(logoText);
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            onThisDayButton = createOnThisDayButton();
+
+            logoArea.getChildren().addAll(logoText, spacer, onThisDayButton);
         }
         
         return logoArea;
+    }
+
+    private ToggleButton createOnThisDayButton() {
+        onThisDayIcon = new SVGPath();
+        onThisDayIcon.setContent("M12 2l1.15 3.35L16.5 6.5l-3.35 1.15L12 11l-1.15-3.35L7.5 6.5l3.35-1.15L12 2zM18.5 10l.67 1.83L21 12.5l-1.83.67L18.5 15l-.67-1.83L16 12.5l1.83-.67L18.5 10zM7 13l.92 2.58L10.5 16.5l-2.58.92L7 20l-.92-2.58L3.5 16.5l2.58-.92L7 13z");
+        onThisDayIcon.setScaleX(0.8);
+        onThisDayIcon.setScaleY(0.8);
+
+        ToggleButton button = new ToggleButton();
+        button.setGraphic(onThisDayIcon);
+        button.getStyleClass().add("sidebar-quick-button");
+        button.setFocusTraversable(false);
+        button.setMinSize(36, 36);
+        button.setPrefSize(36, 36);
+        button.setMaxSize(36, 36);
+        button.setTooltip(new Tooltip("On this day in years past"));
+        button.setVisible(false);
+        button.setManaged(false);
+        button.setOnAction(e -> {
+            button.setSelected(true);
+            updateOnThisDayButtonStyle();
+            onNavigationChanged.accept(DesktopMainView.ViewMode.ON_THIS_DAY);
+        });
+
+        button.selectedProperty().addListener((obs, oldVal, newVal) -> updateOnThisDayButtonStyle());
+        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) ->
+                javafx.application.Platform.runLater(this::updateOnThisDayButtonStyle));
+        updateOnThisDayButtonStyle();
+        return button;
+    }
+
+    private void updateOnThisDayButtonStyle() {
+        if (onThisDayButton == null || onThisDayIcon == null) {
+            return;
+        }
+
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        boolean selected = onThisDayButton.isSelected();
+        String primaryColor = isDark ? "#22D3EE" : "#0969DA";
+        String mutedColor = isDark ? "#8B949E" : "#57606A";
+        String accentBg = isDark ? "rgba(6, 182, 212, 0.15)" : "rgba(9, 105, 218, 0.08)";
+        String hoverBg = isDark ? "rgba(0, 212, 255, 0.12)" : "rgba(9, 105, 218, 0.08)";
+
+        onThisDayButton.setStyle(
+                "-fx-background-radius: 10px; " +
+                "-fx-border-radius: 10px; " +
+                "-fx-padding: 0; " +
+                "-fx-cursor: hand; " +
+                "-fx-background-color: " + (selected ? accentBg : "transparent") + ";"
+        );
+        onThisDayIcon.setFill(Color.web(selected ? primaryColor : mutedColor));
+
+        onThisDayButton.setOnMouseEntered(e -> {
+            if (!onThisDayButton.isSelected()) {
+                onThisDayButton.setStyle(
+                        "-fx-background-radius: 10px; " +
+                        "-fx-border-radius: 10px; " +
+                        "-fx-padding: 0; " +
+                        "-fx-cursor: hand; " +
+                        "-fx-background-color: " + hoverBg + ";"
+                );
+                onThisDayIcon.setFill(Color.web(isDark ? "#E6EDF3" : "#24292F"));
+            }
+        });
+
+        onThisDayButton.setOnMouseExited(e -> {
+            if (!onThisDayButton.isSelected()) {
+                onThisDayButton.setStyle(
+                        "-fx-background-radius: 10px; " +
+                        "-fx-border-radius: 10px; " +
+                        "-fx-padding: 0; " +
+                        "-fx-cursor: hand; " +
+                        "-fx-background-color: transparent;"
+                );
+                onThisDayIcon.setFill(Color.web(mutedColor));
+            }
+        });
+    }
+
+    private void setupOnThisDayAvailabilityTracking() {
+        ServiceManager serviceManager = ServiceManager.getInstance();
+        serviceManager.getLocalCacheService();
+
+        serviceManager.addListener((status, message) -> {
+            if ("local_cache_ready".equals(status)
+                    || "account_switched".equals(status)
+                    || "reinitializing".equals(status)) {
+                registerOnThisDayChangeListenerIfReady();
+                refreshOnThisDayButtonVisibility();
+            }
+        });
+
+        registerOnThisDayChangeListenerIfReady();
+        refreshOnThisDayButtonVisibility();
+    }
+
+    private void registerOnThisDayChangeListenerIfReady() {
+        ServiceManager serviceManager = ServiceManager.getInstance();
+        if (onThisDayListenerRegistered
+                || serviceManager.getLocalCacheState() != ServiceManager.InitializationState.READY) {
+            return;
+        }
+
+        LocalCacheService cache = serviceManager.getLocalCacheService();
+        if (cache == null) {
+            return;
+        }
+
+        cache.addChangeListener(new LocalCacheService.NoteChangeListener() {
+            @Override
+            public void onNoteInserted(LocalCacheService.NoteData note) {
+            }
+
+            @Override
+            public void onNotesInserted(java.util.List<LocalCacheService.NoteData> notes) {
+                refreshOnThisDayButtonVisibility();
+            }
+        });
+        onThisDayListenerRegistered = true;
+    }
+
+    public void refreshOnThisDayAvailability() {
+        refreshOnThisDayButtonVisibility();
+    }
+
+    private void refreshOnThisDayButtonVisibility() {
+        if (!SettingsService.getInstance().getShowOnThisDayInYearsPast()) {
+            setOnThisDayVisible(false);
+            return;
+        }
+
+        ServiceManager serviceManager = ServiceManager.getInstance();
+        if (serviceManager.getLocalCacheState() != ServiceManager.InitializationState.READY) {
+            setOnThisDayVisible(false);
+            return;
+        }
+
+        LocalCacheService cache = serviceManager.getLocalCacheService();
+        if (cache == null) {
+            setOnThisDayVisible(false);
+            return;
+        }
+
+        Task<Boolean> task = new Task<>() {
+            @Override
+            protected Boolean call() {
+                return cache.getNotesOnThisDayCount() > 0;
+            }
+        };
+        task.setOnSucceeded(event -> setOnThisDayVisible(Boolean.TRUE.equals(task.getValue()) || onThisDayButton.isSelected()));
+        task.setOnFailed(event -> setOnThisDayVisible(onThisDayButton.isSelected()));
+
+        Thread thread = new Thread(task, "SidebarOnThisDayVisibility");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    public void setOnThisDayVisible(boolean visible) {
+        if (onThisDayButton == null) {
+            return;
+        }
+        onThisDayButton.setVisible(visible);
+        onThisDayButton.setManaged(visible);
     }
     
     /**
@@ -330,6 +513,10 @@ public class SidebarView extends VBox {
         searchButton.setSelected(mode == DesktopMainView.ViewMode.SEARCH);
         reviewButton.setSelected(mode == DesktopMainView.ViewMode.REVIEW);
         settingsButton.setSelected(mode == DesktopMainView.ViewMode.SETTINGS);
+        if (onThisDayButton != null) {
+            onThisDayButton.setSelected(mode == DesktopMainView.ViewMode.ON_THIS_DAY);
+            updateOnThisDayButtonStyle();
+        }
         
         // Show review panel when in REVIEW mode, hide for other modes
         if (mode == DesktopMainView.ViewMode.REVIEW) {
@@ -347,6 +534,10 @@ public class SidebarView extends VBox {
         } else {
             settingsSubPanel.setVisible(false);
             settingsSubPanel.setManaged(false);
+        }
+
+        if (mode != DesktopMainView.ViewMode.ON_THIS_DAY) {
+            refreshOnThisDayButtonVisibility();
         }
     }
 }

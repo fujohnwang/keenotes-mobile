@@ -96,15 +96,20 @@ class NoteFragment : Fragment() {
         val app = requireActivity().application as KeeNotesApp
 
         binding.btnOnThisDay.setOnClickListener {
-            findNavController().navigate(R.id.action_note_to_onThisDay)
+            viewLifecycleOwner.lifecycleScope.launch {
+                if (app.settingsRepository.showOnThisDayInYearsPast.first()) {
+                    findNavController().navigate(R.id.action_note_to_onThisDay)
+                }
+            }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             combine(
+                app.settingsRepository.showOnThisDayInYearsPast,
                 app.database.noteDao().getNotesOnThisDayFlow(),
                 app.settingsRepository.debugMockOnThisDay
-            ) { notes, debugMockEnabled ->
-                debugMockEnabled || notes.isNotEmpty()
+            ) { isEnabled, notes, debugMockEnabled ->
+                isEnabled && (debugMockEnabled || notes.isNotEmpty())
             }.collectLatest { shouldShow ->
                 if (_binding != null) {
                     binding.btnOnThisDay.visibility = if (shouldShow) View.VISIBLE else View.GONE

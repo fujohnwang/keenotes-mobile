@@ -122,6 +122,7 @@ class SettingsFragment : Fragment() {
             binding.autoFocusInputSwitch.isChecked = app.settingsRepository.autoFocusInputOnLaunch.first()
             binding.confettiOnPostSwitch.isChecked = app.settingsRepository.confettiOnPostSuccess.first()
             binding.showSyncChannelStatusSwitch.isChecked = app.settingsRepository.showSyncChannelStatus.first()
+            binding.onThisDaySwitch.isChecked = app.settingsRepository.showOnThisDayInYearsPast.first()
         }
         
         // Auto-save on toggle change
@@ -152,6 +153,12 @@ class SettingsFragment : Fragment() {
         binding.showSyncChannelStatusSwitch.setOnCheckedChangeListener { _, isChecked ->
             lifecycleScope.launch {
                 app.settingsRepository.setShowSyncChannelStatus(isChecked)
+            }
+        }
+
+        binding.onThisDaySwitch.setOnCheckedChangeListener { _, isChecked ->
+            lifecycleScope.launch {
+                app.settingsRepository.setShowOnThisDayInYearsPast(isChecked)
             }
         }
     }

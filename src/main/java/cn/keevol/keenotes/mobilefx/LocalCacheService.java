@@ -9,6 +9,11 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +30,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public class LocalCacheService {
     private static final String DB_NAME = "keenotes_cache.db";
+    private static final DateTimeFormatter DB_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static LocalCacheService instance;
     private String dbPathString;
     private Connection connection;
@@ -357,6 +363,58 @@ public class LocalCacheService {
         return results;
     }
 
+    public List<NoteData> getNotesOnThisDay() {
+        ensureInitialized();
+        List<NoteData> results = new ArrayList<>();
+        QuerySpec query = buildOnThisDayQuery();
+        if (query == null) {
+            return results;
+        }
+
+        String sql = "SELECT id, content, channel, created_at FROM notes_cache WHERE "
+                + query.whereClause + " ORDER BY created_at DESC";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            bindQueryArgs(pstmt, query.args);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    results.add(new NoteData(
+                            rs.getLong("id"),
+                            rs.getString("content"),
+                            rs.getString("channel"),
+                            rs.getString("created_at"),
+                            null
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            // Get On This Day notes failed
+        }
+        return results;
+    }
+
+    public int getNotesOnThisDayCount() {
+        ensureInitialized();
+        QuerySpec query = buildOnThisDayQuery();
+        if (query == null) {
+            return 0;
+        }
+
+        String sql = "SELECT COUNT(*) FROM notes_cache WHERE " + query.whereClause;
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            bindQueryArgs(pstmt, query.args);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            // Get On This Day notes count failed
+        }
+        return 0;
+    }
+
     public List<NoteData> getAllNotes() {
         ensureInitialized();
         List<NoteData> results = new ArrayList<>();
@@ -544,6 +602,47 @@ public class LocalCacheService {
         return null;
     }
 
+    private QuerySpec buildOnThisDayQuery() {
+        LocalDate localDate = LocalDate.now();
+        ZoneId zoneId = ZoneId.systemDefault();
+        List<String> clauses = new ArrayList<>();
+        List<String> args = new ArrayList<>();
+
+        for (int year = 2000; year < localDate.getYear(); year++) {
+            try {
+                String startUtc = localDate.withYear(year)
+                        .atStartOfDay(zoneId)
+                        .withZoneSameInstant(ZoneOffset.UTC)
+                        .toLocalDateTime()
+                        .format(DB_TIMESTAMP_FORMATTER);
+                String endUtc = localDate.withYear(year)
+                        .atTime(23, 59, 59)
+                        .atZone(zoneId)
+                        .withZoneSameInstant(ZoneOffset.UTC)
+                        .toLocalDateTime()
+                        .format(DB_TIMESTAMP_FORMATTER);
+
+                clauses.add("(created_at >= ? AND created_at <= ?)");
+                args.add(startUtc);
+                args.add(endUtc);
+            } catch (DateTimeException ignored) {
+                // Skip invalid local dates such as Feb 29 in non-leap years.
+            }
+        }
+
+        if (clauses.isEmpty()) {
+            return null;
+        }
+
+        return new QuerySpec(String.join(" OR ", clauses), args);
+    }
+
+    private void bindQueryArgs(PreparedStatement pstmt, List<String> args) throws SQLException {
+        for (int i = 0; i < args.size(); i++) {
+            pstmt.setString(i + 1, args.get(i));
+        }
+    }
+
     public void close() {
         try {
             if (connection != null && !connection.isClosed()) {
@@ -679,6 +778,16 @@ public class LocalCacheService {
             return String.format("NoteData{id=%d, content='%s', channel='%s', createdAt='%s'}",
                     id, content != null ? content.substring(0, Math.min(20, content.length())) : "null",
                     channel, createdAt);
+        }
+    }
+
+    private static class QuerySpec {
+        final String whereClause;
+        final List<String> args;
+
+        QuerySpec(String whereClause, List<String> args) {
+            this.whereClause = whereClause;
+            this.args = args;
         }
     }
 }
