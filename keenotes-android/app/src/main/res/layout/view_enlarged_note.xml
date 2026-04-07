@@ -17,6 +17,7 @@
 
         <!-- Header: Date, Channel (left) + Shrink button (right) -->
         <LinearLayout
+            android:id="@+id/enlargedHeaderRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
