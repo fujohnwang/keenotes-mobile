@@ -8,10 +8,13 @@ struct EnlargedNoteView: View {
     @EnvironmentObject var appState: AppState
     
     @State private var showCopiedAlert = false
+    @State private var dragOffset: CGFloat = 0
     
     private var isPad: Bool { DeviceType.isPad }
     private var cardPadding: CGFloat { isPad ? 32 : 20 }
     private var messageFontSize: CGFloat { isPad ? 24 : 22 }
+    private var copiedToastBottomPadding: CGFloat { isPad ? 120 : 92 }
+    private var dismissDragThreshold: CGFloat { isPad ? 180 : 120 }
     
     private var formattedDate: String {
         Theme.formatNoteDate(note.createdAt, compact: appState.settingsService.compactDateFormat)
@@ -96,7 +99,7 @@ struct EnlargedNoteView: View {
                         .padding(.vertical, 8)
                         .background(Color.black.opacity(0.7))
                         .cornerRadius(20)
-                        .padding(.bottom, 20)
+                        .padding(.bottom, copiedToastBottomPadding)
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -104,6 +107,8 @@ struct EnlargedNoteView: View {
         )
         .padding(.horizontal, DeviceType.horizontalPadding)
         .padding(.vertical, 8)
+        .offset(y: dragOffset)
+        .simultaneousGesture(dismissDragGesture)
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
     }
     
@@ -123,5 +128,39 @@ struct EnlargedNoteView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation { showCopiedAlert = false }
         }
+    }
+
+    private var dismissDragGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                let horizontal = value.translation.width
+                let vertical = value.translation.height
+
+                guard vertical > 0, vertical > abs(horizontal) else { return }
+                dragOffset = vertical
+            }
+            .onEnded { value in
+                let horizontal = value.translation.width
+                let vertical = value.translation.height
+                let predictedVertical = value.predictedEndTranslation.height
+
+                guard vertical > 0, vertical > abs(horizontal) else {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                        dragOffset = 0
+                    }
+                    return
+                }
+
+                if vertical > dismissDragThreshold || predictedVertical > dismissDragThreshold * 1.3 {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        dragOffset = max(vertical, dismissDragThreshold)
+                    }
+                    onDismiss()
+                } else {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                        dragOffset = 0
+                    }
+                }
+            }
     }
 }
