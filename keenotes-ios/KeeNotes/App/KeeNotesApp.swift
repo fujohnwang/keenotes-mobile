@@ -96,6 +96,21 @@ class AppState: ObservableObject {
         settingsService.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
+
+        settingsService.$showOnThisDayInYearsPast
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] isEnabled in
+                guard let self else { return }
+                Task { @MainActor in
+                    if isEnabled {
+                        await self.loadOnThisDayNotes()
+                    } else {
+                        self.onThisDayNotes = []
+                    }
+                }
+            }
+            .store(in: &cancellables)
         
         // Forward database changes
         databaseService.objectWillChange.sink { [weak self] _ in
@@ -178,6 +193,11 @@ class AppState: ObservableObject {
     }
     
     private func loadOnThisDayNotes() async {
+        guard settingsService.showOnThisDayInYearsPast else {
+            onThisDayNotes = []
+            return
+        }
+
         do {
             let notes = try await databaseService.getNotesOnThisDay()
             print("[AppState] On this day: \(notes.count) note(s)")

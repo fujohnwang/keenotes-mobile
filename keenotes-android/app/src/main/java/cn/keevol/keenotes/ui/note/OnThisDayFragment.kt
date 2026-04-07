@@ -66,19 +66,25 @@ class OnThisDayFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             combine(
+                app.settingsRepository.showOnThisDayInYearsPast,
                 app.database.noteDao().getNotesOnThisDayFlow(),
                 app.settingsRepository.debugMockOnThisDay
-            ) { realNotes, debugMockEnabled ->
-                if (debugMockEnabled) {
+            ) { isEnabled, realNotes, debugMockEnabled ->
+                isEnabled to if (!isEnabled) {
+                    emptyList()
+                } else if (debugMockEnabled) {
                     OnThisDayDebugMock.build()
                 } else {
                     realNotes
                 }
-            }.collectLatest { notes ->
+            }.collectLatest { (isEnabled, notes) ->
                 if (_binding == null) return@collectLatest
                 val isEnlargedVisible = binding.enlargedNoteContainer.root.visibility == View.VISIBLE
 
                 binding.countText.text = getString(R.string.on_this_day_count, notes.size)
+                binding.emptyText.text = getString(
+                    if (isEnabled) R.string.on_this_day_empty else R.string.on_this_day_disabled
+                )
                 binding.emptyText.visibility =
                     if (notes.isEmpty() && !isEnlargedVisible) View.VISIBLE else View.GONE
                 binding.notesRecyclerView.visibility =

@@ -250,6 +250,16 @@
                     android:textSize="14sp"
                     android:padding="12dp" />
 
+                <androidx.appcompat.widget.SwitchCompat
+                    style="@style/Widget.KeeNotes.Switch"
+                    android:id="@+id/onThisDaySwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_on_this_day_in_years_past"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:padding="12dp" />
+
             </LinearLayout>
 
             <!-- ========== Card 3: Hidden Watermark ========== -->

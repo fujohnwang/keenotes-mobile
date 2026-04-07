@@ -24,11 +24,13 @@
     <string name="overview_total_notes">Total Notes</string>
     <string name="overview_days_using">Days Using</string>
     <string name="overview_show_card">Show Overview Card</string>
+    <string name="settings_on_this_day_in_years_past">On this day in years past</string>
     <string name="copied">Copied</string>
     <string name="search_notes">Search notes</string>
     <string name="on_this_day_title">On this day in years past</string>
     <string name="on_this_day_count">%1$d note(s) from past years</string>
     <string name="on_this_day_empty">No notes from this day in past years yet.</string>
+    <string name="on_this_day_disabled">On this day in years past is turned off in Settings.</string>
     <string name="go_back">Go back</string>
     <string name="enlarge_note">Enlarge note</string>
     <string name="debug_mock_on_this_day">Mock On This Day</string>

@@ -522,6 +522,10 @@
     -fx-text-fill: -fx-primary;
 }
 
+.sidebar-quick-button {
+    -fx-background-color: transparent;
+}
+
 /* Sidebar Status Area */
 .sidebar-status-area {
     -fx-background-color: transparent;

@@ -282,7 +282,7 @@ struct NoteView: View {
         HStack(spacing: 12) {
             topHeaderButton(
                 systemName: "sparkles",
-                isVisible: !appState.onThisDayNotes.isEmpty,
+                isVisible: appState.settingsService.showOnThisDayInYearsPast && !appState.onThisDayNotes.isEmpty,
                 action: { showingOnThisDay = true }
             )
 

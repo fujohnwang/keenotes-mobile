@@ -169,6 +169,13 @@ struct SettingsView: View {
                     ))
                     .listRowBackground(Color.clear)
                     .padding(.vertical, 6)
+
+                    Toggle("On this day in years past", isOn: Binding(
+                        get: { appState.settingsService.showOnThisDayInYearsPast },
+                        set: { appState.settingsService.showOnThisDayInYearsPast = $0 }
+                    ))
+                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 6)
                 }
                 .font(.system(size: isPad ? 17 : 17))
                 .toggleStyle(SwitchToggleStyle(tint: Theme.brandColor))

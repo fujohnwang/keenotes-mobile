@@ -20,6 +20,7 @@ class SettingsService: ObservableObject {
         static let hiddenMessage = "hidden_message"
         static let showSyncChannelStatus = "show_sync_channel_status"
         static let compactDateFormat = "compact_date_format"
+        static let showOnThisDayInYearsPast = "show_on_this_day_in_years_past"
     }
     
     @Published var endpointUrl: String {
@@ -85,6 +86,12 @@ class SettingsService: ObservableObject {
             defaults.set(compactDateFormat, forKey: Keys.compactDateFormat)
         }
     }
+
+    @Published var showOnThisDayInYearsPast: Bool {
+        didSet {
+            defaults.set(showOnThisDayInYearsPast, forKey: Keys.showOnThisDayInYearsPast)
+        }
+    }
     
     @Published var firstNoteDate: String? {
         didSet {
@@ -114,6 +121,7 @@ class SettingsService: ObservableObject {
         self.hiddenMessage = defaults.string(forKey: Keys.hiddenMessage) ?? ""
         self.showSyncChannelStatus = defaults.object(forKey: Keys.showSyncChannelStatus) == nil ? false : defaults.bool(forKey: Keys.showSyncChannelStatus)
         self.compactDateFormat = defaults.object(forKey: Keys.compactDateFormat) == nil ? true : defaults.bool(forKey: Keys.compactDateFormat)
+        self.showOnThisDayInYearsPast = defaults.object(forKey: Keys.showOnThisDayInYearsPast) == nil ? true : defaults.bool(forKey: Keys.showOnThisDayInYearsPast)
         self.firstNoteDate = defaults.string(forKey: Keys.firstNoteDate)
     }
     
