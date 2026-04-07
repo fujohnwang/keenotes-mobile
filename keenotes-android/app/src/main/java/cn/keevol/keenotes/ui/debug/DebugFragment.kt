@@ -9,11 +9,13 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.widget.SwitchCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -22,6 +24,7 @@ import kotlinx.coroutines.launch
 class DebugFragment : Fragment() {
     
     private lateinit var statusText: TextView
+    private lateinit var mockOnThisDaySwitch: SwitchCompat
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -82,6 +85,8 @@ class DebugFragment : Fragment() {
             }
             scrollView.addView(statusText)
             addView(scrollView)
+
+            addView(createMockOnThisDayToggle())
             
             // Debug buttons
             addView(createDebugButton("View Debug Logs") { viewDebugLogs() })
@@ -91,6 +96,48 @@ class DebugFragment : Fragment() {
             addView(createDebugButton("Reset Sync State") { resetSyncState() })
             addView(createDebugButton("Clear All Notes") { clearAllNotes() })
             addView(createDebugButton("Test WebSocket") { testWebSocket() })
+        }
+    }
+
+    private fun createMockOnThisDayToggle(): View {
+        val app = requireActivity().application as KeeNotesApp
+
+        return LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 24)
+            var isInitializing = true
+
+            addView(TextView(requireContext()).apply {
+                text = getString(R.string.debug_mock_on_this_day)
+                textSize = 16f
+                setTextColor(requireContext().getColor(R.color.text_primary))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+
+            mockOnThisDaySwitch = SwitchCompat(requireContext()).apply {
+                lifecycleScope.launch {
+                    isChecked = app.settingsRepository.debugMockOnThisDay.first()
+                    isInitializing = false
+                }
+
+                setOnCheckedChangeListener { _, isChecked ->
+                    if (isInitializing) {
+                        return@setOnCheckedChangeListener
+                    }
+                    lifecycleScope.launch {
+                        app.settingsRepository.setDebugMockOnThisDay(isChecked)
+                        val message = if (isChecked) {
+                            "Mock On This Day enabled"
+                        } else {
+                            "Mock On This Day disabled"
+                        }
+                        statusText.text = message
+                        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            addView(mockOnThisDaySwitch)
         }
     }
     

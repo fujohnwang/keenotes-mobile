@@ -39,6 +39,7 @@ class KeeNotesApp : Application() {
         // Initialize dependencies
         database = AppDatabase.getInstance(this)
         settingsRepository = SettingsRepository(this)
+        resetEphemeralDebugToggles()
         
         // Initialize DebugLogger
         DebugLogger.init(database.debugLogDao())
@@ -79,8 +80,15 @@ class KeeNotesApp : Application() {
     }
     
     override fun onTerminate() {
+        resetEphemeralDebugToggles()
         super.onTerminate()
         pendingNoteService.shutdown()
         webSocketService.shutdown()
+    }
+
+    fun resetEphemeralDebugToggles() {
+        runBlocking {
+            settingsRepository.setDebugMockOnThisDay(false)
+        }
     }
 }

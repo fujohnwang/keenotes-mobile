@@ -1,9 +1,14 @@
 package cn.keevol.keenotes.ui.search
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -11,20 +16,25 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
+import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.FragmentSearchBinding
 import cn.keevol.keenotes.network.WebSocketService
+import cn.keevol.keenotes.ui.common.EnlargedNoteDismissGesture
 import cn.keevol.keenotes.ui.review.NotesAdapter
+import cn.keevol.keenotes.util.DateTimeUtil
+import cn.keevol.keenotes.util.ZeroWidthSteganography
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class SearchFragment : Fragment() {
     
     private var _binding: FragmentSearchBinding? = null
     private val binding get() = _binding!!
     
-    private val notesAdapter = NotesAdapter()
+    private val notesAdapter = NotesAdapter { note -> showEnlargedNote(note) }
     private var searchJob: Job? = null
     
     override fun onCreateView(
@@ -42,6 +52,7 @@ class SearchFragment : Fragment() {
         setupHeader()
         setupSearchField()
         setupRecyclerView()
+        setupEnlargedCardDismissGesture()
         setupSyncChannelStatus()
         
         // Auto-focus search input
@@ -70,12 +81,14 @@ class SearchFragment : Fragment() {
                 binding.emptyState.visibility = View.VISIBLE
                 binding.emptyText.text = "Enter keywords to search notes"
                 binding.searchResultsRecyclerView.visibility = View.GONE
+                binding.enlargedNoteContainer.root.visibility = View.GONE
                 binding.headerRow.visibility = View.GONE
             } else {
                 // Show loading and perform search with debounce
                 binding.emptyState.visibility = View.GONE
                 binding.loadingIndicator.visibility = View.VISIBLE
                 binding.searchResultsRecyclerView.visibility = View.GONE
+                binding.enlargedNoteContainer.root.visibility = View.GONE
                 binding.headerRow.visibility = View.GONE
                 
                 searchJob = lifecycleScope.launch {
@@ -95,6 +108,14 @@ class SearchFragment : Fragment() {
         binding.searchResultsRecyclerView.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = notesAdapter
+        }
+    }
+
+    private fun setupEnlargedCardDismissGesture() {
+        EnlargedNoteDismissGesture.attach(binding.enlargedNoteContainer) {
+            if (binding.enlargedNoteContainer.root.visibility == View.VISIBLE) {
+                hideEnlargedNote()
+            }
         }
     }
     
@@ -130,6 +151,7 @@ class SearchFragment : Fragment() {
                 binding.emptyState.visibility = View.VISIBLE
                 binding.emptyText.text = "No results found"
                 binding.searchResultsRecyclerView.visibility = View.GONE
+                binding.enlargedNoteContainer.root.visibility = View.GONE
                 binding.headerRow.visibility = View.GONE
             } else {
                 binding.emptyState.visibility = View.GONE
@@ -143,7 +165,64 @@ class SearchFragment : Fragment() {
             binding.emptyState.visibility = View.VISIBLE
             binding.emptyText.text = "Search failed: ${e.message}"
             binding.searchResultsRecyclerView.visibility = View.GONE
+            binding.enlargedNoteContainer.root.visibility = View.GONE
             binding.headerRow.visibility = View.GONE
+        }
+    }
+
+    private fun showEnlargedNote(note: Note) {
+        if (_binding == null) return
+
+        val container = binding.enlargedNoteContainer.root
+        binding.enlargedNoteContainer.enlargedDateText.text = DateTimeUtil.utcToLocalDisplay(note.createdAt)
+        val channelText = if (note.channel.isNotEmpty()) note.channel else "default"
+        binding.enlargedNoteContainer.enlargedChannelText.text = "• $channelText"
+        binding.enlargedNoteContainer.enlargedContentText.text = note.content
+
+        binding.enlargedNoteContainer.enlargedContentText.setOnClickListener {
+            copyToClipboard(note.content)
+        }
+
+        binding.enlargedNoteContainer.shrinkButton.setOnClickListener {
+            hideEnlargedNote()
+        }
+
+        binding.searchResultsRecyclerView.visibility = View.GONE
+        container.visibility = View.VISIBLE
+        container.alpha = 0f
+        container.animate().alpha(1f).setDuration(200).start()
+    }
+
+    private fun hideEnlargedNote() {
+        if (_binding == null) return
+
+        val container = binding.enlargedNoteContainer.root
+        container.animate().alpha(0f).setDuration(200).withEndAction {
+            if (_binding != null) {
+                container.visibility = View.GONE
+                if (notesAdapter.currentList.isNotEmpty()) {
+                    binding.searchResultsRecyclerView.visibility = View.VISIBLE
+                }
+            }
+        }.start()
+    }
+
+    private fun copyToClipboard(content: String) {
+        val context = requireContext()
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val hiddenMessage = runBlocking {
+            (context.applicationContext as KeeNotesApp).settingsRepository.getHiddenMessage()
+        }
+        val clip = ClipData.newPlainText("note", ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage))
+        clipboard.setPrimaryClip(clip)
+
+        val inflater = LayoutInflater.from(context)
+        val layout = inflater.inflate(R.layout.toast_copied, null)
+        Toast(context).apply {
+            duration = Toast.LENGTH_SHORT
+            view = layout
+            setGravity(Gravity.CENTER, 0, 0)
+            show()
         }
     }
     

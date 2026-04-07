@@ -28,6 +28,21 @@
             android:textStyle="bold"
             android:textColor="@color/text_primary" />
 
+        <ImageView
+            android:id="@+id/btnOnThisDay"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginStart="4dp"
+            android:src="@drawable/ic_on_this_day"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            app:tint="@color/text_primary"
+            android:contentDescription="@string/on_this_day_title" />
+
         <!-- Search icon (right) -->
         <ImageView
             android:id="@+id/btnSearch"

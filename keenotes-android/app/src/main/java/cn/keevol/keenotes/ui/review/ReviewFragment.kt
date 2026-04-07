@@ -17,6 +17,7 @@ import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.FragmentReviewBinding
 import cn.keevol.keenotes.network.WebSocketService
+import cn.keevol.keenotes.ui.common.EnlargedNoteDismissGesture
 import cn.keevol.keenotes.util.ZeroWidthSteganography
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -56,6 +57,7 @@ class ReviewFragment : Fragment() {
         
         setupPeriodSelector()
         setupRecyclerView()
+        setupEnlargedCardDismissGesture()
         setupSyncChannelStatus()
         loadInitialNotes()
     }
@@ -377,6 +379,14 @@ class ReviewFragment : Fragment() {
                 binding.notesRecyclerView.visibility = View.VISIBLE
             }
         }.start()
+    }
+
+    private fun setupEnlargedCardDismissGesture() {
+        EnlargedNoteDismissGesture.attach(binding.enlargedNoteContainer) {
+            if (binding.enlargedNoteContainer.root.visibility == View.VISIBLE) {
+                hideEnlargedNote()
+            }
+        }
     }
     
     private fun copyToClipboard(content: String) {

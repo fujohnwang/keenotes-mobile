@@ -181,6 +181,13 @@
             android:paddingVertical="8dp"
             android:visibility="gone" />
 
+        <include
+            android:id="@+id/enlargedNoteContainer"
+            layout="@layout/view_enlarged_note"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
     </FrameLayout>
 
 </LinearLayout>

@@ -232,7 +232,11 @@ class MainActivity : AppCompatActivity() {
     }
     
     override fun onDestroy() {
+        val app = application as KeeNotesApp
+        if (isFinishing && !isChangingConfigurations) {
+            app.resetEphemeralDebugToggles()
+        }
         super.onDestroy()
-        (application as KeeNotesApp).webSocketService.disconnect()
+        app.webSocketService.disconnect()
     }
 }
