@@ -25,6 +25,7 @@ class SettingsRepository(private val context: Context) {
         private val KEY_CONFETTI_ON_POST = stringPreferencesKey("confetti_on_post_success")
         private val KEY_HIDDEN_MESSAGE = stringPreferencesKey("hidden_message")
         private val KEY_SHOW_SYNC_CHANNEL_STATUS = stringPreferencesKey("show_sync_channel_status")
+        private val KEY_DEBUG_MOCK_ON_THIS_DAY = stringPreferencesKey("debug_mock_on_this_day")
     }
     
     val endpointUrl: Flow<String> = context.dataStore.data.map { it[KEY_ENDPOINT] ?: "https://kns.afoo.me" }
@@ -37,6 +38,7 @@ class SettingsRepository(private val context: Context) {
     val confettiOnPostSuccess: Flow<Boolean> = context.dataStore.data.map { it[KEY_CONFETTI_ON_POST]?.toBoolean() ?: true }
     val hiddenMessage: Flow<String> = context.dataStore.data.map { it[KEY_HIDDEN_MESSAGE] ?: "" }
     val showSyncChannelStatus: Flow<Boolean> = context.dataStore.data.map { it[KEY_SHOW_SYNC_CHANNEL_STATUS]?.toBoolean() ?: false }
+    val debugMockOnThisDay: Flow<Boolean> = context.dataStore.data.map { it[KEY_DEBUG_MOCK_ON_THIS_DAY]?.toBoolean() ?: false }
     
     val isConfigured: Flow<Boolean> = context.dataStore.data.map { prefs ->
         // 检查所有必填字段是否都已配置（不为空）
@@ -104,6 +106,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun setShowSyncChannelStatus(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[KEY_SHOW_SYNC_CHANNEL_STATUS] = enabled.toString()
+        }
+    }
+
+    suspend fun setDebugMockOnThisDay(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_DEBUG_MOCK_ON_THIS_DAY] = enabled.toString()
         }
     }
     

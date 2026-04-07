@@ -13,7 +13,9 @@ import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentNoteBinding
 import cn.keevol.keenotes.util.ZeroWidthSteganography
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,6 +39,7 @@ class NoteFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
+        setupOnThisDayButton()
         setupSearchButton()
         setupOverviewCard()
         setupNoteInput()
@@ -89,6 +92,27 @@ class NoteFragment : Fragment() {
         }
     }
 
+    private fun setupOnThisDayButton() {
+        val app = requireActivity().application as KeeNotesApp
+
+        binding.btnOnThisDay.setOnClickListener {
+            findNavController().navigate(R.id.action_note_to_onThisDay)
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            combine(
+                app.database.noteDao().getNotesOnThisDayFlow(),
+                app.settingsRepository.debugMockOnThisDay
+            ) { notes, debugMockEnabled ->
+                debugMockEnabled || notes.isNotEmpty()
+            }.collectLatest { shouldShow ->
+                if (_binding != null) {
+                    binding.btnOnThisDay.visibility = if (shouldShow) View.VISIBLE else View.GONE
+                }
+            }
+        }
+    }
+    
     private fun setupAutoFocusInput() {
         val app = requireActivity().application as KeeNotesApp
         

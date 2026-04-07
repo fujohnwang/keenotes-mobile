@@ -49,7 +49,7 @@
                 android:src="@drawable/ic_open_in_full"
                 android:scaleType="centerInside"
                 android:padding="4dp"
-                android:contentDescription="Enlarge note" />
+                android:contentDescription="@string/enlarge_note" />
 
         </LinearLayout>
 
