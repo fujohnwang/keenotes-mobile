@@ -37,6 +37,10 @@ public class LocalCacheService {
     private final CryptoService cryptoService;
     private volatile boolean initialized = false;
 
+    // 所有 JDBC 操作的同步锁 — Connection 不是线程安全的，
+    // 重连期间 cryptoExecutor 写库和 UI reload 线程读库会并发访问同一个 Connection
+    private final Object dbLock = new Object();
+
     // 用于追踪初始化步骤
     private volatile String initStep = "not started";
 
@@ -99,6 +103,15 @@ public class LocalCacheService {
                 // Ignore listener errors
             }
         }
+    }
+
+    /**
+     * Dispatch a single batch-change notification on the JavaFX thread.
+     * Used after a reconnect sync has fully drained to avoid one UI reload per batch.
+     */
+    public void notifyBatchSyncApplied() {
+        refreshNoteCount();
+        Platform.runLater(() -> notifyNotesInserted(java.util.Collections.emptyList()));
     }
 
     private LocalCacheService() {
@@ -249,30 +262,60 @@ public class LocalCacheService {
     // ==================== 数据操作方法（统一使用 JDBC）====================
 
     public void batchInsertNotes(List<NoteData> notes) throws SQLException {
+        batchInsertNotes(notes, true);
+    }
+
+    public void batchInsertNotes(List<NoteData> notes, boolean notifyListeners) throws SQLException {
         ensureInitialized();
         if (notes.isEmpty()) return;
 
         String sql = "INSERT OR REPLACE INTO notes_cache (id, content, channel, created_at, encrypted_content) VALUES (?, ?, ?, ?, ?)";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            connection.setAutoCommit(false);
+        synchronized (dbLock) {
+            boolean autoCommitChanged = false;
+            SQLException failure = null;
 
-            for (NoteData note : notes) {
-                pstmt.setLong(1, note.id);
-                pstmt.setString(2, note.content);
-                pstmt.setString(3, note.channel);
-                pstmt.setString(4, note.createdAt);
-                pstmt.setString(5, note.encryptedContent);
-                pstmt.addBatch();
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                connection.setAutoCommit(false);
+                autoCommitChanged = true;
+
+                for (NoteData note : notes) {
+                    pstmt.setLong(1, note.id);
+                    pstmt.setString(2, note.content);
+                    pstmt.setString(3, note.channel);
+                    pstmt.setString(4, note.createdAt);
+                    pstmt.setString(5, note.encryptedContent);
+                    pstmt.addBatch();
+                }
+
+                pstmt.executeBatch();
+                connection.commit();
+            } catch (SQLException e) {
+                failure = e;
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackError) {
+                    e.addSuppressed(rollbackError);
+                }
+                throw e;
+            } finally {
+                if (autoCommitChanged) {
+                    try {
+                        connection.setAutoCommit(true);
+                    } catch (SQLException resetError) {
+                        if (failure != null) {
+                            failure.addSuppressed(resetError);
+                        } else {
+                            throw resetError;
+                        }
+                    }
+                }
             }
+        }
 
-            pstmt.executeBatch();
-            connection.commit();
-            connection.setAutoCommit(true);
-
+        if (notifyListeners) {
             // Update note count property
             refreshNoteCount();
-
             // Notify listeners of batch insertion (on JavaFX thread)
             Platform.runLater(() -> notifyNotesInserted(notes));
         }
@@ -282,20 +325,22 @@ public class LocalCacheService {
         ensureInitialized();
         String sql = "INSERT OR REPLACE INTO notes_cache (id, content, channel, created_at, encrypted_content) VALUES (?, ?, ?, ?, ?)";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setLong(1, note.id);
-            pstmt.setString(2, note.content);
-            pstmt.setString(3, note.channel);
-            pstmt.setString(4, note.createdAt);
-            pstmt.setString(5, note.encryptedContent);
-            pstmt.executeUpdate();
-
-            // Update note count property
-            refreshNoteCount();
-
-            // Notify listeners of single note insertion (on JavaFX thread)
-            Platform.runLater(() -> notifyNoteInserted(note));
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setLong(1, note.id);
+                pstmt.setString(2, note.content);
+                pstmt.setString(3, note.channel);
+                pstmt.setString(4, note.createdAt);
+                pstmt.setString(5, note.encryptedContent);
+                pstmt.executeUpdate();
+            }
         }
+
+        // Update note count property
+        refreshNoteCount();
+
+        // Notify listeners of single note insertion (on JavaFX thread)
+        Platform.runLater(() -> notifyNoteInserted(note));
     }
 
     /**
@@ -319,21 +364,23 @@ public class LocalCacheService {
 
         String sql = "SELECT id, content, channel, created_at FROM notes_cache WHERE content LIKE ? ORDER BY created_at DESC LIMIT 100";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, "%" + query + "%");
-            ResultSet rs = pstmt.executeQuery();
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, "%" + query + "%");
+                ResultSet rs = pstmt.executeQuery();
 
-            while (rs.next()) {
-                results.add(new NoteData(
-                        rs.getLong("id"),
-                        rs.getString("content"),
-                        rs.getString("channel"),
-                        rs.getString("created_at"),
-                        null
-                ));
+                while (rs.next()) {
+                    results.add(new NoteData(
+                            rs.getLong("id"),
+                            rs.getString("content"),
+                            rs.getString("channel"),
+                            rs.getString("created_at"),
+                            null
+                    ));
+                }
+            } catch (SQLException e) {
+                // Search failed
             }
-        } catch (SQLException e) {
-            // Search failed
         }
         return results;
     }
@@ -344,21 +391,23 @@ public class LocalCacheService {
 
         String sql = "SELECT id, content, channel, created_at FROM notes_cache WHERE created_at >= datetime('now', '-' || ? || ' days') ORDER BY created_at DESC LIMIT 100";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, days);
-            ResultSet rs = pstmt.executeQuery();
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setInt(1, days);
+                ResultSet rs = pstmt.executeQuery();
 
-            while (rs.next()) {
-                results.add(new NoteData(
-                        rs.getLong("id"),
-                        rs.getString("content"),
-                        rs.getString("channel"),
-                        rs.getString("created_at"),
-                        null
-                ));
+                while (rs.next()) {
+                    results.add(new NoteData(
+                            rs.getLong("id"),
+                            rs.getString("content"),
+                            rs.getString("channel"),
+                            rs.getString("created_at"),
+                            null
+                    ));
+                }
+            } catch (SQLException e) {
+                // Review failed
             }
-        } catch (SQLException e) {
-            // Review failed
         }
         return results;
     }
@@ -374,21 +423,23 @@ public class LocalCacheService {
         String sql = "SELECT id, content, channel, created_at FROM notes_cache WHERE "
                 + query.whereClause + " ORDER BY created_at DESC";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            bindQueryArgs(pstmt, query.args);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    results.add(new NoteData(
-                            rs.getLong("id"),
-                            rs.getString("content"),
-                            rs.getString("channel"),
-                            rs.getString("created_at"),
-                            null
-                    ));
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                bindQueryArgs(pstmt, query.args);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        results.add(new NoteData(
+                                rs.getLong("id"),
+                                rs.getString("content"),
+                                rs.getString("channel"),
+                                rs.getString("created_at"),
+                                null
+                        ));
+                    }
                 }
+            } catch (SQLException e) {
+                // Get On This Day notes failed
             }
-        } catch (SQLException e) {
-            // Get On This Day notes failed
         }
         return results;
     }
@@ -402,15 +453,17 @@ public class LocalCacheService {
 
         String sql = "SELECT COUNT(*) FROM notes_cache WHERE " + query.whereClause;
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            bindQueryArgs(pstmt, query.args);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1);
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                bindQueryArgs(pstmt, query.args);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
                 }
+            } catch (SQLException e) {
+                // Get On This Day notes count failed
             }
-        } catch (SQLException e) {
-            // Get On This Day notes count failed
         }
         return 0;
     }
@@ -420,20 +473,22 @@ public class LocalCacheService {
         List<NoteData> results = new ArrayList<>();
         String sql = "SELECT id, content, channel, created_at FROM notes_cache ORDER BY created_at DESC";
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        synchronized (dbLock) {
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
 
-            while (rs.next()) {
-                results.add(new NoteData(
-                        rs.getLong("id"),
-                        rs.getString("content"),
-                        rs.getString("channel"),
-                        rs.getString("created_at"),
-                        null
-                ));
+                while (rs.next()) {
+                    results.add(new NoteData(
+                            rs.getLong("id"),
+                            rs.getString("content"),
+                            rs.getString("channel"),
+                            rs.getString("created_at"),
+                            null
+                    ));
+                }
+            } catch (SQLException e) {
+                // getAllNotes failed
             }
-        } catch (SQLException e) {
-            // getAllNotes failed
         }
         return results;
     }
@@ -442,9 +497,11 @@ public class LocalCacheService {
         ensureInitialized();
         String sql = "UPDATE sync_state SET last_sync_id = ?, last_sync_time = datetime('now') WHERE id = 1";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setLong(1, lastSyncId);
-            pstmt.executeUpdate();
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setLong(1, lastSyncId);
+                pstmt.executeUpdate();
+            }
         }
     }
 
@@ -452,14 +509,16 @@ public class LocalCacheService {
         ensureInitialized();
         String sql = "SELECT last_sync_id FROM sync_state WHERE id = 1";
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        synchronized (dbLock) {
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
 
-            if (rs.next()) {
-                return rs.getLong("last_sync_id");
+                if (rs.next()) {
+                    return rs.getLong("last_sync_id");
+                }
+            } catch (SQLException e) {
+                // Get last sync ID failed
             }
-        } catch (SQLException e) {
-            // Get last sync ID failed
         }
         return -1;
     }
@@ -468,14 +527,16 @@ public class LocalCacheService {
         ensureInitialized();
         String sql = "SELECT last_sync_time FROM sync_state WHERE id = 1";
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        synchronized (dbLock) {
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
 
-            if (rs.next()) {
-                return rs.getString("last_sync_time");
+                if (rs.next()) {
+                    return rs.getString("last_sync_time");
+                }
+            } catch (SQLException e) {
+                // Get last sync time failed
             }
-        } catch (SQLException e) {
-            // Get last sync time failed
         }
         return null;
     }
@@ -484,14 +545,16 @@ public class LocalCacheService {
         ensureInitialized();
         String sql = "SELECT COUNT(*) FROM notes_cache";
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        synchronized (dbLock) {
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
 
-            if (rs.next()) {
-                return rs.getInt(1);
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            } catch (SQLException e) {
+                // Get note count failed
             }
-        } catch (SQLException e) {
-            // Get note count failed
         }
         return 0;
     }
@@ -508,22 +571,24 @@ public class LocalCacheService {
         List<NoteData> results = new ArrayList<>();
         String sql = "SELECT id, content, channel, created_at FROM notes_cache ORDER BY created_at DESC LIMIT ? OFFSET ?";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, limit);
-            pstmt.setInt(2, offset);
-            ResultSet rs = pstmt.executeQuery();
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setInt(1, limit);
+                pstmt.setInt(2, offset);
+                ResultSet rs = pstmt.executeQuery();
 
-            while (rs.next()) {
-                results.add(new NoteData(
-                        rs.getLong("id"),
-                        rs.getString("content"),
-                        rs.getString("channel"),
-                        rs.getString("created_at"),
-                        null
-                ));
+                while (rs.next()) {
+                    results.add(new NoteData(
+                            rs.getLong("id"),
+                            rs.getString("content"),
+                            rs.getString("channel"),
+                            rs.getString("created_at"),
+                            null
+                    ));
+                }
+            } catch (SQLException e) {
+                // Get paged notes failed
             }
-        } catch (SQLException e) {
-            // Get paged notes failed
         }
         return results;
     }
@@ -541,24 +606,26 @@ public class LocalCacheService {
         List<NoteData> results = new ArrayList<>();
         String sql = "SELECT id, content, channel, created_at FROM notes_cache WHERE created_at >= datetime('now', '-' || ? || ' days') ORDER BY created_at DESC LIMIT ? OFFSET ?";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, days);
-            pstmt.setInt(2, limit);
-            pstmt.setInt(3, offset);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    results.add(new NoteData(
-                            rs.getLong("id"),
-                            rs.getString("content"),
-                            rs.getString("channel"),
-                            rs.getString("created_at"),
-                            null
-                    ));
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setInt(1, days);
+                pstmt.setInt(2, limit);
+                pstmt.setInt(3, offset);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        results.add(new NoteData(
+                                rs.getLong("id"),
+                                rs.getString("content"),
+                                rs.getString("channel"),
+                                rs.getString("created_at"),
+                                null
+                        ));
+                    }
                 }
+            } catch (SQLException e) {
+                // Get paged review notes failed
+                e.printStackTrace();
             }
-        } catch (SQLException e) {
-            // Get paged review notes failed
-            e.printStackTrace();
         }
         return results;
     }
@@ -573,15 +640,17 @@ public class LocalCacheService {
         ensureInitialized();
         String sql = "SELECT COUNT(*) FROM notes_cache WHERE created_at >= datetime('now', '-' || ? || ' days')";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, days);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1);
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setInt(1, days);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
                 }
+            } catch (SQLException e) {
+                // Get review notes count failed
             }
-        } catch (SQLException e) {
-            // Get review notes count failed
         }
         return 0;
     }
@@ -590,14 +659,16 @@ public class LocalCacheService {
         ensureInitialized();
         String sql = "SELECT MIN(created_at) FROM notes_cache";
 
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        synchronized (dbLock) {
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
 
-            if (rs.next()) {
-                return rs.getString(1);
+                if (rs.next()) {
+                    return rs.getString(1);
+                }
+            } catch (SQLException e) {
+                // Get oldest note date failed
             }
-        } catch (SQLException e) {
-            // Get oldest note date failed
         }
         return null;
     }
@@ -644,35 +715,41 @@ public class LocalCacheService {
     }
 
     public void close() {
-        try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
+        synchronized (dbLock) {
+            try {
+                if (connection != null && !connection.isClosed()) {
+                    connection.close();
+                }
+            } catch (SQLException e) {
+                // Failed to close database
             }
-        } catch (SQLException e) {
-            // Failed to close database
         }
     }
 
     public void resetSyncState() {
         ensureInitialized();
-        try (Statement stmt = connection.createStatement()) {
-            stmt.executeUpdate("UPDATE sync_state SET last_sync_id = -1, last_sync_time = NULL WHERE id = 1");
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to reset sync state", e);
+        synchronized (dbLock) {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.executeUpdate("UPDATE sync_state SET last_sync_id = -1, last_sync_time = NULL WHERE id = 1");
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed to reset sync state", e);
+            }
         }
     }
 
     public void clearAllData() {
         ensureInitialized();
-        try (Statement stmt = connection.createStatement()) {
-            stmt.executeUpdate("DELETE FROM notes_cache");
-            stmt.executeUpdate("UPDATE sync_state SET last_sync_id = -1, last_sync_time = NULL WHERE id = 1");
-
-            // Update note count property to 0
-            refreshNoteCount();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to clear cache data", e);
+        synchronized (dbLock) {
+            try (Statement stmt = connection.createStatement()) {
+                stmt.executeUpdate("DELETE FROM notes_cache");
+                stmt.executeUpdate("UPDATE sync_state SET last_sync_id = -1, last_sync_time = NULL WHERE id = 1");
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed to clear cache data", e);
+            }
         }
+
+        // Update note count property to 0
+        refreshNoteCount();
     }
 
     // ==================== Pending Notes (离线暂存) ====================
@@ -692,11 +769,13 @@ public class LocalCacheService {
     public void insertPendingNote(String content, String channel) throws SQLException {
         ensureInitialized();
         String sql = "INSERT INTO pending_notes (content, channel, created_at) VALUES (?, ?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, content);
-            pstmt.setString(2, channel);
-            pstmt.setString(3, DateTimeUtil.getCurrentUtcTimestamp());
-            pstmt.executeUpdate();
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, content);
+                pstmt.setString(2, channel);
+                pstmt.setString(3, DateTimeUtil.getCurrentUtcTimestamp());
+                pstmt.executeUpdate();
+            }
         }
         refreshPendingNoteCount();
     }
@@ -705,18 +784,20 @@ public class LocalCacheService {
         ensureInitialized();
         List<PendingNoteData> notes = new ArrayList<>();
         String sql = "SELECT id, content, channel, created_at FROM pending_notes ORDER BY created_at ASC";
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                notes.add(new PendingNoteData(
-                        rs.getLong("id"),
-                        rs.getString("content"),
-                        rs.getString("channel"),
-                        rs.getString("created_at")
-                ));
+        synchronized (dbLock) {
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+                while (rs.next()) {
+                    notes.add(new PendingNoteData(
+                            rs.getLong("id"),
+                            rs.getString("content"),
+                            rs.getString("channel"),
+                            rs.getString("created_at")
+                    ));
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return notes;
     }
@@ -724,20 +805,24 @@ public class LocalCacheService {
     public void deletePendingNote(long id) throws SQLException {
         ensureInitialized();
         String sql = "DELETE FROM pending_notes WHERE id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setLong(1, id);
-            pstmt.executeUpdate();
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setLong(1, id);
+                pstmt.executeUpdate();
+            }
         }
         refreshPendingNoteCount();
     }
 
     public int getPendingNoteCount() {
         ensureInitialized();
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM pending_notes")) {
-            if (rs.next()) return rs.getInt(1);
-        } catch (SQLException e) {
-            e.printStackTrace();
+        synchronized (dbLock) {
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM pending_notes")) {
+                if (rs.next()) return rs.getInt(1);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
         return 0;
     }

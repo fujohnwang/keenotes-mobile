@@ -141,7 +141,8 @@ public class MainContentArea extends StackPane {
 
             @Override
             public void onSyncComplete(int total, long lastSyncId) {
-                // Hide sync indicator on all NotesDisplayPanel instances
+                // Hide sync indicator; the UI refresh is triggered by a single
+                // LocalCache batch notification after all sync writes have drained.
                 Platform.runLater(() -> {
                     if (notesDisplayPanel != null) {
                         notesDisplayPanel.hideSyncIndicator();
@@ -149,9 +150,6 @@ public class MainContentArea extends StackPane {
                     if (reviewNotesPanel != null) {
                         reviewNotesPanel.hideSyncIndicator();
                     }
-
-                    // Note: Data refresh is handled by LocalCacheService change listener
-                    // Don't reload here to avoid duplicate loading
                 });
             }
 
@@ -264,22 +262,22 @@ public class MainContentArea extends StackPane {
     }
 
     /**
-     * Handle batch notes from database change notification
-     * For batch sync (>1 notes), reload the list instead of adding one by one
+     * Handle batch notes from database change notification.
+     * Reconnect sync now dispatches this only once after all batches are persisted,
+     * so it is safe to reload immediately.
      */
     private void handleBatchNotesFromDb(java.util.List<LocalCacheService.NoteData> notes) {
-        // Update UI based on current panel
         if (currentPanel == noteModePanel) {
-            logger.info("Batch sync completed with " + notes.size() + " notes, reloading Note list");
+            logger.info("Batch sync persisted, reloading Note list");
             loadRecentNotes();
         } else if (currentPanel == reviewModePanel) {
-            logger.info("Batch sync completed with " + notes.size() + " notes, reloading Review list");
+            logger.info("Batch sync persisted, reloading Review list");
             loadReviewNotes(currentReviewPeriod);
         } else if (currentPanel == onThisDayModePanel) {
-            logger.info("Batch sync completed with " + notes.size() + " notes, reloading On This Day list");
+            logger.info("Batch sync persisted, reloading On This Day list");
             loadOnThisDayNotes();
         } else {
-            logger.fine("Batch sync completed but current panel is not Note/Review/OnThisDay mode, skipping UI update");
+            logger.fine("Batch sync persisted but current panel is not Note/Review/OnThisDay mode, skipping UI update");
         }
     }
 
@@ -731,40 +729,51 @@ public class MainContentArea extends StackPane {
 
         pendingListView.getChildren().add(header);
 
-        // 加载 pending notes
-        java.util.List<LocalCacheService.PendingNoteData> pendingNotes = ServiceManager.getInstance()
-                .getPendingNoteService().getPendingNotes();
+        // 先显示 loading 状态，替换 notesDisplayPanel
+        Label loadingLabel = new Label("Loading...");
+        loadingLabel.getStyleClass().add("search-loading");
+        pendingListView.getChildren().add(loadingLabel);
 
-        if (pendingNotes.isEmpty()) {
-            Label emptyLabel = new Label("No pending notes");
-            emptyLabel.getStyleClass().add("search-loading");
-            pendingListView.getChildren().add(emptyLabel);
-        } else {
-            javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane();
-            scrollPane.setFitToWidth(true);
-            scrollPane.getStyleClass().add("content-scroll");
-            VBox.setVgrow(scrollPane, Priority.ALWAYS);
-
-            VBox cardsContainer = new VBox(12);
-            cardsContainer.setPadding(new Insets(8, 0, 8, 0));
-            cardsContainer.getStyleClass().add("notes-container");
-
-            for (LocalCacheService.PendingNoteData note : pendingNotes) {
-                // 转换为 NoteData，复用 NoteCardView
-                LocalCacheService.NoteData noteData = new LocalCacheService.NoteData(
-                        note.id, note.content, note.channel, note.createdAt, null);
-                cardsContainer.getChildren().add(new NoteCardView(noteData));
-            }
-
-            scrollPane.setContent(cardsContainer);
-            pendingListView.getChildren().add(scrollPane);
-        }
-
-        // 替换 notesDisplayPanel 为 pendingListView
         int idx = noteModePanel.getChildren().indexOf(notesDisplayPanel);
         if (idx >= 0) {
             noteModePanel.getChildren().set(idx, pendingListView);
         }
+
+        // 在后台线程读取 pending notes（避免 dbLock 阻塞 FX 线程）
+        new Thread(() -> {
+            java.util.List<LocalCacheService.PendingNoteData> pendingNotes = ServiceManager.getInstance()
+                    .getPendingNoteService().getPendingNotes();
+
+            Platform.runLater(() -> {
+                // 移除 loading label
+                pendingListView.getChildren().remove(loadingLabel);
+
+                if (pendingNotes.isEmpty()) {
+                    Label emptyLabel = new Label("No pending notes");
+                    emptyLabel.getStyleClass().add("search-loading");
+                    pendingListView.getChildren().add(emptyLabel);
+                } else {
+                    javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane();
+                    scrollPane.setFitToWidth(true);
+                    scrollPane.getStyleClass().add("content-scroll");
+                    VBox.setVgrow(scrollPane, Priority.ALWAYS);
+
+                    VBox cardsContainer = new VBox(12);
+                    cardsContainer.setPadding(new Insets(8, 0, 8, 0));
+                    cardsContainer.getStyleClass().add("notes-container");
+
+                    for (LocalCacheService.PendingNoteData note : pendingNotes) {
+                        // 转换为 NoteData，复用 NoteCardView
+                        LocalCacheService.NoteData noteData = new LocalCacheService.NoteData(
+                                note.id, note.content, note.channel, note.createdAt, null);
+                        cardsContainer.getChildren().add(new NoteCardView(noteData));
+                    }
+
+                    scrollPane.setContent(cardsContainer);
+                    pendingListView.getChildren().add(scrollPane);
+                }
+            });
+        }, "LoadPendingNotes").start();
     }
 
     /**

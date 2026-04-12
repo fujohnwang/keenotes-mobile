@@ -55,6 +55,14 @@ public class WebSocketClientService {
     // 批量同步进度追踪
     private int expectedBatches = 0;
     private int receivedBatches = 0;
+    private int pendingBatchWrites = 0;
+    private boolean syncCompletionPending = false;
+    private int completedSyncTotal = 0;
+    private long completedSyncLastSyncId = -1;
+    private boolean syncDataChanged = false;
+    private boolean syncWriteFailed = false;
+    private long syncEpoch = 0;
+    private final Object syncStateLock = new Object();
 
     // 专用线程：解密 + DB 写入（避免阻塞 OkHttp WebSocket 线程）
     private final ExecutorService cryptoExecutor = Executors.newSingleThreadExecutor(r -> {
@@ -152,7 +160,7 @@ public class WebSocketClientService {
                 }
             }
         } catch (Exception e) {
-            logger.warning("Invalid URL: " + wsUrl);
+            logger.warning("Invalid WebSocket endpoint URL '" + wsUrl + "': " + describeThrowableChain(e));
             isConnecting.set(false);
             return;
         }
@@ -183,13 +191,21 @@ public class WebSocketClientService {
         // 添加 Authorization 头 - 复用 HTTP POST 的 token 认证方式
         if (authToken != null && !authToken.isEmpty()) {
             requestBuilder.addHeader("Authorization", "Bearer " + authToken);
-            logger.info("Adding Authorization header: Bearer " + authToken.substring(0, Math.min(4, authToken.length()))
-                    + "...");
+            logger.info("Adding Authorization header: " + summarizeToken(authToken));
         } else {
             logger.warning("No auth token configured!");
         }
 
-        logger.info("WebSocket connecting to: " + wsRequestUrl);
+        logger.info("WebSocket connect request: endpoint=" + wsUrl
+                + ", requestUrl=" + wsRequestUrl
+                + ", host=" + host
+                + ", port=" + port
+                + ", path=" + path
+                + ", ssl=" + ssl
+                + ", origin=" + origin
+                + ", token=" + summarizeToken(authToken)
+                + ", lastSyncId=" + lastSyncId
+                + ", reconnectAttempts=" + reconnectAttempts);
 
         // 创建WebSocket监听器
         WebSocketListener listener = new WebSocketListener() {
@@ -203,13 +219,14 @@ public class WebSocketClientService {
                 WebSocketClientService.this.webSocket = webSocket;
                 isConnected.set(true);
                 isConnecting.set(false);
+                isOffline.set(false);
                 reconnectAttempts = 0;
 
                 sendHandshake();
                 startHeartbeat();
                 notifyConnectionStatus(true);
 
-                logger.info("WebSocket connected successfully");
+                logger.info("WebSocket connected successfully: " + describeResponse(response));
             }
 
             @Override
@@ -233,10 +250,13 @@ public class WebSocketClientService {
             @Override
             public void onFailure(WebSocket webSocket, Throwable t, Response response) {
                 if (isShuttingDown.get()) {
-                    logger.info("WebSocket failure during shutdown: " + t.getMessage());
+                    logger.info("WebSocket failure during shutdown: " + describeThrowableChain(t));
                     return;
                 }
-                logger.warning("WebSocket failure: " + t.getMessage());
+                logger.warning("WebSocket failure [" + classifyFailure(t, response) + "]: " + describeThrowableChain(t));
+                if (response != null) {
+                    logger.warning("WebSocket failure response: " + describeResponse(response));
+                }
                 isConnected.set(false);
                 notifyError(t.getMessage());
                 cleanup();
@@ -248,7 +268,7 @@ public class WebSocketClientService {
         try {
             httpClient.newWebSocket(requestBuilder.build(), listener);
         } catch (Exception e) {
-            logger.warning("WebSocket connection exception: " + e.getMessage());
+            logger.warning("WebSocket connection exception while creating call: " + describeThrowableChain(e));
             isConnecting.set(false);
             scheduleReconnect();
         }
@@ -393,14 +413,10 @@ public class WebSocketClientService {
         int batchId = json.getInteger("batch_id", 0);
         int totalBatches = json.getInteger("total_batches", 1);
 
-        if (expectedBatches == 0) {
-            expectedBatches = totalBatches;
-        }
-
         JsonArray notes = json.getJsonArray("notes");
         if (notes == null) {
-            receivedBatches++;
-            notifySyncProgress(receivedBatches, totalBatches);
+            int currentBatch = markBatchReceived(totalBatches);
+            notifySyncProgress(currentBatch, totalBatches);
             logger.info("Received empty batch " + batchId + "/" + totalBatches);
             return;
         }
@@ -411,82 +427,87 @@ public class WebSocketClientService {
             noteSnapshots.add(notes.getJsonObject(i));
         }
 
+        final long currentSyncEpoch;
+        synchronized (syncStateLock) {
+            pendingBatchWrites++;
+            currentSyncEpoch = syncEpoch;
+        }
+
         // Decrypt + DB write on dedicated thread (avoid blocking OkHttp WebSocket thread)
-        cryptoExecutor.submit(() -> {
-            List<LocalCacheService.NoteData> batchNotes = new ArrayList<>();
-            long maxNoteId = -1;
-
-            for (JsonObject note : noteSnapshots) {
+        try {
+            cryptoExecutor.submit(() -> {
+                boolean batchChangedData = false;
+                boolean batchWriteFailed = false;
                 try {
-                    long id = note.getLong("id");
-                    String encryptedContent = note.getString("content");
-                    String channel = note.getString("channel");
-                    String createdAt = note.getString("created_at");
+                    List<LocalCacheService.NoteData> batchNotes = new ArrayList<>();
+                    for (JsonObject note : noteSnapshots) {
+                        try {
+                            long id = note.getLong("id");
+                            String encryptedContent = note.getString("content");
+                            String channel = note.getString("channel");
+                            String createdAt = note.getString("created_at");
 
-                    String decryptedContent;
-                    try {
-                        decryptedContent = cryptoService.decrypt(encryptedContent);
-                    } catch (Exception e) {
-                        logger.warning("Failed to decrypt note " + id + ": " + e.getMessage() + ", storing encrypted content");
-                        decryptedContent = encryptedContent;
+                            String decryptedContent;
+                            try {
+                                decryptedContent = cryptoService.decrypt(encryptedContent);
+                            } catch (Exception e) {
+                                logger.warning("Failed to decrypt note " + id + ": " + e.getMessage()
+                                        + ", storing encrypted content");
+                                decryptedContent = encryptedContent;
+                            }
+
+                            batchNotes.add(new LocalCacheService.NoteData(
+                                    id, decryptedContent, channel, createdAt, encryptedContent));
+                        } catch (Exception e) {
+                            logger.warning("Failed to parse note: " + e.getMessage());
+                        }
                     }
 
-                    batchNotes.add(new LocalCacheService.NoteData(
-                            id, decryptedContent, channel, createdAt, encryptedContent));
-                    if (id > maxNoteId) {
-                        maxNoteId = id;
+                    if (!batchNotes.isEmpty()) {
+                        try {
+                            localCache.batchInsertNotes(batchNotes, false);
+                            batchChangedData = true;
+                            logger.info("Batch " + batchId + ": inserted " + batchNotes.size() + " notes to DB");
+                        } catch (Exception e) {
+                            batchWriteFailed = true;
+                            logger.warning("Failed to insert batch " + batchId + ": " + e.getMessage());
+                        }
                     }
-                } catch (Exception e) {
-                    logger.warning("Failed to parse note: " + e.getMessage());
+                } finally {
+                    onBatchWriteFinished(currentSyncEpoch, batchChangedData, batchWriteFailed);
                 }
-            }
+            });
+        } catch (RejectedExecutionException e) {
+            logger.warning("Rejected batch " + batchId + " because crypto executor is shutting down");
+            onBatchWriteFinished(currentSyncEpoch, false, true);
+        }
 
-            if (!batchNotes.isEmpty()) {
-                try {
-                    localCache.batchInsertNotes(batchNotes);
-                    logger.info("Batch " + batchId + ": inserted " + batchNotes.size() + " notes to DB");
-                } catch (Exception e) {
-                    logger.warning("Failed to insert batch " + batchId + ": " + e.getMessage());
-                }
-            }
-
-            if (maxNoteId > 0) {
-                try {
-                    localCache.updateLastSyncId(maxNoteId);
-                    this.lastSyncId = maxNoteId;
-                    logger.info("Batch " + batchId + ": updated lastSyncId to " + maxNoteId);
-                } catch (Exception e) {
-                    logger.warning("Failed to update lastSyncId after batch " + batchId + ": " + e.getMessage());
-                }
-            }
-        });
-
-        receivedBatches++;
-        notifySyncProgress(receivedBatches, totalBatches);
+        int currentBatch = markBatchReceived(totalBatches);
+        notifySyncProgress(currentBatch, totalBatches);
         logger.info("Received batch " + batchId + "/" + totalBatches);
     }
 
     private void handleSyncComplete(JsonObject json) {
         int totalSynced = json.getInteger("total_synced", 0);
         long newLastSyncId = json.getLong("last_sync_id", -1L);
+        final long currentSyncEpoch;
+        final int remainingWrites;
+        final boolean finalizeNow;
 
-        try {
-            // 以服务器返回的 last_sync_id 为准做最终更新
-            if (totalSynced > 0 && newLastSyncId > 0) {
-                localCache.updateLastSyncId(newLastSyncId);
-                this.lastSyncId = newLastSyncId;
-                logger.info("Updated lastSyncId to: " + newLastSyncId);
-            }
-        } catch (Exception e) {
-            logger.warning("Failed to update lastSyncId on sync complete: " + e.getMessage());
+        synchronized (syncStateLock) {
+            currentSyncEpoch = syncEpoch;
+            syncCompletionPending = true;
+            completedSyncTotal = totalSynced;
+            completedSyncLastSyncId = newLastSyncId;
+            remainingWrites = pendingBatchWrites;
+            finalizeNow = pendingBatchWrites == 0;
         }
 
-        expectedBatches = 0;
-        receivedBatches = 0;
-        isSyncing.set(false);
-
-        notifySyncComplete(totalSynced, newLastSyncId);
-        logger.info("Sync complete: " + totalSynced + " notes");
+        if (finalizeNow) {
+            finalizeSyncRound(currentSyncEpoch);
+        } else {
+            logger.info("sync_complete received; waiting for " + remainingWrites + " batch write(s) to finish");
+        }
     }
 
     private void handleRealtimeUpdate(JsonObject json) {
@@ -674,10 +695,99 @@ public class WebSocketClientService {
             reconnectTask = null;
         }
 
-        expectedBatches = 0;
-        receivedBatches = 0;
+        synchronized (syncStateLock) {
+            syncEpoch++;
+            resetSyncStateLocked();
+        }
+        isSyncing.set(false);
         isConnected.set(false);
         isConnecting.set(false);
+    }
+
+    private int markBatchReceived(int totalBatches) {
+        synchronized (syncStateLock) {
+            if (expectedBatches == 0) {
+                expectedBatches = totalBatches;
+            }
+            receivedBatches++;
+            return receivedBatches;
+        }
+    }
+
+    private void onBatchWriteFinished(long batchSyncEpoch, boolean batchChangedData, boolean batchWriteFailed) {
+        final boolean finalizeNow;
+
+        synchronized (syncStateLock) {
+            if (batchSyncEpoch != syncEpoch) {
+                return;
+            }
+
+            if (batchChangedData) {
+                syncDataChanged = true;
+            }
+            if (batchWriteFailed) {
+                syncWriteFailed = true;
+            }
+
+            pendingBatchWrites = Math.max(0, pendingBatchWrites - 1);
+            finalizeNow = syncCompletionPending && pendingBatchWrites == 0;
+        }
+
+        if (finalizeNow) {
+            finalizeSyncRound(batchSyncEpoch);
+        }
+    }
+
+    private void finalizeSyncRound(long batchSyncEpoch) {
+        final int totalSynced;
+        final long newLastSyncId;
+        final boolean shouldNotifyBatchReload;
+        final boolean shouldAdvanceSyncCursor;
+
+        synchronized (syncStateLock) {
+            if (batchSyncEpoch != syncEpoch || !syncCompletionPending || pendingBatchWrites != 0) {
+                return;
+            }
+
+            totalSynced = completedSyncTotal;
+            newLastSyncId = completedSyncLastSyncId;
+            shouldNotifyBatchReload = syncDataChanged;
+            shouldAdvanceSyncCursor = !syncWriteFailed;
+            resetSyncStateLocked();
+        }
+
+        try {
+            // 以服务器返回的 last_sync_id 为准做最终更新
+            if (shouldAdvanceSyncCursor && totalSynced > 0 && newLastSyncId > 0) {
+                localCache.updateLastSyncId(newLastSyncId);
+                this.lastSyncId = newLastSyncId;
+                logger.info("Updated lastSyncId to: " + newLastSyncId);
+            } else if (!shouldAdvanceSyncCursor) {
+                logger.warning("Sync round had batch write failures; keeping previous lastSyncId so the server can replay");
+            }
+        } catch (Exception e) {
+            logger.warning("Failed to update lastSyncId on sync complete: " + e.getMessage());
+        }
+
+        isSyncing.set(false);
+
+        if (shouldNotifyBatchReload) {
+            localCache.notifyBatchSyncApplied();
+        }
+
+        notifySyncComplete(totalSynced, newLastSyncId);
+        logger.info("Sync complete after DB drain: " + totalSynced + " notes");
+    }
+
+    private void resetSyncStateLocked() {
+        expectedBatches = 0;
+        receivedBatches = 0;
+        pendingBatchWrites = 0;
+        syncCompletionPending = false;
+        completedSyncTotal = 0;
+        completedSyncLastSyncId = -1L;
+        syncDataChanged = false;
+        syncWriteFailed = false;
     }
 
     /**
@@ -710,6 +820,12 @@ public class WebSocketClientService {
 
         // 关闭解密专用线程
         cryptoExecutor.shutdownNow();
+
+        synchronized (syncStateLock) {
+            syncEpoch++;
+            resetSyncStateLocked();
+        }
+        isSyncing.set(false);
 
         // 3. 立即强制关闭OkHttp底层资源（这会强制断开所有连接）
         if (httpClient != null) {
@@ -799,6 +915,92 @@ public class WebSocketClientService {
 
     public boolean isOffline() {
         return isOffline.get();
+    }
+
+    private String summarizeToken(String token) {
+        if (token == null || token.isEmpty()) {
+            return "missing";
+        }
+
+        String prefix = token.substring(0, Math.min(4, token.length()));
+        return "Bearer " + prefix + "...(len=" + token.length() + ")";
+    }
+
+    private String classifyFailure(Throwable throwable, Response response) {
+        if (hasCause(throwable, java.net.UnknownHostException.class)) {
+            return "dns";
+        }
+        if (hasCause(throwable, javax.net.ssl.SSLException.class)) {
+            return "tls";
+        }
+        if (hasCause(throwable, java.net.SocketTimeoutException.class)) {
+            return "timeout";
+        }
+        if (hasCause(throwable, java.net.ConnectException.class)) {
+            return "connect";
+        }
+        if (response != null) {
+            return "http_" + response.code();
+        }
+        return throwable == null ? "unknown" : throwable.getClass().getSimpleName();
+    }
+
+    private boolean hasCause(Throwable throwable, Class<? extends Throwable> type) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable current = throwable;
+        while (current != null && seen.add(current)) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private String describeThrowableChain(Throwable throwable) {
+        if (throwable == null) {
+            return "unknown";
+        }
+
+        List<String> parts = new ArrayList<>();
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable current = throwable;
+        while (current != null && seen.add(current)) {
+            String message = current.getMessage();
+            if (message == null || message.isBlank()) {
+                parts.add(current.getClass().getName());
+            } else {
+                parts.add(current.getClass().getName() + ": " + message);
+            }
+            current = current.getCause();
+        }
+        return String.join(" <- ", parts);
+    }
+
+    private String describeResponse(Response response) {
+        if (response == null) {
+            return "none";
+        }
+
+        List<String> headers = new ArrayList<>();
+        appendHeader(headers, response, "server");
+        appendHeader(headers, response, "cf-ray");
+        appendHeader(headers, response, "content-type");
+        appendHeader(headers, response, "location");
+        appendHeader(headers, response, "sec-websocket-accept");
+
+        String headerSummary = headers.isEmpty() ? "" : ", headers={" + String.join(", ", headers) + "}";
+        return "code=" + response.code()
+                + ", message=" + response.message()
+                + ", url=" + response.request().url()
+                + headerSummary;
+    }
+
+    private void appendHeader(List<String> headers, Response response, String name) {
+        String value = response.header(name);
+        if (value != null && !value.isBlank()) {
+            headers.add(name + "=" + value);
+        }
     }
 
     /**
