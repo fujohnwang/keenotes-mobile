@@ -814,6 +814,7 @@ public class MainContentArea extends StackPane {
         // 网络可用：后台发送
         apiService.postNote(content, channel, ts).thenAccept(result -> Platform.runLater(() -> {
             if (result.success()) {
+                notesDisplayPanel.finishOptimisticRequest(tempNote);
                 // Copy to clipboard if enabled
                 if (SettingsService.getInstance().getCopyToClipboardOnPost()) {
                     javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
@@ -825,8 +826,13 @@ public class MainContentArea extends StackPane {
                 // 边缘动画会在 handleNewNoteFromDb 匹配到远程同步数据时完成
             } else {
                 // 发送失败：存入 pending，取消动画，反向移除卡片
-                pendingService.savePendingNote(content, channel);
-                removeOptimisticCard();
+                if (notesDisplayPanel.consumeResolvedOptimistic(tempNote)) {
+                    logger.info("Skipping pending fallback because note was already resolved by realtime sync");
+                } else {
+                    pendingService.savePendingNote(content, channel);
+                    removeOptimisticCard();
+                }
+                notesDisplayPanel.finishOptimisticRequest(tempNote);
             }
         }));
     }
