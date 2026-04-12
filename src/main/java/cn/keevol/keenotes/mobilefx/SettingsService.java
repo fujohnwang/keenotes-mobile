@@ -4,11 +4,16 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.scene.text.Font;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -30,6 +35,7 @@ public class SettingsService {
     private static final String KEY_FIRST_NOTE_DATE = "first.note.date";
     private static final String KEY_THEME = "ui.theme";
     private static final String KEY_NOTE_FONT_SIZE = "note.font.size";
+    private static final String KEY_NOTE_FONT_FAMILY = "note.font.family";
     private static final String KEY_ZOOM_IN_SHORTCUT = "shortcut.zoom.in";
     private static final String KEY_TAKE_NOTE_SHORTCUT = "shortcut.take.note";
     private static final String KEY_ZOOM_OUT_SHORTCUT = "shortcut.zoom.out";
@@ -46,6 +52,8 @@ public class SettingsService {
     private static final String DEFAULT_SEND_SHORTCUT = "Alt+Enter";
     private static final String DEFAULT_THEME = "dark";
     private static final int DEFAULT_NOTE_FONT_SIZE = 14;
+    private static final String DEFAULT_NOTE_FONT_FAMILY = "MiSans";
+    private static final String FALLBACK_NOTE_FONT_FAMILY = "System";
     private static final int MIN_NOTE_FONT_SIZE = 10;
     private static final int MAX_NOTE_FONT_SIZE = 24;
     private static final int FONT_SIZE_STEP = 2;
@@ -60,6 +68,7 @@ public class SettingsService {
     // JavaFX Property for reactive binding
     private final BooleanProperty showOverviewCardProperty = new SimpleBooleanProperty(true);
     private final IntegerProperty noteFontSizeProperty = new SimpleIntegerProperty(DEFAULT_NOTE_FONT_SIZE);
+    private final StringProperty noteFontFamilyProperty = new SimpleStringProperty(DEFAULT_NOTE_FONT_FAMILY);
     private final BooleanProperty showSyncChannelStatusProperty = new SimpleBooleanProperty(false);
     private final BooleanProperty showOnThisDayInYearsPastProperty = new SimpleBooleanProperty(true);
 
@@ -70,6 +79,7 @@ public class SettingsService {
         // Initialize property from loaded settings
         showOverviewCardProperty.set(getShowOverviewCard());
         noteFontSizeProperty.set(getNoteFontSize());
+        noteFontFamilyProperty.set(getEffectiveNoteFontFamily());
         showSyncChannelStatusProperty.set(getShowSyncChannelStatus());
         showOnThisDayInYearsPastProperty.set(getShowOnThisDayInYearsPast());
     }
@@ -294,6 +304,33 @@ public class SettingsService {
         return noteFontSizeProperty;
     }
 
+    public String getNoteFontFamily() {
+        String fontFamily = properties.getProperty(KEY_NOTE_FONT_FAMILY, DEFAULT_NOTE_FONT_FAMILY);
+        return fontFamily == null || fontFamily.isBlank() ? DEFAULT_NOTE_FONT_FAMILY : fontFamily;
+    }
+
+    public String getEffectiveNoteFontFamily() {
+        return resolveAvailableFontFamily(getNoteFontFamily());
+    }
+
+    public void setNoteFontFamily(String fontFamily) {
+        String normalizedFontFamily = fontFamily == null ? "" : fontFamily.trim();
+        if (normalizedFontFamily.isEmpty()) {
+            properties.remove(KEY_NOTE_FONT_FAMILY);
+        } else {
+            properties.setProperty(KEY_NOTE_FONT_FAMILY, normalizedFontFamily);
+        }
+        noteFontFamilyProperty.set(getEffectiveNoteFontFamily());
+    }
+
+    public StringProperty noteFontFamilyProperty() {
+        return noteFontFamilyProperty;
+    }
+
+    public List<String> getAvailableNoteFontFamilies() {
+        return loadAvailableFontFamilies();
+    }
+
     public void zoomIn() {
         int currentSize = getNoteFontSize();
         if (currentSize < MAX_NOTE_FONT_SIZE) {
@@ -361,5 +398,53 @@ public class SettingsService {
 
     public BooleanProperty showSyncChannelStatusProperty() {
         return showSyncChannelStatusProperty;
+    }
+
+    private String resolveAvailableFontFamily(String requestedFontFamily) {
+        List<String> availableFontFamilies = loadAvailableFontFamilies();
+
+        String requestedMatch = findFontFamilyIgnoreCase(availableFontFamilies, requestedFontFamily);
+        if (requestedMatch != null) {
+            return requestedMatch;
+        }
+
+        String defaultMatch = findFontFamilyIgnoreCase(availableFontFamilies, DEFAULT_NOTE_FONT_FAMILY);
+        if (defaultMatch != null) {
+            return defaultMatch;
+        }
+
+        String fallbackMatch = findFontFamilyIgnoreCase(availableFontFamilies, FALLBACK_NOTE_FONT_FAMILY);
+        if (fallbackMatch != null) {
+            return fallbackMatch;
+        }
+
+        return availableFontFamilies.isEmpty() ? FALLBACK_NOTE_FONT_FAMILY : availableFontFamilies.get(0);
+    }
+
+    private String findFontFamilyIgnoreCase(List<String> fontFamilies, String candidate) {
+        if (candidate == null || candidate.isBlank()) {
+            return null;
+        }
+
+        for (String fontFamily : fontFamilies) {
+            if (fontFamily.equalsIgnoreCase(candidate)) {
+                return fontFamily;
+            }
+        }
+        return null;
+    }
+
+    private List<String> loadAvailableFontFamilies() {
+        try {
+            LinkedHashSet<String> uniqueFontFamilies = new LinkedHashSet<>(Font.getFamilies());
+            List<String> fontFamilies = new ArrayList<>(uniqueFontFamilies);
+            fontFamilies.sort(String.CASE_INSENSITIVE_ORDER);
+            return fontFamilies;
+        } catch (Exception e) {
+            List<String> fallbackFontFamilies = new ArrayList<>();
+            fallbackFontFamilies.add(DEFAULT_NOTE_FONT_FAMILY);
+            fallbackFontFamilies.add(FALLBACK_NOTE_FONT_FAMILY);
+            return fallbackFontFamilies;
+        }
     }
 }

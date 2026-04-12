@@ -1,10 +1,15 @@
 package cn.keevol.keenotes.mobilefx;
 
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
 
 /**
  * Preferences settings view (UI preferences, shortcuts, etc.)
@@ -17,11 +22,13 @@ public class SettingsPreferencesView extends VBox {
     private final ToggleSwitch showOnThisDayToggle;
     private final ToggleSwitch showSyncChannelStatusToggle;
     private final ToggleSwitch themeToggle;
+    private final ComboBox<String> noteFontFamilyComboBox;
     private final KeyCaptureField takeNoteShortcutField;
     private final KeyCaptureField searchShortcutField;
     private final KeyCaptureField sendShortcutField;
     private final KeyCaptureField zoomInShortcutField;
     private final KeyCaptureField zoomOutShortcutField;
+    private boolean loadingSettings;
     
     public SettingsPreferencesView() {
         this.settings = SettingsService.getInstance();
@@ -63,6 +70,21 @@ public class SettingsPreferencesView extends VBox {
         themeToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
             ThemeService.Theme theme = newVal ? ThemeService.Theme.LIGHT : ThemeService.Theme.DARK;
             ThemeService.getInstance().setTheme(theme);
+        });
+
+        // Note card font family
+        noteFontFamilyComboBox = new ComboBox<>(FXCollections.observableArrayList(settings.getAvailableNoteFontFamilies()));
+        noteFontFamilyComboBox.getStyleClass().add("review-period-select");
+        noteFontFamilyComboBox.setMaxWidth(Double.MAX_VALUE);
+        noteFontFamilyComboBox.setVisibleRowCount(16);
+        noteFontFamilyComboBox.setButtonCell(new FontFamilyListCell());
+        noteFontFamilyComboBox.setCellFactory(listView -> new FontFamilyListCell());
+        noteFontFamilyComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (loadingSettings || newVal == null || newVal.isBlank() || newVal.equals(oldVal)) {
+                return;
+            }
+            settings.setNoteFontFamily(newVal);
+            settings.save();
         });
 
         // Take Note shortcut
@@ -132,6 +154,8 @@ public class SettingsPreferencesView extends VBox {
             createToggleRow("On this day in years past", showOnThisDayToggle),
             createToggleRow("Show Sync Channel Status", showSyncChannelStatusToggle),
             createToggleRow("Light Theme", themeToggle),
+            createFieldRow("Note Card font", noteFontFamilyComboBox,
+                "Use any font available on this system. Missing fonts on another OS will fall back automatically."),
             createShortcutRow("Take Note shortcut", takeNoteShortcutField,
                 "Click the field and press your desired key combination (e.g., Alt+T)"),
             createShortcutRow("Search shortcut", searchShortcutField, 
@@ -160,6 +184,10 @@ public class SettingsPreferencesView extends VBox {
     }
     
     private HBox createShortcutRow(String labelText, KeyCaptureField field, String hintText) {
+        return createFieldRow(labelText, field, hintText);
+    }
+
+    private HBox createFieldRow(String labelText, Node field, String hintText) {
         Label label = new Label(labelText);
         label.getStyleClass().add("field-label");
         label.setAlignment(Pos.CENTER_RIGHT);
@@ -168,7 +196,10 @@ public class SettingsPreferencesView extends VBox {
         hint.getStyleClass().add("field-hint");
 
         VBox fieldWithHint = new VBox(6, field, hint);
-        HBox.setHgrow(fieldWithHint, javafx.scene.layout.Priority.ALWAYS);
+        HBox.setHgrow(fieldWithHint, Priority.ALWAYS);
+        if (field instanceof javafx.scene.control.Control control) {
+            control.setMaxWidth(Double.MAX_VALUE);
+        }
 
         VBox labelWrapper = new VBox(label);
         labelWrapper.setAlignment(Pos.TOP_RIGHT);
@@ -182,15 +213,36 @@ public class SettingsPreferencesView extends VBox {
     }
     
     private void loadSettings() {
-        copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
-        showOverviewCardToggle.setSelected(settings.getShowOverviewCard());
-        showOnThisDayToggle.setSelected(settings.getShowOnThisDayInYearsPast());
-        showSyncChannelStatusToggle.setSelected(settings.getShowSyncChannelStatus());
-        themeToggle.setSelected(ThemeService.getInstance().getCurrentTheme() == ThemeService.Theme.LIGHT);
-        takeNoteShortcutField.setShortcut(settings.getTakeNoteShortcut());
-        searchShortcutField.setShortcut(settings.getSearchShortcut());
-        sendShortcutField.setShortcut(settings.getSendShortcut());
-        zoomInShortcutField.setShortcut(settings.getZoomInShortcut());
-        zoomOutShortcutField.setShortcut(settings.getZoomOutShortcut());
+        loadingSettings = true;
+        try {
+            copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
+            showOverviewCardToggle.setSelected(settings.getShowOverviewCard());
+            showOnThisDayToggle.setSelected(settings.getShowOnThisDayInYearsPast());
+            showSyncChannelStatusToggle.setSelected(settings.getShowSyncChannelStatus());
+            themeToggle.setSelected(ThemeService.getInstance().getCurrentTheme() == ThemeService.Theme.LIGHT);
+            noteFontFamilyComboBox.setValue(settings.getEffectiveNoteFontFamily());
+            takeNoteShortcutField.setShortcut(settings.getTakeNoteShortcut());
+            searchShortcutField.setShortcut(settings.getSearchShortcut());
+            sendShortcutField.setShortcut(settings.getSendShortcut());
+            zoomInShortcutField.setShortcut(settings.getZoomInShortcut());
+            zoomOutShortcutField.setShortcut(settings.getZoomOutShortcut());
+        } finally {
+            loadingSettings = false;
+        }
+    }
+
+    private static final class FontFamilyListCell extends javafx.scene.control.ListCell<String> {
+        @Override
+        protected void updateItem(String item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null || item.isBlank()) {
+                setText(null);
+                setFont(Font.getDefault());
+                return;
+            }
+
+            setText(item);
+            setFont(Font.font(item, 13));
+        }
     }
 }
