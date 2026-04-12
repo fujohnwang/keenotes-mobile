@@ -18,7 +18,10 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Logger;
 
 /**
@@ -68,6 +71,9 @@ public class NotesDisplayPanel extends VBox {
     // Optimistic card tracking
     private LocalCacheService.NoteData optimisticNoteData = null;
     private NoteCardView optimisticCard = null;
+    private final Set<Long> renderedRealNoteIds = new HashSet<>();
+    private final Set<LocalCacheService.NoteData> resolvedOptimisticNotes = new HashSet<>();
+    private final Set<LocalCacheService.NoteData> closedOptimisticNotes = new HashSet<>();
 
     public NotesDisplayPanel() {
         getStyleClass().add("notes-display-panel");
@@ -349,6 +355,7 @@ public class NotesDisplayPanel extends VBox {
             java.util.function.Consumer<java.util.List<LocalCacheService.NoteData>> noteLoadCallback) {
         stopDotsAnimation();
         noteItems.clear();
+        renderedRealNoteIds.clear();
         hideStatus();
         showListView();
         loadGeneration++;
@@ -403,7 +410,7 @@ public class NotesDisplayPanel extends VBox {
                         noteLoadCallback.accept(notes);
                     }
 
-                    noteItems.addAll(notes);
+                    appendUniqueNotes(notes);
                     loadedFromDbCount = notes.size();
 
                     logger.info("loadInitialNotesFromDb: rendered " + notes.size()
@@ -427,6 +434,7 @@ public class NotesDisplayPanel extends VBox {
     public void displayNotes(List<LocalCacheService.NoteData> notes, String periodInfo) {
         stopDotsAnimation();
         noteItems.clear();
+        renderedRealNoteIds.clear();
         hideStatus();
         showListView();
         loadGeneration++;
@@ -443,7 +451,7 @@ public class NotesDisplayPanel extends VBox {
         }
         createHeaderRow(countText);
 
-        noteItems.addAll(notes);
+        appendUniqueNotes(notes);
     }
 
     /**
@@ -475,7 +483,7 @@ public class NotesDisplayPanel extends VBox {
                         noteLoadCallback.accept(notes);
                     }
 
-                    noteItems.addAll(notes);
+                    appendUniqueNotes(notes);
                     loadedFromDbCount += notes.size();
                     isLoadingMore = false;
                 });
@@ -491,7 +499,13 @@ public class NotesDisplayPanel extends VBox {
      * Add a single note at the top (for new notes from sync)
      */
     public void addNoteAtTop(LocalCacheService.NoteData note) {
+        if (isDuplicateRealNote(note)) {
+            logger.fine("Skipping duplicate note render for id=" + note.id);
+            return;
+        }
+
         noteItems.add(0, note);
+        trackRenderedNote(note);
         listView.scrollTo(0);
 
         if (useTruePagination) {
@@ -513,6 +527,8 @@ public class NotesDisplayPanel extends VBox {
      * Add an optimistic note at the top with border animation
      */
     public void addOptimisticNote(LocalCacheService.NoteData note) {
+        resolvedOptimisticNotes.remove(note);
+        closedOptimisticNotes.remove(note);
         optimisticNoteData = note;
         optimisticCard = null;
         addNoteAtTop(note);
@@ -542,6 +558,8 @@ public class NotesDisplayPanel extends VBox {
         }
         if (optimisticNoteData != null) {
             noteItems.remove(optimisticNoteData);
+            resolvedOptimisticNotes.remove(optimisticNoteData);
+            closedOptimisticNotes.remove(optimisticNoteData);
         }
         optimisticNoteData = null;
         optimisticCard = null;
@@ -554,10 +572,18 @@ public class NotesDisplayPanel extends VBox {
      */
     public void replaceOptimisticNoteWithReal(LocalCacheService.NoteData realNote) {
         if (optimisticNoteData != null) {
+            if (!closedOptimisticNotes.remove(optimisticNoteData)) {
+                resolvedOptimisticNotes.add(optimisticNoteData);
+            }
             int index = noteItems.indexOf(optimisticNoteData);
             if (index >= 0) {
-                // Replace the optimistic note data with real note data
-                noteItems.set(index, realNote);
+                if (isDuplicateRealNote(realNote)) {
+                    noteItems.remove(index);
+                } else {
+                    // Replace the optimistic note data with real note data
+                    noteItems.set(index, realNote);
+                    trackRenderedNote(realNote);
+                }
             }
         }
         // Complete the border animation on the card
@@ -567,6 +593,22 @@ public class NotesDisplayPanel extends VBox {
         // Clear optimistic tracking
         optimisticNoteData = null;
         optimisticCard = null;
+    }
+
+    /**
+     * Consume the "optimistic note has already been resolved by realtime sync" marker.
+     */
+    public boolean consumeResolvedOptimistic(LocalCacheService.NoteData optimisticNote) {
+        return resolvedOptimisticNotes.remove(optimisticNote);
+    }
+
+    public void finishOptimisticRequest(LocalCacheService.NoteData optimisticNote) {
+        resolvedOptimisticNotes.remove(optimisticNote);
+        if (optimisticNoteData == optimisticNote) {
+            closedOptimisticNotes.add(optimisticNote);
+        } else {
+            closedOptimisticNotes.remove(optimisticNote);
+        }
     }
 
     // ===== Status display =====
@@ -586,6 +628,7 @@ public class NotesDisplayPanel extends VBox {
      */
     public void showLoading(String message) {
         noteItems.clear();
+        renderedRealNoteIds.clear();
         listView.setVisible(false);
         listView.setManaged(false);
         fixedHeaderContainer.setVisible(false);
@@ -607,6 +650,7 @@ public class NotesDisplayPanel extends VBox {
     public void showEmptyState(String message) {
         stopDotsAnimation();
         noteItems.clear();
+        renderedRealNoteIds.clear();
 
         createHeaderRow("");
         if (countLabel != null) {
@@ -632,6 +676,7 @@ public class NotesDisplayPanel extends VBox {
     public void showError(String message) {
         stopDotsAnimation();
         noteItems.clear();
+        renderedRealNoteIds.clear();
         listView.setVisible(false);
         listView.setManaged(false);
         fixedHeaderContainer.setVisible(false);
@@ -652,6 +697,7 @@ public class NotesDisplayPanel extends VBox {
     public void clear() {
         stopDotsAnimation();
         noteItems.clear();
+        renderedRealNoteIds.clear();
         fixedHeaderContainer.setVisible(false);
         fixedHeaderContainer.setManaged(false);
         headerRow = null;
@@ -686,6 +732,49 @@ public class NotesDisplayPanel extends VBox {
         if (dotsAnimation != null) {
             dotsAnimation.stop();
             dotsAnimation = null;
+        }
+    }
+
+    private void appendUniqueNotes(List<LocalCacheService.NoteData> notes) {
+        List<LocalCacheService.NoteData> filteredNotes = filterUniqueNotes(notes);
+        if (filteredNotes.isEmpty()) {
+            return;
+        }
+
+        noteItems.addAll(filteredNotes);
+        filteredNotes.forEach(this::trackRenderedNote);
+    }
+
+    private List<LocalCacheService.NoteData> filterUniqueNotes(List<LocalCacheService.NoteData> notes) {
+        List<LocalCacheService.NoteData> filteredNotes = new ArrayList<>();
+        Set<Long> batchIds = new HashSet<>();
+
+        for (LocalCacheService.NoteData note : notes) {
+            if (!isRealNote(note)) {
+                filteredNotes.add(note);
+                continue;
+            }
+            if (renderedRealNoteIds.contains(note.id) || !batchIds.add(note.id)) {
+                logger.fine("Filtered duplicate note from batch render, id=" + note.id);
+                continue;
+            }
+            filteredNotes.add(note);
+        }
+
+        return filteredNotes;
+    }
+
+    private boolean isDuplicateRealNote(LocalCacheService.NoteData note) {
+        return isRealNote(note) && renderedRealNoteIds.contains(note.id);
+    }
+
+    private boolean isRealNote(LocalCacheService.NoteData note) {
+        return note != null && note.id > 0;
+    }
+
+    private void trackRenderedNote(LocalCacheService.NoteData note) {
+        if (isRealNote(note)) {
+            renderedRealNoteIds.add(note.id);
         }
     }
 }
