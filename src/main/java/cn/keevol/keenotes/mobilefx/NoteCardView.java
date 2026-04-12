@@ -19,6 +19,7 @@ import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -48,6 +49,9 @@ public class NoteCardView extends StackPane {
     private static final double BORDER_ANIM_DURATION = 10.0; // max seconds for one full loop
     private static final double BORDER_LINE_WIDTH = 3.0;
     private static final double BORDER_RADIUS = 12.0;
+    private static final double MIN_CONTENT_HEIGHT = 30.0;
+    private static final double FALLBACK_TEXT_HORIZONTAL_PADDING = 18.0;
+    private static final double FALLBACK_TEXT_VERTICAL_PADDING = 24.0;
 
     public NoteCardView(LocalCacheService.NoteData noteData) {
         this.noteData = noteData;
@@ -64,7 +68,12 @@ public class NoteCardView extends StackPane {
 
         // Listen to font size changes
         settings.noteFontSizeProperty().addListener((obs, oldSize, newSize) -> {
-            javafx.application.Platform.runLater(() -> updateFontSize(newSize.intValue()));
+            javafx.application.Platform.runLater(this::updateContentTypography);
+        });
+
+        // Listen to font family changes
+        settings.noteFontFamilyProperty().addListener((obs, oldFamily, newFamily) -> {
+            javafx.application.Platform.runLater(this::updateContentTypography);
         });
 
         // Main content container
@@ -100,56 +109,36 @@ public class NoteCardView extends StackPane {
 
         String textColor = isDark ? "#E6EDF3" : "#24292F";
         int fontSize = settings.getNoteFontSize();
-        contentArea.setStyle(
-                "-fx-control-inner-background: transparent; " +
-                        "-fx-background-color: transparent; " +
-                        "-fx-text-fill: " + textColor + "; " +
-                        "-fx-font-size: " + fontSize + "px; " +
-                        "-fx-border-width: 0; " +
-                        "-fx-focus-color: transparent; " +
-                        "-fx-faint-focus-color: transparent; " +
-                        "-fx-cursor: hand;");
+        String fontFamily = settings.getEffectiveNoteFontFamily();
+        applyContentAreaStyle(textColor, fontSize, fontFamily);
 
         // Disable scrollbars completely
         contentArea.setScrollTop(0);
         contentArea.setScrollLeft(0);
+        contentArea.skinProperty().addListener((obs, oldSkin, newSkin) -> {
+            javafx.application.Platform.runLater(this::refreshContentMetrics);
+        });
+        contentArea.widthProperty().addListener((obs, oldWidth, newWidth) -> {
+            if (Math.abs(newWidth.doubleValue() - oldWidth.doubleValue()) > 0.5) {
+                refreshContentMetrics();
+            }
+        });
 
         // Create hidden Text node for accurate height measurement
         textMeasure = new Text();
-        textMeasure.setFont(Font.font("MiSans", fontSize)); // Use same font family
+        textMeasure.setFont(Font.font(fontFamily, fontSize));
         textMeasure.setWrappingWidth(500); // Will be updated based on actual width
         textMeasure.textProperty().bind(contentArea.textProperty());
 
         // Bind TextArea height to Text measurement (with guard to avoid redundant layout requests)
         textMeasure.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
-            double textHeight = newBounds.getHeight();
-            double padding = 20; // Minimal padding
-            double height = Math.max(30, textHeight + padding);
-            if (Math.abs(contentArea.getPrefHeight() - height) > 0.5) {
-                contentArea.setPrefHeight(height);
-                contentArea.setMinHeight(height);
-            }
+            refreshContentHeight();
             // Ensure scrollbars stay hidden after any layout change
             javafx.application.Platform.runLater(this::hideScrollBars);
         });
 
-        // Update wrapping width when card width changes (with guard to avoid redundant layout)
-        widthProperty().addListener((obs, oldWidth, newWidth) -> {
-            if (newWidth.doubleValue() > 64) { // Ensure we have valid width
-                // Card padding (16*2) + content box padding (16*2) = 64
-                double wrappingWidth = newWidth.doubleValue() - 64;
-                if (Math.abs(textMeasure.getWrappingWidth() - wrappingWidth) > 0.5) {
-                    textMeasure.setWrappingWidth(wrappingWidth);
-                }
-            }
-        });
-
         // Initial wrapping width setup after layout
-        javafx.application.Platform.runLater(() -> {
-            if (getWidth() > 64) {
-                textMeasure.setWrappingWidth(getWidth() - 64);
-            }
-        });
+        javafx.application.Platform.runLater(this::refreshContentMetrics);
 
         // Custom context menu for copy
         ContextMenu contextMenu = new ContextMenu();
@@ -322,6 +311,7 @@ public class NoteCardView extends StackPane {
         channelLabel.setText("• " + ch);
         contentArea.setText(newData.content);
         cancelBorderAnimation();
+        refreshContentMetrics();
         hideScrollBars();
     }
 
@@ -350,16 +340,7 @@ public class NoteCardView extends StackPane {
         }
 
         // Update content area text color
-        int fontSize = settings.getNoteFontSize();
-        contentArea.setStyle(
-                "-fx-control-inner-background: transparent; " +
-                        "-fx-background-color: transparent; " +
-                        "-fx-text-fill: " + textColor + "; " +
-                        "-fx-font-size: " + fontSize + "px; " +
-                        "-fx-border-width: 0; " +
-                        "-fx-focus-color: transparent; " +
-                        "-fx-faint-focus-color: transparent; " +
-                        "-fx-cursor: hand;");
+        applyContentAreaStyle(textColor, settings.getNoteFontSize(), settings.getEffectiveNoteFontFamily());
 
         // Update copied popup colors
         copiedPopup.setStyle(
@@ -374,20 +355,94 @@ public class NoteCardView extends StackPane {
     /**
      * Update font size for content area
      */
-    private void updateFontSize(int fontSize) {
+    private void updateContentTypography() {
         boolean isDark = ThemeService.getInstance().isDarkTheme();
         String textColor = isDark ? "#E6EDF3" : "#24292F";
+        int fontSize = settings.getNoteFontSize();
+        String fontFamily = settings.getEffectiveNoteFontFamily();
+        applyContentAreaStyle(textColor, fontSize, fontFamily);
+        textMeasure.setFont(Font.font(fontFamily, fontSize));
+        refreshContentMetrics();
+    }
+
+    private void applyContentAreaStyle(String textColor, int fontSize, String fontFamily) {
         contentArea.setStyle(
                 "-fx-control-inner-background: transparent; " +
                         "-fx-background-color: transparent; " +
                         "-fx-text-fill: " + textColor + "; " +
+                        "-fx-font-family: " + toCssFontFamily(fontFamily) + "; " +
                         "-fx-font-size: " + fontSize + "px; " +
                         "-fx-border-width: 0; " +
                         "-fx-focus-color: transparent; " +
                         "-fx-faint-focus-color: transparent; " +
                         "-fx-cursor: hand;");
-        // Update text measure font
-        textMeasure.setFont(Font.font("MiSans", fontSize));
+    }
+
+    private String toCssFontFamily(String fontFamily) {
+        String safeFontFamily = (fontFamily == null || fontFamily.isBlank()) ? "System" : fontFamily;
+        return "\"" + safeFontFamily
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"") + "\"";
+    }
+
+    private void refreshContentMetrics() {
+        refreshTextMeasureWrappingWidth();
+        refreshContentHeight();
+    }
+
+    private void refreshTextMeasureWrappingWidth() {
+        double wrappingWidth = resolveTextWrappingWidth();
+        if (wrappingWidth > 0 && Math.abs(textMeasure.getWrappingWidth() - wrappingWidth) > 0.5) {
+            textMeasure.setWrappingWidth(wrappingWidth);
+        }
+    }
+
+    private void refreshContentHeight() {
+        double textHeight = Math.ceil(textMeasure.getLayoutBounds().getHeight());
+        double height = Math.max(MIN_CONTENT_HEIGHT, textHeight + resolveTextVerticalPadding());
+        if (Math.abs(contentArea.getPrefHeight() - height) > 0.5 || Math.abs(contentArea.getMaxHeight() - height) > 0.5) {
+            contentArea.setPrefHeight(height);
+            contentArea.setMinHeight(height);
+            contentArea.setMaxHeight(height);
+        }
+    }
+
+    private double resolveTextWrappingWidth() {
+        javafx.scene.Node viewportNode = contentArea.lookup(".scroll-pane .viewport");
+        if (viewportNode instanceof Region viewportRegion && viewportRegion.getWidth() > 0) {
+            return viewportRegion.getWidth();
+        }
+
+        javafx.scene.Node contentNode = contentArea.lookup(".content");
+        if (contentNode instanceof Region contentRegion && contentRegion.getWidth() > 0) {
+            Insets insets = contentRegion.getInsets();
+            return Math.max(0, contentRegion.getWidth() - insets.getLeft() - insets.getRight());
+        }
+
+        double contentWidth = contentArea.getWidth();
+        if (contentWidth > 0) {
+            return Math.max(0,
+                    contentWidth - contentArea.snappedLeftInset() - contentArea.snappedRightInset()
+                            - FALLBACK_TEXT_HORIZONTAL_PADDING);
+        }
+
+        if (getWidth() > 64) {
+            return Math.max(0, getWidth() - 64 - FALLBACK_TEXT_HORIZONTAL_PADDING);
+        }
+
+        return textMeasure.getWrappingWidth();
+    }
+
+    private double resolveTextVerticalPadding() {
+        double padding = contentArea.snappedTopInset() + contentArea.snappedBottomInset() + FALLBACK_TEXT_VERTICAL_PADDING;
+
+        javafx.scene.Node contentNode = contentArea.lookup(".content");
+        if (contentNode instanceof Region contentRegion) {
+            Insets insets = contentRegion.getInsets();
+            padding = Math.max(padding, insets.getTop() + insets.getBottom() + FALLBACK_TEXT_VERTICAL_PADDING);
+        }
+
+        return padding;
     }
 
     /**
