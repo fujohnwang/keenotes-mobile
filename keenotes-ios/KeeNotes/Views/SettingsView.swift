@@ -325,6 +325,14 @@ struct SettingsView: View {
             token: token,
             password: password
         )
+        
+        // Check if Keychain write failed
+        if let error = appState.settingsService.lastSaveError {
+            print("[Settings] Keychain save failed: \(error)")
+            statusMessage = "Save failed: \(error)"
+            isSuccess = false
+            return
+        }
         print("[Settings] Settings saved successfully")
 
         // Update status message
