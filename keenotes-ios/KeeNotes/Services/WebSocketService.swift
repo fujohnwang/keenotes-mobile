@@ -46,13 +46,15 @@ class WebSocketService: NSObject, ObservableObject {
         super.init()
         
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 5
-        config.timeoutIntervalForResource = 5
+        config.waitsForConnectivity = true
         self.session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }
     
     func connect() {
-        guard connectionState != .connected && !isConnecting else {
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        
+        guard !isConnecting, webSocketTask == nil, connectionState == .disconnected else {
             print("[WS] Already connected or connecting, skipping")
             return
         }
@@ -63,6 +65,9 @@ class WebSocketService: NSObject, ObservableObject {
         }
         
         isConnecting = true
+        Task { @MainActor in
+            connectionState = .connecting
+        }
         
         Task {
             // Cache encryption password before connection
@@ -76,12 +81,14 @@ class WebSocketService: NSObject, ObservableObject {
             // Build WebSocket URL
             guard let wsUrl = buildWebSocketUrl() else {
                 print("[WS] Failed to build WebSocket URL")
-                isConnecting = false
+                await MainActor.run {
+                    self.isConnecting = false
+                    self.connectionState = .disconnected
+                }
                 return
             }
             
             print("[WS] Connecting to: \(wsUrl)")
-            await MainActor.run { connectionState = .connecting }
             
             var request = URLRequest(url: wsUrl)
             request.setValue("Bearer \(settingsService.token)", forHTTPHeaderField: "Authorization")
@@ -93,22 +100,16 @@ class WebSocketService: NSObject, ObservableObject {
                 request.setValue(origin, forHTTPHeaderField: "Origin")
             }
             
-            webSocketTask = session.webSocketTask(with: request)
-            webSocketTask?.resume()
-            
-            isConnecting = false
-            await MainActor.run { connectionState = .connected }
-            
-            // Send handshake
-            sendHandshake()
-            
-            // Start receiving messages
-            receiveMessage()
+            let task = session.webSocketTask(with: request)
+            webSocketTask = task
+            task.resume()
         }
     }
     
     func disconnect() {
         reconnectTask?.cancel()
+        reconnectTask = nil
+        isConnecting = false
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
         Task { @MainActor in
@@ -204,6 +205,8 @@ class WebSocketService: NSObject, ObservableObject {
             case .failure(let error):
                 print("[WS] Receive error: \(error)")
                 Task { @MainActor in
+                    self.isConnecting = false
+                    self.webSocketTask = nil
                     self.connectionState = .disconnected
                 }
                 self.scheduleReconnect()
@@ -403,7 +406,9 @@ class WebSocketService: NSObject, ObservableObject {
             guard !Task.isCancelled else { return }
             
             await MainActor.run {
-                if self.connectionState == .disconnected {
+                if self.connectionState == .disconnected,
+                   UIApplication.shared.applicationState == .active,
+                   self.settingsService.isConfigured {
                     print("[WS] Attempting reconnect...")
                     self.connect()
                 }
@@ -413,7 +418,51 @@ class WebSocketService: NSObject, ObservableObject {
 }
 
 // MARK: - URLSessionDelegate
-extension WebSocketService: URLSessionDelegate {
+extension WebSocketService: URLSessionWebSocketDelegate {
+    func urlSession(
+        _ session: URLSession,
+        webSocketTask: URLSessionWebSocketTask,
+        didOpenWithProtocol protocol: String?
+    ) {
+        guard webSocketTask === self.webSocketTask else {
+            print("[WS] Ignoring didOpen from stale WebSocket task")
+            return
+        }
+        
+        print("[WS] WebSocket opened")
+        isConnecting = false
+        Task { @MainActor in
+            connectionState = .connected
+        }
+        
+        sendHandshake()
+        receiveMessage()
+    }
+    
+    func urlSession(
+        _ session: URLSession,
+        webSocketTask: URLSessionWebSocketTask,
+        didCloseWith closeCode: URLSessionWebSocketTask.CloseCode,
+        reason: Data?
+    ) {
+        guard webSocketTask === self.webSocketTask else {
+            print("[WS] Ignoring didClose from stale WebSocket task")
+            return
+        }
+        
+        let reasonText = reason.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        print("[WS] WebSocket closed: code=\(closeCode.rawValue), reason=\(reasonText)")
+        
+        self.webSocketTask = nil
+        isConnecting = false
+        Task { @MainActor in
+            connectionState = .disconnected
+            syncStatus = .idle
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+        scheduleReconnect()
+    }
+    
     func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
