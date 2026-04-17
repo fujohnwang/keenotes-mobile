@@ -16,6 +16,9 @@ struct KeeNotesApp: App {
                     if !appState.settingsService.isConfigured {
                         appState.selectedTab = 2  // 跳转到设置页面
                     }
+                    if scenePhase == .active {
+                        handleScenePhaseChange(newPhase: .active)
+                    }
                 }
                 .onChange(of: scenePhase, perform: { newPhase in
                     handleScenePhaseChange(newPhase: newPhase)
@@ -134,11 +137,6 @@ class AppState: ObservableObject {
                 // Small delay to ensure database is fully ready
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 await initializeFirstNoteDate()
-            }
-            
-            // Connect WebSocket if configured
-            if !settingsService.endpointUrl.isEmpty && !settingsService.token.isEmpty {
-                webSocketService.connect()
             }
             
             // Start pending note retry scheduler
