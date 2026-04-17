@@ -53,6 +53,8 @@ class AppState: ObservableObject {
     @Published var isInitialized = false
     @Published var selectedTab = 0  // 0: Note, 1: Review, 2: Settings
     @Published var onThisDayNotes: [Note] = []
+    /// Draft text in NoteView input — survives tab switches
+    @Published var noteDraftText = ""
     
     // Services
     let settingsService = SettingsService()

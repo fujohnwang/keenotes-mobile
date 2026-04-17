@@ -5,7 +5,6 @@ import AudioToolbox
 /// Note input view for creating new notes
 struct NoteView: View {
     @EnvironmentObject var appState: AppState
-    @State private var noteText = ""
     @State private var showSuccessToast = false
     @State private var showErrorToast = false
     @State private var errorMessage = ""
@@ -15,6 +14,7 @@ struct NoteView: View {
     @State private var showingOnThisDay = false
     @FocusState private var isTextFieldFocused: Bool
     @State private var keyboardVisible = false
+    @State private var keyboardObserverTokens: [NSObjectProtocol] = []
     @StateObject private var speechService = SpeechRecognitionService()
     /// Current keyboard language for speech recognition
     @State private var currentKeyboardLocale: Locale?
@@ -67,7 +67,7 @@ struct NoteView: View {
 
                     // Full-screen canvas: TextEditor as Layer 1
                     ZStack(alignment: .bottom) {
-                        TextEditor(text: $noteText)
+                        TextEditor(text: $appState.noteDraftText)
                             .focused($isTextFieldFocused)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .padding(.top, isPad ? 12 : 8)
@@ -78,7 +78,7 @@ struct NoteView: View {
                                 UITextView.appearance().backgroundColor = .clear
                             }
                             .overlay(alignment: .topLeading) {
-                                if noteText.isEmpty {
+                                if appState.noteDraftText.isEmpty {
                                     Text("Write your note here...")
                                         .foregroundColor(.gray)
                                         .padding(.horizontal, isPad ? 20 : 16)
@@ -109,11 +109,11 @@ struct NoteView: View {
                 }
                 speechService.onFinalResult = { finalText in
                     // Append final result to editor content
-                    if noteText.isEmpty {
-                        noteText = finalText
+                    if appState.noteDraftText.isEmpty {
+                        appState.noteDraftText = finalText
                     } else {
-                        let separator = noteText.hasSuffix(" ") || noteText.hasSuffix("\n") ? "" : " "
-                        noteText += separator + finalText
+                        let separator = appState.noteDraftText.hasSuffix(" ") || appState.noteDraftText.hasSuffix("\n") ? "" : " "
+                        appState.noteDraftText += separator + finalText
                     }
                 }
                 // Auto-focus input if enabled
@@ -222,7 +222,7 @@ struct NoteView: View {
             }
             .overlay(alignment: .bottomTrailing) {
                 // FAB: Floating send button when keyboard is hidden and there's content
-                if !keyboardVisible && !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if !keyboardVisible && !appState.noteDraftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Button(action: postNote) {
                         Group {
                             if isPosting {
@@ -250,7 +250,7 @@ struct NoteView: View {
                     .animation(.spring(response: 0.4, dampingFraction: 0.65), value: true)
                 }
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.65), value: !keyboardVisible && !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .animation(.spring(response: 0.4, dampingFraction: 0.65), value: !keyboardVisible && !appState.noteDraftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .overlay {
                 // Confetti overlay on successful send
                 ConfettiView(isActive: $showSuccessToast)
@@ -322,7 +322,7 @@ struct NoteView: View {
     }
 
     private var canPost: Bool {
-        !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !appState.noteDraftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         appState.settingsService.isConfigured &&
         appState.settingsService.isEncryptionEnabled
     }
@@ -340,8 +340,8 @@ struct NoteView: View {
     }
 
     private func performSend() {
-        let sentContent = noteText
-        noteText = ""
+        let sentContent = appState.noteDraftText
+        appState.noteDraftText = ""
 
         // Trigger confetti + sound + haptic immediately for seamless feel (optimistic UI)
         if appState.settingsService.confettiOnPostSuccess {
@@ -399,7 +399,9 @@ struct NoteView: View {
     }
 
     private func setupKeyboardObservers() {
-        NotificationCenter.default.addObserver(
+        guard keyboardObserverTokens.isEmpty else { return }
+
+        let keyboardWillShowObserver = NotificationCenter.default.addObserver(
             forName: UIResponder.keyboardWillShowNotification,
             object: nil,
             queue: .main
@@ -410,7 +412,7 @@ struct NoteView: View {
             updateKeyboardLocale()
         }
 
-        NotificationCenter.default.addObserver(
+        let keyboardWillHideObserver = NotificationCenter.default.addObserver(
             forName: UIResponder.keyboardWillHideNotification,
             object: nil,
             queue: .main
@@ -420,19 +422,24 @@ struct NoteView: View {
             }
         }
         
-        NotificationCenter.default.addObserver(
+        let inputModeDidChangeObserver = NotificationCenter.default.addObserver(
             forName: UITextInputMode.currentInputModeDidChangeNotification,
             object: nil,
             queue: .main
         ) { _ in
             updateKeyboardLocale()
         }
+
+        keyboardObserverTokens = [
+            keyboardWillShowObserver,
+            keyboardWillHideObserver,
+            inputModeDidChangeObserver
+        ]
     }
 
     private func removeKeyboardObservers() {
-        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
-        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
-        NotificationCenter.default.removeObserver(self, name: UITextInputMode.currentInputModeDidChangeNotification, object: nil)
+        keyboardObserverTokens.forEach(NotificationCenter.default.removeObserver)
+        keyboardObserverTokens.removeAll()
     }
     
     private func updateKeyboardLocale() {
