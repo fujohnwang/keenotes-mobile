@@ -53,6 +53,9 @@ public class NoteCardView extends StackPane {
     private static final double FALLBACK_TEXT_HORIZONTAL_PADDING = 18.0;
     private static final double FALLBACK_TEXT_VERTICAL_PADDING = 24.0;
 
+    // Precise horizontal inset: contentArea.width - viewport.width, calibrated after skin loads
+    private double horizontalInset = FALLBACK_TEXT_HORIZONTAL_PADDING;
+
     public NoteCardView(LocalCacheService.NoteData noteData) {
         this.noteData = noteData;
         this.settings = SettingsService.getInstance();
@@ -117,31 +120,35 @@ public class NoteCardView extends StackPane {
         contentArea.setScrollLeft(0);
         contentArea.skinProperty().addListener((obs, oldSkin, newSkin) -> {
             javafx.application.Platform.runLater(() -> {
+                calibrateHorizontalInset();
                 setupInternalTextListener();
-                refreshContentMetrics();
+                setupViewportWidthListener();
+                hideScrollBars();
             });
         });
-        contentArea.widthProperty().addListener((obs, oldWidth, newWidth) -> {
-            if (Math.abs(newWidth.doubleValue() - oldWidth.doubleValue()) > 0.5) {
-                refreshContentMetrics();
-            }
-        });
 
-        // Create hidden Text node for accurate height measurement
+        // Create hidden Text node for height measurement (fallback before skin loads)
         textMeasure = new Text();
         textMeasure.setFont(Font.font(fontFamily, fontSize));
-        textMeasure.setWrappingWidth(500); // Will be updated based on actual width
+        textMeasure.setWrappingWidth(500); // Will be calibrated once skin loads
         textMeasure.textProperty().bind(contentArea.textProperty());
 
-        // Bind TextArea height to Text measurement (with guard to avoid redundant layout requests)
+        // Reactive: textMeasure layoutBounds change → update height
         textMeasure.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
-            refreshContentHeight();
-            // Ensure scrollbars stay hidden after any layout change
-            javafx.application.Platform.runLater(this::hideScrollBars);
+            updateContentAreaHeight();
         });
 
-        // Initial wrapping width setup after layout
-        javafx.application.Platform.runLater(this::refreshContentMetrics);
+        // Reactive: contentArea width change → sync textMeasure wrappingWidth (synchronous path)
+        // Also flush CSS+layout on the entire card so internal Text node re-wraps in the same frame
+        // (this is exactly what hover's setStyle() triggers on the NoteCardView subtree)
+        contentArea.widthProperty().addListener((obs, oldWidth, newWidth) -> {
+            double w = newWidth.doubleValue();
+            if (w > 0 && Math.abs(w - oldWidth.doubleValue()) > 0.5) {
+                syncTextMeasureWrappingWidth(w);
+                this.applyCss();
+                this.layout();
+            }
+        });
 
         // Custom context menu for copy
         ContextMenu contextMenu = new ContextMenu();
@@ -227,16 +234,62 @@ public class NoteCardView extends StackPane {
     }
 
     /**
-     * Listen to the actual rendered Text node inside TextArea for accurate height tracking.
-     * Must be called after skin is loaded.
+     * Calibrate the precise horizontal inset by measuring the difference between
+     * contentArea width and viewport width. Called once after skin loads.
+     */
+    private void calibrateHorizontalInset() {
+        javafx.scene.Node viewportNode = contentArea.lookup(".scroll-pane .viewport");
+        if (viewportNode instanceof Region viewportRegion && viewportRegion.getWidth() > 0) {
+            double contentAreaWidth = contentArea.getWidth();
+            if (contentAreaWidth > 0) {
+                horizontalInset = contentAreaWidth - viewportRegion.getWidth();
+            }
+        }
+        // Sync textMeasure with the now-precise inset
+        syncTextMeasureWrappingWidth(contentArea.getWidth());
+    }
+
+    /**
+     * Sync textMeasure wrappingWidth from contentArea width using calibrated inset.
+     * This is the synchronous path — fires immediately when contentArea width changes.
+     */
+    private void syncTextMeasureWrappingWidth(double contentAreaWidth) {
+        if (contentAreaWidth <= 0) return;
+        double wrappingWidth = Math.max(0, contentAreaWidth - horizontalInset);
+        if (wrappingWidth > 0 && Math.abs(textMeasure.getWrappingWidth() - wrappingWidth) > 0.5) {
+            textMeasure.setWrappingWidth(wrappingWidth);
+        }
+    }
+
+    /**
+     * Reactive: listen to viewport width for precise async correction.
+     * Viewport width is the ground truth for text wrapping.
+     */
+    private void setupViewportWidthListener() {
+        javafx.scene.Node viewportNode = contentArea.lookup(".scroll-pane .viewport");
+        if (viewportNode instanceof Region viewportRegion) {
+            viewportRegion.widthProperty().addListener((obs, oldW, newW) -> {
+                double w = newW.doubleValue();
+                if (w > 0 && Math.abs(textMeasure.getWrappingWidth() - w) > 0.5) {
+                    textMeasure.setWrappingWidth(w);
+                }
+            });
+        }
+    }
+
+    /**
+     * Reactive: listen to the actual rendered Text node inside TextArea.
+     * Any change (width/font/content) that causes the internal Text to re-wrap
+     * will automatically flow through this listener to update contentArea height.
      */
     private void setupInternalTextListener() {
         javafx.scene.Node internalText = contentArea.lookup(".text");
         if (internalText != null) {
             internalText.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
-                refreshContentHeight();
-                javafx.application.Platform.runLater(this::hideScrollBars);
+                updateContentAreaHeight();
             });
+            // Trigger initial height calculation now that internal Text is available
+            updateContentAreaHeight();
         }
     }
 
@@ -327,9 +380,8 @@ public class NoteCardView extends StackPane {
         String ch = (newData.channel != null && !newData.channel.isEmpty()) ? newData.channel : "default";
         channelLabel.setText("• " + ch);
         contentArea.setText(newData.content);
+        // Height update is reactive: setText() → internal Text layoutBounds change → listener
         cancelBorderAnimation();
-        refreshContentMetrics();
-        hideScrollBars();
     }
 
     /**
@@ -379,11 +431,7 @@ public class NoteCardView extends StackPane {
         String fontFamily = settings.getEffectiveNoteFontFamily();
         applyContentAreaStyle(textColor, fontSize, fontFamily);
         textMeasure.setFont(Font.font(fontFamily, fontSize));
-        // Delay refresh to next pulse so CSS style takes effect before measuring
-        javafx.application.Platform.runLater(() -> {
-            refreshContentMetrics();
-            hideScrollBars();
-        });
+        // Height update is reactive: CSS/font change → internal Text layoutBounds change → listener
     }
 
     private void applyContentAreaStyle(String textColor, int fontSize, String fontFamily) {
@@ -406,22 +454,15 @@ public class NoteCardView extends StackPane {
                 .replace("\"", "\\\"") + "\"";
     }
 
-    private void refreshContentMetrics() {
-        refreshTextMeasureWrappingWidth();
-        refreshContentHeight();
-    }
-
-    private void refreshTextMeasureWrappingWidth() {
-        double wrappingWidth = resolveTextWrappingWidth();
-        if (wrappingWidth > 0 && Math.abs(textMeasure.getWrappingWidth() - wrappingWidth) > 0.5) {
-            textMeasure.setWrappingWidth(wrappingWidth);
-        }
-    }
-
-    private void refreshContentHeight() {
+    /**
+     * Single reactive handler: compute the correct contentArea height from
+     * the best available text measurement and apply it.
+     * Called only by layoutBoundsProperty listeners — never manually.
+     */
+    private void updateContentAreaHeight() {
         double textHeight = Math.ceil(textMeasure.getLayoutBounds().getHeight());
 
-        // Prefer actual rendered Text node height inside TextArea (most accurate)
+        // Prefer actual rendered Text node height (most accurate, available after skin load)
         javafx.scene.Node internalText = contentArea.lookup(".text");
         if (internalText != null) {
             double internalHeight = Math.ceil(internalText.getLayoutBounds().getHeight());
@@ -430,38 +471,14 @@ public class NoteCardView extends StackPane {
             }
         }
 
-        double height = Math.max(MIN_CONTENT_HEIGHT, textHeight + resolveTextVerticalPadding());
+        double padding = resolveTextVerticalPadding();
+        double height = Math.max(MIN_CONTENT_HEIGHT, textHeight + padding);
         if (Math.abs(contentArea.getPrefHeight() - height) > 0.5 || Math.abs(contentArea.getMaxHeight() - height) > 0.5) {
             contentArea.setPrefHeight(height);
             contentArea.setMinHeight(height);
             contentArea.setMaxHeight(height);
         }
-    }
-
-    private double resolveTextWrappingWidth() {
-        javafx.scene.Node viewportNode = contentArea.lookup(".scroll-pane .viewport");
-        if (viewportNode instanceof Region viewportRegion && viewportRegion.getWidth() > 0) {
-            return viewportRegion.getWidth();
-        }
-
-        javafx.scene.Node contentNode = contentArea.lookup(".content");
-        if (contentNode instanceof Region contentRegion && contentRegion.getWidth() > 0) {
-            Insets insets = contentRegion.getInsets();
-            return Math.max(0, contentRegion.getWidth() - insets.getLeft() - insets.getRight());
-        }
-
-        double contentWidth = contentArea.getWidth();
-        if (contentWidth > 0) {
-            return Math.max(0,
-                    contentWidth - contentArea.snappedLeftInset() - contentArea.snappedRightInset()
-                            - FALLBACK_TEXT_HORIZONTAL_PADDING);
-        }
-
-        if (getWidth() > 64) {
-            return Math.max(0, getWidth() - 64 - FALLBACK_TEXT_HORIZONTAL_PADDING);
-        }
-
-        return textMeasure.getWrappingWidth();
+        hideScrollBars();
     }
 
     private double resolveTextVerticalPadding() {
