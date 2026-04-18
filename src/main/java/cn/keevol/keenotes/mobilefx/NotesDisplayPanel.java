@@ -115,6 +115,15 @@ public class NotesDisplayPanel extends VBox {
 
         getChildren().addAll(fixedHeaderContainer, listView, statusLabel);
 
+        // Refresh ListView when font changes so VirtualFlow recalculates cell heights
+        SettingsService settings = SettingsService.getInstance();
+        settings.noteFontSizeProperty().addListener((obs, oldVal, newVal) -> {
+            Platform.runLater(() -> listView.refresh());
+        });
+        settings.noteFontFamilyProperty().addListener((obs, oldVal, newVal) -> {
+            Platform.runLater(() -> listView.refresh());
+        });
+
         // Setup WebSocket listener for sync status
         setupSyncStatusListener();
     }

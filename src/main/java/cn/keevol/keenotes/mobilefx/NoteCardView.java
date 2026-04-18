@@ -116,7 +116,10 @@ public class NoteCardView extends StackPane {
         contentArea.setScrollTop(0);
         contentArea.setScrollLeft(0);
         contentArea.skinProperty().addListener((obs, oldSkin, newSkin) -> {
-            javafx.application.Platform.runLater(this::refreshContentMetrics);
+            javafx.application.Platform.runLater(() -> {
+                setupInternalTextListener();
+                refreshContentMetrics();
+            });
         });
         contentArea.widthProperty().addListener((obs, oldWidth, newWidth) -> {
             if (Math.abs(newWidth.doubleValue() - oldWidth.doubleValue()) > 0.5) {
@@ -221,6 +224,20 @@ public class NoteCardView extends StackPane {
         setOnMouseExited(e -> {
             setStyle("");
         });
+    }
+
+    /**
+     * Listen to the actual rendered Text node inside TextArea for accurate height tracking.
+     * Must be called after skin is loaded.
+     */
+    private void setupInternalTextListener() {
+        javafx.scene.Node internalText = contentArea.lookup(".text");
+        if (internalText != null) {
+            internalText.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
+                refreshContentHeight();
+                javafx.application.Platform.runLater(this::hideScrollBars);
+            });
+        }
     }
 
     /**
@@ -362,7 +379,11 @@ public class NoteCardView extends StackPane {
         String fontFamily = settings.getEffectiveNoteFontFamily();
         applyContentAreaStyle(textColor, fontSize, fontFamily);
         textMeasure.setFont(Font.font(fontFamily, fontSize));
-        refreshContentMetrics();
+        // Delay refresh to next pulse so CSS style takes effect before measuring
+        javafx.application.Platform.runLater(() -> {
+            refreshContentMetrics();
+            hideScrollBars();
+        });
     }
 
     private void applyContentAreaStyle(String textColor, int fontSize, String fontFamily) {
@@ -399,6 +420,16 @@ public class NoteCardView extends StackPane {
 
     private void refreshContentHeight() {
         double textHeight = Math.ceil(textMeasure.getLayoutBounds().getHeight());
+
+        // Prefer actual rendered Text node height inside TextArea (most accurate)
+        javafx.scene.Node internalText = contentArea.lookup(".text");
+        if (internalText != null) {
+            double internalHeight = Math.ceil(internalText.getLayoutBounds().getHeight());
+            if (internalHeight > 0) {
+                textHeight = Math.max(textHeight, internalHeight);
+            }
+        }
+
         double height = Math.max(MIN_CONTENT_HEIGHT, textHeight + resolveTextVerticalPadding());
         if (Math.abs(contentArea.getPrefHeight() - height) > 0.5 || Math.abs(contentArea.getMaxHeight() - height) > 0.5) {
             contentArea.setPrefHeight(height);
