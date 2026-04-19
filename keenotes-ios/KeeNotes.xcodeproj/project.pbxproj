@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0A1B2C3D4E5F60718293EF01 /* AnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1B2C3D4E5F60718293EF02 /* AnalyticsView.swift */; };
+		0A2B3C4D5E6F70819293EF03 /* TopHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A2B3C4D5E6F70819293EF04 /* TopHeaderView.swift */; };
 		1522A18793715A66AF3C5B1E /* encoding.c in Sources */ = {isa = PBXBuildFile; fileRef = CD8A13501AA7A7CAB9DD2D6B /* encoding.c */; };
 		185B386682B6638BD824635B /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516619C5BAA926CB01F4B456 /* DatabaseService.swift */; };
 		1AE2B3C4D5F6A78091023B4C /* ConfettiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE3C4D5F6A78091023B4C5D /* ConfettiView.swift */; };
@@ -49,6 +51,8 @@
 
 /* Begin PBXFileReference section */
 		03605D0E1E6AE5D607639961 /* blamka-round-ref.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blamka-round-ref.h"; sourceTree = "<group>"; };
+		0A1B2C3D4E5F60718293EF02 /* AnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsView.swift; sourceTree = "<group>"; };
+		0A2B3C4D5E6F70819293EF04 /* TopHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopHeaderView.swift; sourceTree = "<group>"; };
 		0CCFBB1C4E585233C8949042 /* ApiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiService.swift; sourceTree = "<group>"; };
 		0F0DB648B1399AF3B170E27B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		12CB0C7E4D18D06ED6D1966A /* thread.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = thread.c; sourceTree = "<group>"; };
@@ -121,6 +125,7 @@
 		27988A83321BB36CAEDE057E /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				0A1B2C3D4E5F60718293EF02 /* AnalyticsView.swift */,
 				2AE3C4D5F6A78091023B4C5D /* ConfettiView.swift */,
 				E71854385AA7C1EECC7F20F2 /* DebugView.swift */,
 				2BE4D5E6F7A89012345678AB /* EnlargedNoteView.swift */,
@@ -134,6 +139,7 @@
 				87901956656FA3E18B94F424 /* ReviewView.swift */,
 				4DBFDFFD9FC62E4A40312B79 /* SearchView.swift */,
 				6AE190F702AB5FD4FAAF4205 /* SettingsView.swift */,
+				0A2B3C4D5E6F70819293EF04 /* TopHeaderView.swift */,
 				E2D3C4B5A6978081920B4C5E /* WizardCard.swift */,
 				E3D4C5B6A7980819210C6F9C /* WizardInlineCard.swift */,
 			);
@@ -313,6 +319,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0A1B2C3D4E5F60718293EF01 /* AnalyticsView.swift in Sources */,
+				0A2B3C4D5E6F70819293EF03 /* TopHeaderView.swift in Sources */,
 				946E8578E0A828A727191C99 /* ApiService.swift in Sources */,
 				8B963F8CCE2F5E131B06788B /* Argon2Swift.swift in Sources */,
 				1AE2B3C4D5F6A78091023B4C /* ConfettiView.swift in Sources */,

@@ -293,6 +293,24 @@ class DatabaseService: ObservableObject {
         }
         print("[DB] All notes deleted")
     }
+    // MARK: - Analytics
+    
+    /// Returns notes count grouped by year, sorted ascending by year
+    func getNotesCountByYear() async throws -> [(year: Int, count: Int)] {
+        guard let dbQueue = dbQueue else {
+            throw DatabaseError.notInitialized
+        }
+        return try await dbQueue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT CAST(strftime('%Y', createdAt) AS INTEGER) AS year, COUNT(*) AS count
+                FROM notes
+                GROUP BY year
+                ORDER BY year ASC
+                """)
+            return rows.map { (year: $0["year"] as Int, count: $0["count"] as Int) }
+        }
+    }
+    
     // MARK: - Sync State
     
     func getSyncState() async throws -> SyncState? {

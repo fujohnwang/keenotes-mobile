@@ -12,8 +12,6 @@ struct OnThisDayView: View {
     private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
     private var isEnabled: Bool { appState.settingsService.showOnThisDayInYearsPast }
     private var notes: [Note] { appState.onThisDayNotes }
-    private var topButtonSize: CGFloat { isPad ? 44 : 40 }
-    private var topIconSize: CGFloat { isPad ? 19 : 17 }
 
     var body: some View {
         ZStack {
@@ -86,28 +84,9 @@ struct OnThisDayView: View {
     }
 
     private var topHeader: some View {
-        HStack(spacing: 12) {
-            Button(action: { dismiss() }) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: topIconSize, weight: .medium))
-                    .foregroundColor(.primary)
-                    .frame(width: topButtonSize, height: topButtonSize, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            Spacer(minLength: 0)
-
-            Text("On this day in years past")
-                .font(.system(size: isPad ? 20 : 19, weight: .semibold))
-                .foregroundColor(.primary)
-                .lineLimit(1)
-
-            Spacer(minLength: 0)
-
-            Color.clear
-                .frame(width: topButtonSize, height: topButtonSize)
-        }
-        .frame(height: topButtonSize)
+        TopHeaderView(
+            title: "On this day in years past",
+            leftButton: .back { dismiss() }
+        )
     }
 }

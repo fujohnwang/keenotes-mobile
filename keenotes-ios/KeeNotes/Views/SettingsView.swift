@@ -6,6 +6,7 @@ struct SettingsView: View {
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
+    private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var endpointUrl = ""
@@ -47,6 +48,12 @@ struct SettingsView: View {
         ZStack {
             NavigationView {
                 ScrollViewReader { scrollProxy in
+                VStack(spacing: 0) {
+                    TopHeaderView(title: "KeeNotes Settings")
+                        .padding(.horizontal, horizontalPadding)
+                        .padding(.top, 6)
+                        .padding(.bottom, 2)
+
                 Form {
                     // Server configuration
                     Section(header: Text("Server Configuration").modifier(Theme.SectionHeaderStyle())) {
@@ -239,8 +246,7 @@ struct SettingsView: View {
                 }
                 }
                 .modifier(FormBackgroundModifier(colorScheme: colorScheme))
-                .navigationTitle("KeeNotes Settings")
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarHidden(true)
                 .onAppear(perform: loadSettings)
                 .sheet(isPresented: $showDebugView) {
                     DebugView()
@@ -254,6 +260,7 @@ struct SettingsView: View {
                         }
                     }
                 }
+                } // VStack
                 } // ScrollViewReader
             }
             .navigationViewStyle(.stack)
