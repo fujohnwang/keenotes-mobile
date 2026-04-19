@@ -137,12 +137,19 @@ class MainActivity : AppCompatActivity() {
                 velocityY: Float
             ): Boolean {
                 if (e1 == null) return false
-                if (currentTabIndex < 0) return false
 
                 val diffX = e2.x - e1.x
                 val diffY = e2.y - e1.y
                 if (abs(diffX) <= abs(diffY) * 1.5) return false
                 if (abs(diffX) < SWIPE_THRESHOLD || abs(velocityX) < SWIPE_VELOCITY_THRESHOLD) return false
+
+                // Sub-page: swipe right to go back to parent tab
+                if (currentTabIndex < 0) {
+                    if (diffX > 0) {
+                        navController.popBackStack()
+                    }
+                    return true
+                }
 
                 val targetIndex = if (diffX < 0) {
                     (currentTabIndex + 1).coerceAtMost(tabCount - 1)
@@ -159,7 +166,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (::swipeGestureDetector.isInitialized && currentTabIndex >= 0) {
+        if (::swipeGestureDetector.isInitialized) {
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     touchDownX = ev.x

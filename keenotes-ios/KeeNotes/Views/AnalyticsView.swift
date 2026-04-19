@@ -57,6 +57,11 @@ struct AnalyticsView: View {
             }
         }
         .navigationBarHidden(true)
+        .onAppear { appState.isInSubPage = true }
+        .onDisappear { appState.isInSubPage = false }
+        .onChange(of: appState.subPageDismissTrigger) { _ in
+            dismiss()
+        }
         .task {
             await loadData()
         }
