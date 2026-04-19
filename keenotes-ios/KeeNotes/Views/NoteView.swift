@@ -23,8 +23,6 @@ struct NoteView: View {
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
     private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
-    private var topButtonSize: CGFloat { isPad ? 44 : 40 }
-    private var topIconSize: CGFloat { isPad ? 19 : 17 }
 
     var body: some View {
         NavigationView {
@@ -279,46 +277,18 @@ struct NoteView: View {
     }
 
     private var topHeader: some View {
-        HStack(spacing: 12) {
-            topHeaderButton(
+        TopHeaderView(
+            title: "KeeNotes",
+            leftButton: HeaderButton(
                 systemName: "sparkles",
                 isVisible: appState.settingsService.showOnThisDayInYearsPast && !appState.onThisDayNotes.isEmpty,
                 action: { showingOnThisDay = true }
-            )
-
-            Spacer(minLength: 0)
-
-            Text("KeeNotes")
-                .font(.system(size: isPad ? 20 : 19, weight: .semibold))
-                .foregroundColor(.primary)
-                .lineLimit(1)
-
-            Spacer(minLength: 0)
-
-            topHeaderButton(
+            ),
+            rightButton: HeaderButton(
                 systemName: "magnifyingglass",
-                isVisible: true,
                 action: { showingSearch = true }
             )
-        }
-        .frame(height: topButtonSize)
-    }
-
-    @ViewBuilder
-    private func topHeaderButton(systemName: String, isVisible: Bool, action: @escaping () -> Void) -> some View {
-        if isVisible {
-            Button(action: action) {
-                Image(systemName: systemName)
-                    .font(.system(size: topIconSize, weight: .medium))
-                    .foregroundColor(.primary)
-                    .frame(width: topButtonSize, height: topButtonSize)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        } else {
-            Color.clear
-                .frame(width: topButtonSize, height: topButtonSize)
-        }
+        )
     }
 
     private var canPost: Bool {

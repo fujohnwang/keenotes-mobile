@@ -10,6 +10,7 @@ struct ReviewView: View {
     @State private var totalCount = 0
     @State private var hasMoreData = true
     @State private var enlargedNote: Note? = nil
+    @State private var showingAnalytics = false
     @Environment(\.colorScheme) private var colorScheme
 
     // Adaptive layout based on device
@@ -26,6 +27,12 @@ struct ReviewView: View {
                 Theme.pageBackground(colorScheme).ignoresSafeArea()
 
                 VStack(spacing: 0) {
+                    // Custom top header with analytics button
+                    topHeader
+                        .padding(.horizontal, horizontalPadding)
+                        .padding(.top, 6)
+                        .padding(.bottom, 2)
+
                     // Period selector - custom tab style
                     HStack(spacing: isPad ? 24 : 16) {
                         ForEach(0..<periods.count, id: \.self) { index in
@@ -169,6 +176,11 @@ struct ReviewView: View {
             }
             .navigationTitle("KeeNotes Review")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(true)
+            .background(
+                NavigationLink(destination: AnalyticsView().environmentObject(appState), isActive: $showingAnalytics) { EmptyView() }
+                    .hidden()
+            )
         }
         .navigationViewStyle(.stack)
         .task {
@@ -300,5 +312,17 @@ struct ReviewView: View {
         case 3: return " note(s) - All"
         default: return " note(s)"
         }
+    }
+
+    // MARK: - Top Header
+
+    private var topHeader: some View {
+        TopHeaderView(
+            title: "KeeNotes Review",
+            rightButton: HeaderButton(
+                systemName: "chart.bar.xaxis",
+                action: { showingAnalytics = true }
+            )
+        )
     }
 }

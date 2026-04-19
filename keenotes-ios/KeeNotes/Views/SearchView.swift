@@ -15,8 +15,6 @@ struct SearchView: View {
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
     private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
-    private var topButtonSize: CGFloat { isPad ? 44 : 40 }
-    private var topIconSize: CGFloat { isPad ? 19 : 17 }
     
     var body: some View {
         ZStack {
@@ -180,29 +178,10 @@ struct SearchView: View {
     }
 
     private var topHeader: some View {
-        HStack(spacing: 12) {
-            Button(action: { dismiss() }) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: topIconSize, weight: .medium))
-                    .foregroundColor(.primary)
-                    .frame(width: topButtonSize, height: topButtonSize, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            Spacer(minLength: 0)
-
-            Text("Search")
-                .font(.system(size: isPad ? 20 : 19, weight: .semibold))
-                .foregroundColor(.primary)
-                .lineLimit(1)
-
-            Spacer(minLength: 0)
-
-            Color.clear
-                .frame(width: topButtonSize, height: topButtonSize)
-        }
-        .frame(height: topButtonSize)
+        TopHeaderView(
+            title: "Search",
+            leftButton: .back { dismiss() }
+        )
     }
 }
 
