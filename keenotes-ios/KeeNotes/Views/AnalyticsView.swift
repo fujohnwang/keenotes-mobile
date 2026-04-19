@@ -128,7 +128,7 @@ private struct YearlyBarChart: View {
                     Text(formatCount(item.count))
                         .font(.system(size: isPad ? 13 : 12, weight: .semibold, design: .rounded))
                         .foregroundColor(Theme.brandColor)
-                        .frame(minWidth: isPad ? 44 : 38, alignment: .leading)
+                        .frame(minWidth: isPad ? 44 : 38, alignment: .trailing)
                 }
             }
         }
