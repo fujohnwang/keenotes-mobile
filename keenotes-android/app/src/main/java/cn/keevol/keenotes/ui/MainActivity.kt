@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
@@ -38,6 +39,19 @@ class MainActivity : AppCompatActivity() {
     /** Current main tab index (0=Note, 1=Review, 2=Settings), -1 for sub-pages */
     private var currentTabIndex = 0
     private val tabCount = 3
+
+    // ---- 滑动手势拦截状态 ----
+    /** 触摸起始坐标，用于判断是否为水平滑动 */
+    private var touchDownX = 0f
+    private var touchDownY = 0f
+    /** 一旦判定为水平滑动，拦截后续事件不传递给子 view */
+    private var isInterceptingSwipe = false
+    /** 手势方向尚未确定 */
+    private var gestureUndecided = false
+    /** 判定滑动方向所需的最小移动距离 (px) */
+    private val touchSlopPx by lazy {
+        android.view.ViewConfiguration.get(this).scaledTouchSlop
+    }
     
     /** Destination IDs of the 3 main tabs, ordered by index */
     private val mainTabDestinations by lazy {
@@ -91,15 +105,15 @@ class MainActivity : AppCompatActivity() {
     private fun setupCustomTabBar() {
         // Set click listeners
         binding.tabNote.setOnClickListener {
-            navController.navigate(R.id.noteFragment)
+            navigateToTab(0)
         }
         
         binding.tabReview.setOnClickListener {
-            navController.navigate(R.id.reviewFragment)
+            navigateToTab(1)
         }
         
         binding.tabSettings.setOnClickListener {
-            navController.navigate(R.id.settingsFragment)
+            navigateToTab(2)
         }
         
         // Select first tab by default
@@ -137,7 +151,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (targetIndex != currentTabIndex) {
-                    navController.navigate(mainTabDestinations[targetIndex])
+                    navigateToTab(targetIndex)
                 }
                 return true
             }
@@ -145,9 +159,52 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        // Let the gesture detector see every touch event before fragments handle it
-        if (::swipeGestureDetector.isInitialized) {
-            swipeGestureDetector.onTouchEvent(ev)
+        if (::swipeGestureDetector.isInitialized && currentTabIndex >= 0) {
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    touchDownX = ev.x
+                    touchDownY = ev.y
+                    isInterceptingSwipe = false
+                    gestureUndecided = true
+                    // ACTION_DOWN 必须传递下去，否则子 view 收不到后续事件
+                    swipeGestureDetector.onTouchEvent(ev)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    swipeGestureDetector.onTouchEvent(ev)
+                    if (gestureUndecided) {
+                        val dx = abs(ev.x - touchDownX)
+                        val dy = abs(ev.y - touchDownY)
+                        if (dx > touchSlopPx || dy > touchSlopPx) {
+                            // 方向已确定
+                            gestureUndecided = false
+                            if (dx > dy * 1.2f) {
+                                // 水平滑动 → 拦截，发 CANCEL 给子 view 让 EditText 放弃焦点
+                                isInterceptingSwipe = true
+                                val cancel = MotionEvent.obtain(ev).apply {
+                                    action = MotionEvent.ACTION_CANCEL
+                                }
+                                super.dispatchTouchEvent(cancel)
+                                cancel.recycle()
+                                return true
+                            }
+                        }
+                    }
+                    if (isInterceptingSwipe) return true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    swipeGestureDetector.onTouchEvent(ev)
+                    if (isInterceptingSwipe) {
+                        isInterceptingSwipe = false
+                        gestureUndecided = false
+                        return true
+                    }
+                    gestureUndecided = false
+                }
+                else -> {
+                    swipeGestureDetector.onTouchEvent(ev)
+                    if (isInterceptingSwipe) return true
+                }
+            }
         }
         return super.dispatchTouchEvent(ev)
     }
@@ -203,6 +260,41 @@ class MainActivity : AppCompatActivity() {
      */
     fun navigateToNote() {
         binding.tabNote.performClick()
+    }
+
+    /**
+     * 根据导航方向构建带滑动动画的 NavOptions。
+     * @param forward true = 向左滑（进入右侧 tab），false = 向右滑（进入左侧 tab）
+     */
+    private fun buildTabNavOptions(forward: Boolean): NavOptions {
+        return if (forward) {
+            NavOptions.Builder()
+                .setEnterAnim(R.anim.slide_in_right)
+                .setExitAnim(R.anim.slide_out_left)
+                .setPopEnterAnim(R.anim.slide_in_left)
+                .setPopExitAnim(R.anim.slide_out_right)
+                .setLaunchSingleTop(true)
+                .setPopUpTo(R.id.nav_graph, inclusive = false)
+                .build()
+        } else {
+            NavOptions.Builder()
+                .setEnterAnim(R.anim.slide_in_left)
+                .setExitAnim(R.anim.slide_out_right)
+                .setPopEnterAnim(R.anim.slide_in_right)
+                .setPopExitAnim(R.anim.slide_out_left)
+                .setLaunchSingleTop(true)
+                .setPopUpTo(R.id.nav_graph, inclusive = false)
+                .build()
+        }
+    }
+
+    /**
+     * 导航到指定 tab，自动根据当前 tab 位置决定动画方向。
+     */
+    private fun navigateToTab(targetIndex: Int) {
+        if (targetIndex == currentTabIndex) return
+        val forward = targetIndex > currentTabIndex
+        navController.navigate(mainTabDestinations[targetIndex], null, buildTabNavOptions(forward))
     }
     
     private fun connectWebSocket() {
