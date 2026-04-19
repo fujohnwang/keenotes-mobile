@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.navigation.fragment.findNavController
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
@@ -55,11 +56,18 @@ class ReviewFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
+        setupAnalyticsButton()
         setupPeriodSelector()
         setupRecyclerView()
         setupEnlargedCardDismissGesture()
         setupSyncChannelStatus()
         loadInitialNotes()
+    }
+    
+    private fun setupAnalyticsButton() {
+        binding.btnAnalytics.setOnClickListener {
+            findNavController().navigate(R.id.action_review_to_analytics)
+        }
     }
     
     private fun setupPeriodSelector() {

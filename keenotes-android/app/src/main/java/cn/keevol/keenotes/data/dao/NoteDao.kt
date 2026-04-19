@@ -4,6 +4,7 @@ import androidx.room.*
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import cn.keevol.keenotes.data.entity.Note
+import cn.keevol.keenotes.data.entity.YearlyNoteCount
 import kotlinx.coroutines.flow.Flow
 import java.time.DateTimeException
 import java.time.LocalDate
@@ -52,6 +53,12 @@ interface NoteDao {
     
     @Query("SELECT MAX(id) FROM notes")
     suspend fun getMaxId(): Long?
+
+    /**
+     * Get notes count grouped by year, sorted ascending
+     */
+    @Query("SELECT CAST(strftime('%Y', createdAt) AS INTEGER) AS year, COUNT(*) AS count FROM notes GROUP BY year ORDER BY year ASC")
+    suspend fun getNotesCountByYear(): List<YearlyNoteCount>
 
     @RawQuery(observedEntities = [Note::class])
     fun observeNotesByQuery(query: SupportSQLiteQuery): Flow<List<Note>>
