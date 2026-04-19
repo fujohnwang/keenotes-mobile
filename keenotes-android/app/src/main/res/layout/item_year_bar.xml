@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingVertical="4dp">
+
+    <!-- Year label (fixed width, right-aligned) -->
+    <TextView
+        android:id="@+id/yearLabel"
+        android:layout_width="42dp"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary"
+        android:gravity="end"
+        android:fontFamily="sans-serif-medium" />
+
+    <!-- Bar container -->
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="28dp"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp">
+
+        <View
+            android:id="@+id/bar"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_chart_bar" />
+
+    </FrameLayout>
+
+    <!-- Count label -->
+    <TextView
+        android:id="@+id/countLabel"
+        android:layout_width="48dp"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="@color/primary"
+        android:fontFamily="sans-serif-medium" />
+
+</LinearLayout>

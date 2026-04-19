@@ -34,7 +34,15 @@
     <fragment
         android:id="@+id/reviewFragment"
         android:name="cn.keevol.keenotes.ui.review.ReviewFragment"
-        android:label="Review" />
+        android:label="Review">
+        <action
+            android:id="@+id/action_review_to_analytics"
+            app:destination="@id/analyticsFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
 
     <fragment
         android:id="@+id/settingsFragment"
@@ -81,5 +89,10 @@
         android:id="@+id/onThisDayFragment"
         android:name="cn.keevol.keenotes.ui.note.OnThisDayFragment"
         android:label="On This Day" />
+
+    <fragment
+        android:id="@+id/analyticsFragment"
+        android:name="cn.keevol.keenotes.ui.analytics.AnalyticsFragment"
+        android:label="Analytics" />
 
 </navigation>
