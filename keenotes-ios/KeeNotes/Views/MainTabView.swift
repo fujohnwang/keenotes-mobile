@@ -41,6 +41,14 @@ struct MainTabView: View {
                         // Only trigger if horizontal movement clearly dominates
                         guard abs(horizontal) > abs(vertical) * 1.5 else { return }
 
+                        if appState.isInSubPage {
+                            // Sub-page: swipe right to go back
+                            if horizontal > 0 {
+                                appState.subPageDismissTrigger += 1
+                            }
+                            return
+                        }
+
                         if horizontal < 0, appState.selectedTab < tabCount - 1 {
                             // Swipe left → next tab
                             swipeDirection = .left

@@ -122,10 +122,17 @@ struct SearchView: View {
         }
         .navigationBarHidden(true)
         .onAppear {
+            appState.isInSubPage = true
             // Auto-focus search input
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isSearchFocused = true
             }
+        }
+        .onDisappear {
+            appState.isInSubPage = false
+        }
+        .onChange(of: appState.subPageDismissTrigger) { _ in
+            dismiss()
         }
         .onChange(of: searchText) { _ in
             // Debounce search - cancel previous task and start new one

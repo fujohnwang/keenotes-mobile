@@ -55,6 +55,9 @@ struct KeeNotesApp: App {
 class AppState: ObservableObject {
     @Published var isInitialized = false
     @Published var selectedTab = 0  // 0: Note, 1: Review, 2: Settings
+    @Published var isInSubPage = false  // true when a sub-page (Search, Analytics, etc.) is active
+    /// Incremented to signal sub-pages to dismiss themselves
+    @Published var subPageDismissTrigger = 0
     @Published var onThisDayNotes: [Note] = []
     /// Draft text in NoteView input — survives tab switches
     @Published var noteDraftText = ""
