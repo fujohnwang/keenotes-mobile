@@ -287,6 +287,16 @@ class NoteFragment : Fragment() {
         }
     }
     
+    override fun onPause() {
+        super.onPause()
+        // 离开 NoteFragment 时主动隐藏键盘并清除焦点，防止切换到其他 tab 时出现键盘残影
+        if (_binding != null) {
+            binding.noteInput.clearFocus()
+            val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
+        }
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
