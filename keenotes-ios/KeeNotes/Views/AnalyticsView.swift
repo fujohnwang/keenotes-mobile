@@ -37,11 +37,12 @@ struct AnalyticsView: View {
                     Spacer()
                 } else {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
+                        VStack(spacing: 16) {
                             // Section header
                             Text("Notes per Year")
                                 .font(.system(size: isPad ? 17 : 15, weight: .semibold))
                                 .foregroundColor(.primary)
+                                .frame(maxWidth: .infinity, alignment: .center)
 
                             // Horizontal bar chart
                             YearlyBarChart(data: yearlyData, colorScheme: colorScheme, isPad: isPad)
@@ -79,7 +80,7 @@ struct AnalyticsView: View {
 
     private var topHeader: some View {
         TopHeaderView(
-            title: "Analytics",
+            title: "KeeNotes Insight",
             leftButton: .back { dismiss() }
         )
     }
@@ -132,14 +133,6 @@ private struct YearlyBarChart: View {
             }
         }
         .padding(isPad ? 20 : 16)
-        .background(Theme.cardBackground(colorScheme))
-        .cornerRadius(isPad ? 16 : 12)
-        .shadow(
-            color: Theme.cardShadow(colorScheme).color,
-            radius: Theme.cardShadow(colorScheme).radius,
-            x: Theme.cardShadow(colorScheme).x,
-            y: Theme.cardShadow(colorScheme).y
-        )
     }
 
     private func formatCount(_ count: Int) -> String {
