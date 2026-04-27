@@ -439,11 +439,13 @@
 				DEVELOPMENT_TEAM = NG744CF46S;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = KeeNotes/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = KeeNotes;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.7.11;
+				MARKETING_VERSION = 1.7.12;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
@@ -461,11 +463,13 @@
 				DEVELOPMENT_TEAM = NG744CF46S;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = KeeNotes/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = KeeNotes;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.7.11;
+				MARKETING_VERSION = 1.7.12;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
