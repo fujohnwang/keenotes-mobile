@@ -355,8 +355,6 @@ public class WebSocketClientService {
         }
 
         try {
-            logger.info("Received message: " + message);
-
             // 每次收到消息都更新时间戳，用于心跳超时检测
             lastMessageTime = System.currentTimeMillis();
 
@@ -367,8 +365,6 @@ public class WebSocketClientService {
                 logger.warning("Message without type: " + message);
                 return;
             }
-
-            logger.info("Processing message type: " + type);
 
             switch (type) {
                 case "sync_batch":
@@ -390,7 +386,6 @@ public class WebSocketClientService {
                     break;
                 case "pong":
                     // 服务器对我们ping的响应，lastMessageTime已在上面更新
-                    logger.fine("Received pong from server");
                     break;
                 case "error":
                     handleError(json);
@@ -602,7 +597,6 @@ public class WebSocketClientService {
             WebSocket ws = webSocket;
             if (ws != null) {
                 boolean sent = ws.send("{\"type\":\"ping\"}");
-                logger.fine("Sent heartbeat ping (silent " + silentMs + "ms)");
                 if (!sent) {
                     logger.warning("Failed to send heartbeat ping, forcing reconnect...");
                     forceReconnect();

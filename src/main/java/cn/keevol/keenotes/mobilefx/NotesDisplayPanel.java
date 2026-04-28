@@ -396,9 +396,18 @@ public class NotesDisplayPanel extends VBox {
      * Load initial batch of notes from database
      */
     private void loadInitialNotesFromDb() {
+        loadInitialNotesFromDb(0);
+    }
+
+    private void loadInitialNotesFromDb(int retryAttempt) {
         final int gen = loadGeneration;
+        final int currentRetryAttempt = retryAttempt;
         new Thread(() -> {
             try {
+                logger.info("loadInitialNotesFromDb start: gen=" + gen
+                        + ", retryAttempt=" + currentRetryAttempt
+                        + ", totalNoteCount=" + totalNoteCount
+                        + ", reviewDays=" + reviewDays);
                 List<LocalCacheService.NoteData> notes;
                 if (reviewDays > 0) {
                     notes = localCache.getNotesForReviewPaged(reviewDays, 0, 20);
@@ -411,12 +420,29 @@ public class NotesDisplayPanel extends VBox {
 
                 Platform.runLater(() -> {
                     if (gen != loadGeneration) {
-                        logger.info("loadInitialNotesFromDb: stale generation, skipping");
+                        logger.info("loadInitialNotesFromDb: stale generation, skipping"
+                                + " (gen=" + gen + ", current=" + loadGeneration + ")");
                         return;
                     }
 
                     if (noteLoadCallback != null) {
                         noteLoadCallback.accept(notes);
+                    }
+
+                    if (totalNoteCount > 0 && notes.isEmpty()) {
+                        logger.warning("loadInitialNotesFromDb mismatch: totalNoteCount=" + totalNoteCount
+                                + ", loaded=0, retryAttempt=" + currentRetryAttempt
+                                + ", useTruePagination=" + useTruePagination
+                                + ", loadedFromDbCount=" + loadedFromDbCount);
+                        if (currentRetryAttempt == 0) {
+                            // One-shot retry to recover from transient DB/connection issues
+                            // without leaving users in a blank list state.
+                            logger.warning("loadInitialNotesFromDb scheduling one-shot retry");
+                            loadInitialNotesFromDb(1);
+                            return;
+                        }
+                        showError("Failed to load notes from cache. Please retry.");
+                        return;
                     }
 
                     appendUniqueNotes(notes);
@@ -426,11 +452,12 @@ public class NotesDisplayPanel extends VBox {
                             + " notes via ListView, noteItems.size=" + noteItems.size());
                 });
             } catch (Exception e) {
-                logger.severe("loadInitialNotesFromDb ERROR: " + e.getMessage());
+                logger.severe("loadInitialNotesFromDb ERROR (retryAttempt="
+                        + currentRetryAttempt + "): " + e.getMessage());
                 e.printStackTrace();
                 Platform.runLater(() -> showError("Error loading notes: " + e.getMessage()));
             }
-        }, "LoadInitialNotes").start();
+        }, "LoadInitialNotes-" + currentRetryAttempt).start();
     }
 
     /**
