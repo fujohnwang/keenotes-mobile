@@ -14,6 +14,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -25,11 +27,18 @@ public class DataImportService {
     private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     
     private final ApiServiceV2 apiService;
+    private final ExecutorService importExecutor;
     private volatile boolean isImporting = false;
     private volatile boolean shouldCancel = false;
+    private volatile boolean closed = false;
     
     public DataImportService(ApiServiceV2 apiService) {
         this.apiService = apiService;
+        this.importExecutor = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "data-import");
+            t.setDaemon(true);
+            return t;
+        });
     }
     
     /**
@@ -113,7 +122,7 @@ public class DataImportService {
             } catch (Exception e) {
                 return ValidationResult.error("Error reading file: " + e.getMessage());
             }
-        });
+        }, importExecutor);
     }
     
     /**
@@ -143,7 +152,9 @@ public class DataImportService {
                     }
                 }
             } catch (Exception e) {
-                Platform.runLater(() -> listener.onError("Error counting lines: " + e.getMessage()));
+                if (!closed) {
+                    Platform.runLater(() -> listener.onError("Error counting lines: " + e.getMessage()));
+                }
                 isImporting = false;
                 return;
             }
@@ -204,7 +215,9 @@ public class DataImportService {
                     
                     // Update progress
                     int prog = current.incrementAndGet();
-                    Platform.runLater(() -> listener.onProgress(prog, total));
+                    if (!closed) {
+                        Platform.runLater(() -> listener.onProgress(prog, total));
+                    }
                     
                     // Small delay to avoid overwhelming the server
                     Thread.sleep(100);
@@ -217,14 +230,18 @@ public class DataImportService {
                 }
                 
                 final String finalFailedFilePath = failedFilePath;
-                Platform.runLater(() -> listener.onComplete(successCount.get(), failedCount.get(), finalFailedFilePath));
+                if (!closed) {
+                    Platform.runLater(() -> listener.onComplete(successCount.get(), failedCount.get(), finalFailedFilePath));
+                }
                 
             } catch (Exception e) {
-                Platform.runLater(() -> listener.onError("Import error: " + e.getMessage()));
+                if (!closed) {
+                    Platform.runLater(() -> listener.onError("Import error: " + e.getMessage()));
+                }
             } finally {
                 isImporting = false;
             }
-        });
+        }, importExecutor);
     }
     
     /**
@@ -268,5 +285,14 @@ public class DataImportService {
      */
     public boolean isImporting() {
         return isImporting;
+    }
+
+    /**
+     * Release import executor resources. Call when this service is no longer needed.
+     */
+    public void close() {
+        closed = true;
+        shouldCancel = true;
+        importExecutor.shutdownNow();
     }
 }

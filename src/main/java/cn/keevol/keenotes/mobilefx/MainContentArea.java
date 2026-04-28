@@ -3,6 +3,7 @@ package cn.keevol.keenotes.mobilefx;
 import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.beans.value.ChangeListener;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -62,6 +63,13 @@ public class MainContentArea extends StackPane {
     // Flag to prevent duplicate listener registration
     private boolean localCacheListenerRegistered = false;
 
+    // Listener references for dispose pattern
+    private final ChangeListener<Number> accountSwitchedListener;
+    private final ServiceManager.ServiceStatusListener serviceStatusListener;
+    private WebSocketClientService.SyncListener webSocketSyncListener;
+    private WebSocketClientService registeredWebSocketService;
+    private LocalCacheService.NoteChangeListener localCacheChangeListener;
+
     // Pending notes UI components
     private HBox pendingBanner;
     private Label pendingLabel;
@@ -79,7 +87,7 @@ public class MainContentArea extends StackPane {
         registerWebSocketListener();
 
         // Listen to account switch events to re-register WebSocket listener
-        ServiceManager.getInstance().accountSwitchedProperty().addListener((obs, oldVal, newVal) -> {
+        accountSwitchedListener = (obs, oldVal, newVal) -> {
             Platform.runLater(() -> {
                 logger.info("Account switched, re-registering WebSocket listener");
                 // Get new WebSocket service instance
@@ -91,10 +99,11 @@ public class MainContentArea extends StackPane {
                 // Note: Don't reset localCacheListenerRegistered
                 // LocalCacheService is singleton and listener is still valid
             });
-        });
+        };
+        ServiceManager.getInstance().accountSwitchedProperty().addListener(accountSwitchedListener);
 
         // Listen to ServiceManager for cache ready event
-        ServiceManager.getInstance().addListener((status, message) -> {
+        serviceStatusListener = (status, message) -> {
             if ("local_cache_ready".equals(status)) {
                 Platform.runLater(() -> {
                     // Register LocalCacheService change listener
@@ -107,7 +116,8 @@ public class MainContentArea extends StackPane {
                     }
                 });
             }
-        });
+        };
+        ServiceManager.getInstance().addListener(serviceStatusListener);
 
         setupPanels();
     }
@@ -117,9 +127,15 @@ public class MainContentArea extends StackPane {
      */
     private void registerWebSocketListener() {
         logger.info("Registering WebSocket listener");
+
+        // Remove old listener from the service it was actually registered on
+        if (webSocketSyncListener != null && registeredWebSocketService != null) {
+            registeredWebSocketService.removeListener(webSocketSyncListener);
+        }
+
         // Listen to WebSocket events for sync status display only
         // Note: UI updates are now driven by LocalCacheService change listeners
-        webSocketService.addListener(new WebSocketClientService.SyncListener() {
+        webSocketSyncListener = new WebSocketClientService.SyncListener() {
             @Override
             public void onConnectionStatus(boolean connected) {
                 // Not needed here
@@ -181,7 +197,9 @@ public class MainContentArea extends StackPane {
                     }
                 });
             }
-        });
+        };
+        webSocketService.addListener(webSocketSyncListener);
+        registeredWebSocketService = webSocketService;
     }
 
     /**
@@ -203,7 +221,7 @@ public class MainContentArea extends StackPane {
             return;
         }
 
-        localCache.addChangeListener(new LocalCacheService.NoteChangeListener() {
+        localCacheChangeListener = new LocalCacheService.NoteChangeListener() {
             @Override
             public void onNoteInserted(LocalCacheService.NoteData note) {
                 // Single note inserted (realtime update)
@@ -217,7 +235,8 @@ public class MainContentArea extends StackPane {
                 // This is already on JavaFX thread (Platform.runLater in LocalCacheService)
                 handleBatchNotesFromDb(notes);
             }
-        });
+        };
+        localCache.addChangeListener(localCacheChangeListener);
 
         localCacheListenerRegistered = true;
         logger.info("LocalCacheService change listener registered");
@@ -279,6 +298,37 @@ public class MainContentArea extends StackPane {
         } else {
             logger.fine("Batch sync persisted but current panel is not Note/Review/OnThisDay mode, skipping UI update");
         }
+    }
+
+    /**
+     * Remove all listeners registered on singleton services.
+     * Call when this component is no longer in use.
+     */
+    public void dispose() {
+        ServiceManager.getInstance().accountSwitchedProperty().removeListener(accountSwitchedListener);
+        ServiceManager.getInstance().removeListener(serviceStatusListener);
+        if (registeredWebSocketService != null && webSocketSyncListener != null) {
+            registeredWebSocketService.removeListener(webSocketSyncListener);
+        }
+        if (localCache != null && localCacheChangeListener != null) {
+            localCache.removeChangeListener(localCacheChangeListener);
+        }
+        if (notesDisplayPanel != null) {
+            notesDisplayPanel.dispose();
+        }
+        if (searchResultsPanel != null) {
+            searchResultsPanel.dispose();
+        }
+        if (reviewNotesPanel != null) {
+            reviewNotesPanel.dispose();
+        }
+        if (onThisDayNotesPanel != null) {
+            onThisDayNotesPanel.dispose();
+        }
+        if (settingsView != null) {
+            settingsView.dispose();
+        }
+        logger.info("MainContentArea disposed");
     }
 
     private void setupPanels() {

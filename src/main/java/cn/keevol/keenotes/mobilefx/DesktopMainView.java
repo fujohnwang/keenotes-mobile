@@ -1,6 +1,7 @@
 package cn.keevol.keenotes.mobilefx;
 
 import javafx.animation.PauseTransition;
+import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
@@ -22,6 +23,9 @@ public class DesktopMainView extends BorderPane {
     private final SidebarView sidebar;
     private final MainContentArea mainContent;
     private PauseTransition onThisDayMidnightRefreshTimer;
+
+    // Listener reference for dispose pattern
+    private final ChangeListener<Boolean> onThisDaySettingListener;
     
     // Current mode
     private ViewMode currentMode = ViewMode.NOTE;
@@ -47,7 +51,20 @@ public class DesktopMainView extends BorderPane {
         // Setup keyboard shortcuts
         setupKeyboardShortcuts();
         setupOnThisDayDateRefresh();
-        setupOnThisDaySettingObserver();
+
+        // Initialize listener field for SettingsService
+        onThisDaySettingListener = (obs, oldVal, newVal) -> {
+            sidebar.refreshOnThisDayAvailability();
+            if (Boolean.TRUE.equals(newVal)) {
+                scheduleNextOnThisDayDateRefresh();
+            } else {
+                stopOnThisDayDateRefresh();
+                if (currentMode == ViewMode.ON_THIS_DAY) {
+                    switchToMode(ViewMode.NOTE);
+                }
+            }
+        };
+        SettingsService.getInstance().showOnThisDayInYearsPastProperty().addListener(onThisDaySettingListener);
 
         // Initialize with Note mode
         switchToMode(ViewMode.NOTE);
@@ -117,20 +134,6 @@ public class DesktopMainView extends BorderPane {
                 return;
             }
             scheduleNextOnThisDayDateRefresh();
-        });
-    }
-
-    private void setupOnThisDaySettingObserver() {
-        SettingsService.getInstance().showOnThisDayInYearsPastProperty().addListener((obs, oldVal, newVal) -> {
-            sidebar.refreshOnThisDayAvailability();
-            if (Boolean.TRUE.equals(newVal)) {
-                scheduleNextOnThisDayDateRefresh();
-            } else {
-                stopOnThisDayDateRefresh();
-                if (currentMode == ViewMode.ON_THIS_DAY) {
-                    switchToMode(ViewMode.NOTE);
-                }
-            }
         });
     }
 
@@ -329,6 +332,16 @@ public class DesktopMainView extends BorderPane {
         switchToMode(ViewMode.SETTINGS);
     }
     
+    /**
+     * Remove all listeners registered on singleton services.
+     */
+    public void dispose() {
+        SettingsService.getInstance().showOnThisDayInYearsPastProperty().removeListener(onThisDaySettingListener);
+        mainContent.dispose();
+        sidebar.dispose();
+        stopOnThisDayDateRefresh();
+    }
+
     /**
      * Get the sidebar (for status updates from Main)
      */

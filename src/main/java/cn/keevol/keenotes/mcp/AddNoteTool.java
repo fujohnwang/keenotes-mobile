@@ -6,6 +6,7 @@ import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * MCP Tool for adding notes to KeeNotes
@@ -48,7 +49,7 @@ public class AddNoteTool {
                 future = apiService.postNote(content, channel, timestamp);
             }
             
-            ApiServiceV2.ApiResult result = future.get();
+            ApiServiceV2.ApiResult result = future.get(30, TimeUnit.SECONDS);
             
             if (result.success()) {
                 String message = String.format("✓ Note saved successfully to KeeNotes (channel: %s)", channel);

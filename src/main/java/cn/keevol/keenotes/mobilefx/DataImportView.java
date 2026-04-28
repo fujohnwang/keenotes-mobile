@@ -389,6 +389,14 @@ public class DataImportView extends VBox {
         }
     }
     
+    /**
+     * Release import resources. Call when this view is no longer needed.
+     */
+    public void dispose() {
+        importService.cancelImport();
+        importService.close();
+    }
+
     private void updateLocalPortSetting() {
         String localPort = localImportServerPortField.getText();
         if (localPort == null || localPort.isEmpty()) {

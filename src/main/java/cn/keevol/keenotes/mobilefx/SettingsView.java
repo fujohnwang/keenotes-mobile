@@ -20,7 +20,7 @@ public class SettingsView extends BorderPane {
     private VBox preferencesView;
     private VBox aiView;
     private VBox shareView;
-    private VBox dataImportView;
+    private DataImportView dataImportView;
     private VBox debugView;
 
     private VBox currentView;
@@ -62,6 +62,13 @@ public class SettingsView extends BorderPane {
 
         // Footer
         setBottom(createFooter());
+    }
+
+    /**
+     * Release sub-view resources. Call when settings is no longer needed.
+     */
+    public void dispose() {
+        dataImportView.dispose();
     }
 
     /**
