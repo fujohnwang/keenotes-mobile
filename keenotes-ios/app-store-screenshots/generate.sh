@@ -223,7 +223,7 @@ composite_slide() {
     cmd+=("$overlay" -gravity northwest -geometry "+${x}+${y}" -composite)
     shift 3
   done
-  cmd+=("$out")
+  cmd+=("PNG24:$out")
   "${cmd[@]}"
 }
 

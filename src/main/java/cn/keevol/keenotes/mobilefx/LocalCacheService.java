@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Logger;
 
 /**
  * 本地缓存服务，管理客户端的SQLite数据库
@@ -29,6 +30,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * - Android 需要包含 ARM64 原生库
  */
 public class LocalCacheService {
+    private static final Logger logger = AppLogger.getLogger(LocalCacheService.class);
     private static final String DB_NAME = "keenotes_cache.db";
     private static final DateTimeFormatter DB_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static LocalCacheService instance;
@@ -155,6 +157,7 @@ public class LocalCacheService {
                 }
             }
         }
+        ensureConnectionHealthy();
     }
 
     private String resolveDbPath() {
@@ -193,16 +196,11 @@ public class LocalCacheService {
             // Desktop: 使用标准 DriverManager
             Class.forName("org.sqlite.JDBC");
             connection = DriverManager.getConnection(jdbcUrl);
+            logger.info("Connected to SQLite DB: " + dbPathString);
 
             // 通过 PRAGMA 语句设置 SQLite 优化参数（而不是在 URL 中拼接）
             initStep = "setting SQLite pragmas";
-            Statement pragmaStmt = connection.createStatement();
-            pragmaStmt.execute("PRAGMA journal_mode=WAL");
-            pragmaStmt.execute("PRAGMA synchronous=NORMAL");
-            pragmaStmt.execute("PRAGMA cache_size=10000");
-            pragmaStmt.execute("PRAGMA busy_timeout=30000");
-            pragmaStmt.close();
-
+            applyPragmas(connection);
 
             if (connection == null || connection.isClosed()) {
                 throw new SQLException("Failed to establish database connection - connection is null or closed");
@@ -212,7 +210,28 @@ public class LocalCacheService {
 
             // 创建表
             initStep = "creating tables";
-            Statement stmt = connection.createStatement();
+            ensureSchema(connection);
+            initStep = "completed";
+            initLog.append("Database init completed OK");
+
+        } catch (Exception e) {
+            initLog.append("ERROR: ").append(e.getClass().getSimpleName())
+                    .append(" - ").append(e.getMessage());
+            throw new RuntimeException(initLog.toString(), e);
+        }
+    }
+
+    private void applyPragmas(Connection conn) throws SQLException {
+        try (Statement pragmaStmt = conn.createStatement()) {
+            pragmaStmt.execute("PRAGMA journal_mode=WAL");
+            pragmaStmt.execute("PRAGMA synchronous=NORMAL");
+            pragmaStmt.execute("PRAGMA cache_size=10000");
+            pragmaStmt.execute("PRAGMA busy_timeout=30000");
+        }
+    }
+
+    private void ensureSchema(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
             stmt.setQueryTimeout(30);
 
             stmt.executeUpdate(
@@ -238,7 +257,6 @@ public class LocalCacheService {
             stmt.executeUpdate(
                     "INSERT OR IGNORE INTO sync_state (id, last_sync_id) VALUES (1, -1)");
 
-            // 离线暂存表：网络不可用时暂存未发送的笔记
             stmt.executeUpdate(
                     "CREATE TABLE IF NOT EXISTS pending_notes (" +
                             "  id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -246,16 +264,57 @@ public class LocalCacheService {
                             "  channel TEXT DEFAULT 'desktop', " +
                             "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
                             ")");
-
-            stmt.close();
-            initStep = "completed";
-            initLog.append("Database init completed OK");
-
-        } catch (Exception e) {
-            initLog.append("ERROR: ").append(e.getClass().getSimpleName())
-                    .append(" - ").append(e.getMessage());
-            throw new RuntimeException(initLog.toString(), e);
         }
+    }
+
+    private void ensureConnectionHealthy() {
+        synchronized (dbLock) {
+            try {
+                if (isConnectionHealthy(connection)) {
+                    return;
+                }
+                logger.warning("SQLite connection unhealthy, attempting recovery");
+                reconnectDatabaseLocked();
+                logger.info("SQLite connection recovered successfully");
+            } catch (Exception e) {
+                logger.severe("SQLite connection recovery failed: " + e.getMessage());
+            }
+        }
+    }
+
+    private boolean isConnectionHealthy(Connection conn) {
+        if (conn == null) {
+            return false;
+        }
+        try {
+            if (conn.isClosed()) {
+                return false;
+            }
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT 1")) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            logger.warning("SQLite connection health check failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private void reconnectDatabaseLocked() throws Exception {
+        if (connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException closeError) {
+                logger.warning("Closing old SQLite connection failed during recovery: " + closeError.getMessage());
+            }
+            connection = null;
+        }
+
+        Class.forName("org.sqlite.JDBC");
+        String jdbcUrl = "jdbc:sqlite:" + dbPathString;
+        connection = DriverManager.getConnection(jdbcUrl);
+        applyPragmas(connection);
+        ensureSchema(connection);
     }
 
 
@@ -553,7 +612,7 @@ public class LocalCacheService {
                     return rs.getInt(1);
                 }
             } catch (SQLException e) {
-                // Get note count failed
+                logger.warning("getLocalNoteCount failed: " + e.getMessage());
             }
         }
         return 0;
@@ -587,7 +646,7 @@ public class LocalCacheService {
                     ));
                 }
             } catch (SQLException e) {
-                // Get paged notes failed
+                logger.warning("getNotesPaged failed (offset=" + offset + ", limit=" + limit + "): " + e.getMessage());
             }
         }
         return results;
@@ -623,8 +682,8 @@ public class LocalCacheService {
                     }
                 }
             } catch (SQLException e) {
-                // Get paged review notes failed
-                e.printStackTrace();
+                logger.warning("getNotesForReviewPaged failed (days=" + days + ", offset=" + offset
+                        + ", limit=" + limit + "): " + e.getMessage());
             }
         }
         return results;
@@ -723,6 +782,47 @@ public class LocalCacheService {
             } catch (SQLException e) {
                 // Failed to close database
             }
+        }
+    }
+
+    public String buildDiagnosticsSnapshot() {
+        ensureInitialized();
+        synchronized (dbLock) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("=== KeeNotes Diagnostics Snapshot ===").append(System.lineSeparator());
+            sb.append("time=").append(java.time.LocalDateTime.now()).append(System.lineSeparator());
+            sb.append("dbPath=").append(dbPathString).append(System.lineSeparator());
+
+            boolean healthy = isConnectionHealthy(connection);
+            sb.append("dbConnectionHealthy=").append(healthy).append(System.lineSeparator());
+
+            try {
+                sb.append("localNoteCount=").append(getLocalNoteCount()).append(System.lineSeparator());
+            } catch (Exception e) {
+                sb.append("localNoteCount=ERROR: ").append(e.getMessage()).append(System.lineSeparator());
+            }
+
+            try {
+                sb.append("pendingNoteCount=").append(getPendingNoteCount()).append(System.lineSeparator());
+            } catch (Exception e) {
+                sb.append("pendingNoteCount=ERROR: ").append(e.getMessage()).append(System.lineSeparator());
+            }
+
+            try {
+                sb.append("lastSyncId=").append(getLastSyncId()).append(System.lineSeparator());
+            } catch (Exception e) {
+                sb.append("lastSyncId=ERROR: ").append(e.getMessage()).append(System.lineSeparator());
+            }
+
+            try {
+                sb.append("lastSyncTime=").append(getLastSyncTime()).append(System.lineSeparator());
+            } catch (Exception e) {
+                sb.append("lastSyncTime=ERROR: ").append(e.getMessage()).append(System.lineSeparator());
+            }
+
+            sb.append("initStep=").append(initStep).append(System.lineSeparator());
+            sb.append("initialized=").append(initialized).append(System.lineSeparator());
+            return sb.toString();
         }
     }
 

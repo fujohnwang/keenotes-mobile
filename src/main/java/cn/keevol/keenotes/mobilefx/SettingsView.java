@@ -159,10 +159,15 @@ public class SettingsView extends BorderPane {
         clearDataButton.setMaxWidth(300);
         clearDataButton.setOnAction(e -> clearLocalData());
 
+        Button diagnosticsButton = new Button("Copy Diagnostics Snapshot");
+        diagnosticsButton.getStyleClass().addAll("action-button");
+        diagnosticsButton.setMaxWidth(300);
+        diagnosticsButton.setOnAction(e -> copyDiagnosticsSnapshot());
+
         Label statusLabel = new Label();
         statusLabel.getStyleClass().add("status-label");
 
-        debugSection.getChildren().addAll(debugLabel, clearDataButton, statusLabel);
+        debugSection.getChildren().addAll(debugLabel, clearDataButton, diagnosticsButton, statusLabel);
         debugSection.setUserData(statusLabel); // Store reference for clearLocalData
 
         return debugSection;
@@ -205,6 +210,50 @@ public class SettingsView extends BorderPane {
                 });
             }
         }, "ClearLocalData").start();
+    }
+
+    private void copyDiagnosticsSnapshot() {
+        Label statusLabel = (Label) debugView.getUserData();
+        statusLabel.setText("Collecting diagnostics...");
+        statusLabel.getStyleClass().removeAll("error", "success");
+        statusLabel.getStyleClass().add("success");
+
+        new Thread(() -> {
+            try {
+                ServiceManager serviceManager = ServiceManager.getInstance();
+                LocalCacheService cache = serviceManager.getLocalCacheService();
+                WebSocketClientService ws = serviceManager.getWebSocketService();
+
+                StringBuilder snapshot = new StringBuilder();
+                snapshot.append(cache.buildDiagnosticsSnapshot()).append(System.lineSeparator());
+                snapshot.append("service.localCacheState=").append(serviceManager.getLocalCacheState())
+                        .append(System.lineSeparator());
+                snapshot.append("service.localCacheErrorMessage=").append(serviceManager.getLocalCacheErrorMessage())
+                        .append(System.lineSeparator());
+                snapshot.append("service.webSocketConnected=").append(serviceManager.isWebSocketConnected())
+                        .append(System.lineSeparator());
+                snapshot.append("ws.connected=").append(ws.isConnected()).append(System.lineSeparator());
+                snapshot.append("ws.syncing=").append(ws.isSyncing()).append(System.lineSeparator());
+                snapshot.append("ws.offline=").append(ws.isOffline()).append(System.lineSeparator());
+
+                javafx.application.Platform.runLater(() -> {
+                    javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+                    javafx.scene.input.ClipboardContent clipboardContent = new javafx.scene.input.ClipboardContent();
+                    clipboardContent.putString(snapshot.toString());
+                    clipboard.setContent(clipboardContent);
+
+                    statusLabel.setText("✓ Diagnostics snapshot copied to clipboard");
+                    statusLabel.getStyleClass().removeAll("error", "success");
+                    statusLabel.getStyleClass().add("success");
+                });
+            } catch (Exception e) {
+                javafx.application.Platform.runLater(() -> {
+                    statusLabel.setText("✗ Failed to collect diagnostics: " + e.getMessage());
+                    statusLabel.getStyleClass().removeAll("error", "success");
+                    statusLabel.getStyleClass().add("error");
+                });
+            }
+        }, "CopyDiagnosticsSnapshot").start();
     }
 
     private void handleSaveSuccess() {
