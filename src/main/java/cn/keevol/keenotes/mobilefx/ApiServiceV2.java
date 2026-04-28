@@ -8,6 +8,10 @@ import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -20,11 +24,22 @@ public class ApiServiceV2 {
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
     private final OkHttpClient httpClient;
+    private final ExecutorService networkExecutor;
     private final SettingsService settings;
     private final CryptoService cryptoService;
 
     public ApiServiceV2() {
         this.httpClient = createClient();
+        this.networkExecutor = new ThreadPoolExecutor(
+                0, 4, 30L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(16),
+                r -> {
+                    Thread t = new Thread(r, "api-network");
+                    t.setDaemon(true);
+                    return t;
+                },
+                new ThreadPoolExecutor.AbortPolicy()
+        );
         this.settings = SettingsService.getInstance();
         this.cryptoService = new CryptoService();
     }
@@ -137,7 +152,7 @@ public class ApiServiceV2 {
                 e.printStackTrace();
                 return ApiResult.failure("Network error: " + e.getMessage());
             }
-        });
+        }, networkExecutor);
     }
 
     /**
@@ -190,6 +205,21 @@ public class ApiServiceV2 {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * Release OkHttp resources: dispatcher thread pool, connection pool, and cache.
+     */
+    public void close() {
+        httpClient.dispatcher().executorService().shutdownNow();
+        httpClient.connectionPool().evictAll();
+        if (httpClient.cache() != null) {
+            try {
+                httpClient.cache().close();
+            } catch (Exception ignored) {
+            }
+        }
+        networkExecutor.shutdownNow();
     }
 
     public boolean isConfigured() {
@@ -247,6 +277,6 @@ public class ApiServiceV2 {
                 e.printStackTrace();
                 return ApiResult.failure("Network error: " + e.getMessage());
             }
-        });
+        }, networkExecutor);
     }
 }

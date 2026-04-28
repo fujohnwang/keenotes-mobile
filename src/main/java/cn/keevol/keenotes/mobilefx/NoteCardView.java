@@ -64,21 +64,6 @@ public class NoteCardView extends StackPane {
         setCache(false);
         setCacheShape(false);
 
-        // Listen to theme changes
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
-            javafx.application.Platform.runLater(this::updateThemeColors);
-        });
-
-        // Listen to font size changes
-        settings.noteFontSizeProperty().addListener((obs, oldSize, newSize) -> {
-            javafx.application.Platform.runLater(this::updateContentTypography);
-        });
-
-        // Listen to font family changes
-        settings.noteFontFamilyProperty().addListener((obs, oldFamily, newFamily) -> {
-            javafx.application.Platform.runLater(this::updateContentTypography);
-        });
-
         // Main content container
         VBox contentBox = new VBox(8);
         contentBox.setPadding(new Insets(16));
@@ -372,7 +357,8 @@ public class NoteCardView extends StackPane {
     }
 
     /**
-     * Update card with new data (for cell reuse in ListView)
+     * Update card with new data (for cell reuse in ListView).
+     * Also reapplies current theme/font in case they changed since construction.
      */
     public void update(LocalCacheService.NoteData newData) {
         this.noteData = newData;
@@ -380,7 +366,8 @@ public class NoteCardView extends StackPane {
         String ch = (newData.channel != null && !newData.channel.isEmpty()) ? newData.channel : "default";
         channelLabel.setText("• " + ch);
         contentArea.setText(newData.content);
-        // Height update is reactive: setText() → internal Text layoutBounds change → listener
+        updateThemeColors();
+        updateContentTypography();
         cancelBorderAnimation();
     }
 

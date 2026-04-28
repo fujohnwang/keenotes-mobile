@@ -38,6 +38,7 @@ public class LocalCacheService {
     private Connection connection;
     private final CryptoService cryptoService;
     private volatile boolean initialized = false;
+    private volatile boolean closed = false;
 
     // 所有 JDBC 操作的同步锁 — Connection 不是线程安全的，
     // 重连期间 cryptoExecutor 写库和 UI reload 线程读库会并发访问同一个 Connection
@@ -150,6 +151,9 @@ public class LocalCacheService {
     }
 
     private void ensureInitialized() {
+        if (closed) {
+            throw new IllegalStateException("LocalCacheService is closed");
+        }
         if (!initialized) {
             synchronized (this) {
                 if (!initialized) {
@@ -268,6 +272,9 @@ public class LocalCacheService {
     }
 
     private void ensureConnectionHealthy() {
+        if (closed) {
+            return;
+        }
         synchronized (dbLock) {
             try {
                 if (isConnectionHealthy(connection)) {
@@ -438,7 +445,7 @@ public class LocalCacheService {
                     ));
                 }
             } catch (SQLException e) {
-                // Search failed
+                logger.warning("searchNotes failed: " + e.getMessage());
             }
         }
         return results;
@@ -465,7 +472,7 @@ public class LocalCacheService {
                     ));
                 }
             } catch (SQLException e) {
-                // Review failed
+                logger.warning("Review failed: " + e.getMessage());
             }
         }
         return results;
@@ -497,7 +504,7 @@ public class LocalCacheService {
                     }
                 }
             } catch (SQLException e) {
-                // Get On This Day notes failed
+                logger.warning("getNotesOnThisDay failed: " + e.getMessage());
             }
         }
         return results;
@@ -521,7 +528,7 @@ public class LocalCacheService {
                     }
                 }
             } catch (SQLException e) {
-                // Get On This Day notes count failed
+                logger.warning("getNotesOnThisDayCount failed: " + e.getMessage());
             }
         }
         return 0;
@@ -546,7 +553,7 @@ public class LocalCacheService {
                     ));
                 }
             } catch (SQLException e) {
-                // getAllNotes failed
+                logger.warning("getAllNotes failed: " + e.getMessage());
             }
         }
         return results;
@@ -576,7 +583,7 @@ public class LocalCacheService {
                     return rs.getLong("last_sync_id");
                 }
             } catch (SQLException e) {
-                // Get last sync ID failed
+                logger.warning("getLastSyncId failed: " + e.getMessage());
             }
         }
         return -1;
@@ -594,7 +601,7 @@ public class LocalCacheService {
                     return rs.getString("last_sync_time");
                 }
             } catch (SQLException e) {
-                // Get last sync time failed
+                logger.warning("getLastSyncTime failed: " + e.getMessage());
             }
         }
         return null;
@@ -708,7 +715,7 @@ public class LocalCacheService {
                     }
                 }
             } catch (SQLException e) {
-                // Get review notes count failed
+                logger.warning("getNotesCountForReview failed: " + e.getMessage());
             }
         }
         return 0;
@@ -726,7 +733,7 @@ public class LocalCacheService {
                     return rs.getString(1);
                 }
             } catch (SQLException e) {
-                // Get oldest note date failed
+                logger.warning("getOldestNoteDate failed: " + e.getMessage());
             }
         }
         return null;
@@ -774,6 +781,8 @@ public class LocalCacheService {
     }
 
     public void close() {
+        closed = true;
+        initialized = false;
         synchronized (dbLock) {
             try {
                 if (connection != null && !connection.isClosed()) {
@@ -782,6 +791,7 @@ public class LocalCacheService {
             } catch (SQLException e) {
                 // Failed to close database
             }
+            connection = null;
         }
     }
 

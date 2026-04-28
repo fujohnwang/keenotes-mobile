@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "mcp__sequential-thinking__sequentialthinking",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      "Bash(mvn compile *)",
+      "Bash(mvn test *)"
     ]
   }
 }

@@ -1,5 +1,6 @@
 package cn.keevol.keenotes.mobilefx;
 
+import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.concurrent.Task;
@@ -22,6 +23,9 @@ public class SidebarView extends VBox {
     
     private final Consumer<DesktopMainView.ViewMode> onNavigationChanged;
     
+    // Overview card
+    private final OverviewCard overviewCard;
+
     // Navigation buttons
     private NavigationButton noteButton;
     private NavigationButton searchButton;
@@ -32,35 +36,63 @@ public class SidebarView extends VBox {
     
     // Review periods panel
     private ReviewPeriodsPanel reviewPeriodsPanel;
-    
+
     // Settings sub panel
     private SettingsSubPanel settingsSubPanel;
     private boolean onThisDayListenerRegistered = false;
+
+    // Listener references for dispose pattern
+    private final ChangeListener<Boolean> onThisDaySettingListener;
+    private final ChangeListener<ThemeService.Theme> themeChangeListener;
+    private ServiceManager.ServiceStatusListener serviceStatusListener;
+    private LocalCacheService.NoteChangeListener localCacheChangeListener;
     
     public SidebarView(Consumer<DesktopMainView.ViewMode> onNavigationChanged) {
         this.onNavigationChanged = onNavigationChanged;
-        
+
         getStyleClass().add("sidebar");
         setPadding(new Insets(16));
         setSpacing(16);
-        
+
+        // Initialize overview card (needed before setupComponents for field reference)
+        overviewCard = new OverviewCard();
+
+        // Initialize listener fields
+        onThisDaySettingListener = (obs, oldVal, newVal) -> refreshOnThisDayButtonVisibility();
+        themeChangeListener = (obs, oldTheme, newTheme) ->
+                javafx.application.Platform.runLater(this::updateOnThisDayButtonStyle);
+
         setupComponents();
         setupOnThisDayAvailabilityTracking();
     }
     
+    /**
+     * Remove all listeners registered on singleton services.
+     */
+    public void dispose() {
+        SettingsService.getInstance().showOnThisDayInYearsPastProperty().removeListener(onThisDaySettingListener);
+        ThemeService.getInstance().currentThemeProperty().removeListener(themeChangeListener);
+        if (serviceStatusListener != null) {
+            ServiceManager.getInstance().removeListener(serviceStatusListener);
+        }
+        if (localCacheChangeListener != null) {
+            ServiceManager.getInstance().getLocalCacheService().removeChangeListener(localCacheChangeListener);
+        }
+        overviewCard.dispose();
+    }
+
     private void setupComponents() {
         // Logo area with icon and text
         HBox logoArea = createLogoArea();
         
         // Overview Card (conditionally shown)
-        OverviewCard overviewCard = new OverviewCard();
         overviewCard.setMaxWidth(Double.MAX_VALUE);
         
         // Bind visibility to settings property (reactive)
         SettingsService settings = SettingsService.getInstance();
         overviewCard.visibleProperty().bind(settings.showOverviewCardProperty());
         overviewCard.managedProperty().bind(settings.showOverviewCardProperty());
-        settings.showOnThisDayInYearsPastProperty().addListener((obs, oldVal, newVal) -> refreshOnThisDayButtonVisibility());
+        settings.showOnThisDayInYearsPastProperty().addListener(onThisDaySettingListener);
         
         // Add more spacing between logo and overview card
         VBox.setMargin(overviewCard, new Insets(8, 0, 0, 0));
@@ -250,8 +282,7 @@ public class SidebarView extends VBox {
         });
 
         button.selectedProperty().addListener((obs, oldVal, newVal) -> updateOnThisDayButtonStyle());
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) ->
-                javafx.application.Platform.runLater(this::updateOnThisDayButtonStyle));
+        ThemeService.getInstance().currentThemeProperty().addListener(themeChangeListener);
         updateOnThisDayButtonStyle();
         return button;
     }
@@ -308,14 +339,15 @@ public class SidebarView extends VBox {
         ServiceManager serviceManager = ServiceManager.getInstance();
         serviceManager.getLocalCacheService();
 
-        serviceManager.addListener((status, message) -> {
+        serviceStatusListener = (status, message) -> {
             if ("local_cache_ready".equals(status)
                     || "account_switched".equals(status)
                     || "reinitializing".equals(status)) {
                 registerOnThisDayChangeListenerIfReady();
                 refreshOnThisDayButtonVisibility();
             }
-        });
+        };
+        serviceManager.addListener(serviceStatusListener);
 
         registerOnThisDayChangeListenerIfReady();
         refreshOnThisDayButtonVisibility();
@@ -333,7 +365,7 @@ public class SidebarView extends VBox {
             return;
         }
 
-        cache.addChangeListener(new LocalCacheService.NoteChangeListener() {
+        localCacheChangeListener = new LocalCacheService.NoteChangeListener() {
             @Override
             public void onNoteInserted(LocalCacheService.NoteData note) {
             }
@@ -342,7 +374,8 @@ public class SidebarView extends VBox {
             public void onNotesInserted(java.util.List<LocalCacheService.NoteData> notes) {
                 refreshOnThisDayButtonVisibility();
             }
-        });
+        };
+        cache.addChangeListener(localCacheChangeListener);
         onThisDayListenerRegistered = true;
     }
 

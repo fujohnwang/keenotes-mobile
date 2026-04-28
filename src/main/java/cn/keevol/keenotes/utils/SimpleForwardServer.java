@@ -4,6 +4,7 @@ import cn.keevol.keenotes.mobilefx.SettingsService;
 import com.sun.net.httpserver.HttpServer;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -13,6 +14,7 @@ public class SimpleForwardServer {
 
     protected static final AtomicBoolean running = new AtomicBoolean(false);
     protected static final AtomicReference<HttpServer> httpServerRef = new AtomicReference<>();
+    private static volatile ExecutorService executorService;
 
     public static int stopWaitInSeconds = 5;
 
@@ -30,11 +32,12 @@ public class SimpleForwardServer {
                         httpServerRef.set(server);
                         // =================================================================
                         // 核心重点：使用单线程 Executor
-                        // 这直接从底层保证了请求是“串行”的。
+                        // 这直接从底层保证了请求是”串行”的。
                         // 只有当前一个请求的 handle 方法彻底执行完毕退出后，
                         // 线程才会去取下一个请求。你不需要自己写锁。
                         // =================================================================
-                        server.setExecutor(Executors.newSingleThreadExecutor());
+                        executorService = Executors.newSingleThreadExecutor();
+                        server.setExecutor(executorService);
 
                         // 2. 创建上下文，绑定路径
                         server.createContext("/", new ForwardHandler());
@@ -62,6 +65,10 @@ public class SimpleForwardServer {
                 server.stop(stopWaitInSeconds);
                 httpServerRef.set(null);
                 System.out.println("stop local import server stopped.");
+            }
+            if (executorService != null && !executorService.isShutdown()) {
+                executorService.shutdownNow();
+                executorService = null;
             }
         }
     }

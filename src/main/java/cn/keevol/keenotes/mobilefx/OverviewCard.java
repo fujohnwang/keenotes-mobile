@@ -3,6 +3,7 @@ package cn.keevol.keenotes.mobilefx;
 import javafx.application.Platform;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -23,6 +24,11 @@ public class OverviewCard extends HBox {
     private final Label daysUsingValue;
     private final IntegerProperty totalNotesProperty = new SimpleIntegerProperty(0);
     private final IntegerProperty daysUsingProperty = new SimpleIntegerProperty(0);
+
+    // Listener references for dispose pattern
+    private ChangeListener<Number> accountSwitchListener;
+    private LocalCacheService.NoteChangeListener localCacheChangeListener;
+    private volatile boolean disposed = false;
     
     public OverviewCard() {
         getStyleClass().add("overview-card");
@@ -91,52 +97,75 @@ public class OverviewCard extends HBox {
      */
     private void initializeDataBinding() {
         // 监听账户切换事件（响应式）
-        ServiceManager.getInstance().accountSwitchedProperty().addListener((obs, oldVal, newVal) -> {
+        accountSwitchListener = (obs, oldVal, newVal) -> {
             // Property 值变化时自动触发，直接重置
             System.out.println("[OverviewCard] Account switched detected! oldVal: " + oldVal + ", newVal: " + newVal);
             reset();
-        });
+        };
+        ServiceManager.getInstance().accountSwitchedProperty().addListener(accountSwitchListener);
         
         new Thread(() -> {
             try {
                 // Wait for ServiceManager to be ready
                 ServiceManager serviceManager = ServiceManager.getInstance();
-                while (serviceManager.getLocalCacheState() != ServiceManager.InitializationState.READY) {
+                while (serviceManager.getLocalCacheState() != ServiceManager.InitializationState.READY
+                        && !disposed) {
                     Thread.sleep(100);
                 }
-                
+                // Check again after loop — service might never become ready or we might be disposed
+                if (disposed || serviceManager.getLocalCacheState() != ServiceManager.InitializationState.READY) {
+                    return;
+                }
+
                 LocalCacheService cache = serviceManager.getLocalCacheService();
-                
+
                 // Bind to note count property
                 Platform.runLater(() -> {
-                    totalNotesProperty.bind(cache.noteCountProperty());
+                    if (!disposed) {
+                        totalNotesProperty.bind(cache.noteCountProperty());
+                    }
                 });
-                
+
                 // 方案 B: 监听批量插入事件
-                cache.addChangeListener(new LocalCacheService.NoteChangeListener() {
+                localCacheChangeListener = new LocalCacheService.NoteChangeListener() {
                     @Override
                     public void onNoteInserted(LocalCacheService.NoteData note) {
-                        // Single note - check if need to initialize
+                        if (disposed) return;
                         initializeFirstNoteDateIfNeeded();
                     }
-                    
+
                     @Override
                     public void onNotesInserted(java.util.List<LocalCacheService.NoteData> notes) {
-                        // Batch insert - definitely need to update
+                        if (disposed) return;
                         initializeFirstNoteDateIfNeeded();
                     }
-                });
-                
+                };
+                cache.addChangeListener(localCacheChangeListener);
+
                 // Initialize first note date if needed
                 if (cache.getLocalNoteCount() > 0) {
                     initializeFirstNoteDateIfNeeded();
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             } catch (Exception e) {
                 System.err.println("[OverviewCard] Failed to initialize data binding: " + e.getMessage());
             }
         }, "OverviewCardInit").start();
     }
     
+    /**
+     * Remove all listeners registered on singleton services.
+     */
+    public void dispose() {
+        disposed = true;
+        ServiceManager.getInstance().accountSwitchedProperty().removeListener(accountSwitchListener);
+        if (localCacheChangeListener != null) {
+            ServiceManager.getInstance().getLocalCacheService().removeChangeListener(localCacheChangeListener);
+        }
+        totalNotesProperty.unbind();
+    }
+
     /**
      * Reset both metrics to 0 (called when account is switched)
      */
@@ -210,7 +239,8 @@ public class OverviewCard extends HBox {
      * Initialize first note date from database
      */
     private void initializeFirstNoteDate() {
-        new Thread(() -> {
+        Thread t = new Thread(() -> {
+            if (disposed) return;
             try {
                 ServiceManager serviceManager = ServiceManager.getInstance();
                 if (serviceManager.getLocalCacheState() == ServiceManager.InitializationState.READY) {
@@ -227,6 +257,8 @@ public class OverviewCard extends HBox {
             } catch (Exception e) {
                 System.err.println("[OverviewCard] Failed to initialize first note date: " + e.getMessage());
             }
-        }, "InitFirstNoteDate").start();
+        }, "InitFirstNoteDate");
+        t.setDaemon(true);
+        t.start();
     }
 }

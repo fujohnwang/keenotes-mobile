@@ -91,7 +91,9 @@ public class PendingNoteService {
     public void onNetworkRestored() {
         if (localCache.getPendingNoteCount() > 0) {
             logger.info("Network restored, triggering pending note retry");
-            CompletableFuture.runAsync(this::retryPendingNotes);
+            if (retryScheduler != null && !retryScheduler.isShutdown()) {
+                retryScheduler.submit(this::retryPendingNotes);
+            }
         }
     }
 
@@ -144,6 +146,13 @@ public class PendingNoteService {
     public void shutdown() {
         if (retryScheduler != null && !retryScheduler.isShutdown()) {
             retryScheduler.shutdownNow();
+            try {
+                if (!retryScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                    logger.warning("Pending note retry did not terminate in 5s");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             logger.info("Pending note retry scheduler stopped");
         }
     }

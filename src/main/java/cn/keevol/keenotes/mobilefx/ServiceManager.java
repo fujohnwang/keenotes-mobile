@@ -417,28 +417,28 @@ public class ServiceManager {
     public void shutdown() {
         System.out.println("[ServiceManager] Starting shutdown...");
 
-        // 先关闭WebSocket服务，停止网络连接
+        // 先关闭 PendingNoteService（它会使用 local cache 和 api service，必须先停）
+        if (pendingNoteService != null) {
+            System.out.println("[ServiceManager] Shutting down pending note service...");
+            pendingNoteService.shutdown();
+        }
+
+        // 关闭WebSocket服务，停止网络连接
         if (webSocketService != null) {
             System.out.println("[ServiceManager] Shutting down WebSocket service...");
             webSocketService.shutdown();
         }
 
-        // 关闭本地缓存服务
-        if (localCacheService != null) {
-            System.out.println("[ServiceManager] Closing local cache service...");
-            localCacheService.close();
-        }
-
-        // 关闭API服务（如果需要）
+        // 关闭API服务（释放 OkHttp dispatcher/connection pool）
         if (apiService != null) {
-            // ApiServiceV2 如果有需要关闭的资源，在这里处理
+            apiService.close();
             System.out.println("[ServiceManager] API service shutdown complete");
         }
 
-        // 关闭 PendingNoteService
-        if (pendingNoteService != null) {
-            System.out.println("[ServiceManager] Shutting down pending note service...");
-            pendingNoteService.shutdown();
+        // 最后关闭本地缓存服务（没有任何后台任务再依赖它）
+        if (localCacheService != null) {
+            System.out.println("[ServiceManager] Closing local cache service...");
+            localCacheService.close();
         }
 
         System.out.println("[ServiceManager] All services shutdown complete");

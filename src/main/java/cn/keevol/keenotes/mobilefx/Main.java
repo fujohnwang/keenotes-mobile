@@ -169,9 +169,17 @@ public class Main extends Application {
     public void stop() {
         System.out.println("Application stopping...");
         try {
+            // Dispose UI component listeners (prevents listener leaks on singleton services)
+            if (mainView != null) {
+                mainView.dispose();
+            }
+
             // Stop MCP Server
             cn.keevol.keenotes.mcp.SimpleMcpServer.stop();
-            
+
+            // Stop local import server (shuts down executor + HTTP server)
+            SimpleForwardServer.stop();
+
             // Stop other services
             ServiceManager.getInstance().shutdown();
         } catch (Exception e) {

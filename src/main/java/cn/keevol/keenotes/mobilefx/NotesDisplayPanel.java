@@ -15,6 +15,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.beans.value.ChangeListener;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
@@ -75,14 +76,16 @@ public class NotesDisplayPanel extends VBox {
     private final Set<LocalCacheService.NoteData> resolvedOptimisticNotes = new HashSet<>();
     private final Set<LocalCacheService.NoteData> closedOptimisticNotes = new HashSet<>();
 
+    // Listener references for dispose pattern
+    private final ChangeListener<ThemeService.Theme> themeListener;
+    private final ChangeListener<Number> noteFontSizeListener;
+    private final ChangeListener<String> noteFontFamilyListener;
+    private WebSocketClientService.SyncListener webSocketSyncListener;
+    private WebSocketClientService registeredWebSocketService;
+
     public NotesDisplayPanel() {
         getStyleClass().add("notes-display-panel");
         setSpacing(0);
-
-        // Listen to theme changes
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
-            Platform.runLater(this::updateThemeColors);
-        });
 
         // Fixed header container (stays at top, doesn't scroll)
         fixedHeaderContainer = new VBox();
@@ -115,17 +118,39 @@ public class NotesDisplayPanel extends VBox {
 
         getChildren().addAll(fixedHeaderContainer, listView, statusLabel);
 
-        // Refresh ListView when font changes so VirtualFlow recalculates cell heights
+        // Store listener references for dispose() — font/theme changes trigger listView.refresh()
+        // so NoteCardView.update() reapplies current settings from singletons.
+        themeListener = (obs, oldTheme, newTheme) -> Platform.runLater(() -> {
+            updateThemeColors();
+            listView.refresh();
+        });
+        noteFontSizeListener = (obs, oldVal, newVal) -> Platform.runLater(() -> listView.refresh());
+        noteFontFamilyListener = (obs, oldVal, newVal) -> Platform.runLater(() -> listView.refresh());
+
+        ThemeService.getInstance().currentThemeProperty().addListener(themeListener);
         SettingsService settings = SettingsService.getInstance();
-        settings.noteFontSizeProperty().addListener((obs, oldVal, newVal) -> {
-            Platform.runLater(() -> listView.refresh());
-        });
-        settings.noteFontFamilyProperty().addListener((obs, oldVal, newVal) -> {
-            Platform.runLater(() -> listView.refresh());
-        });
+        settings.noteFontSizeProperty().addListener(noteFontSizeListener);
+        settings.noteFontFamilyProperty().addListener(noteFontFamilyListener);
 
         // Setup WebSocket listener for sync status
         setupSyncStatusListener();
+    }
+
+    /**
+     * Remove all listeners registered on singleton services.
+     * Call when this panel is no longer in use (account switch, window close, etc.)
+     * to prevent listener retention.
+     */
+    public void dispose() {
+        stopDotsAnimation();
+        loadGeneration++; // invalidate any pending Platform.runLater callbacks
+        ThemeService.getInstance().currentThemeProperty().removeListener(themeListener);
+        SettingsService settings = SettingsService.getInstance();
+        settings.noteFontSizeProperty().removeListener(noteFontSizeListener);
+        settings.noteFontFamilyProperty().removeListener(noteFontFamilyListener);
+        if (registeredWebSocketService != null && webSocketSyncListener != null) {
+            registeredWebSocketService.removeListener(webSocketSyncListener);
+        }
     }
 
     /**
@@ -151,7 +176,7 @@ public class NotesDisplayPanel extends VBox {
     private void setupSyncStatusListener() {
         WebSocketClientService webSocketService = ServiceManager.getInstance().getWebSocketService();
 
-        webSocketService.addListener(new WebSocketClientService.SyncListener() {
+        webSocketSyncListener = new WebSocketClientService.SyncListener() {
             @Override
             public void onConnectionStatus(boolean connected) {
                 Platform.runLater(() -> updateSyncChannelStatus(connected));
@@ -191,7 +216,9 @@ public class NotesDisplayPanel extends VBox {
             public void onReconnecting(int attempt, int maxAttempts) {
                 Platform.runLater(() -> showSyncChannelReconnecting(attempt, maxAttempts));
             }
-        });
+        };
+        webSocketService.addListener(webSocketSyncListener);
+        registeredWebSocketService = webSocketService;
 
         // Initial status
         updateSyncChannelStatus(webSocketService.isConnected());
@@ -663,8 +690,8 @@ public class NotesDisplayPanel extends VBox {
      * Show loading state with animated dots
      */
     public void showLoading(String message) {
-        noteItems.clear();
-        renderedRealNoteIds.clear();
+        // Don't clear noteItems — keep old data visible in case loading fails.
+        // displayNotesWithPagination() will clear and repopulate on success.
         listView.setVisible(false);
         listView.setManaged(false);
         fixedHeaderContainer.setVisible(false);
