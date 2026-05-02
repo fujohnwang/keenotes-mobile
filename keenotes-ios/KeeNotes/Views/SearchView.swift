@@ -186,7 +186,7 @@ struct SearchView: View {
 
     private var topHeader: some View {
         TopHeaderView(
-            title: "Search",
+            title: "KeeNotes Search",
             leftButton: .back { dismiss() }
         )
     }
