@@ -46,6 +46,8 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack {
+            Theme.pageBackground(colorScheme).ignoresSafeArea()
+
             NavigationView {
                 ScrollViewReader { scrollProxy in
                 VStack(spacing: 0) {
@@ -261,6 +263,7 @@ struct SettingsView: View {
                     }
                 }
                 } // VStack
+                .background(Theme.pageBackground(colorScheme).ignoresSafeArea())
                 } // ScrollViewReader
             }
             .navigationViewStyle(.stack)
