@@ -41,6 +41,8 @@
     </dict>
     <key>NSMicrophoneUsageDescription</key>
     <string>KeeNotes needs microphone access for voice input to create notes.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>KeeNotes needs permission to save note posters to your photo library.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>KeeNotes needs speech recognition to convert your voice into text notes.</string>
     <key>UIRequiredDeviceCapabilities</key>

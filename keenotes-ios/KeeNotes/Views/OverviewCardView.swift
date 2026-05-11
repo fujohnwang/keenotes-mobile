@@ -60,13 +60,10 @@ struct OverviewCardView: View {
             }
         }
         .onChange(of: appState.databaseService.noteCount) { newCount in
-            print("[OverviewCard] noteCount changed to: \(newCount)")
             // Update first note date whenever note count changes
             if newCount > 0 {
                 Task {
-                    print("[OverviewCard] Querying oldest note date...")
                     if let oldestDate = try? await getOldestNoteDate() {
-                        print("[OverviewCard] Found oldest date: \(oldestDate), updating firstNoteDate")
                         updateFirstNoteDateIfChanged(oldestDate)
                     } else {
                         print("[OverviewCard] Failed to get oldest date")
@@ -75,7 +72,6 @@ struct OverviewCardView: View {
             }
         }
         .onChange(of: appState.settingsService.firstNoteDate) { newValue in
-            print("[OverviewCard] firstNoteDate changed to: \(newValue ?? "nil")")
             // Automatically update days using when firstNoteDate changes
             updateDaysUsing()
         }
@@ -83,13 +79,10 @@ struct OverviewCardView: View {
     
     private func updateDaysUsing() {
         guard let firstDateStr = appState.settingsService.firstNoteDate else {
-            print("[OverviewCard] firstNoteDate is nil, setting daysUsing to 0")
             daysUsing = 0
             return
         }
-        
-        print("[OverviewCard] Calculating days using from: \(firstDateStr)")
-        
+
         // Try multiple date formats to handle both "yyyy-MM-dd HH:mm:ss" and "yyyy-MM-dd'T'HH:mm:ss"
         let formatters = [
             { () -> DateFormatter in
@@ -121,17 +114,13 @@ struct OverviewCardView: View {
             daysUsing = 0
             return
         }
-        
-        print("[OverviewCard] Parsed firstDate: \(firstDate)")
-        
+
         // Calculate days using the same logic as Android/Desktop
         let calendar = Calendar.current
         let firstDateStart = calendar.startOfDay(for: firstDate)
         let todayStart = calendar.startOfDay(for: Date())
         let days = calendar.dateComponents([.day], from: firstDateStart, to: todayStart).day ?? 0
         let calculatedDays = days + 1
-        
-        print("[OverviewCard] Calculated days: \(calculatedDays) (raw: \(days))")
         daysUsing = calculatedDays
     }
     
