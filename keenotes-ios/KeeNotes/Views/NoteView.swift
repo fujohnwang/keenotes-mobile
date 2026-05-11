@@ -67,6 +67,7 @@ struct NoteView: View {
                     ZStack(alignment: .bottom) {
                         TextEditor(text: $appState.noteDraftText)
                             .focused($isTextFieldFocused)
+                            .modifier(TextEditorBackgroundModifier(colorScheme: colorScheme))
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .padding(.top, isPad ? 12 : 8)
                             .padding(.horizontal, isPad ? 16 : 12)
@@ -132,6 +133,7 @@ struct NoteView: View {
                 speechService.stopRecording()
             }
             .navigationBarHidden(true)
+            .background(Theme.pageBackground(colorScheme).ignoresSafeArea())
             .background(
                 Group {
                     NavigationLink(destination: OnThisDayView().environmentObject(appState), isActive: $showingOnThisDay) { EmptyView() }
@@ -215,7 +217,7 @@ struct NoteView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
                     }
-                    .background(Color(.systemBackground))
+                    .background(Theme.pageBackground(colorScheme))
                 }
             }
             .overlay(alignment: .bottomTrailing) {
@@ -422,6 +424,22 @@ struct NoteView: View {
             let locale = Locale(identifier: lang)
             currentKeyboardLocale = locale
             speechService.currentLocale = locale
+        }
+    }
+}
+
+/// Modifier to make TextEditor blend into the unified page background.
+private struct TextEditorBackgroundModifier: ViewModifier {
+    let colorScheme: ColorScheme
+
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content
+                .scrollContentBackground(.hidden)
+                .background(Theme.pageBackground(colorScheme))
+        } else {
+            content
+                .background(Theme.pageBackground(colorScheme))
         }
     }
 }
