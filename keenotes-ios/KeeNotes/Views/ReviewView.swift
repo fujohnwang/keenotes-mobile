@@ -5,6 +5,7 @@ struct ReviewView: View {
     @EnvironmentObject var appState: AppState
     @State private var notes: [Note] = []
     @State private var isLoading = false
+    @State private var isRefreshingNotes = false
     @State private var isLoadingMore = false
     @State private var selectedPeriod = 0  // 0: 7 days, 1: 30 days, 2: 90 days, 3: All
     @State private var totalCount = 0
@@ -210,6 +211,10 @@ struct ReviewView: View {
     }
 
     private func loadNotes() async {
+        guard !isRefreshingNotes else { return }
+        isRefreshingNotes = true
+        defer { isRefreshingNotes = false }
+
         isLoading = true
         hasMoreData = true
         defer { isLoading = false }
@@ -225,7 +230,6 @@ struct ReviewView: View {
                 offset: 0
             )
 
-            print("[ReviewView] Loaded \(loadedNotes.count) of \(totalCount) notes from database")
             await MainActor.run {
                 notes = loadedNotes
                 hasMoreData = notes.count < totalCount
@@ -247,8 +251,6 @@ struct ReviewView: View {
                 limit: pageSize,
                 offset: notes.count
             )
-
-            print("[ReviewView] Loaded \(loadedNotes.count) more notes (total: \(notes.count + loadedNotes.count)/\(totalCount))")
 
             await MainActor.run {
                 notes.append(contentsOf: loadedNotes)

@@ -8,6 +8,7 @@ struct EnlargedNoteView: View {
     @EnvironmentObject var appState: AppState
     
     @State private var showCopiedAlert = false
+    @State private var showSharePoster = false
     @State private var dragOffset: CGFloat = 0
     
     private var isPad: Bool { DeviceType.isPad }
@@ -44,13 +45,25 @@ struct EnlargedNoteView: View {
                 }
                 
                 Spacer()
-                
-                Button(action: onDismiss) {
-                    Image(systemName: "arrow.up.right.and.arrow.down.left")
-                        .font(.system(size: isPad ? 20 : 17))
-                        .foregroundColor(.secondary)
-                        .padding(8)
-                        .contentShape(Rectangle())
+
+                HStack(spacing: 4) {
+                    Button(action: { showSharePoster = true }) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: isPad ? 20 : 17))
+                            .foregroundColor(.secondary)
+                            .padding(8)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onDismiss) {
+                        Image(systemName: "arrow.up.right.and.arrow.down.left")
+                            .font(.system(size: isPad ? 20 : 17))
+                            .foregroundColor(.secondary)
+                            .padding(8)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, cardPadding)
@@ -110,6 +123,14 @@ struct EnlargedNoteView: View {
         .offset(y: dragOffset)
         .simultaneousGesture(dismissDragGesture)
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
+        .fullScreenCover(isPresented: $showSharePoster) {
+            NoteSharePosterOverlay(
+                note: note,
+                formattedDate: formattedDate,
+                hiddenMessage: appState.settingsService.hiddenMessage,
+                onDismiss: { showSharePoster = false }
+            )
+        }
     }
     
     private func copyToClipboard() {
