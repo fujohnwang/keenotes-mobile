@@ -108,6 +108,7 @@ struct NoteRow: View {
             NoteSharePosterOverlay(
                 note: note,
                 formattedDate: formattedDate,
+                posterDate: Theme.formatPosterDate(note.createdAt) ?? formattedDate,
                 hiddenMessage: appState.settingsService.hiddenMessage,
                 onDismiss: { showSharePoster = false }
             )
@@ -248,6 +249,7 @@ class CustomUITextView: UITextView {
 struct NoteSharePosterOverlay: View {
     let note: Note
     let formattedDate: String
+    let posterDate: String
     let hiddenMessage: String
     let onDismiss: () -> Void
 
@@ -311,7 +313,7 @@ struct NoteSharePosterOverlay: View {
                         VStack(spacing: 10) {
                             NoteSharePosterContent(
                                 noteContent: note.content,
-                                formattedDate: formattedDate,
+                                formattedDate: posterDate,
                                 hiddenMessage: hiddenMessage
                             )
                             .frame(width: displayWidth)
@@ -359,7 +361,7 @@ struct NoteSharePosterOverlay: View {
 
         let poster = NoteSharePosterContent(
             noteContent: note.content,
-            formattedDate: formattedDate,
+            formattedDate: posterDate,
             hiddenMessage: hiddenMessage
         )
         .frame(width: posterWidth)
@@ -484,6 +486,8 @@ private struct NoteSharePosterContent: View {
                         .frame(height: 0.5)
 
                     HStack(spacing: 6) {
+                        Spacer(minLength: 0)
+
                         Text(brandText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
