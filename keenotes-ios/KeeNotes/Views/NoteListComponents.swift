@@ -291,7 +291,6 @@ struct NoteSharePosterOverlay: View {
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(.white)
                                 .frame(width: 36, height: 36)
-                                .background(Color.black.opacity(0.35))
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
@@ -302,7 +301,6 @@ struct NoteSharePosterOverlay: View {
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(.white)
                                 .frame(width: 36, height: 36)
-                                .background(Color.black.opacity(0.35))
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
@@ -472,7 +470,7 @@ private struct NoteSharePosterContent: View {
                 VStack(alignment: .leading, spacing: 0) {
                     VStack(alignment: .leading, spacing: 0) {
                         Text(noteContent)
-                            .font(.system(size: contentFontSize, weight: .regular, design: .serif))
+                            .font(.system(size: contentFontSize, weight: .bold, design: .serif))
                             .foregroundColor(Color(red: 0.10, green: 0.095, blue: 0.085))
                             .lineSpacing(contentLineSpacing)
                             .frame(maxWidth: .infinity, alignment: .leading)
