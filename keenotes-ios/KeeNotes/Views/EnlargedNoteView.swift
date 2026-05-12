@@ -127,6 +127,7 @@ struct EnlargedNoteView: View {
             NoteSharePosterOverlay(
                 note: note,
                 formattedDate: formattedDate,
+                posterDate: Theme.formatPosterDate(note.createdAt) ?? formattedDate,
                 hiddenMessage: appState.settingsService.hiddenMessage,
                 onDismiss: { showSharePoster = false }
             )
