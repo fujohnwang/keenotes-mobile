@@ -3,21 +3,22 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
-      - 'V*'
+      - "v*"
+      - "V*"
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., 1.0.0)'
+        description: "Release version (e.g., 1.0.0)"
         required: true
-        default: '1.0.0'
+        default: "1.0.0"
 
 env:
   VERSION: ${{ github.event.inputs.version || github.ref_name }}
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    # runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,20 +41,20 @@ jobs:
       - name: Setup Java 21 # github 更高jdk不支持
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          distribution: "temurin"
+          java-version: "21"
 
       - name: Generate BuildInfo
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          
+
           mkdir -p src/main/java/cn/keevol/keenotes/mobilefx/generated
-          
+
           cat > src/main/java/cn/keevol/keenotes/mobilefx/generated/BuildInfo.java <<EOF
           package cn.keevol.keenotes.mobilefx.generated;
-          
+
           /**
            * Auto-generated build information.
            * DO NOT EDIT - This file is generated during build.
@@ -61,11 +62,11 @@ jobs:
           public final class BuildInfo {
               public static final String VERSION = "$VERSION";
               public static final String BUILD_TIME = "$BUILD_TIME";
-              
+
               private BuildInfo() {}
           }
           EOF
-          
+
           echo "Generated BuildInfo.java with version: $VERSION"
 
       - name: Build JAR
@@ -125,7 +126,6 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN }} # 使用上面配置的Token
           tag_name: ${{ github.ref_name }} # 同步Tag名称
 
-
   build-macos:
     strategy:
       matrix:
@@ -158,19 +158,19 @@ jobs:
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          distribution: "temurin"
+          java-version: "21"
 
       - name: Generate BuildInfo
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          
+
           mkdir -p src/main/java/cn/keevol/keenotes/mobilefx/generated
-          
+
           cat > src/main/java/cn/keevol/keenotes/mobilefx/generated/BuildInfo.java <<EOF
           package cn.keevol.keenotes.mobilefx.generated;
-          
+
           /**
            * Auto-generated build information.
            * DO NOT EDIT - This file is generated during build.
@@ -178,11 +178,11 @@ jobs:
           public final class BuildInfo {
               public static final String VERSION = "$VERSION";
               public static final String BUILD_TIME = "$BUILD_TIME";
-              
+
               private BuildInfo() {}
           }
           EOF
-          
+
           echo "Generated BuildInfo.java with version: $VERSION"
 
       - name: Build JAR for ${{ matrix.arch }}
@@ -203,7 +203,7 @@ jobs:
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          
+
           # Import application signing certificate (Developer ID Application)
           echo "$MACOS_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
           security import $RUNNER_TEMP/certificate.p12 \
@@ -211,7 +211,7 @@ jobs:
             -P "$MACOS_CERTIFICATE_PWD" \
             -T /usr/bin/codesign \
             -T /usr/bin/security
-          
+
           # Import installer signing certificate (Developer ID Installer)
           echo "$MACOS_INSTALLER_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/installer_certificate.p12
           security import $RUNNER_TEMP/installer_certificate.p12 \
@@ -219,11 +219,11 @@ jobs:
             -P "$MACOS_INSTALLER_CERTIFICATE_PWD" \
             -T /usr/bin/productsign \
             -T /usr/bin/security
-          
+
           # Set keychain as default and allow codesign to access it
           security list-keychain -d user -s $KEYCHAIN_PATH
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          
+
           # Verify certificates
           echo "Available signing identities:"
           security find-identity -v -p codesigning $KEYCHAIN_PATH
@@ -257,7 +257,7 @@ jobs:
           else
             SQLITE_ARCH="x86_64"
           fi
-          
+
           jpackage \
             --input target \
             --name "KeeNotes" \
@@ -273,51 +273,51 @@ jobs:
             --java-options "-Xdock:name=KeeNotes" \
             --java-options "-Dorg.sqlite.lib.path=\$APPDIR/../Frameworks" \
             --dest dist
-          
+
           APP_PATH="dist/KeeNotes.app"
           FRAMEWORKS_DIR="$APP_PATH/Contents/Frameworks"
           mkdir -p "$FRAMEWORKS_DIR"
-          
+
           echo "=== Processing Native Libraries ==="
-          
+
           # 获取 Main Jar 的绝对路径
           MAIN_JAR="$(pwd)/$APP_PATH/Contents/app/keenotes-mobile-1.0.0-SNAPSHOT.jar"
           echo "Processing Main JAR: $MAIN_JAR"
-          
+
           # 1. 提取 sqlite jar 到临时文件
           unzip -p "$MAIN_JAR" "BOOT-INF/lib/sqlite-jdbc-*.jar" > sqlite-temp.jar
-          
+
           if [ -s sqlite-temp.jar ]; then
              echo "Found SQLite JDBC jar."
-             
+
              # 2. 提取 dylib 到 Frameworks (供 App 运行时加载)
              unzip -p sqlite-temp.jar "org/sqlite/native/Mac/$SQLITE_ARCH/libsqlitejdbc.dylib" > "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
-             
+
              if [ -s "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
                 echo "  ✓ Extracted libsqlitejdbc.dylib to Frameworks"
-                
+
                 # 3. 【关键】从 sqlite-temp.jar 中彻底删除 Mac native 库
                 # 这一步是为了满足 Apple 公证，因为它们在 jar 里没法签名
                 echo "  Stripping unsigned binaries from sqlite-temp.jar..."
                 zip -d sqlite-temp.jar "org/sqlite/native/Mac/*" 2>/dev/null || true
-                
+
                 # 4. 【核心修复】将处理干净的 jar 塞回 Main Jar
                 # 必须使用 zip -0 (无压缩模式) 更新，否则 Spring Boot 启动会报错
                 SQLITE_INTERNAL_PATH=$(unzip -l "$MAIN_JAR" | grep "sqlite-jdbc-.*\.jar" | awk '{print $4}')
                 echo "  Updating $SQLITE_INTERNAL_PATH inside Main JAR..."
-                
+
                 # 创建对应的目录结构以便 zip 更新
                 TEMP_UPDATE_DIR="update_tmp"
                 mkdir -p "$TEMP_UPDATE_DIR/$(dirname "$SQLITE_INTERNAL_PATH")"
                 mv sqlite-temp.jar "$TEMP_UPDATE_DIR/$SQLITE_INTERNAL_PATH"
-                
+
                 # 进入临时目录执行更新
                 cd "$TEMP_UPDATE_DIR"
                 # -u: 更新, -0: 仅存储(不压缩) -> 这解决了 ClassNotFoundException
                 zip -0 -u "$MAIN_JAR" "$SQLITE_INTERNAL_PATH"
                 cd ..
                 rm -rf "$TEMP_UPDATE_DIR"
-                
+
                 echo "  ✓ Successfully patched Main JAR (Store mode)"
              else
                 echo "  ⚠ Failed to extract dylib (Architecture mismatch?)"
@@ -330,7 +330,7 @@ jobs:
           # 3. 签名流程
           # ==========================================
           echo "=== Signing Binaries ==="
-          
+
           # [关键] 修复 libjli.dylib 软链接
           JLI_REAL="$APP_PATH/Contents/runtime/Contents/Home/lib/libjli.dylib"
           JLI_LINK="$APP_PATH/Contents/runtime/Contents/MacOS/libjli.dylib"
@@ -339,12 +339,12 @@ jobs:
             ln -s "../Home/lib/libjli.dylib" "$JLI_LINK"
             echo "  ✓ Fixed libjli.dylib symlink"
           fi
-          
+
           # 1. 签名 Frameworks (刚才提取出来的 sqlite)
           if [ -f "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
              codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
           fi
-          
+
           # 2. 签名所有 dylib/jnilib (排除 Frameworks)
           find "$APP_PATH/Contents" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
              if [[ "$lib" != *"/Frameworks/"* ]]; then
@@ -352,7 +352,7 @@ jobs:
                  codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
              fi
           done
-          
+
           # 3. 签名 JRE 可执行文件
           find "$APP_PATH/Contents/runtime" -type f -perm +111 | while read exe; do
              if file "$exe" | grep -q "Mach-O"; then
@@ -360,14 +360,14 @@ jobs:
                 codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$exe"
              fi
           done
-          
+
           # 4. 签名主程序和 App Bundle
           echo "Signing Main Executable..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH/Contents/MacOS/KeeNotes"
-          
+
           echo "Signing App Bundle..."
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH"
-          
+
           # 验证
           codesign -vvv --deep --strict "$APP_PATH"
 
@@ -378,18 +378,18 @@ jobs:
           DMG_RW="dist/KeeNotes-rw.dmg"
           DMG_FINAL="dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg"
           SOURCE_DIR="dist/dmg-source"
-          
+
           # Create source directory with app and Applications symlink
           mkdir -p "$SOURCE_DIR"
           cp -R dist/KeeNotes.app "$SOURCE_DIR/"
           ln -s /Applications "$SOURCE_DIR/Applications"
-          
+
           # Create read-write DMG
           hdiutil create -volname "$VOLNAME" -srcfolder "$SOURCE_DIR" -ov -format UDRW "$DMG_RW"
-          
+
           # Mount the DMG
           MOUNT_DIR=$(hdiutil attach "$DMG_RW" | grep Volumes | awk '{print $3}')
-          
+
           # Set window properties and icon positions using AppleScript
           echo '
           tell application "Finder"
@@ -410,21 +410,21 @@ jobs:
             end tell
           end tell
           ' | osascript
-          
+
           # Unmount
           hdiutil detach "$MOUNT_DIR"
-          
+
           # Convert to compressed read-only DMG
           hdiutil convert "$DMG_RW" -format UDZO -o "$DMG_TEMP"
           rm "$DMG_RW"
-          
+
           # Clean up temporary source directory to avoid uploading it
           rm -rf "$SOURCE_DIR"
-          
+
           # Sign DMG
           echo "Signing DMG..."
           codesign --force --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --timestamp "$DMG_TEMP"
-          
+
           mv "$DMG_TEMP" "$DMG_FINAL"
           codesign -vvv "$DMG_FINAL"
 
@@ -444,11 +444,11 @@ jobs:
             --wait \
             --timeout 30m \
             --output-format json)
-          
+
           echo "$SUBMISSION_OUTPUT"
-          
+
           STATUS=$(echo "$SUBMISSION_OUTPUT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-          
+
           if [ "$STATUS" = "Accepted" ]; then
             echo "✅ Notarization successful!"
             xcrun stapler staple dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
@@ -486,7 +486,7 @@ jobs:
       #     else
       #       SQLITE_ARCH="x86_64"
       #     fi
-          
+
       #     # jpackage 命令
       #     # -Dorg.sqlite.lib.path 告诉 SQLite 优先去 Frameworks 找库
       #     jpackage \
@@ -504,27 +504,27 @@ jobs:
       #       --java-options "-Xdock:name=KeeNotes" \
       #       --java-options "-Dorg.sqlite.lib.path=\$APPDIR/../Frameworks" \
       #       --dest dist
-          
+
       #     APP_PATH="dist/KeeNotes.app"
       #     FRAMEWORKS_DIR="$APP_PATH/Contents/Frameworks"
       #     mkdir -p "$FRAMEWORKS_DIR"
-          
+
       #     # ==========================================
       #     # 3. 提取 Native Libraries (只提取，不修改 Jar)
       #     # ==========================================
       #     echo "=== Extracting Native Libraries to Frameworks ==="
-          
+
       #     MAIN_JAR="$APP_PATH/Contents/app/keenotes-mobile-1.0.0-SNAPSHOT.jar"
-          
+
       #     # 使用 unzip 管道提取，不解压整个 Jar，保证 Main Jar 完好无损
       #     # 1. 从 Main Jar 提取 sqlite jar 到 stdout -> 写入 temp jar
       #     unzip -p "$MAIN_JAR" "BOOT-INF/lib/sqlite-jdbc-*.jar" > sqlite-temp.jar
-          
+
       #     if [ -s sqlite-temp.jar ]; then
       #        echo "Found SQLite JDBC jar, extracting dylib..."
       #        # 2. 从 temp jar 提取 dylib 到 Frameworks
       #        unzip -p sqlite-temp.jar "org/sqlite/native/Mac/$SQLITE_ARCH/libsqlitejdbc.dylib" > "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
-             
+
       #        if [ -s "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
       #           echo "  ✓ Extracted libsqlitejdbc.dylib to Frameworks"
       #        else
@@ -539,23 +539,23 @@ jobs:
       #     # 4. 签名流程
       #     # ==========================================
       #     echo "=== Signing Binaries ==="
-          
+
       #     # [关键步骤] 修复 libjli.dylib 结构，防止 Notarization 失败
       #     JLI_REAL="$APP_PATH/Contents/runtime/Contents/Home/lib/libjli.dylib"
       #     JLI_LINK="$APP_PATH/Contents/runtime/Contents/MacOS/libjli.dylib"
-          
+
       #     if [ -f "$JLI_LINK" ]; then
       #       echo "Fixing libjli.dylib structure..."
       #       rm "$JLI_LINK"
       #       ln -s "../Home/lib/libjli.dylib" "$JLI_LINK"
       #       echo "  ✓ Replaced MacOS/libjli.dylib with symlink"
       #     fi
-          
+
       #     # 1. 签名 Frameworks (刚才提取出来的 sqlite)
       #     if [ -f "$FRAMEWORKS_DIR/libsqlitejdbc.dylib" ]; then
       #        codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$FRAMEWORKS_DIR/libsqlitejdbc.dylib"
       #     fi
-          
+
       #     # 2. 签名 App 内的所有 .dylib 和 .jnilib (JRE 自带的)
       #     # 使用 -type f 忽略我们刚才建立的软链接
       #     find "$APP_PATH/Contents" -type f \( -name "*.dylib" -o -name "*.jnilib" \) | while read lib; do
@@ -564,7 +564,7 @@ jobs:
       #            codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime "$lib"
       #        fi
       #     done
-          
+
       #     # 3. 签名 JRE 的可执行文件
       #     find "$APP_PATH/Contents/runtime" -type f -perm +111 | while read exe; do
       #        if file "$exe" | grep -q "Mach-O"; then
@@ -572,15 +572,15 @@ jobs:
       #           codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$exe"
       #        fi
       #     done
-          
+
       #     # 4. 签名主启动器
       #     echo "Signing Main Executable..."
       #     codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH/Contents/MacOS/KeeNotes"
-          
+
       #     # 5. 签名整个 App Bundle (不加 --deep)
       #     echo "Signing App Bundle..."
       #     codesign --force --sign "$MACOS_SIGNING_IDENTITY" --timestamp --options runtime --entitlements entitlements.plist "$APP_PATH"
-          
+
       #     # 验证
       #     codesign -vvv --deep --strict "$APP_PATH"
 
@@ -589,14 +589,14 @@ jobs:
       #     VOLNAME="KeeNotes"
       #     DMG_TEMP="dist/KeeNotes-temp.dmg"
       #     DMG_FINAL="dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg"
-          
+
       #     # 创建 DMG
       #     hdiutil create -volname "$VOLNAME" -srcfolder dist/KeeNotes.app -ov -format UDZO "$DMG_TEMP"
-          
+
       #     # 签名 DMG (Notarization 需要)
       #     echo "Signing DMG..."
       #     codesign --force --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" --timestamp "$DMG_TEMP"
-          
+
       #     mv "$DMG_TEMP" "$DMG_FINAL"
       #     codesign -vvv "$DMG_FINAL"
 
@@ -609,7 +609,7 @@ jobs:
       #     APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
       #   run: |
       #     echo "Submitting DMG for notarization..."
-          
+
       #     # Submit for notarization
       #     SUBMISSION_OUTPUT=$(xcrun notarytool submit dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg \
       #       --apple-id "$APPLE_ID" \
@@ -618,32 +618,32 @@ jobs:
       #       --wait \
       #       --timeout 30m \
       #       --output-format json)
-          
+
       #     echo "$SUBMISSION_OUTPUT"
-          
+
       #     # Check if notarization was successful
       #     STATUS=$(echo "$SUBMISSION_OUTPUT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-          
+
       #     if [ "$STATUS" = "Accepted" ]; then
       #       echo "✅ Notarization successful!"
-            
+
       #       # Staple the notarization ticket to the DMG
       #       echo "Stapling notarization ticket..."
       #       xcrun stapler staple dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
-            
+
       #       # Verify stapling
       #       xcrun stapler validate dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg
-            
+
       #       # Final verification with spctl (should pass now after notarization)
       #       echo "Verifying Gatekeeper acceptance..."
       #       hdiutil attach dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.dmg -nobrowse -mountpoint /Volumes/KeeNotes
       #       spctl -a -vvv -t install /Volumes/KeeNotes/KeeNotes.app
       #       hdiutil detach /Volumes/KeeNotes
-            
+
       #       echo "notarized=true" >> $GITHUB_OUTPUT
       #     else
       #       echo "❌ Notarization failed with status: $STATUS"
-            
+
       #       # Get submission ID for debugging
       #       SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
       #       if [ -n "$SUBMISSION_ID" ]; then
@@ -653,7 +653,7 @@ jobs:
       #           --password "$APPLE_PASSWORD" \
       #           --team-id "$APPLE_TEAM_ID"
       #       fi
-            
+
       #       exit 1
       #     fi
 
@@ -673,10 +673,10 @@ jobs:
       #       --mac-sign \
       #       --mac-signing-key-user-name "$MACOS_INSTALLER_IDENTITY" \
       #       --dest dist
-          
+
       #     # Rename PKG to include platform suffix
       #     mv dist/KeeNotes-${{ steps.version.outputs.app_version }}.pkg dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
-          
+
       #     # Verify PKG signature
       #     echo "Verifying PKG signature..."
       #     pkgutil --check-signature dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
@@ -690,7 +690,7 @@ jobs:
       #     APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
       #   run: |
       #     echo "Submitting PKG for notarization..."
-          
+
       #     # Submit for notarization
       #     SUBMISSION_OUTPUT=$(xcrun notarytool submit dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg \
       #       --apple-id "$APPLE_ID" \
@@ -699,30 +699,30 @@ jobs:
       #       --wait \
       #       --timeout 30m \
       #       --output-format json)
-          
+
       #     echo "$SUBMISSION_OUTPUT"
-          
+
       #     # Check if notarization was successful
       #     STATUS=$(echo "$SUBMISSION_OUTPUT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-          
+
       #     if [ "$STATUS" = "Accepted" ]; then
       #       echo "✅ Notarization successful!"
-            
+
       #       # Staple the notarization ticket to the PKG
       #       echo "Stapling notarization ticket..."
       #       xcrun stapler staple dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
-            
+
       #       # Verify stapling
       #       xcrun stapler validate dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
-            
+
       #       # Final verification with spctl
       #       echo "Verifying Gatekeeper acceptance..."
       #       spctl -a -vvv -t install dist/KeeNotes-${{ matrix.name-suffix }}-${{ steps.version.outputs.version }}.pkg
-            
+
       #       echo "notarized=true" >> $GITHUB_OUTPUT
       #     else
       #       echo "❌ Notarization failed with status: $STATUS"
-            
+
       #       # Get submission ID for debugging
       #       SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
       #       if [ -n "$SUBMISSION_ID" ]; then
@@ -732,7 +732,7 @@ jobs:
       #           --password "$APPLE_PASSWORD" \
       #           --team-id "$APPLE_TEAM_ID"
       #       fi
-            
+
       #       exit 1
       #     fi
 
@@ -748,13 +748,13 @@ jobs:
           echo "| Item | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Code Signing | ✅ Enabled |" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ "$DMG_NOTARIZED" = "true" ]; then
             echo "| DMG Notarization | ✅ Success |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| DMG Notarization | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [ "$PKG_NOTARIZED" = "true" ]; then
             echo "| PKG Notarization | ✅ Success |" >> $GITHUB_STEP_SUMMARY
           else
@@ -812,19 +812,19 @@ jobs:
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          distribution: "temurin"
+          java-version: "21"
 
       - name: Generate BuildInfo
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          
+
           mkdir -p src/main/java/cn/keevol/keenotes/mobilefx/generated
-          
+
           cat > src/main/java/cn/keevol/keenotes/mobilefx/generated/BuildInfo.java <<EOF
           package cn.keevol.keenotes.mobilefx.generated;
-          
+
           /**
            * Auto-generated build information.
            * DO NOT EDIT - This file is generated during build.
@@ -832,11 +832,11 @@ jobs:
           public final class BuildInfo {
               public static final String VERSION = "$VERSION";
               public static final String BUILD_TIME = "$BUILD_TIME";
-              
+
               private BuildInfo() {}
           }
           EOF
-          
+
           echo "Generated BuildInfo.java with version: $VERSION"
 
       - name: Build JAR
@@ -887,7 +887,6 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN }} # 使用上面配置的Token
           tag_name: ${{ github.ref_name }} # 同步Tag名称
 
-
   build-android:
     runs-on: ubuntu-latest
     steps:
@@ -911,8 +910,8 @@ jobs:
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: "temurin"
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -920,7 +919,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.13'
+          gradle-version: "8.13"
 
       # Decode keystore from secrets
       - name: Decode Keystore
@@ -1069,11 +1068,11 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           VERSION="${VERSION#V}"
           RELEASE_URL="https://github.com/fujohnwang/keenotes-releases/releases/tag/${{ github.ref_name }}"
-          
+
           echo "Updating version info: $VERSION"
           curl -X POST https://kns.afoo.me/version/latest \
             -H "Authorization: Bearer ${{ secrets.KNS_ADMIN_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d "{\"version\":\"$VERSION\",\"url\":\"$RELEASE_URL\"}"
-          
+
           echo "Version info updated successfully"
