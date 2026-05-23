@@ -2,14 +2,15 @@ name: Desktop Build
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
   pull_request:
-    branches: [ master, main ]
+    branches: [master, main]
   workflow_dispatch:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    # runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,8 +18,8 @@ jobs:
       - name: Setup Java 21 # github 更高jdk不支持
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          distribution: "temurin"
+          java-version: "21"
 
       - name: Build JAR
         shell: bash
@@ -76,7 +77,7 @@ jobs:
           - arch: mac
             name-suffix: Intel
             runner: macos-15-intel
-          - arch: mac-aarch64  
+          - arch: mac-aarch64
             name-suffix: AppleSilicon
             runner: macos-latest
     runs-on: ${{ matrix.runner }}
@@ -87,8 +88,8 @@ jobs:
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          distribution: "temurin"
+          java-version: "21"
 
       - name: Build JAR for ${{ matrix.arch }}
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=${{ matrix.arch }}"
@@ -110,22 +111,22 @@ jobs:
             --java-options "-Xdock:name=KeeNotes" \
             --dest dist
           mv dist/KeeNotes-1.0.0.dmg dist/KeeNotes-${{ matrix.name-suffix }}-1.0.0.dmg
-          
+
           # Create installation instructions for unsigned builds
           cat > dist/INSTALL-MACOS.txt << 'EOF'
           KeeNotes for macOS - Installation Instructions
           ===============================================
-          
+
           This is an unsigned development build for testing purposes.
-          
+
           If you see "KeeNotes.app is damaged" error, run this command in Terminal:
-          
+
               xattr -cr /Applications/KeeNotes.app
-          
+
           Or right-click the app and select "Open" (first time only).
-          
+
           This is safe - the app is open source and built from GitHub Actions.
-          
+
           For signed releases, please download from the Releases page.
           EOF
 
@@ -169,8 +170,8 @@ jobs:
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
+          distribution: "temurin"
+          java-version: "21"
 
       - name: Build JAR
         run: mvn clean package -Pdesktop -DskipTests "-Djavafx.platform=linux"
