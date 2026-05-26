@@ -284,24 +284,28 @@ struct NoteSharePosterOverlay: View {
                     .onTapGesture(perform: onDismiss)
 
                 VStack(spacing: 18) {
-                    HStack {
+                    HStack(spacing: 12) {
                         Spacer()
                         Button(action: savePoster) {
-                            Image(systemName: "arrow.down.circle")
-                                .font(.system(size: 15, weight: .semibold))
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
+                                .frame(width: 44, height: 44)
+                                .background(Color.white.opacity(0.2))
                                 .clipShape(Circle())
+                                .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
                         .disabled(isSaving)
 
                         Button(action: onDismiss) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .semibold))
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
+                                .frame(width: 44, height: 44)
+                                .background(Color.white.opacity(0.2))
                                 .clipShape(Circle())
+                                .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
                     }
