@@ -255,8 +255,11 @@ struct NoteSharePosterOverlay: View {
 
     @StateObject private var imageSaver = PosterImageSaver()
     @State private var isSaving = false
+    @State private var isExportingVideo = false
 
     private let posterWidth: CGFloat = 390
+
+    private var isBusy: Bool { isSaving || isExportingVideo }
 
     private func posterPreviewWidth(for geometry: GeometryProxy) -> CGFloat {
         let candidate = geometry.size.width - 40
@@ -296,7 +299,19 @@ struct NoteSharePosterOverlay: View {
                                 .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
-                        .disabled(isSaving)
+                        .disabled(isBusy)
+
+                        Button(action: saveVideo) {
+                            Image(systemName: "video.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.white.opacity(0.2))
+                                .clipShape(Circle())
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isBusy)
 
                         Button(action: onDismiss) {
                             Image(systemName: "xmark.circle.fill")
@@ -344,7 +359,7 @@ struct NoteSharePosterOverlay: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
-                if isSaving {
+                if isBusy {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .padding(18)
@@ -358,40 +373,54 @@ struct NoteSharePosterOverlay: View {
 
     @MainActor
     private func savePoster() {
-        guard !isSaving else { return }
+        guard !isBusy else { return }
         isSaving = true
 
-        let poster = NoteSharePosterContent(
+        guard let image = PosterShareRenderer.renderPosterImage(
             noteContent: note.content,
-            formattedDate: posterDate,
-            hiddenMessage: hiddenMessage
-        )
-        .frame(width: posterWidth)
-        .fixedSize(horizontal: false, vertical: true)
-
-        let image: UIImage?
-        if #available(iOS 16.0, *) {
-            let renderer = ImageRenderer(content: poster)
-            renderer.scale = UIScreen.main.scale
-            renderer.proposedSize = ProposedViewSize(width: posterWidth, height: nil)
-            image = renderer.uiImage
-        } else {
-            image = PosterRenderer.render(view: poster, width: posterWidth)
-        }
-
-        if let image {
-            imageSaver.save(image.opaquePosterImage()) {
-                isSaving = false
-            }
-        } else {
+            posterDate: posterDate,
+            hiddenMessage: hiddenMessage,
+            width: posterWidth
+        ) else {
             imageSaver.showMessage("Save failed")
             isSaving = false
+            return
+        }
+
+        imageSaver.save(image) {
+            isSaving = false
+        }
+    }
+
+    private func saveVideo() {
+        guard !isBusy else { return }
+        isExportingVideo = true
+
+        Task {
+            defer { isExportingVideo = false }
+
+            guard let image = PosterShareRenderer.renderPosterImage(
+                noteContent: note.content,
+                posterDate: posterDate,
+                hiddenMessage: hiddenMessage,
+                width: posterWidth
+            ) else {
+                imageSaver.showMessage("Save failed")
+                return
+            }
+
+            do {
+                try await PosterVideoExporter.exportAndSaveToPhotos(posterImage: image)
+                imageSaver.showMessage("Saved video to Photos")
+            } catch {
+                imageSaver.showMessage("Video export failed")
+            }
         }
     }
 }
 
 /// Poster image content. Keep this view self-contained so it can be rendered to UIImage.
-private struct NoteSharePosterContent: View {
+struct NoteSharePosterContent: View {
     let noteContent: String
     let formattedDate: String
     let hiddenMessage: String
@@ -581,45 +610,6 @@ private final class PosterImageSaver: NSObject, ObservableObject {
             self.showMessage(self.lastSaveSucceeded ? "Saved to Photos" : "Save failed")
             self.completion?()
             self.completion = nil
-        }
-    }
-}
-
-private enum PosterRenderer {
-    @MainActor
-    static func render<Content: View>(view: Content, width: CGFloat) -> UIImage {
-        let controller = UIHostingController(rootView: view)
-        let renderView = controller.view!
-        renderView.bounds = CGRect(x: 0, y: 0, width: width, height: 10_000)
-        renderView.backgroundColor = .clear
-        renderView.setNeedsLayout()
-        renderView.layoutIfNeeded()
-
-        let measuredHeight = renderView.sizeThatFits(
-            CGSize(width: width, height: .greatestFiniteMagnitude)
-        ).height
-        let size = CGSize(width: width, height: max(measuredHeight, 1))
-        renderView.bounds = CGRect(origin: .zero, size: size)
-        renderView.setNeedsLayout()
-        renderView.layoutIfNeeded()
-
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { _ in
-            renderView.drawHierarchy(in: renderView.bounds, afterScreenUpdates: true)
-        }
-    }
-}
-
-private extension UIImage {
-    func opaquePosterImage() -> UIImage {
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = scale
-        format.opaque = true
-
-        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            UIColor.white.setFill()
-            UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
-            draw(in: CGRect(origin: .zero, size: size))
         }
     }
 }

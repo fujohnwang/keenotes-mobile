@@ -33,17 +33,24 @@
 		946E8578E0A828A727191C99 /* ApiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CCFBB1C4E585233C8949042 /* ApiService.swift */; };
 		9E1AA8C7DADD4E82A4D437BC /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87901956656FA3E18B94F424 /* ReviewView.swift */; };
 		A1B2C3D4E5F6071829304A5B /* WizardStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A6978081920A3B /* WizardStep.swift */; };
+		A1B2C3D4E5F60718293EF12 /* LoopLepr.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293EF11 /* LoopLepr.mp3 */; };
+		A1B2C3D4E5F60718293EF14 /* Win Battle.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293EF13 /* Win Battle.mp3 */; };
+		A1B2C3D4E5F60718293EF16 /* Defend Castle.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293EF15 /* Defend Castle.mp3 */; };
 		A1C2D3E4F5A6B7C8D9E0F124 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C2D3E4F5A6B7C8D9E0F125 /* KeychainService.swift */; };
 		B2C3D4E5F6A7182930415C6D /* WizardCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D3C4B5A6978081920B4C5E /* WizardCard.swift */; };
 		B3C4D5E6F7A8293041526E8B /* WizardInlineCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D4C5B6A7980819210C6F9C /* WizardInlineCard.swift */; };
+		B4C5D6E7F8091A2B3C4D5E7 /* PosterShareRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C5D6E7F8091A2B3C4D5E6 /* PosterShareRenderer.swift */; };
 		BB1B2C3D4E5F60718293AB02 /* SpeechRecognitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F60718293AB01 /* SpeechRecognitionService.swift */; };
 		C0AE7EC02E4C49132B40A4A0 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 149970AB595EDA07A0940B31 /* GRDB */; };
 		C3D4E5F6A7B8293041526D7F /* OnboardingWizardOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */; };
+		C5D6E7F8091A2B3C4D5E6F8 /* PosterVideoComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5D6E7F8091A2B3C4D5E6F7 /* PosterVideoComposer.swift */; };
 		CC1B2C3D4E5F60718293AB03 /* PendingNoteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1B2C3D4E5F60718293AB04 /* PendingNoteService.swift */; };
+		D6E7F8091A2B3C4D5E6F709 /* PosterVideoExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E7F8091A2B3C4D5E6F708 /* PosterVideoExporter.swift */; };
 		DA5DD2A22882D996C37B27EF /* argon2.c in Sources */ = {isa = PBXBuildFile; fileRef = 6D467341E90F4D144FCEC974 /* argon2.c */; };
 		E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC48816DBEEFEE56707E5302 /* NoteView.swift */; };
 		E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9040A9739D8D0416CE13A31 /* MainTabView.swift */; };
 		E641EC093049E5F7E4D0D094 /* ref.c in Sources */ = {isa = PBXBuildFile; fileRef = 9946B1EE523C44AB196C6446 /* ref.c */; };
+		E7F8091A2B3C4D5E6F7081A /* PosterBGM.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F8091A2B3C4D5E6F70819 /* PosterBGM.swift */; };
 		F1A2B3C4D5E6F70819203456 /* FloatingDockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F70819203457 /* FloatingDockView.swift */; };
 		F1A2B3C4D5E6F7081929304B /* OnThisDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3B4C5D6E7F8091A2B3C4D /* OnThisDayView.swift */; };
 		FBDF52C9E3B0CF6AFF1CAF1A /* KeeNotesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D8A3032850BEA6F1E1698E /* KeeNotesApp.swift */; };
@@ -76,24 +83,31 @@
 		87901956656FA3E18B94F424 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
 		8E07C8BA817350735F9023F6 /* blamka-round-opt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blamka-round-opt.h"; sourceTree = "<group>"; };
 		9946B1EE523C44AB196C6446 /* ref.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ref.c; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293EF11 /* LoopLepr.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = LoopLepr.mp3; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293EF13 /* Win Battle.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Win Battle.mp3"; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293EF15 /* Defend Castle.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Defend Castle.mp3"; sourceTree = "<group>"; };
 		A1C2D3E4F5A6B7C8D9E0F125 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		A9040A9739D8D0416CE13A31 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		AA1B2C3D4E5F60718293AB01 /* SpeechRecognitionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognitionService.swift; sourceTree = "<group>"; };
+		B4C5D6E7F8091A2B3C4D5E6 /* PosterShareRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterShareRenderer.swift; sourceTree = "<group>"; };
 		B5515BAE55139991A54308D6 /* KeeNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KeeNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC48816DBEEFEE56707E5302 /* NoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteView.swift; sourceTree = "<group>"; };
 		C41FB2074330D7D199860EB8 /* encoding.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = encoding.h; sourceTree = "<group>"; };
+		C5D6E7F8091A2B3C4D5E6F7 /* PosterVideoComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterVideoComposer.swift; sourceTree = "<group>"; };
 		CD8A13501AA7A7CAB9DD2D6B /* encoding.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = encoding.c; sourceTree = "<group>"; };
 		CEED188D3B81AF7268E2D579 /* blake2b.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = blake2b.c; sourceTree = "<group>"; };
 		D1DA3D7B9EC0F4278F1C8070 /* argon2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = argon2.h; sourceTree = "<group>"; };
 		D34FAB7AB6D6F412B2AD704B /* KeeNotes-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "KeeNotes-Bridging-Header.h"; sourceTree = "<group>"; };
 		D3C4B5A6978081920C5D6E8A /* OnboardingWizardOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWizardOverlay.swift; sourceTree = "<group>"; };
 		D6B16CD3673E6F843DF0CC2C /* blake2-impl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blake2-impl.h"; sourceTree = "<group>"; };
+		D6E7F8091A2B3C4D5E6F708 /* PosterVideoExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterVideoExporter.swift; sourceTree = "<group>"; };
 		DD1B2C3D4E5F60718293AB04 /* PendingNoteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingNoteService.swift; sourceTree = "<group>"; };
 		DF16E09CF759358B4C94BCBD /* DeviceType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceType.swift; sourceTree = "<group>"; };
 		DFE252BFDC15087E4D34EB51 /* WebSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketService.swift; sourceTree = "<group>"; };
 		E2D3C4B5A6978081920B4C5E /* WizardCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardCard.swift; sourceTree = "<group>"; };
 		E3D4C5B6A7980819210C6F9C /* WizardInlineCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardInlineCard.swift; sourceTree = "<group>"; };
 		E71854385AA7C1EECC7F20F2 /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
+		E7F8091A2B3C4D5E6F70819 /* PosterBGM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterBGM.swift; sourceTree = "<group>"; };
 		EAA89252DC520456A6A43EEC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		EC56614EF00CDBBE7B740F99 /* SettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsService.swift; sourceTree = "<group>"; };
 		EF27F1ADF86A469C5DA5CDCE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -158,6 +172,7 @@
 			isa = PBXGroup;
 			children = (
 				EAA89252DC520456A6A43EEC /* Assets.xcassets */,
+				F8091A2B3C4D5E6F708192A /* PosterBGM */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -198,6 +213,10 @@
 				516619C5BAA926CB01F4B456 /* DatabaseService.swift */,
 				A1C2D3E4F5A6B7C8D9E0F125 /* KeychainService.swift */,
 				DD1B2C3D4E5F60718293AB04 /* PendingNoteService.swift */,
+				E7F8091A2B3C4D5E6F70819 /* PosterBGM.swift */,
+				B4C5D6E7F8091A2B3C4D5E6 /* PosterShareRenderer.swift */,
+				C5D6E7F8091A2B3C4D5E6F7 /* PosterVideoComposer.swift */,
+				D6E7F8091A2B3C4D5E6F708 /* PosterVideoExporter.swift */,
 				EC56614EF00CDBBE7B740F99 /* SettingsService.swift */,
 				AA1B2C3D4E5F60718293AB01 /* SpeechRecognitionService.swift */,
 				DFE252BFDC15087E4D34EB51 /* WebSocketService.swift */,
@@ -240,6 +259,16 @@
 				EF27F1ADF86A469C5DA5CDCE /* Theme.swift */,
 			);
 			path = Utils;
+			sourceTree = "<group>";
+		};
+		F8091A2B3C4D5E6F708192A /* PosterBGM */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60718293EF11 /* LoopLepr.mp3 */,
+				A1B2C3D4E5F60718293EF13 /* Win Battle.mp3 */,
+				A1B2C3D4E5F60718293EF15 /* Defend Castle.mp3 */,
+			);
+			path = PosterBGM;
 			sourceTree = "<group>";
 		};
 		FEBE91F7B35D8EFFF38E18D9 /* Products */ = {
@@ -309,6 +338,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				41F5062EB8A1F683E01EC160 /* Assets.xcassets in Resources */,
+				A1B2C3D4E5F60718293EF12 /* LoopLepr.mp3 in Resources */,
+				A1B2C3D4E5F60718293EF14 /* Win Battle.mp3 in Resources */,
+				A1B2C3D4E5F60718293EF16 /* Defend Castle.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -338,6 +370,10 @@
 				1C2D3E4F5A6B7C8D9E0F1021 /* NoteListComponents.swift in Sources */,
 				E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */,
 				CC1B2C3D4E5F60718293AB03 /* PendingNoteService.swift in Sources */,
+				E7F8091A2B3C4D5E6F7081A /* PosterBGM.swift in Sources */,
+				B4C5D6E7F8091A2B3C4D5E7 /* PosterShareRenderer.swift in Sources */,
+				C5D6E7F8091A2B3C4D5E6F8 /* PosterVideoComposer.swift in Sources */,
+				D6E7F8091A2B3C4D5E6F709 /* PosterVideoExporter.swift in Sources */,
 				C3D4E5F6A7B8293041526D7F /* OnboardingWizardOverlay.swift in Sources */,
 				F1A2B3C4D5E6F7081929304B /* OnThisDayView.swift in Sources */,
 				1FFF7BD4F1D6ED72F2E2FA18 /* OverviewCardView.swift in Sources */,
@@ -445,7 +481,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.7.14;
+				MARKETING_VERSION = 1.7.15;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
@@ -469,7 +505,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.7.14;
+				MARKETING_VERSION = 1.7.15;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
