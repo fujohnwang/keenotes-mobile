@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.util.logging.Logger;
 
 /**
@@ -68,6 +69,7 @@ public class NotesDisplayPanel extends VBox {
     // Generation counter: prevents stale background thread callbacks from modifying
     // UI
     private int loadGeneration = 0;
+    private volatile Future<?> dbLoadFuture;
 
     // Optimistic card tracking
     private LocalCacheService.NoteData optimisticNoteData = null;
@@ -143,6 +145,7 @@ public class NotesDisplayPanel extends VBox {
      */
     public void dispose() {
         stopDotsAnimation();
+        cancelDbLoad();
         loadGeneration++; // invalidate any pending Platform.runLater callbacks
         ThemeService.getInstance().currentThemeProperty().removeListener(themeListener);
         SettingsService settings = SettingsService.getInstance();
@@ -176,6 +179,8 @@ public class NotesDisplayPanel extends VBox {
     private void setupSyncStatusListener() {
         WebSocketClientService webSocketService = ServiceManager.getInstance().getWebSocketService();
 
+        // Sync progress indicator is driven by MainContentArea for the visible panel only.
+        // This listener only updates the long-lived Sync Channel status in the header.
         webSocketSyncListener = new WebSocketClientService.SyncListener() {
             @Override
             public void onConnectionStatus(boolean connected) {
@@ -184,27 +189,22 @@ public class NotesDisplayPanel extends VBox {
 
             @Override
             public void onSyncProgress(int current, int total) {
-                Platform.runLater(() -> showSyncIndicator("Syncing..."));
+                // handled centrally by MainContentArea
             }
 
             @Override
             public void onSyncComplete(int total, long lastSyncId) {
-                Platform.runLater(() -> hideSyncIndicator());
+                // handled centrally by MainContentArea
             }
 
             @Override
             public void onRealtimeUpdate(long id, String content) {
-                Platform.runLater(() -> {
-                    showSyncIndicator("Syncing...");
-                    PauseTransition hideDelay = new PauseTransition(Duration.millis(500));
-                    hideDelay.setOnFinished(e -> hideSyncIndicator());
-                    hideDelay.play();
-                });
+                // handled centrally by MainContentArea
             }
 
             @Override
             public void onError(String error) {
-                Platform.runLater(() -> hideSyncIndicator());
+                // handled centrally by MainContentArea
             }
 
             @Override
@@ -389,6 +389,7 @@ public class NotesDisplayPanel extends VBox {
 
     public void displayNotesWithPagination(int totalCount, LocalCacheService localCache, int days, String periodInfo,
             java.util.function.Consumer<java.util.List<LocalCacheService.NoteData>> noteLoadCallback) {
+        cancelDbLoad();
         stopDotsAnimation();
         noteItems.clear();
         renderedRealNoteIds.clear();
@@ -429,7 +430,8 @@ public class NotesDisplayPanel extends VBox {
     private void loadInitialNotesFromDb(int retryAttempt) {
         final int gen = loadGeneration;
         final int currentRetryAttempt = retryAttempt;
-        new Thread(() -> {
+        cancelDbLoad();
+        dbLoadFuture = AppExecutors.submitUiDb(() -> {
             try {
                 logger.info("loadInitialNotesFromDb start: gen=" + gen
                         + ", retryAttempt=" + currentRetryAttempt
@@ -441,50 +443,61 @@ public class NotesDisplayPanel extends VBox {
                 } else {
                     notes = localCache.getNotesPaged(0, 20);
                 }
-
-                logger.info("loadInitialNotesFromDb: loaded " + notes.size()
-                        + " notes from DB (totalNoteCount=" + totalNoteCount + ")");
-
-                Platform.runLater(() -> {
-                    if (gen != loadGeneration) {
-                        logger.info("loadInitialNotesFromDb: stale generation, skipping"
-                                + " (gen=" + gen + ", current=" + loadGeneration + ")");
-                        return;
-                    }
-
-                    if (noteLoadCallback != null) {
-                        noteLoadCallback.accept(notes);
-                    }
-
-                    if (totalNoteCount > 0 && notes.isEmpty()) {
-                        logger.warning("loadInitialNotesFromDb mismatch: totalNoteCount=" + totalNoteCount
-                                + ", loaded=0, retryAttempt=" + currentRetryAttempt
-                                + ", useTruePagination=" + useTruePagination
-                                + ", loadedFromDbCount=" + loadedFromDbCount);
-                        if (currentRetryAttempt == 0) {
-                            // One-shot retry to recover from transient DB/connection issues
-                            // without leaving users in a blank list state.
-                            logger.warning("loadInitialNotesFromDb scheduling one-shot retry");
-                            loadInitialNotesFromDb(1);
-                            return;
-                        }
-                        showError("Failed to load notes from cache. Please retry.");
-                        return;
-                    }
-
-                    appendUniqueNotes(notes);
-                    loadedFromDbCount = notes.size();
-
-                    logger.info("loadInitialNotesFromDb: rendered " + notes.size()
-                            + " notes via ListView, noteItems.size=" + noteItems.size());
-                });
+                if (Thread.currentThread().isInterrupted() || gen != loadGeneration) {
+                    return null;
+                }
+                Platform.runLater(() -> applyInitialNotesFromDb(gen, currentRetryAttempt, notes));
             } catch (Exception e) {
-                logger.severe("loadInitialNotesFromDb ERROR (retryAttempt="
-                        + currentRetryAttempt + "): " + e.getMessage());
-                e.printStackTrace();
-                Platform.runLater(() -> showError("Error loading notes: " + e.getMessage()));
+                if (!Thread.currentThread().isInterrupted() && gen == loadGeneration) {
+                    Platform.runLater(() -> {
+                        logger.severe("loadInitialNotesFromDb ERROR (retryAttempt="
+                                + currentRetryAttempt + "): " + e.getMessage());
+                        showError("Error loading notes: " + e.getMessage());
+                    });
+                }
             }
-        }, "LoadInitialNotes-" + currentRetryAttempt).start();
+            return null;
+        });
+    }
+
+    private void applyInitialNotesFromDb(int gen, int currentRetryAttempt, List<LocalCacheService.NoteData> notes) {
+        if (gen != loadGeneration) {
+            logger.info("loadInitialNotesFromDb: stale generation, skipping"
+                    + " (gen=" + gen + ", current=" + loadGeneration + ")");
+            return;
+        }
+
+        logger.info("loadInitialNotesFromDb: loaded " + notes.size()
+                + " notes from DB (totalNoteCount=" + totalNoteCount + ")");
+
+        if (noteLoadCallback != null) {
+            noteLoadCallback.accept(notes);
+        }
+
+        if (totalNoteCount > 0 && notes.isEmpty()) {
+            logger.warning("loadInitialNotesFromDb mismatch: totalNoteCount=" + totalNoteCount
+                    + ", loaded=0, retryAttempt=" + currentRetryAttempt);
+            if (currentRetryAttempt == 0) {
+                logger.warning("loadInitialNotesFromDb scheduling one-shot retry");
+                loadInitialNotesFromDb(1);
+                return;
+            }
+            showError("Failed to load notes from cache. Please retry.");
+            return;
+        }
+
+        appendUniqueNotes(notes);
+        loadedFromDbCount = notes.size();
+        logger.info("loadInitialNotesFromDb: rendered " + notes.size()
+                + " notes via ListView, noteItems.size=" + noteItems.size());
+    }
+
+    private void cancelDbLoad() {
+        Future<?> future = dbLoadFuture;
+        if (future != null) {
+            future.cancel(true);
+            dbLoadFuture = null;
+        }
     }
 
     /**
@@ -526,26 +539,28 @@ public class NotesDisplayPanel extends VBox {
 
         isLoadingMore = true;
         final int gen = loadGeneration;
+        final int offset = loadedFromDbCount;
 
-        new Thread(() -> {
+        AppExecutors.submitUiDb(() -> {
             try {
                 List<LocalCacheService.NoteData> notes;
                 if (reviewDays > 0) {
-                    notes = localCache.getNotesForReviewPaged(reviewDays, loadedFromDbCount, 10);
+                    notes = localCache.getNotesForReviewPaged(reviewDays, offset, 10);
                 } else {
-                    notes = localCache.getNotesPaged(loadedFromDbCount, 10);
+                    notes = localCache.getNotesPaged(offset, 10);
                 }
-
+                if (Thread.currentThread().isInterrupted() || gen != loadGeneration) {
+                    Platform.runLater(() -> isLoadingMore = false);
+                    return null;
+                }
                 Platform.runLater(() -> {
                     if (gen != loadGeneration) {
                         isLoadingMore = false;
                         return;
                     }
-
                     if (noteLoadCallback != null) {
                         noteLoadCallback.accept(notes);
                     }
-
                     appendUniqueNotes(notes);
                     loadedFromDbCount += notes.size();
                     isLoadingMore = false;
@@ -553,7 +568,8 @@ public class NotesDisplayPanel extends VBox {
             } catch (Exception e) {
                 Platform.runLater(() -> isLoadingMore = false);
             }
-        }, "LoadMoreNotes").start();
+            return null;
+        });
     }
 
     // ===== Note operations =====

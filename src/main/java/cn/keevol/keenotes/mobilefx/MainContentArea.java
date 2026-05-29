@@ -4,7 +4,6 @@ import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.value.ChangeListener;
-import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -14,6 +13,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
@@ -23,6 +23,14 @@ import java.util.logging.Logger;
 public class MainContentArea extends StackPane {
 
     private static final Logger logger = AppLogger.getLogger(MainContentArea.class);
+
+    private static final String SLOT_RECENT = "recent";
+    private static final String SLOT_REVIEW = "review";
+    private static final String SLOT_SEARCH = "search";
+    private static final String SLOT_ON_THIS_DAY = "on-this-day";
+    private static final String SLOT_PENDING = "pending";
+
+    private static final long REVIEW_LOAD_DEBOUNCE_MS = 250;
 
     // Mode panels
     private VBox noteModePanel;
@@ -74,6 +82,10 @@ public class MainContentArea extends StackPane {
     private HBox pendingBanner;
     private Label pendingLabel;
     private boolean showingPendingList = false;
+
+    private final UiLoadCoordinator uiLoads = new UiLoadCoordinator();
+    private final FxCoalescer syncIndicatorShowCoalescer = new FxCoalescer();
+    private final FxCoalescer syncIndicatorHideCoalescer = new FxCoalescer();
 
     public MainContentArea() {
         getStyleClass().add("main-content-area");
@@ -143,59 +155,28 @@ public class MainContentArea extends StackPane {
 
             @Override
             public void onSyncProgress(int current, int total) {
-                // Show sync indicator on all NotesDisplayPanel instances
-                Platform.runLater(() -> {
-                    if (currentPanel == noteModePanel && notesDisplayPanel != null) {
-                        notesDisplayPanel.showSyncIndicator("Syncing...");
-                    }
-                    if (currentPanel == reviewModePanel && reviewNotesPanel != null) {
-                        reviewNotesPanel.showSyncIndicator("Syncing...");
-                    }
-                    // Search results panel doesn't need sync indicator (it's for manual search)
-                });
+                coalescedShowSyncIndicator("Syncing...");
             }
 
             @Override
             public void onSyncComplete(int total, long lastSyncId) {
-                // Hide sync indicator; the UI refresh is triggered by a single
-                // LocalCache batch notification after all sync writes have drained.
-                Platform.runLater(() -> {
-                    if (notesDisplayPanel != null) {
-                        notesDisplayPanel.hideSyncIndicator();
-                    }
-                    if (reviewNotesPanel != null) {
-                        reviewNotesPanel.hideSyncIndicator();
-                    }
-                });
+                coalescedHideSyncIndicator();
             }
 
             @Override
             public void onRealtimeUpdate(long id, String content) {
-                // Realtime update - UI will be updated via LocalCacheService listener
-                // Show brief sync indicator for realtime updates
+                coalescedShowSyncIndicator("Syncing...");
                 Platform.runLater(() -> {
-                    if (currentPanel == noteModePanel && notesDisplayPanel != null) {
-                        notesDisplayPanel.showSyncIndicator("Syncing...");
-                        // Hide after short delay (same as NotesDisplayPanel's own listener)
-                        javafx.animation.PauseTransition hideDelay = new javafx.animation.PauseTransition(
-                                javafx.util.Duration.millis(500));
-                        hideDelay.setOnFinished(e -> notesDisplayPanel.hideSyncIndicator());
-                        hideDelay.play();
-                    }
+                    javafx.animation.PauseTransition hideDelay = new javafx.animation.PauseTransition(
+                            javafx.util.Duration.millis(500));
+                    hideDelay.setOnFinished(e -> coalescedHideSyncIndicator());
+                    hideDelay.play();
                 });
             }
 
             @Override
             public void onError(String error) {
-                // Hide sync indicator on error
-                Platform.runLater(() -> {
-                    if (notesDisplayPanel != null) {
-                        notesDisplayPanel.hideSyncIndicator();
-                    }
-                    if (reviewNotesPanel != null) {
-                        reviewNotesPanel.hideSyncIndicator();
-                    }
-                });
+                coalescedHideSyncIndicator();
             }
         };
         webSocketService.addListener(webSocketSyncListener);
@@ -305,6 +286,8 @@ public class MainContentArea extends StackPane {
      * Call when this component is no longer in use.
      */
     public void dispose() {
+        uiLoads.cancelAll();
+        uiLoads.shutdown();
         ServiceManager.getInstance().accountSwitchedProperty().removeListener(accountSwitchedListener);
         ServiceManager.getInstance().removeListener(serviceStatusListener);
         if (registeredWebSocketService != null && webSocketSyncListener != null) {
@@ -439,81 +422,58 @@ public class MainContentArea extends StackPane {
     }
 
     /**
-     * Load review notes for a specific period
+     * Load review notes for a specific period (debounced to coalesce rapid period clicks).
      */
     public void loadReviewNotes(String period) {
+        uiLoads.debounce(SLOT_REVIEW, REVIEW_LOAD_DEBOUNCE_MS, () -> loadReviewNotesNow(period));
+    }
+
+    private void loadReviewNotesNow(String period) {
         logger.info("loadReviewNotes called with period: " + period);
         currentReviewPeriod = period;
-        Platform.runLater(() -> reviewNotesPanel.showLoading("Loading notes"));
+        reviewNotesPanel.showLoading("Loading notes");
 
-        new Thread(() -> {
-            try {
-                ServiceManager serviceManager = ServiceManager.getInstance();
-                ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
+        uiLoads.submit(SLOT_REVIEW, () -> loadReviewData(period), this::applyReviewLoadResult,
+                e -> reviewNotesPanel.showError("Error loading notes: " + e.getMessage()));
+    }
 
-                if (state == ServiceManager.InitializationState.READY) {
-                    localCache = serviceManager.getLocalCacheService();
+    private ReviewLoadResult loadReviewData(String period) {
+        ServiceManager serviceManager = ServiceManager.getInstance();
+        ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
+        if (state != ServiceManager.InitializationState.READY) {
+            return new ReviewLoadResult(state, serviceManager.getLocalCacheErrorMessage(), period, 0, 0, null);
+        }
 
-                    int days = switch (period) {
-                        case "30 days" -> 30;
-                        case "90 days" -> 90;
-                        case "All" -> 3650; // 10 years
-                        default -> 7;
-                    };
+        LocalCacheService cache = serviceManager.getLocalCacheService();
+        int days = reviewPeriodToDays(period);
+        logger.info("Loading notes for " + days + " days");
+        int totalCount = cache.getNotesCountForReview(days);
+        String periodInfo = reviewPeriodToInfo(period);
+        logger.info("Period info: " + periodInfo + ", notes count: " + totalCount);
+        return new ReviewLoadResult(state, null, period, days, totalCount, periodInfo);
+    }
 
-                    logger.info("Loading notes for " + days + " days");
-
-                    int totalCount = localCache.getNotesCountForReview(days);
-
-                    // Format period info for display
-                    String periodInfo = switch (period) {
-                        case "7 days" -> "Last 7 days";
-                        case "30 days" -> "Last 30 days";
-                        case "90 days" -> "Last 90 days";
-                        case "All" -> "All time";
-                        default -> "Last 7 days";
-                    };
-
-                    logger.info("Period info: " + periodInfo + ", notes count: " + totalCount);
-
-                    Platform.runLater(() -> {
-                        if (totalCount == 0) {
-                            reviewNotesPanel.showEmptyState("No notes found for " + period);
-                        } else {
-                            reviewNotesPanel.displayNotesWithPagination(totalCount, localCache, days, periodInfo);
-                        }
-                    });
-                } else if (state == ServiceManager.InitializationState.INITIALIZING) {
-                    Platform.runLater(() -> reviewNotesPanel.showLoading("Cache is initializing"));
-                    // Retry after delay
-                    new Thread(() -> {
-                        try {
-                            Thread.sleep(2000);
-                            loadReviewNotes(period);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }).start();
-                } else if (state == ServiceManager.InitializationState.ERROR) {
-                    String errorMsg = serviceManager.getLocalCacheErrorMessage();
-                    Platform.runLater(() -> reviewNotesPanel.showError("Cache error: " + errorMsg));
-                } else {
-                    // NOT_STARTED - trigger initialization
-                    Platform.runLater(() -> reviewNotesPanel.showLoading("Initializing cache"));
-                    serviceManager.getLocalCacheService();
-                    new Thread(() -> {
-                        try {
-                            Thread.sleep(1000);
-                            loadReviewNotes(period);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }).start();
-                }
-            } catch (Exception e) {
-                Platform.runLater(() -> reviewNotesPanel.showError("Error loading notes: " + e.getMessage()));
+    private void applyReviewLoadResult(ReviewLoadResult result) {
+        if (result.state == ServiceManager.InitializationState.READY) {
+            localCache = ServiceManager.getInstance().getLocalCacheService();
+            if (result.totalCount == 0) {
+                reviewNotesPanel.showEmptyState("No notes found for " + result.period);
+            } else {
+                reviewNotesPanel.displayNotesWithPagination(
+                        result.totalCount, localCache, result.days, result.periodInfo);
             }
-        }).start();
+            return;
+        }
+        if (result.state == ServiceManager.InitializationState.INITIALIZING) {
+            reviewNotesPanel.showLoading("Cache is initializing");
+            uiLoads.scheduleDelayed(SLOT_REVIEW + "-retry", 2000, () -> loadReviewNotesNow(result.period));
+        } else if (result.state == ServiceManager.InitializationState.ERROR) {
+            reviewNotesPanel.showError("Cache error: " + result.errorMessage);
+        } else {
+            reviewNotesPanel.showLoading("Initializing cache");
+            ServiceManager.getInstance().getLocalCacheService();
+            uiLoads.scheduleDelayed(SLOT_REVIEW + "-retry", 1000, () -> loadReviewNotesNow(result.period));
+        }
     }
 
     public void loadOnThisDayNotes() {
@@ -522,81 +482,52 @@ public class MainContentArea extends StackPane {
         }
 
         if (!SettingsService.getInstance().getShowOnThisDayInYearsPast()) {
-            Platform.runLater(() -> onThisDayNotesPanel.showEmptyState("On This Day is turned off in Settings."));
+            onThisDayNotesPanel.showEmptyState("On This Day is turned off in Settings.");
             return;
         }
 
-        Platform.runLater(() -> onThisDayNotesPanel.showLoading("Loading notes"));
+        onThisDayNotesPanel.showLoading("Loading notes");
+        uiLoads.submit(SLOT_ON_THIS_DAY, this::loadOnThisDayData, this::applyOnThisDayLoadResult,
+                e -> onThisDayNotesPanel.showError("Error loading On This Day notes: " + e.getMessage()));
+    }
 
+    private OnThisDayLoadResult loadOnThisDayData() {
         ServiceManager serviceManager = ServiceManager.getInstance();
         ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
-
-        if (state == ServiceManager.InitializationState.INITIALIZING) {
-            Platform.runLater(() -> onThisDayNotesPanel.showLoading("Cache is initializing"));
-            new Thread(() -> {
-                try {
-                    Thread.sleep(2000);
-                    loadOnThisDayNotes();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }, "RetryOnThisDayInit").start();
-            return;
+        if (state != ServiceManager.InitializationState.READY) {
+            return new OnThisDayLoadResult(state, serviceManager.getLocalCacheErrorMessage(), null);
         }
-
-        if (state == ServiceManager.InitializationState.ERROR) {
-            String errorMsg = serviceManager.getLocalCacheErrorMessage();
-            Platform.runLater(() -> onThisDayNotesPanel.showError("Cache error: " + errorMsg));
-            return;
+        LocalCacheService cache = serviceManager.getLocalCacheService();
+        if (cache == null) {
+            return new OnThisDayLoadResult(ServiceManager.InitializationState.ERROR,
+                    "Cache unavailable", null);
         }
+        return new OnThisDayLoadResult(state, null, cache.getNotesOnThisDay());
+    }
 
-        if (state == ServiceManager.InitializationState.NOT_STARTED) {
-            Platform.runLater(() -> onThisDayNotesPanel.showLoading("Initializing cache"));
-            serviceManager.getLocalCacheService();
-            new Thread(() -> {
-                try {
-                    Thread.sleep(1000);
-                    loadOnThisDayNotes();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }, "RetryOnThisDayStart").start();
-            return;
-        }
-
-        Task<java.util.List<LocalCacheService.NoteData>> task = new Task<>() {
-            @Override
-            protected java.util.List<LocalCacheService.NoteData> call() {
-                localCache = serviceManager.getLocalCacheService();
-                if (localCache == null) {
-                    return null;
-                }
-
-                return localCache.getNotesOnThisDay();
-            }
-        };
-
-        task.setOnSucceeded(event -> {
-            java.util.List<LocalCacheService.NoteData> notes = task.getValue();
-
+    private void applyOnThisDayLoadResult(OnThisDayLoadResult result) {
+        if (result.state == ServiceManager.InitializationState.READY) {
+            localCache = ServiceManager.getInstance().getLocalCacheService();
+            List<LocalCacheService.NoteData> notes = result.notes;
             if (notes == null) {
                 onThisDayNotesPanel.showError("On This Day notes are unavailable");
-                return;
-            }
-
-            if (notes.isEmpty()) {
+            } else if (notes.isEmpty()) {
                 onThisDayNotesPanel.showEmptyState("No notes from this day in past years yet.");
             } else {
                 onThisDayNotesPanel.displayNotes(notes, "From past years");
             }
-        });
-
-        task.setOnFailed(event -> onThisDayNotesPanel.showError(
-                "Error loading On This Day notes: " + task.getException().getMessage()));
-
-        Thread thread = new Thread(task, "LoadOnThisDayNotes");
-        thread.setDaemon(true);
-        thread.start();
+            return;
+        }
+        if (result.state == ServiceManager.InitializationState.INITIALIZING) {
+            onThisDayNotesPanel.showLoading("Cache is initializing");
+            uiLoads.scheduleDelayed(SLOT_ON_THIS_DAY + "-retry", 2000, this::loadOnThisDayNotes);
+        } else if (result.state == ServiceManager.InitializationState.ERROR) {
+            onThisDayNotesPanel.showError("Cache error: " + result.errorMessage);
+        } else {
+            onThisDayNotesPanel.showLoading("Initializing cache");
+            ServiceManager.getInstance().getLocalCacheService();
+            uiLoads.scheduleDelayed(SLOT_ON_THIS_DAY + "-retry", 1000, this::loadOnThisDayNotes);
+        }
     }
 
     /**
@@ -625,60 +556,46 @@ public class MainContentArea extends StackPane {
      */
     private void handleSearch(String query) {
         if (query == null || query.trim().isEmpty()) {
-            // Clear results without showing any text
-            Platform.runLater(() -> searchResultsPanel.clear());
+            searchResultsPanel.clear();
             return;
         }
 
-        Platform.runLater(() -> searchResultsPanel.showLoading("Searching"));
+        final String trimmedQuery = query.trim();
+        searchResultsPanel.showLoading("Searching");
+        uiLoads.submit(SLOT_SEARCH, () -> loadSearchData(trimmedQuery), result -> applySearchLoadResult(trimmedQuery, result),
+                e -> searchResultsPanel.showError("Error searching notes: " + e.getMessage()));
+    }
 
-        new Thread(() -> {
-            try {
-                ServiceManager serviceManager = ServiceManager.getInstance();
-                ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
+    private SearchLoadResult loadSearchData(String query) {
+        ServiceManager serviceManager = ServiceManager.getInstance();
+        ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
+        if (state != ServiceManager.InitializationState.READY) {
+            return new SearchLoadResult(state, serviceManager.getLocalCacheErrorMessage(), List.of());
+        }
+        LocalCacheService cache = serviceManager.getLocalCacheService();
+        return new SearchLoadResult(state, null, cache.searchNotes(query));
+    }
 
-                if (state == ServiceManager.InitializationState.READY) {
-                    localCache = serviceManager.getLocalCacheService();
-                    var results = localCache.searchNotes(query);
-
-                    Platform.runLater(() -> {
-                        if (results.isEmpty()) {
-                            searchResultsPanel.showEmptyState("No results found for \"" + query + "\"");
-                        } else {
-                            searchResultsPanel.displayNotes(results);
-                        }
-                    });
-                } else if (state == ServiceManager.InitializationState.INITIALIZING) {
-                    Platform.runLater(() -> searchResultsPanel.showLoading("Cache is initializing"));
-                    // Retry after delay
-                    new Thread(() -> {
-                        try {
-                            Thread.sleep(2000);
-                            handleSearch(query);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }).start();
-                } else if (state == ServiceManager.InitializationState.ERROR) {
-                    String errorMsg = serviceManager.getLocalCacheErrorMessage();
-                    Platform.runLater(() -> searchResultsPanel.showError("Cache error: " + errorMsg));
-                } else {
-                    // NOT_STARTED - trigger initialization
-                    Platform.runLater(() -> searchResultsPanel.showLoading("Initializing cache"));
-                    serviceManager.getLocalCacheService();
-                    new Thread(() -> {
-                        try {
-                            Thread.sleep(1000);
-                            handleSearch(query);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }).start();
-                }
-            } catch (Exception e) {
-                Platform.runLater(() -> searchResultsPanel.showError("Error searching notes: " + e.getMessage()));
+    private void applySearchLoadResult(String query, SearchLoadResult result) {
+        if (result.state == ServiceManager.InitializationState.READY) {
+            localCache = ServiceManager.getInstance().getLocalCacheService();
+            if (result.notes.isEmpty()) {
+                searchResultsPanel.showEmptyState("No results found for \"" + query + "\"");
+            } else {
+                searchResultsPanel.displayNotes(result.notes);
             }
-        }).start();
+            return;
+        }
+        if (result.state == ServiceManager.InitializationState.INITIALIZING) {
+            searchResultsPanel.showLoading("Cache is initializing");
+            uiLoads.scheduleDelayed(SLOT_SEARCH + "-retry", 2000, () -> handleSearch(query));
+        } else if (result.state == ServiceManager.InitializationState.ERROR) {
+            searchResultsPanel.showError("Cache error: " + result.errorMessage);
+        } else {
+            searchResultsPanel.showLoading("Initializing cache");
+            ServiceManager.getInstance().getLocalCacheService();
+            uiLoads.scheduleDelayed(SLOT_SEARCH + "-retry", 1000, () -> handleSearch(query));
+        }
     }
 
     /**
@@ -789,41 +706,45 @@ public class MainContentArea extends StackPane {
             noteModePanel.getChildren().set(idx, pendingListView);
         }
 
-        // 在后台线程读取 pending notes（避免 dbLock 阻塞 FX 线程）
-        new Thread(() -> {
-            java.util.List<LocalCacheService.PendingNoteData> pendingNotes = ServiceManager.getInstance()
-                    .getPendingNoteService().getPendingNotes();
+        uiLoads.submit(SLOT_PENDING,
+                () -> ServiceManager.getInstance().getPendingNoteService().getPendingNotes(),
+                pendingNotes -> renderPendingNotesList(pendingListView, loadingLabel, pendingNotes),
+                e -> Platform.runLater(() -> {
+                    pendingListView.getChildren().remove(loadingLabel);
+                    Label errorLabel = new Label("Error loading pending notes: " + e.getMessage());
+                    errorLabel.getStyleClass().addAll("status-label", "error");
+                    pendingListView.getChildren().add(errorLabel);
+                }));
+    }
 
-            Platform.runLater(() -> {
-                // 移除 loading label
-                pendingListView.getChildren().remove(loadingLabel);
+    private void renderPendingNotesList(VBox pendingListView, Label loadingLabel,
+            List<LocalCacheService.PendingNoteData> pendingNotes) {
+        pendingListView.getChildren().remove(loadingLabel);
 
-                if (pendingNotes.isEmpty()) {
-                    Label emptyLabel = new Label("No pending notes");
-                    emptyLabel.getStyleClass().add("search-loading");
-                    pendingListView.getChildren().add(emptyLabel);
-                } else {
-                    javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane();
-                    scrollPane.setFitToWidth(true);
-                    scrollPane.getStyleClass().add("content-scroll");
-                    VBox.setVgrow(scrollPane, Priority.ALWAYS);
+        if (pendingNotes.isEmpty()) {
+            Label emptyLabel = new Label("No pending notes");
+            emptyLabel.getStyleClass().add("search-loading");
+            pendingListView.getChildren().add(emptyLabel);
+            return;
+        }
 
-                    VBox cardsContainer = new VBox(12);
-                    cardsContainer.setPadding(new Insets(8, 0, 8, 0));
-                    cardsContainer.getStyleClass().add("notes-container");
+        javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane();
+        scrollPane.setFitToWidth(true);
+        scrollPane.getStyleClass().add("content-scroll");
+        VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
-                    for (LocalCacheService.PendingNoteData note : pendingNotes) {
-                        // 转换为 NoteData，复用 NoteCardView
-                        LocalCacheService.NoteData noteData = new LocalCacheService.NoteData(
-                                note.id, note.content, note.channel, note.createdAt, null);
-                        cardsContainer.getChildren().add(new NoteCardView(noteData));
-                    }
+        VBox cardsContainer = new VBox(12);
+        cardsContainer.setPadding(new Insets(8, 0, 8, 0));
+        cardsContainer.getStyleClass().add("notes-container");
 
-                    scrollPane.setContent(cardsContainer);
-                    pendingListView.getChildren().add(scrollPane);
-                }
-            });
-        }, "LoadPendingNotes").start();
+        for (LocalCacheService.PendingNoteData note : pendingNotes) {
+            LocalCacheService.NoteData noteData = new LocalCacheService.NoteData(
+                    note.id, note.content, note.channel, note.createdAt, null);
+            cardsContainer.getChildren().add(new NoteCardView(noteData));
+        }
+
+        scrollPane.setContent(cardsContainer);
+        pendingListView.getChildren().add(scrollPane);
     }
 
     /**
@@ -921,55 +842,48 @@ public class MainContentArea extends StackPane {
      * Global initialization is handled separately by ServiceManager
      */
     private void loadRecentNotes() {
-        Platform.runLater(() -> notesDisplayPanel.showLoading("Loading recent notes"));
+        notesDisplayPanel.showLoading("Loading recent notes");
+        uiLoads.submit(SLOT_RECENT, this::loadRecentNotesData, this::applyRecentNotesLoadResult,
+                e -> notesDisplayPanel.showError("Error loading notes: " + e.getMessage()));
+    }
 
-        new Thread(() -> {
-            try {
-                ServiceManager serviceManager = ServiceManager.getInstance();
-                localCache = serviceManager.getLocalCacheService();
+    private RecentNotesLoadResult loadRecentNotesData() {
+        ServiceManager serviceManager = ServiceManager.getInstance();
+        LocalCacheService cache = serviceManager.getLocalCacheService();
+        if (cache == null || !cache.isInitialized()) {
+            logger.warning("loadRecentNotes: cache not ready (localCache="
+                    + (cache == null ? "null" : "notNull") + ")");
+            return new RecentNotesLoadResult(false, 0, cache);
+        }
+        int totalCount = cache.getLocalNoteCount();
+        logger.info("loadRecentNotes: totalCount=" + totalCount);
+        return new RecentNotesLoadResult(true, totalCount, cache);
+    }
 
-                // If cache not ready yet, show empty state (global init will handle it)
-                if (localCache == null || !localCache.isInitialized()) {
-                    logger.warning("loadRecentNotes: cache not ready (localCache="
-                            + (localCache == null ? "null" : "notNull") + ", initialized="
-                            + (localCache != null && localCache.isInitialized()) + ")");
-                    Platform.runLater(() -> {
-                        notesDisplayPanel.showEmptyState("Waiting for data sync...");
+    private void applyRecentNotesLoadResult(RecentNotesLoadResult result) {
+        if (!result.cacheReady) {
+            notesDisplayPanel.showEmptyState("Waiting for data sync...");
+            return;
+        }
+
+        localCache = result.cache;
+        registerLocalCacheListener();
+        displayedNoteIds.clear();
+
+        if (result.totalCount == 0) {
+            notesDisplayPanel.showEmptyState("No notes found");
+        } else {
+            notesDisplayPanel.displayNotesWithPagination(result.totalCount, localCache, 0, null,
+                    notes -> {
+                        for (var note : notes) {
+                            displayedNoteIds.add(note.id);
+                        }
                     });
-                    return;
-                }
-
-                // Register change listener if not already registered
-                Platform.runLater(this::registerLocalCacheListener);
-
-                int totalCount = localCache.getLocalNoteCount();
-                logger.info("loadRecentNotes: totalCount=" + totalCount);
-
-                // Track displayed note IDs for incremental updates
-                displayedNoteIds.clear();
-
-                Platform.runLater(() -> {
-                    if (totalCount == 0) {
-                        notesDisplayPanel.showEmptyState("No notes found");
-                    } else {
-                        notesDisplayPanel.displayNotesWithPagination(totalCount, localCache, 0, null,
-                                (notes) -> {
-                                    // Callback: track loaded note IDs
-                                    for (var note : notes) {
-                                        displayedNoteIds.add(note.id);
-                                    }
-                                });
-                    }
-                    logger.info("Note list loaded with " + totalCount + " total notes, tracking "
-                            + displayedNoteIds.size() + " IDs"
-                            + ", noteModePanel.opacity=" + noteModePanel.getOpacity()
-                            + ", noteModePanel.visible=" + noteModePanel.isVisible());
-                });
-            } catch (Exception e) {
-                e.printStackTrace();
-                Platform.runLater(() -> notesDisplayPanel.showError("Error loading notes: " + e.getMessage()));
-            }
-        }).start();
+        }
+        logger.info("Note list loaded with " + result.totalCount + " total notes, tracking "
+                + displayedNoteIds.size() + " IDs"
+                + ", noteModePanel.opacity=" + noteModePanel.getOpacity()
+                + ", noteModePanel.visible=" + noteModePanel.isVisible());
     }
 
     /**
@@ -1082,5 +996,112 @@ public class MainContentArea extends StackPane {
      */
     public SettingsView getSettingsView() {
         return settingsView;
+    }
+
+    private NotesDisplayPanel visibleNotesPanelForSync() {
+        if (currentPanel == noteModePanel) {
+            return notesDisplayPanel;
+        }
+        if (currentPanel == reviewModePanel) {
+            return reviewNotesPanel;
+        }
+        if (currentPanel == onThisDayModePanel) {
+            return onThisDayNotesPanel;
+        }
+        return null;
+    }
+
+    private void coalescedShowSyncIndicator(String message) {
+        syncIndicatorShowCoalescer.runLater(() -> {
+            NotesDisplayPanel panel = visibleNotesPanelForSync();
+            if (panel != null) {
+                panel.showSyncIndicator(message);
+            }
+        });
+    }
+
+    private void coalescedHideSyncIndicator() {
+        syncIndicatorHideCoalescer.runLater(() -> {
+            NotesDisplayPanel panel = visibleNotesPanelForSync();
+            if (panel != null) {
+                panel.hideSyncIndicator();
+            }
+        });
+    }
+
+    private static int reviewPeriodToDays(String period) {
+        return switch (period) {
+            case "30 days" -> 30;
+            case "90 days" -> 90;
+            case "All" -> 3650;
+            default -> 7;
+        };
+    }
+
+    private static String reviewPeriodToInfo(String period) {
+        return switch (period) {
+            case "7 days" -> "Last 7 days";
+            case "30 days" -> "Last 30 days";
+            case "90 days" -> "Last 90 days";
+            case "All" -> "All time";
+            default -> "Last 7 days";
+        };
+    }
+
+    private static final class ReviewLoadResult {
+        final ServiceManager.InitializationState state;
+        final String errorMessage;
+        final String period;
+        final int days;
+        final int totalCount;
+        final String periodInfo;
+
+        ReviewLoadResult(ServiceManager.InitializationState state, String errorMessage, String period,
+                int days, int totalCount, String periodInfo) {
+            this.state = state;
+            this.errorMessage = errorMessage;
+            this.period = period;
+            this.days = days;
+            this.totalCount = totalCount;
+            this.periodInfo = periodInfo;
+        }
+    }
+
+    private static final class OnThisDayLoadResult {
+        final ServiceManager.InitializationState state;
+        final String errorMessage;
+        final List<LocalCacheService.NoteData> notes;
+
+        OnThisDayLoadResult(ServiceManager.InitializationState state, String errorMessage,
+                List<LocalCacheService.NoteData> notes) {
+            this.state = state;
+            this.errorMessage = errorMessage;
+            this.notes = notes;
+        }
+    }
+
+    private static final class SearchLoadResult {
+        final ServiceManager.InitializationState state;
+        final String errorMessage;
+        final List<LocalCacheService.NoteData> notes;
+
+        SearchLoadResult(ServiceManager.InitializationState state, String errorMessage,
+                List<LocalCacheService.NoteData> notes) {
+            this.state = state;
+            this.errorMessage = errorMessage;
+            this.notes = notes;
+        }
+    }
+
+    private static final class RecentNotesLoadResult {
+        final boolean cacheReady;
+        final int totalCount;
+        final LocalCacheService cache;
+
+        RecentNotesLoadResult(boolean cacheReady, int totalCount, LocalCacheService cache) {
+            this.cacheReady = cacheReady;
+            this.totalCount = totalCount;
+            this.cache = cache;
+        }
     }
 }
