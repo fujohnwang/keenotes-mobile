@@ -55,6 +55,9 @@ public class NoteCardView extends StackPane {
 
     // Precise horizontal inset: contentArea.width - viewport.width, calibrated after skin loads
     private double horizontalInset = FALLBACK_TEXT_HORIZONTAL_PADDING;
+    private boolean widthCalibrated = false;
+    private boolean internalTextListenerAttached = false;
+    private boolean viewportWidthListenerAttached = false;
 
     public NoteCardView(LocalCacheService.NoteData noteData) {
         this.noteData = noteData;
@@ -104,18 +107,15 @@ public class NoteCardView extends StackPane {
         contentArea.setScrollTop(0);
         contentArea.setScrollLeft(0);
         contentArea.skinProperty().addListener((obs, oldSkin, newSkin) -> {
-            javafx.application.Platform.runLater(() -> {
-                calibrateHorizontalInset();
-                setupInternalTextListener();
-                setupViewportWidthListener();
-                hideScrollBars();
-            });
+            if (newSkin != null) {
+                javafx.application.Platform.runLater(this::requestLayoutRefresh);
+            }
         });
 
         // Create hidden Text node for height measurement (fallback before skin loads)
         textMeasure = new Text();
         textMeasure.setFont(Font.font(fontFamily, fontSize));
-        textMeasure.setWrappingWidth(500); // Will be calibrated once skin loads
+        textMeasure.setWrappingWidth(0);
         textMeasure.textProperty().bind(contentArea.textProperty());
 
         // Reactive: textMeasure layoutBounds change → update height
@@ -123,15 +123,25 @@ public class NoteCardView extends StackPane {
             updateContentAreaHeight();
         });
 
-        // Reactive: contentArea width change → sync textMeasure wrappingWidth (synchronous path)
-        // Also flush CSS+layout on the entire card so internal Text node re-wraps in the same frame
-        // (this is exactly what hover's setStyle() triggers on the NoteCardView subtree)
+        // Reactive: contentArea width change → recalibrate wrapping width and relayout
         contentArea.widthProperty().addListener((obs, oldWidth, newWidth) -> {
             double w = newWidth.doubleValue();
             if (w > 0 && Math.abs(w - oldWidth.doubleValue()) > 0.5) {
-                syncTextMeasureWrappingWidth(w);
-                this.applyCss();
-                this.layout();
+                requestLayoutRefresh();
+            }
+        });
+
+        // Card width is available only after ListView lays out the cell
+        widthProperty().addListener((obs, oldWidth, newWidth) -> {
+            double w = newWidth.doubleValue();
+            if (w > 0 && Math.abs(w - oldWidth.doubleValue()) > 0.5) {
+                javafx.application.Platform.runLater(this::requestLayoutRefresh);
+            }
+        });
+
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                javafx.application.Platform.runLater(this::requestLayoutRefresh);
             }
         });
 
@@ -219,6 +229,24 @@ public class NoteCardView extends StackPane {
     }
 
     /**
+     * Recalibrate text wrapping and relayout the card subtree.
+     * Mirrors the layout flush that hover's setStyle() used to trigger implicitly.
+     */
+    private void requestLayoutRefresh() {
+        calibrateHorizontalInset();
+        setupInternalTextListener();
+        setupViewportWidthListener();
+        hideScrollBars();
+        double w = contentArea.getWidth();
+        if (w > 0) {
+            syncTextMeasureWrappingWidth(w);
+        }
+        applyCss();
+        layout();
+        updateContentAreaHeight();
+    }
+
+    /**
      * Calibrate the precise horizontal inset by measuring the difference between
      * contentArea width and viewport width. Called once after skin loads.
      */
@@ -243,6 +271,7 @@ public class NoteCardView extends StackPane {
         double wrappingWidth = Math.max(0, contentAreaWidth - horizontalInset);
         if (wrappingWidth > 0 && Math.abs(textMeasure.getWrappingWidth() - wrappingWidth) > 0.5) {
             textMeasure.setWrappingWidth(wrappingWidth);
+            widthCalibrated = true;
         }
     }
 
@@ -251,14 +280,20 @@ public class NoteCardView extends StackPane {
      * Viewport width is the ground truth for text wrapping.
      */
     private void setupViewportWidthListener() {
+        if (viewportWidthListenerAttached) {
+            return;
+        }
         javafx.scene.Node viewportNode = contentArea.lookup(".scroll-pane .viewport");
         if (viewportNode instanceof Region viewportRegion) {
             viewportRegion.widthProperty().addListener((obs, oldW, newW) -> {
                 double w = newW.doubleValue();
                 if (w > 0 && Math.abs(textMeasure.getWrappingWidth() - w) > 0.5) {
                     textMeasure.setWrappingWidth(w);
+                    widthCalibrated = true;
+                    updateContentAreaHeight();
                 }
             });
+            viewportWidthListenerAttached = true;
         }
     }
 
@@ -268,12 +303,15 @@ public class NoteCardView extends StackPane {
      * will automatically flow through this listener to update contentArea height.
      */
     private void setupInternalTextListener() {
+        if (internalTextListenerAttached) {
+            return;
+        }
         javafx.scene.Node internalText = contentArea.lookup(".text");
         if (internalText != null) {
             internalText.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
                 updateContentAreaHeight();
             });
-            // Trigger initial height calculation now that internal Text is available
+            internalTextListenerAttached = true;
             updateContentAreaHeight();
         }
     }
@@ -369,6 +407,7 @@ public class NoteCardView extends StackPane {
         updateThemeColors();
         updateContentTypography();
         cancelBorderAnimation();
+        javafx.application.Platform.runLater(this::requestLayoutRefresh);
     }
 
     /**
@@ -447,15 +486,23 @@ public class NoteCardView extends StackPane {
      * Called only by layoutBoundsProperty listeners — never manually.
      */
     private void updateContentAreaHeight() {
-        double textHeight = Math.ceil(textMeasure.getLayoutBounds().getHeight());
+        double textHeight = 0;
 
-        // Prefer actual rendered Text node height (most accurate, available after skin load)
+        // Prefer actual rendered Text node height — ground truth after skin load
         javafx.scene.Node internalText = contentArea.lookup(".text");
         if (internalText != null) {
             double internalHeight = Math.ceil(internalText.getLayoutBounds().getHeight());
             if (internalHeight > 0) {
-                textHeight = Math.max(textHeight, internalHeight);
+                textHeight = internalHeight;
             }
+        }
+
+        // Fallback to hidden Text node only after wrapping width has been calibrated
+        if (textHeight <= 0 && widthCalibrated) {
+            textHeight = Math.ceil(textMeasure.getLayoutBounds().getHeight());
+        }
+        if (textHeight <= 0) {
+            return;
         }
 
         double padding = resolveTextVerticalPadding();
