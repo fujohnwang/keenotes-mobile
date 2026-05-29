@@ -269,7 +269,9 @@ public class DesktopMainView extends BorderPane {
         
         // Load data for specific modes
         if (loadDefaultData) {
-            if (mode == ViewMode.REVIEW) {
+            if (mode == ViewMode.NOTE) {
+                mainContent.refreshRecentNotes();
+            } else if (mode == ViewMode.REVIEW) {
                 mainContent.loadReviewNotes("7 days");
             } else if (mode == ViewMode.ON_THIS_DAY) {
                 mainContent.loadOnThisDayNotes();

@@ -37,6 +37,9 @@ public class NotesDisplayPanel extends VBox {
 
     private static final Logger logger = AppLogger.getLogger(NotesDisplayPanel.class);
 
+    /** reviewDays sentinel: paginate via {@link LocalCacheService#getNotesOnThisDayPaged} */
+    public static final int PAGINATION_MODE_ON_THIS_DAY = -1;
+
     // ListView (virtualized, replaces VBox + ScrollPane)
     private final ListView<LocalCacheService.NoteData> listView;
     private final ObservableList<LocalCacheService.NoteData> noteItems;
@@ -438,7 +441,9 @@ public class NotesDisplayPanel extends VBox {
                         + ", totalNoteCount=" + totalNoteCount
                         + ", reviewDays=" + reviewDays);
                 List<LocalCacheService.NoteData> notes;
-                if (reviewDays > 0) {
+                if (reviewDays == PAGINATION_MODE_ON_THIS_DAY) {
+                    notes = localCache.getNotesOnThisDayPaged(0, 20);
+                } else if (reviewDays > 0) {
                     notes = localCache.getNotesForReviewPaged(reviewDays, 0, 20);
                 } else {
                     notes = localCache.getNotesPaged(0, 20);
@@ -544,7 +549,9 @@ public class NotesDisplayPanel extends VBox {
         AppExecutors.submitUiDb(() -> {
             try {
                 List<LocalCacheService.NoteData> notes;
-                if (reviewDays > 0) {
+                if (reviewDays == PAGINATION_MODE_ON_THIS_DAY) {
+                    notes = localCache.getNotesOnThisDayPaged(offset, 10);
+                } else if (reviewDays > 0) {
                     notes = localCache.getNotesForReviewPaged(reviewDays, offset, 10);
                 } else {
                     notes = localCache.getNotesPaged(offset, 10);

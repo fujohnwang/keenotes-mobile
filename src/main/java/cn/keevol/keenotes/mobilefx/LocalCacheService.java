@@ -534,6 +534,45 @@ public class LocalCacheService {
         return 0;
     }
 
+    /**
+     * Paginated notes from the same calendar day in past years.
+     */
+    public List<NoteData> getNotesOnThisDayPaged(int offset, int limit) {
+        ensureInitialized();
+        List<NoteData> results = new ArrayList<>();
+        QuerySpec query = buildOnThisDayQuery();
+        if (query == null) {
+            return results;
+        }
+
+        String sql = "SELECT id, content, channel, created_at FROM notes_cache WHERE "
+                + query.whereClause + " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+
+        synchronized (dbLock) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                bindQueryArgs(pstmt, query.args);
+                int argCount = query.args.size();
+                pstmt.setInt(argCount + 1, limit);
+                pstmt.setInt(argCount + 2, offset);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        results.add(new NoteData(
+                                rs.getLong("id"),
+                                rs.getString("content"),
+                                rs.getString("channel"),
+                                rs.getString("created_at"),
+                                null
+                        ));
+                    }
+                }
+            } catch (SQLException e) {
+                logger.warning("getNotesOnThisDayPaged failed (offset=" + offset
+                        + ", limit=" + limit + "): " + e.getMessage());
+            }
+        }
+        return results;
+    }
+
     public List<NoteData> getAllNotes() {
         ensureInitialized();
         List<NoteData> results = new ArrayList<>();

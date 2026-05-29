@@ -3,7 +3,7 @@ package cn.keevol.keenotes.mobilefx;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.concurrent.Task;
+import javafx.animation.PauseTransition;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
@@ -13,7 +13,9 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
+import javafx.util.Duration;
 
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 /**
@@ -46,6 +48,10 @@ public class SidebarView extends VBox {
     private final ChangeListener<ThemeService.Theme> themeChangeListener;
     private ServiceManager.ServiceStatusListener serviceStatusListener;
     private LocalCacheService.NoteChangeListener localCacheChangeListener;
+
+    private static final long ON_THIS_DAY_VISIBILITY_DEBOUNCE_MS = 500;
+    private PauseTransition onThisDayVisibilityDebounce;
+    private volatile Future<?> onThisDayVisibilityFuture;
     
     public SidebarView(Consumer<DesktopMainView.ViewMode> onNavigationChanged) {
         this.onNavigationChanged = onNavigationChanged;
@@ -70,6 +76,14 @@ public class SidebarView extends VBox {
      * Remove all listeners registered on singleton services.
      */
     public void dispose() {
+        if (onThisDayVisibilityDebounce != null) {
+            onThisDayVisibilityDebounce.stop();
+            onThisDayVisibilityDebounce = null;
+        }
+        if (onThisDayVisibilityFuture != null) {
+            onThisDayVisibilityFuture.cancel(true);
+            onThisDayVisibilityFuture = null;
+        }
         SettingsService.getInstance().showOnThisDayInYearsPastProperty().removeListener(onThisDaySettingListener);
         ThemeService.getInstance().currentThemeProperty().removeListener(themeChangeListener);
         if (serviceStatusListener != null) {
@@ -282,9 +296,53 @@ public class SidebarView extends VBox {
         });
 
         button.selectedProperty().addListener((obs, oldVal, newVal) -> updateOnThisDayButtonStyle());
+
+        button.setOnMouseEntered(e -> {
+            if (!button.isSelected()) {
+                applyOnThisDayHoverStyle(true);
+            }
+        });
+        button.setOnMouseExited(e -> {
+            if (!button.isSelected()) {
+                applyOnThisDayHoverStyle(false);
+            }
+        });
+
         ThemeService.getInstance().currentThemeProperty().addListener(themeChangeListener);
         updateOnThisDayButtonStyle();
         return button;
+    }
+
+    private void applyOnThisDayHoverStyle(boolean hovered) {
+        if (onThisDayButton == null || onThisDayIcon == null) {
+            return;
+        }
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        boolean selected = onThisDayButton.isSelected();
+        if (selected) {
+            return;
+        }
+        String mutedColor = isDark ? "#8B949E" : "#57606A";
+        String hoverBg = isDark ? "rgba(0, 212, 255, 0.12)" : "rgba(9, 105, 218, 0.08)";
+        if (hovered) {
+            onThisDayButton.setStyle(
+                    "-fx-background-radius: 10px; " +
+                    "-fx-border-radius: 10px; " +
+                    "-fx-padding: 0; " +
+                    "-fx-cursor: hand; " +
+                    "-fx-background-color: " + hoverBg + ";"
+            );
+            onThisDayIcon.setFill(Color.web(isDark ? "#E6EDF3" : "#24292F"));
+        } else {
+            onThisDayButton.setStyle(
+                    "-fx-background-radius: 10px; " +
+                    "-fx-border-radius: 10px; " +
+                    "-fx-padding: 0; " +
+                    "-fx-cursor: hand; " +
+                    "-fx-background-color: transparent;"
+            );
+            onThisDayIcon.setFill(Color.web(mutedColor));
+        }
     }
 
     private void updateOnThisDayButtonStyle() {
@@ -297,7 +355,6 @@ public class SidebarView extends VBox {
         String primaryColor = isDark ? "#22D3EE" : "#0969DA";
         String mutedColor = isDark ? "#8B949E" : "#57606A";
         String accentBg = isDark ? "rgba(6, 182, 212, 0.15)" : "rgba(9, 105, 218, 0.08)";
-        String hoverBg = isDark ? "rgba(0, 212, 255, 0.12)" : "rgba(9, 105, 218, 0.08)";
 
         onThisDayButton.setStyle(
                 "-fx-background-radius: 10px; " +
@@ -307,32 +364,61 @@ public class SidebarView extends VBox {
                 "-fx-background-color: " + (selected ? accentBg : "transparent") + ";"
         );
         onThisDayIcon.setFill(Color.web(selected ? primaryColor : mutedColor));
+    }
 
-        onThisDayButton.setOnMouseEntered(e -> {
-            if (!onThisDayButton.isSelected()) {
-                onThisDayButton.setStyle(
-                        "-fx-background-radius: 10px; " +
-                        "-fx-border-radius: 10px; " +
-                        "-fx-padding: 0; " +
-                        "-fx-cursor: hand; " +
-                        "-fx-background-color: " + hoverBg + ";"
-                );
-                onThisDayIcon.setFill(Color.web(isDark ? "#E6EDF3" : "#24292F"));
-            }
-        });
+    private void refreshOnThisDayButtonVisibility() {
+        if (!SettingsService.getInstance().getShowOnThisDayInYearsPast()) {
+            setOnThisDayVisible(false);
+            return;
+        }
 
-        onThisDayButton.setOnMouseExited(e -> {
-            if (!onThisDayButton.isSelected()) {
-                onThisDayButton.setStyle(
-                        "-fx-background-radius: 10px; " +
-                        "-fx-border-radius: 10px; " +
-                        "-fx-padding: 0; " +
-                        "-fx-cursor: hand; " +
-                        "-fx-background-color: transparent;"
-                );
-                onThisDayIcon.setFill(Color.web(mutedColor));
+        ServiceManager serviceManager = ServiceManager.getInstance();
+        if (serviceManager.getLocalCacheState() != ServiceManager.InitializationState.READY) {
+            setOnThisDayVisible(false);
+            return;
+        }
+
+        LocalCacheService cache = serviceManager.getLocalCacheService();
+        if (cache == null) {
+            setOnThisDayVisible(false);
+            return;
+        }
+
+        if (onThisDayVisibilityDebounce != null) {
+            onThisDayVisibilityDebounce.stop();
+        }
+        onThisDayVisibilityDebounce = new PauseTransition(Duration.millis(ON_THIS_DAY_VISIBILITY_DEBOUNCE_MS));
+        onThisDayVisibilityDebounce.setOnFinished(e -> queryOnThisDayButtonVisibility(cache));
+        onThisDayVisibilityDebounce.play();
+    }
+
+    private void queryOnThisDayButtonVisibility(LocalCacheService cache) {
+        if (onThisDayVisibilityFuture != null) {
+            onThisDayVisibilityFuture.cancel(true);
+        }
+        onThisDayVisibilityFuture = AppExecutors.submitUiDb(() -> {
+            try {
+                boolean hasNotes = cache.getNotesOnThisDayCount() > 0;
+                if (!Thread.currentThread().isInterrupted()) {
+                    javafx.application.Platform.runLater(() ->
+                            setOnThisDayVisible(hasNotes || onThisDayButton.isSelected()));
+                }
+            } catch (Exception ignored) {
+                if (!Thread.currentThread().isInterrupted()) {
+                    javafx.application.Platform.runLater(() ->
+                            setOnThisDayVisible(onThisDayButton.isSelected()));
+                }
             }
+            return null;
         });
+    }
+
+    public void setOnThisDayVisible(boolean visible) {
+        if (onThisDayButton == null) {
+            return;
+        }
+        onThisDayButton.setVisible(visible);
+        onThisDayButton.setManaged(visible);
     }
 
     private void setupOnThisDayAvailabilityTracking() {
@@ -381,46 +467,6 @@ public class SidebarView extends VBox {
 
     public void refreshOnThisDayAvailability() {
         refreshOnThisDayButtonVisibility();
-    }
-
-    private void refreshOnThisDayButtonVisibility() {
-        if (!SettingsService.getInstance().getShowOnThisDayInYearsPast()) {
-            setOnThisDayVisible(false);
-            return;
-        }
-
-        ServiceManager serviceManager = ServiceManager.getInstance();
-        if (serviceManager.getLocalCacheState() != ServiceManager.InitializationState.READY) {
-            setOnThisDayVisible(false);
-            return;
-        }
-
-        LocalCacheService cache = serviceManager.getLocalCacheService();
-        if (cache == null) {
-            setOnThisDayVisible(false);
-            return;
-        }
-
-        Task<Boolean> task = new Task<>() {
-            @Override
-            protected Boolean call() {
-                return cache.getNotesOnThisDayCount() > 0;
-            }
-        };
-        task.setOnSucceeded(event -> setOnThisDayVisible(Boolean.TRUE.equals(task.getValue()) || onThisDayButton.isSelected()));
-        task.setOnFailed(event -> setOnThisDayVisible(onThisDayButton.isSelected()));
-
-        Thread thread = new Thread(task, "SidebarOnThisDayVisibility");
-        thread.setDaemon(true);
-        thread.start();
-    }
-
-    public void setOnThisDayVisible(boolean visible) {
-        if (onThisDayButton == null) {
-            return;
-        }
-        onThisDayButton.setVisible(visible);
-        onThisDayButton.setManaged(visible);
     }
     
     /**

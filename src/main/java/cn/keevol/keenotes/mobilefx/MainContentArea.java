@@ -286,6 +286,7 @@ public class MainContentArea extends StackPane {
      * Call when this component is no longer in use.
      */
     public void dispose() {
+        stopActiveFadeTransitions();
         uiLoads.cancelAll();
         uiLoads.shutdown();
         ServiceManager.getInstance().accountSwitchedProperty().removeListener(accountSwitchedListener);
@@ -495,26 +496,29 @@ public class MainContentArea extends StackPane {
         ServiceManager serviceManager = ServiceManager.getInstance();
         ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
         if (state != ServiceManager.InitializationState.READY) {
-            return new OnThisDayLoadResult(state, serviceManager.getLocalCacheErrorMessage(), null);
+            return new OnThisDayLoadResult(state, serviceManager.getLocalCacheErrorMessage(), 0);
         }
         LocalCacheService cache = serviceManager.getLocalCacheService();
         if (cache == null) {
             return new OnThisDayLoadResult(ServiceManager.InitializationState.ERROR,
-                    "Cache unavailable", null);
+                    "Cache unavailable", 0);
         }
-        return new OnThisDayLoadResult(state, null, cache.getNotesOnThisDay());
+        return new OnThisDayLoadResult(state, null, cache.getNotesOnThisDayCount());
     }
 
     private void applyOnThisDayLoadResult(OnThisDayLoadResult result) {
         if (result.state == ServiceManager.InitializationState.READY) {
             localCache = ServiceManager.getInstance().getLocalCacheService();
-            List<LocalCacheService.NoteData> notes = result.notes;
-            if (notes == null) {
-                onThisDayNotesPanel.showError("On This Day notes are unavailable");
-            } else if (notes.isEmpty()) {
+            int totalCount = result.totalCount;
+            logger.info("loadOnThisDayNotes: totalCount=" + totalCount);
+            if (totalCount == 0) {
                 onThisDayNotesPanel.showEmptyState("No notes from this day in past years yet.");
             } else {
-                onThisDayNotesPanel.displayNotes(notes, "From past years");
+                onThisDayNotesPanel.displayNotesWithPagination(
+                        totalCount,
+                        localCache,
+                        NotesDisplayPanel.PAGINATION_MODE_ON_THIS_DAY,
+                        "From past years");
             }
             return;
         }
@@ -841,6 +845,13 @@ public class MainContentArea extends StackPane {
      * Simple logic: just load from local DB, assume DB is ready
      * Global initialization is handled separately by ServiceManager
      */
+    /**
+     * Reload recent notes in Note mode (public entry for navigation layer).
+     */
+    public void refreshRecentNotes() {
+        loadRecentNotes();
+    }
+
     private void loadRecentNotes() {
         notesDisplayPanel.showLoading("Loading recent notes");
         uiLoads.submit(SLOT_RECENT, this::loadRecentNotesData, this::applyRecentNotesLoadResult,
@@ -917,25 +928,31 @@ public class MainContentArea extends StackPane {
             return;
         }
 
+        stopActiveFadeTransitions();
+
         // Fade out current panel
-        FadeTransition fadeOut = new FadeTransition(Duration.millis(150), currentPanel);
+        activeFadeOut = new FadeTransition(Duration.millis(150), currentPanel);
+        FadeTransition fadeOut = activeFadeOut;
         fadeOut.setFromValue(1.0);
         fadeOut.setToValue(0.0);
         fadeOut.setOnFinished(e -> {
+            if (fadeOut != activeFadeOut) {
+                return;
+            }
             currentPanel.setVisible(false);
 
             // Fade in target panel
             targetPanel.setVisible(true);
             targetPanel.setOpacity(0.0);
 
-            FadeTransition fadeIn = new FadeTransition(Duration.millis(150), targetPanel);
+            activeFadeIn = new FadeTransition(Duration.millis(150), targetPanel);
+            FadeTransition fadeIn = activeFadeIn;
             fadeIn.setFromValue(0.0);
             fadeIn.setToValue(1.0);
 
             fadeIn.setOnFinished(ev -> {
-                // Reload Note list after fade in animation completes
-                if (targetPanel == noteModePanel) {
-                    loadRecentNotes();
+                if (fadeIn != activeFadeIn) {
+                    return;
                 }
                 // 兜底：确保 opacity 为 1.0（防止动画异常未完成）
                 if (targetPanel.getOpacity() < 1.0) {
@@ -962,10 +979,24 @@ public class MainContentArea extends StackPane {
         fadeOut.play();
     }
 
+    private void stopActiveFadeTransitions() {
+        if (activeFadeOut != null) {
+            activeFadeOut.stop();
+            activeFadeOut = null;
+        }
+        if (activeFadeIn != null) {
+            activeFadeIn.stop();
+            activeFadeIn = null;
+        }
+    }
+
     // Flag to track if search focus is pending
     private boolean pendingSearchFocus = false;
     // Flag to track if note input focus is pending
     private boolean pendingNoteFocus = false;
+
+    private FadeTransition activeFadeOut;
+    private FadeTransition activeFadeIn;
 
     /**
      * Focus on note input field
@@ -1070,13 +1101,12 @@ public class MainContentArea extends StackPane {
     private static final class OnThisDayLoadResult {
         final ServiceManager.InitializationState state;
         final String errorMessage;
-        final List<LocalCacheService.NoteData> notes;
+        final int totalCount;
 
-        OnThisDayLoadResult(ServiceManager.InitializationState state, String errorMessage,
-                List<LocalCacheService.NoteData> notes) {
+        OnThisDayLoadResult(ServiceManager.InitializationState state, String errorMessage, int totalCount) {
             this.state = state;
             this.errorMessage = errorMessage;
-            this.notes = notes;
+            this.totalCount = totalCount;
         }
     }
 

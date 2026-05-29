@@ -37,6 +37,7 @@ public class WebSocketClientService {
     private int reconnectAttempts = 0;
     private static final int MAX_RECONNECT_ATTEMPTS = 10;
     private static final int RECONNECT_BASE_DELAY_MS = 1000;
+    private final AtomicBoolean reconnectDispatchPending = new AtomicBoolean(false);
 
     // 重连定时器
     private ScheduledExecutorService reconnectScheduler;
@@ -132,6 +133,8 @@ public class WebSocketClientService {
             return;
         }
 
+        cancelPendingReconnect();
+
         String wsUrl = settings.getEndpointUrl();
         if (wsUrl == null || wsUrl.isEmpty()) {
             logger.warning("WebSocket URL not configured");
@@ -221,6 +224,7 @@ public class WebSocketClientService {
                 isConnecting.set(false);
                 isOffline.set(false);
                 reconnectAttempts = 0;
+                reconnectDispatchPending.set(false);
 
                 sendHandshake();
                 startHeartbeat();
@@ -242,9 +246,9 @@ public class WebSocketClientService {
                 }
                 logger.info("WebSocket closed: " + code + " " + reason);
                 isConnected.set(false);
-                cleanup();
+                cleanupConnectionState();
                 notifyConnectionStatus(false);
-                scheduleReconnect();
+                requestReconnect("closed");
             }
 
             @Override
@@ -259,8 +263,8 @@ public class WebSocketClientService {
                 }
                 isConnected.set(false);
                 notifyError(t.getMessage());
-                cleanup();
-                scheduleReconnect();
+                cleanupConnectionState();
+                requestReconnect("failure");
             }
         };
 
@@ -270,7 +274,7 @@ public class WebSocketClientService {
         } catch (Exception e) {
             logger.warning("WebSocket connection exception while creating call: " + describeThrowableChain(e));
             isConnecting.set(false);
-            scheduleReconnect();
+            requestReconnect("connect-exception");
         }
     }
 
@@ -313,6 +317,7 @@ public class WebSocketClientService {
         }
         reconnectAttempts = 0;
         isOffline.set(false);
+        cancelPendingReconnect();
         connect();
     }
 
@@ -619,15 +624,38 @@ public class WebSocketClientService {
      */
     private void forceReconnect() {
         WebSocket ws = webSocket;
+        webSocket = null;
         if (ws != null) {
             ws.cancel();
-            webSocket = null;
         }
         isConnected.set(false);
         isConnecting.set(false);
         notifyConnectionStatus(false);
-        cleanup();
+        cleanupConnectionState();
+        requestReconnect("heartbeat-timeout");
+    }
+
+    /**
+     * Coalesce duplicate reconnect triggers (e.g. forceReconnect + onFailure from ws.cancel()).
+     */
+    private void requestReconnect(String reason) {
+        if (isShuttingDown.get() || !isInitialized.get()) {
+            reconnectDispatchPending.set(false);
+            return;
+        }
+        if (!reconnectDispatchPending.compareAndSet(false, true)) {
+            logger.info("Ignoring duplicate reconnect request (" + reason + ")");
+            return;
+        }
         scheduleReconnect();
+    }
+
+    private void cancelPendingReconnect() {
+        if (reconnectTask != null) {
+            reconnectTask.cancel(false);
+            reconnectTask = null;
+        }
+        reconnectDispatchPending.set(false);
     }
 
     /**
@@ -636,11 +664,13 @@ public class WebSocketClientService {
     private void scheduleReconnect() {
         // 如果正在关闭或未初始化，不要重连
         if (isShuttingDown.get() || !isInitialized.get()) {
+            reconnectDispatchPending.set(false);
             return;
         }
 
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             logger.warning("Max reconnect attempts reached, entering offline mode");
+            reconnectDispatchPending.set(false);
             isOffline.set(true);
             notifyOffline();
             return;
@@ -671,6 +701,7 @@ public class WebSocketClientService {
 
         reconnectTask = reconnectScheduler.schedule(() -> {
             reconnectTask = null;
+            reconnectDispatchPending.set(false);
             if (!isShuttingDown.get()) {
                 logger.info("Attempting reconnect...");
                 connect();
@@ -679,15 +710,10 @@ public class WebSocketClientService {
     }
 
     /**
-     * 清理资源
+     * Reset connection/sync state without cancelling a pending reconnect task.
      */
-    private void cleanup() {
+    private void cleanupConnectionState() {
         stopHeartbeat();
-
-        if (reconnectTask != null) {
-            reconnectTask.cancel(true);
-            reconnectTask = null;
-        }
 
         synchronized (syncStateLock) {
             syncEpoch++;
@@ -696,6 +722,19 @@ public class WebSocketClientService {
         isSyncing.set(false);
         isConnected.set(false);
         isConnecting.set(false);
+    }
+
+    /**
+     * 清理资源（含取消重连任务，用于 shutdown / 主动 disconnect）
+     */
+    private void cleanup() {
+        cleanupConnectionState();
+
+        if (reconnectTask != null) {
+            reconnectTask.cancel(true);
+            reconnectTask = null;
+        }
+        reconnectDispatchPending.set(false);
     }
 
     private int markBatchReceived(int totalBatches) {
