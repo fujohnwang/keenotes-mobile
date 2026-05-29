@@ -441,6 +441,8 @@ public class ServiceManager {
             localCacheService.close();
         }
 
+        AppExecutors.shutdown();
+
         System.out.println("[ServiceManager] All services shutdown complete");
     }
 
