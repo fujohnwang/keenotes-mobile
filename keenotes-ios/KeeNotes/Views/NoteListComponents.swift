@@ -334,9 +334,9 @@ struct NoteSharePosterOverlay: View {
                                 hiddenMessage: hiddenMessage
                             )
                             .frame(width: displayWidth)
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
                             .shadow(color: Color.black.opacity(0.25), radius: 24, x: 0, y: 12)
-                            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 24)
@@ -410,7 +410,10 @@ struct NoteSharePosterOverlay: View {
             }
 
             do {
-                try await PosterVideoExporter.exportAndSaveToPhotos(posterImage: image)
+                let videoImage = image.opaquePosterImage(
+                    backgroundColor: UIColor(red: 0.945, green: 0.94, blue: 0.925, alpha: 1)
+                )
+                try await PosterVideoExporter.exportAndSaveToPhotos(posterImage: videoImage)
                 imageSaver.showMessage("Saved video to Photos")
             } catch {
                 imageSaver.showMessage("Video export failed")
@@ -425,9 +428,9 @@ struct NoteSharePosterContent: View {
     let formattedDate: String
     let hiddenMessage: String
 
-    private var brandText: String {
+    private var authorText: String? {
         let trimmed = hiddenMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "KeeNotes" : trimmed
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private var contentLength: Int {
@@ -454,10 +457,6 @@ struct NoteSharePosterContent: View {
         return 12
     }
 
-    private var posterHorizontalPadding: CGFloat {
-        contentLength > 700 ? 24 : 28
-    }
-
     private var cardPadding: CGFloat {
         contentLength > 700 ? 28 : 34
     }
@@ -475,85 +474,92 @@ struct NoteSharePosterContent: View {
         contentLength > 700 ? 18 : 22
     }
 
+    private var posterCornerRadius: CGFloat {
+        32
+    }
+
     var body: some View {
+        let posterShape = RoundedRectangle(cornerRadius: posterCornerRadius, style: .continuous)
+
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.945, green: 0.94, blue: 0.925),
-                    Color(red: 0.975, green: 0.965, blue: 0.945)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            posterShape
+                .fill(Color(red: 0.995, green: 0.992, blue: 0.982))
 
             PaperGrainOverlay()
-                .opacity(0.45)
+                .opacity(0.32)
 
             RadialGradient(
                 colors: [
                     Color.white.opacity(0),
-                    Color.black.opacity(0.035)
+                    Color.black.opacity(0.025)
                 ],
                 center: .center,
                 startRadius: 160,
                 endRadius: 430
             )
 
-            VStack {
-                VStack(alignment: .leading, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(noteContent)
-                            .font(.system(size: contentFontSize, weight: .bold, design: .serif))
-                            .foregroundColor(Color(red: 0.10, green: 0.095, blue: 0.085))
-                            .lineSpacing(contentLineSpacing)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+            VStack(alignment: .leading, spacing: 0) {
+                Text(noteContent)
+                    .font(.system(size: contentFontSize, weight: .bold, design: .serif))
+                    .foregroundColor(Color(red: 0.10, green: 0.095, blue: 0.085))
+                    .lineSpacing(contentLineSpacing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, contentVerticalPadding)
                     .padding(.horizontal, cardPadding)
 
-                    Rectangle()
-                        .fill(Color.black.opacity(0.07))
-                        .frame(height: 0.5)
+                Spacer(minLength: 24)
 
+                Rectangle()
+                    .fill(Color.black.opacity(0.06))
+                    .frame(height: 0.5)
+
+                HStack(spacing: 10) {
                     HStack(spacing: 6) {
-                        Spacer(minLength: 0)
+                        if let authorText {
+                            Text(authorText)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
 
-                        Text(brandText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-
-                        Text("·")
+                            Text("·")
+                        }
 
                         Text(formattedDate)
                             .lineLimit(1)
-
-                        Text("·")
-
-                        Text("via KeeNotes")
-                            .lineLimit(1)
-
-                        Spacer(minLength: 0)
                     }
-                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(Color.black.opacity(0.34))
-                    .padding(.horizontal, cardPadding)
-                    .padding(.vertical, footerVerticalPadding)
+                    .layoutPriority(1)
+
+                    Spacer(minLength: 12)
+
+                    Text("KeeNotes")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundColor(Color(red: 0.10, green: 0.095, blue: 0.085).opacity(0.58))
+                        .lineLimit(1)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule()
+                                .fill(Color.black.opacity(0.045))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.black.opacity(0.055), lineWidth: 0.5)
+                        )
+                        .accessibilityLabel("KeeNotes")
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .fill(Color(red: 0.995, green: 0.992, blue: 0.982))
-                        .shadow(color: Color.black.opacity(0.055), radius: 32, x: 0, y: 18)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(Color.white.opacity(0.82), lineWidth: 0.8)
-                )
+                .font(.system(size: 11, weight: .medium))
+                .padding(.horizontal, cardPadding)
+                .padding(.vertical, footerVerticalPadding)
             }
-            .padding(.horizontal, posterHorizontalPadding)
-            .padding(.vertical, contentLength > 700 ? 34 : 42)
+            .frame(maxWidth: .infinity, minHeight: 540, alignment: .topLeading)
         }
         .frame(minHeight: 540)
+        .clipShape(posterShape)
+        .overlay(
+            posterShape
+                .stroke(Color.white.opacity(0.82), lineWidth: 0.8)
+        )
     }
 }
 
