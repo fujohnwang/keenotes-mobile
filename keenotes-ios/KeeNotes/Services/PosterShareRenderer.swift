@@ -23,10 +23,10 @@ enum PosterShareRenderer {
             let renderer = ImageRenderer(content: poster)
             renderer.scale = UIScreen.main.scale
             renderer.proposedSize = ProposedViewSize(width: width, height: nil)
-            return renderer.uiImage?.opaquePosterImage()
+            return renderer.uiImage
         }
 
-        return PosterHostingRenderer.render(view: poster, width: width)?.opaquePosterImage()
+        return PosterHostingRenderer.render(view: poster, width: width)
     }
 }
 
@@ -48,7 +48,11 @@ enum PosterHostingRenderer {
         renderView.setNeedsLayout()
         renderView.layoutIfNeeded()
 
-        let renderer = UIGraphicsImageRenderer(size: size)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = UIScreen.main.scale
+        format.opaque = false
+
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { _ in
             renderView.drawHierarchy(in: renderView.bounds, afterScreenUpdates: true)
         }
@@ -56,13 +60,13 @@ enum PosterHostingRenderer {
 }
 
 extension UIImage {
-    func opaquePosterImage() -> UIImage {
+    func opaquePosterImage(backgroundColor: UIColor = .white) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
         format.opaque = true
 
         return UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            UIColor.white.setFill()
+            backgroundColor.setFill()
             UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
             draw(in: CGRect(origin: .zero, size: size))
         }
