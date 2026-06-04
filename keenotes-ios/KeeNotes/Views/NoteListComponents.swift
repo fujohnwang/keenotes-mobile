@@ -262,24 +262,25 @@ struct NoteSharePosterOverlay: View {
     private var isBusy: Bool { isSaving || isExportingVideo }
 
     private func posterPreviewWidth(for geometry: GeometryProxy) -> CGFloat {
-        let candidate = geometry.size.width - 40
-        guard candidate.isFinite, candidate > 0 else {
-            return posterWidth
-        }
-        return min(candidate, posterWidth)
+        let candidateWidth = geometry.size.width - 40
+        let maxWidth = min(candidateWidth.isFinite && candidateWidth > 0 ? candidateWidth : posterWidth, posterWidth)
+        return min(maxWidth, posterPreviewMaxHeight(for: geometry) * PosterShareRenderer.aspectRatio)
     }
 
     private func posterPreviewMaxHeight(for geometry: GeometryProxy) -> CGFloat {
-        let candidate = geometry.size.height - 120
-        guard candidate.isFinite, candidate > 0 else {
-            return 220
-        }
-        return max(candidate, 220)
+        let candidateHeight = geometry.size.height
+            - geometry.safeAreaInsets.top
+            - geometry.safeAreaInsets.bottom
+            - 44
+            - 18
+            - 36
+        return max(candidateHeight.isFinite && candidateHeight > 0 ? candidateHeight : 220, 220)
     }
 
     var body: some View {
         GeometryReader { geometry in
             let displayWidth = posterPreviewWidth(for: geometry)
+            let minimumHeight = PosterShareRenderer.exportHeight(for: displayWidth)
 
             ZStack {
                 Color.black.opacity(0.55)
@@ -331,9 +332,11 @@ struct NoteSharePosterOverlay: View {
                             NoteSharePosterContent(
                                 noteContent: note.content,
                                 formattedDate: posterDate,
-                                hiddenMessage: hiddenMessage
+                                hiddenMessage: hiddenMessage,
+                                minimumHeight: minimumHeight
                             )
                             .frame(width: displayWidth)
+                            .fixedSize(horizontal: false, vertical: true)
                             .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
                             .shadow(color: Color.black.opacity(0.25), radius: 24, x: 0, y: 12)
                             .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
@@ -410,10 +413,7 @@ struct NoteSharePosterOverlay: View {
             }
 
             do {
-                let videoImage = image.opaquePosterImage(
-                    backgroundColor: UIColor(red: 0.945, green: 0.94, blue: 0.925, alpha: 1)
-                )
-                try await PosterVideoExporter.exportAndSaveToPhotos(posterImage: videoImage)
+                try await PosterVideoExporter.exportAndSaveToPhotos(posterImage: image)
                 imageSaver.showMessage("Saved video to Photos")
             } catch {
                 imageSaver.showMessage("Video export failed")
@@ -427,6 +427,7 @@ struct NoteSharePosterContent: View {
     let noteContent: String
     let formattedDate: String
     let hiddenMessage: String
+    var minimumHeight: CGFloat = PosterShareRenderer.exportHeight(for: PosterShareRenderer.exportWidth)
 
     private var authorText: String? {
         let trimmed = hiddenMessage.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -483,7 +484,7 @@ struct NoteSharePosterContent: View {
 
         ZStack {
             posterShape
-                .fill(Color(red: 0.995, green: 0.992, blue: 0.982))
+                .fill(PosterPalette.paperColor)
 
             PaperGrainOverlay()
                 .opacity(0.32)
@@ -499,16 +500,17 @@ struct NoteSharePosterContent: View {
             )
 
             VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: contentVerticalPadding)
+
                 Text(noteContent)
                     .font(.system(size: contentFontSize, weight: .bold, design: .serif))
                     .foregroundColor(Color(red: 0.10, green: 0.095, blue: 0.085))
                     .lineSpacing(contentLineSpacing)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.vertical, contentVerticalPadding)
                     .padding(.horizontal, cardPadding)
 
-                Spacer(minLength: 24)
+                Spacer(minLength: contentVerticalPadding)
 
                 Rectangle()
                     .fill(Color.black.opacity(0.06))
@@ -552,9 +554,8 @@ struct NoteSharePosterContent: View {
                 .padding(.horizontal, cardPadding)
                 .padding(.vertical, footerVerticalPadding)
             }
-            .frame(maxWidth: .infinity, minHeight: 540, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: minimumHeight, alignment: .topLeading)
         }
-        .frame(minHeight: 540)
         .clipShape(posterShape)
         .overlay(
             posterShape
