@@ -916,13 +916,17 @@ public class LocalCacheService {
     }
 
     public void insertPendingNote(String content, String channel) throws SQLException {
+        insertPendingNote(content, channel, DateTimeUtil.getCurrentUtcTimestamp());
+    }
+
+    public void insertPendingNote(String content, String channel, String createdAtUtc) throws SQLException {
         ensureInitialized();
         String sql = "INSERT INTO pending_notes (content, channel, created_at) VALUES (?, ?, ?)";
         synchronized (dbLock) {
             try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
                 pstmt.setString(1, content);
                 pstmt.setString(2, channel);
-                pstmt.setString(3, DateTimeUtil.getCurrentUtcTimestamp());
+                pstmt.setString(3, DateTimeUtil.requireUtcStorageFormat(createdAtUtc));
                 pstmt.executeUpdate();
             }
         }

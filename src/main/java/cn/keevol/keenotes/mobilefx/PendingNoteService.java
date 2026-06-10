@@ -1,10 +1,9 @@
 package cn.keevol.keenotes.mobilefx;
 
-import javafx.application.Platform;
 import javafx.beans.property.IntegerProperty;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
+
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -18,7 +17,6 @@ import java.util.logging.Logger;
  */
 public class PendingNoteService {
     private static final Logger logger = Logger.getLogger(PendingNoteService.class.getName());
-    private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final long RETRY_INTERVAL_MINUTES = 30;
 
     private static PendingNoteService instance;
@@ -49,8 +47,12 @@ public class PendingNoteService {
      * 暂存一条笔记到本地
      */
     public void savePendingNote(String content, String channel) {
+        savePendingNote(content, channel, DateTimeUtil.getCurrentUtcTimestamp());
+    }
+
+    public void savePendingNote(String content, String channel, String createdAtUtc) {
         try {
-            localCache.insertPendingNote(content, channel);
+            localCache.insertPendingNote(content, channel, createdAtUtc);
             logger.info("Note saved to pending: " + content.substring(0, Math.min(20, content.length())) + "...");
         } catch (Exception e) {
             logger.warning("Failed to save pending note: " + e.getMessage());

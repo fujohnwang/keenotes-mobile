@@ -38,3 +38,4 @@ target/
 # GluonFX
 gluonfx/
 archives/ios-screenshots/
+dist/
