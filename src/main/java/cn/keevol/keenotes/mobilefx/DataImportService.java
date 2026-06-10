@@ -192,10 +192,10 @@ public class DataImportService {
                         
                         if (encrypted != null && encrypted) {
                             // Already encrypted - send directly without encryption
-                            sendFuture = apiService.postNoteDirectly(content, channel, timestamp);
+                            sendFuture = apiService.postNoteDirectlyNormalizingTimestamp(content, channel, timestamp);
                         } else {
                             // Not encrypted - use normal E2EE flow
-                            sendFuture = apiService.postNote(content, channel, timestamp);
+                            sendFuture = apiService.postNoteNormalizingTimestamp(content, channel, timestamp);
                         }
                         
                         // Wait for result

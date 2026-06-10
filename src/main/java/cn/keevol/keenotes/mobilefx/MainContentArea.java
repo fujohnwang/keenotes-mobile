@@ -13,6 +13,8 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
+import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
+
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
@@ -760,8 +762,7 @@ public class MainContentArea extends StackPane {
             return;
 
         PendingNoteService pendingService = ServiceManager.getInstance().getPendingNoteService();
-        String ts = java.time.LocalDateTime.now().format(
-                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String ts = DateTimeUtil.getCurrentUtcTimestamp();
         String channel = getDesktopChannel();
 
         // Optimistic UI: 立即清空输入 + 插入临时卡片 + 启动边缘动画
@@ -781,7 +782,7 @@ public class MainContentArea extends StackPane {
 
         // 网络不可用：存入 pending，取消动画，反向移除卡片
         if (!pendingService.isNetworkAvailable()) {
-            pendingService.savePendingNote(content, channel);
+            pendingService.savePendingNote(content, channel, ts);
             removeOptimisticCard();
             return;
         }
@@ -804,7 +805,7 @@ public class MainContentArea extends StackPane {
                 if (notesDisplayPanel.consumeResolvedOptimistic(tempNote)) {
                     logger.info("Skipping pending fallback because note was already resolved by realtime sync");
                 } else {
-                    pendingService.savePendingNote(content, channel);
+                    pendingService.savePendingNote(content, channel, ts);
                     removeOptimisticCard();
                 }
                 notesDisplayPanel.finishOptimisticRequest(tempNote);

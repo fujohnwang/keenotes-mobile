@@ -2,6 +2,7 @@ package cn.keevol.keenotes.utils;
 
 import cn.keevol.keenotes.mobilefx.ApiServiceV2;
 import cn.keevol.keenotes.mobilefx.ServiceManager;
+import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import io.vertx.core.json.JsonObject;
@@ -39,18 +40,16 @@ public class ForwardHandler implements HttpHandler {
             JsonObject json = new JsonObject(new String(requestBody, StandardCharsets.UTF_8));
             String content = json.getString("content");
             String channel = json.getString("channel");
-            String ts = normalizeDate(json.getString("created_at"));
-            
+            String ts = DateTimeUtil.normalizeToUtc(json.getString("created_at"));
+
             // 2. Check if data is already encrypted
             Boolean encrypted = json.getBoolean("encrypted", false);
-            
+
             CompletableFuture<ApiServiceV2.ApiResult> future;
             if (encrypted) {
-                // Data is already encrypted, send directly without E2EE
-                future = serviceManager.postNoteDirectly(content, channel, ts);
+                future = serviceManager.postNoteDirectlyNormalizingTimestamp(content, channel, ts);
             } else {
-                // Data is not encrypted, use E2EE encryption
-                future = serviceManager.postNote(content, channel, ts);
+                future = serviceManager.postNoteNormalizingTimestamp(content, channel, ts);
             }
             
             ApiServiceV2.ApiResult result = future.get(30, TimeUnit.SECONDS);
@@ -69,34 +68,6 @@ public class ForwardHandler implements HttpHandler {
             }
         } finally {
             exchange.close(); // 必须关闭 exchange
-        }
-    }
-
-    /**
-     * Standardize date string to "yyyy-MM-dd HH:mm:ss"
-     */
-    private String normalizeDate(String input) {
-        if (input == null || input.isBlank()) return null;
-        
-        try {
-            // 1. Try ISO-8601 (T and Z)
-            java.time.OffsetDateTime odt;
-            try {
-                odt = java.time.OffsetDateTime.parse(input);
-            } catch (java.time.format.DateTimeParseException e) {
-                // Try ISO_INSTANT or other ISO variations
-                odt = java.time.Instant.parse(input).atOffset(java.time.ZoneOffset.UTC);
-            }
-            return odt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        } catch (Exception e) {
-            // 2. Try standard SQLite format (yyyy-MM-dd HH:mm:ss) or fallback
-            try {
-                java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(input.replace(" ", "T"));
-                return ldt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            } catch (Exception e2) {
-                // If all fails, return raw input as last resort (SQLite might handle it)
-                return input;
-            }
         }
     }
 }

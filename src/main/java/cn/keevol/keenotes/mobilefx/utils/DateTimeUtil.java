@@ -221,6 +221,26 @@ public class DateTimeUtil {
     }
 
     /**
+     * 确认时间戳已是 UTC 存储格式（yyyy-MM-dd HH:mm:ss），直接用于发送/落库。
+     * 来自 getCurrentUtcTimestamp() 或本地 pending 表的数据应走此路径，避免被当作本地时间再次转换。
+     *
+     * @param input UTC 存储格式字符串；null/blank 时返回当前 UTC 时间
+     * @return 可直接传输的 UTC 时间字符串
+     */
+    public static String requireUtcStorageFormat(String input) {
+        if (input == null || input.isBlank()) {
+            return getCurrentUtcTimestamp();
+        }
+        String trimmed = input.trim();
+        try {
+            LocalDateTime.parse(trimmed, TS_FORMATTER);
+            return trimmed;
+        } catch (DateTimeParseException e) {
+            return normalizeToUtc(trimmed);
+        }
+    }
+
+    /**
      * 将 UTC 时间字符串转换为本地时区显示字符串
      * 用于 UI 显示：数据库中存储的是 UTC，显示时转为本地时区
      *

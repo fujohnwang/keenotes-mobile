@@ -6,7 +6,6 @@ import okhttp3.*;
 import javax.net.ssl.*;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
-import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,7 +19,6 @@ import java.util.concurrent.TimeUnit;
  */
 public class ApiServiceV2 {
 
-    private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
     private final OkHttpClient httpClient;
@@ -105,7 +103,19 @@ public class ApiServiceV2 {
         return postNote(content, channel, ts);
     }
 
-    public CompletableFuture<ApiResult> postNote(String content, String channel, String ts) {
+    public CompletableFuture<ApiResult> postNote(String content, String channel, String utcTs) {
+        return postNoteInternal(content, channel, utcTs, false);
+    }
+
+    /**
+     * Post with timestamp from external/import sources (may be local time or mixed formats).
+     */
+    public CompletableFuture<ApiResult> postNoteNormalizingTimestamp(String content, String channel, String ts) {
+        return postNoteInternal(content, channel, ts, true);
+    }
+
+    private CompletableFuture<ApiResult> postNoteInternal(
+            String content, String channel, String ts, boolean normalizeIncoming) {
         String endpointUrl = settings.getEndpointUrl();
         String token = settings.getToken();
 
@@ -122,7 +132,9 @@ public class ApiServiceV2 {
             return CompletableFuture.completedFuture(ApiResult.failure("PIN code not set."));
         }
 
-        final String normalizedTs = normalizeDate(ts);
+        final String normalizedTs = normalizeIncoming
+                ? DateTimeUtil.normalizeToUtc(ts)
+                : DateTimeUtil.requireUtcStorageFormat(ts);
         final String originalContent = content;
 
         return CompletableFuture.supplyAsync(() -> {
@@ -155,13 +167,6 @@ public class ApiServiceV2 {
         }, networkExecutor);
     }
 
-    /**
-     * Standardize date string to "yyyy-MM-dd HH:mm:ss" in UTC
-     */
-    private String normalizeDate(String input) {
-        return DateTimeUtil.normalizeToUtc(input);
-    }
-    
     /**
      * Get default channel name based on platform
      * Format: desktop-{os} (e.g., desktop-mac, desktop-win, desktop-linux)
@@ -235,7 +240,20 @@ public class ApiServiceV2 {
      * Post note directly without encryption (for importing already encrypted data)
      * This method should ONLY be used by DataImportService
      */
-    public CompletableFuture<ApiResult> postNoteDirectly(String encryptedContent, String channel, String ts) {
+    public CompletableFuture<ApiResult> postNoteDirectly(String encryptedContent, String channel, String utcTs) {
+        return postNoteDirectlyInternal(encryptedContent, channel, utcTs, false);
+    }
+
+    /**
+     * Post pre-encrypted note with timestamp from external/import sources.
+     */
+    public CompletableFuture<ApiResult> postNoteDirectlyNormalizingTimestamp(
+            String encryptedContent, String channel, String ts) {
+        return postNoteDirectlyInternal(encryptedContent, channel, ts, true);
+    }
+
+    private CompletableFuture<ApiResult> postNoteDirectlyInternal(
+            String encryptedContent, String channel, String ts, boolean normalizeIncoming) {
         String endpointUrl = settings.getEndpointUrl();
         String token = settings.getToken();
 
@@ -249,7 +267,9 @@ public class ApiServiceV2 {
             return CompletableFuture.completedFuture(ApiResult.failure("Note content cannot be empty."));
         }
 
-        final String normalizedTs = normalizeDate(ts);
+        final String normalizedTs = normalizeIncoming
+                ? DateTimeUtil.normalizeToUtc(ts)
+                : DateTimeUtil.requireUtcStorageFormat(ts);
 
         return CompletableFuture.supplyAsync(() -> {
             try {

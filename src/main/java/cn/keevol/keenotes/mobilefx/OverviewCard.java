@@ -11,8 +11,13 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
+import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
+
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 
 /**
@@ -224,17 +229,40 @@ public class OverviewCard extends HBox {
         }
         
         try {
-            DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
-            LocalDate firstDate = LocalDate.parse(firstDateStr.substring(0, 10));
+            LocalDate firstDate = parseUtcStorageToLocalDate(firstDateStr);
+            if (firstDate == null) {
+                Platform.runLater(() -> daysUsingProperty.set(0));
+                return;
+            }
             LocalDate today = LocalDate.now();
             long days = ChronoUnit.DAYS.between(firstDate, today) + 1;
-            
+
             Platform.runLater(() -> daysUsingProperty.set((int) days));
         } catch (Exception e) {
             Platform.runLater(() -> daysUsingProperty.set(0));
         }
     }
     
+    private static LocalDate parseUtcStorageToLocalDate(String utcStorage) {
+        if (utcStorage == null || utcStorage.isBlank()) {
+            return null;
+        }
+        String trimmed = utcStorage.trim();
+        DateTimeFormatter storageFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        try {
+            LocalDateTime utcDateTime = LocalDateTime.parse(trimmed, storageFormatter);
+            return utcDateTime.atZone(ZoneId.of("UTC"))
+                    .withZoneSameInstant(ZoneId.systemDefault())
+                    .toLocalDate();
+        } catch (DateTimeParseException e) {
+            LocalDateTime parsed = DateTimeUtil.tryParse(trimmed);
+            if (parsed == null) {
+                return null;
+            }
+            return parsed.atZone(ZoneId.systemDefault()).toLocalDate();
+        }
+    }
+
     /**
      * Initialize first note date from database
      */
