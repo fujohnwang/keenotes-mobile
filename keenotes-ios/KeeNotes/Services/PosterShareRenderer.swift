@@ -14,6 +14,7 @@ enum PosterShareRenderer {
         noteContent: String,
         posterDate: String,
         hiddenMessage: String,
+        inkTheme: PosterInkTheme,
         width: CGFloat = exportWidth
     ) -> UIImage? {
         let minimumHeight = exportHeight(for: width)
@@ -21,6 +22,7 @@ enum PosterShareRenderer {
             noteContent: noteContent,
             formattedDate: posterDate,
             hiddenMessage: hiddenMessage,
+            inkTheme: inkTheme,
             minimumHeight: minimumHeight
         )
         .frame(width: width)

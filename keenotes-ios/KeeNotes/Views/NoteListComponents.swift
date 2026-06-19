@@ -256,8 +256,24 @@ struct NoteSharePosterOverlay: View {
     @StateObject private var imageSaver = PosterImageSaver()
     @State private var isSaving = false
     @State private var isExportingVideo = false
+    @State private var inkTheme: PosterInkTheme
 
     private let posterWidth: CGFloat = 390
+
+    init(
+        note: Note,
+        formattedDate: String,
+        posterDate: String,
+        hiddenMessage: String,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.note = note
+        self.formattedDate = formattedDate
+        self.posterDate = posterDate
+        self.hiddenMessage = hiddenMessage
+        self.onDismiss = onDismiss
+        _inkTheme = State(initialValue: PosterInkTheme.stable(forNoteID: note.id))
+    }
 
     private var isBusy: Bool { isSaving || isExportingVideo }
 
@@ -329,17 +345,44 @@ struct NoteSharePosterOverlay: View {
 
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 10) {
-                            NoteSharePosterContent(
-                                noteContent: note.content,
-                                formattedDate: posterDate,
-                                hiddenMessage: hiddenMessage,
-                                minimumHeight: minimumHeight
-                            )
-                            .frame(width: displayWidth)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-                            .shadow(color: Color.black.opacity(0.25), radius: 24, x: 0, y: 12)
-                            .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                            ZStack(alignment: .topTrailing) {
+                                NoteSharePosterContent(
+                                    noteContent: note.content,
+                                    formattedDate: posterDate,
+                                    hiddenMessage: hiddenMessage,
+                                    inkTheme: inkTheme,
+                                    minimumHeight: minimumHeight
+                                )
+                                .frame(width: displayWidth)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                                .shadow(color: Color.black.opacity(0.25), radius: 24, x: 0, y: 12)
+                                .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+
+                                Button(action: cycleInkTheme) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                            .font(.system(size: 11, weight: .semibold))
+                                        Text("换一换")
+                                            .font(.system(size: 11, weight: .medium))
+                                    }
+                                    .foregroundColor(Color(red: 0.10, green: 0.095, blue: 0.085).opacity(0.72))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.white.opacity(0.82))
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.black.opacity(0.08), lineWidth: 0.5)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isBusy)
+                                .padding(12)
+                                .accessibilityLabel("换一换背景，当前\(inkTheme.label)")
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 24)
@@ -374,6 +417,12 @@ struct NoteSharePosterOverlay: View {
         .background(ClearFullScreenCoverBackground())
     }
 
+    private func cycleInkTheme() {
+        withAnimation(.easeInOut(duration: 0.22)) {
+            inkTheme = inkTheme.next()
+        }
+    }
+
     @MainActor
     private func savePoster() {
         guard !isBusy else { return }
@@ -383,6 +432,7 @@ struct NoteSharePosterOverlay: View {
             noteContent: note.content,
             posterDate: posterDate,
             hiddenMessage: hiddenMessage,
+            inkTheme: inkTheme,
             width: posterWidth
         ) else {
             imageSaver.showMessage("Save failed")
@@ -406,6 +456,7 @@ struct NoteSharePosterOverlay: View {
                 noteContent: note.content,
                 posterDate: posterDate,
                 hiddenMessage: hiddenMessage,
+                inkTheme: inkTheme,
                 width: posterWidth
             ) else {
                 imageSaver.showMessage("Save failed")
@@ -427,6 +478,7 @@ struct NoteSharePosterContent: View {
     let noteContent: String
     let formattedDate: String
     let hiddenMessage: String
+    var inkTheme: PosterInkTheme = .mei
     var minimumHeight: CGFloat = PosterShareRenderer.exportHeight(for: PosterShareRenderer.exportWidth)
 
     private var authorText: String? {
@@ -488,6 +540,11 @@ struct NoteSharePosterContent: View {
 
             PaperGrainOverlay()
                 .opacity(0.32)
+
+            InkWashThemeOverlay(
+                theme: inkTheme,
+                contentLength: contentLength
+            )
 
             RadialGradient(
                 colors: [

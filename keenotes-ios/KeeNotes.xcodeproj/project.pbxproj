@@ -51,6 +51,7 @@
 		E25A21451F493CE5F788ACCD /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9040A9739D8D0416CE13A31 /* MainTabView.swift */; };
 		E641EC093049E5F7E4D0D094 /* ref.c in Sources */ = {isa = PBXBuildFile; fileRef = 9946B1EE523C44AB196C6446 /* ref.c */; };
 		E7F8091A2B3C4D5E6F7081A /* PosterBGM.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F8091A2B3C4D5E6F70819 /* PosterBGM.swift */; };
+		E8F8092A3B4C5D6E7F80921 /* PosterInkTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F8092A3B4C5D6E7F80920 /* PosterInkTheme.swift */; };
 		F1A2B3C4D5E6F70819203456 /* FloatingDockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F70819203457 /* FloatingDockView.swift */; };
 		F1A2B3C4D5E6F7081929304B /* OnThisDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3B4C5D6E7F8091A2B3C4D /* OnThisDayView.swift */; };
 		FBDF52C9E3B0CF6AFF1CAF1A /* KeeNotesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D8A3032850BEA6F1E1698E /* KeeNotesApp.swift */; };
@@ -108,6 +109,7 @@
 		E3D4C5B6A7980819210C6F9C /* WizardInlineCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardInlineCard.swift; sourceTree = "<group>"; };
 		E71854385AA7C1EECC7F20F2 /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
 		E7F8091A2B3C4D5E6F70819 /* PosterBGM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterBGM.swift; sourceTree = "<group>"; };
+		E8F8092A3B4C5D6E7F80920 /* PosterInkTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterInkTheme.swift; sourceTree = "<group>"; };
 		EAA89252DC520456A6A43EEC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		EC56614EF00CDBBE7B740F99 /* SettingsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsService.swift; sourceTree = "<group>"; };
 		EF27F1ADF86A469C5DA5CDCE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -214,6 +216,7 @@
 				A1C2D3E4F5A6B7C8D9E0F125 /* KeychainService.swift */,
 				DD1B2C3D4E5F60718293AB04 /* PendingNoteService.swift */,
 				E7F8091A2B3C4D5E6F70819 /* PosterBGM.swift */,
+				E8F8092A3B4C5D6E7F80920 /* PosterInkTheme.swift */,
 				B4C5D6E7F8091A2B3C4D5E6 /* PosterShareRenderer.swift */,
 				C5D6E7F8091A2B3C4D5E6F7 /* PosterVideoComposer.swift */,
 				D6E7F8091A2B3C4D5E6F708 /* PosterVideoExporter.swift */,
@@ -371,6 +374,7 @@
 				E139ECF55E6E158E602AD200 /* NoteView.swift in Sources */,
 				CC1B2C3D4E5F60718293AB03 /* PendingNoteService.swift in Sources */,
 				E7F8091A2B3C4D5E6F7081A /* PosterBGM.swift in Sources */,
+				E8F8092A3B4C5D6E7F80921 /* PosterInkTheme.swift in Sources */,
 				B4C5D6E7F8091A2B3C4D5E7 /* PosterShareRenderer.swift in Sources */,
 				C5D6E7F8091A2B3C4D5E6F8 /* PosterVideoComposer.swift in Sources */,
 				D6E7F8091A2B3C4D5E6F709 /* PosterVideoExporter.swift in Sources */,
@@ -481,7 +485,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.7.16;
+				MARKETING_VERSION = 1.7.17;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
@@ -505,7 +509,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.7.16;
+				MARKETING_VERSION = 1.7.17;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
