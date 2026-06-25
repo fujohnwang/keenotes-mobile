@@ -10,6 +10,16 @@
 git checkout v1.2.3 && ./scripts/release-local.sh --publish
 ```
 
+## Git hooks（推荐）
+
+Release 脚本会在工作区改写 `BuildInfo.java`（正式版号），不应提交进仓库。启用 pre-commit 检查：
+
+```bash
+./scripts/setup-git-hooks.sh
+```
+
+提交时若 staged 的 `BuildInfo.java` 中 `VERSION != "dev"`，commit 会被拒绝。
+
 
 
 

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Block commits that change BuildInfo.java away from the dev placeholder version.
+# Release builds (local scripts / CI) rewrite this file in the working tree only.
+
+set -euo pipefail
+
+BUILD_INFO="src/main/java/cn/keevol/keenotes/mobilefx/generated/BuildInfo.java"
+
+if ! git diff --cached --name-only --diff-filter=ACM | grep -qx "$BUILD_INFO"; then
+  exit 0
+fi
+
+staged_version="$(
+  git show ":$BUILD_INFO" \
+    | sed -n 's/.*public static final String VERSION = "\([^"]*\)".*/\1/p' \
+    | head -n 1
+)"
+
+if [[ "$staged_version" == "dev" ]]; then
+  exit 0
+fi
+
+cat >&2 <<EOF
+pre-commit: refusing to commit release BuildInfo.java
+
+  file:    $BUILD_INFO
+  VERSION: ${staged_version:-<missing>}
+
+BuildInfo.java in git must keep VERSION = "dev".
+Release builds generate a real version locally or in CI; do not commit that file.
+
+Restore the dev placeholder:
+  git restore --staged --worktree -- $BUILD_INFO
+EOF
+
+exit 1
