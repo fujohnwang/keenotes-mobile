@@ -657,26 +657,30 @@ public class NotesDisplayPanel extends VBox {
      * and completes the border animation.
      */
     public void replaceOptimisticNoteWithReal(LocalCacheService.NoteData realNote) {
-        if (optimisticNoteData != null) {
-            if (!closedOptimisticNotes.remove(optimisticNoteData)) {
-                resolvedOptimisticNotes.add(optimisticNoteData);
-            }
-            int index = noteItems.indexOf(optimisticNoteData);
-            if (index >= 0) {
-                if (isDuplicateRealNote(realNote)) {
-                    noteItems.remove(index);
-                } else {
-                    // Replace the optimistic note data with real note data
-                    noteItems.set(index, realNote);
-                    trackRenderedNote(realNote);
-                }
-            }
+        if (optimisticNoteData == null) {
+            return;
         }
-        // Complete the border animation on the card
+
+        if (!closedOptimisticNotes.remove(optimisticNoteData)) {
+            resolvedOptimisticNotes.add(optimisticNoteData);
+        }
+
+        // Complete border animation before list mutation so updateItem does not cancel it
+        // and trigger a heavy TextArea relayout on the FX thread.
         if (optimisticCard != null) {
             optimisticCard.completeBorderAnimation();
         }
-        // Clear optimistic tracking
+
+        int index = noteItems.indexOf(optimisticNoteData);
+        if (index >= 0) {
+            if (isDuplicateRealNote(realNote)) {
+                noteItems.remove(index);
+            } else {
+                noteItems.set(index, realNote);
+                trackRenderedNote(realNote);
+            }
+        }
+
         optimisticNoteData = null;
         optimisticCard = null;
     }

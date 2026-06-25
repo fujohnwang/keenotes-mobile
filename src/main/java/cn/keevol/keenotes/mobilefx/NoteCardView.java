@@ -27,6 +27,8 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.util.Duration;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /**
  * Individual note card component for displaying a single note
  * Click card to copy entire content to clipboard
@@ -58,6 +60,8 @@ public class NoteCardView extends StackPane {
     private boolean widthCalibrated = false;
     private boolean internalTextListenerAttached = false;
     private boolean viewportWidthListenerAttached = false;
+    private final AtomicBoolean layoutRefreshPending = new AtomicBoolean(false);
+    private boolean updatingContentHeight = false;
 
     public NoteCardView(LocalCacheService.NoteData noteData) {
         this.noteData = noteData;
@@ -108,7 +112,7 @@ public class NoteCardView extends StackPane {
         contentArea.setScrollLeft(0);
         contentArea.skinProperty().addListener((obs, oldSkin, newSkin) -> {
             if (newSkin != null) {
-                javafx.application.Platform.runLater(this::requestLayoutRefresh);
+                scheduleLayoutRefresh();
             }
         });
 
@@ -127,7 +131,7 @@ public class NoteCardView extends StackPane {
         contentArea.widthProperty().addListener((obs, oldWidth, newWidth) -> {
             double w = newWidth.doubleValue();
             if (w > 0 && Math.abs(w - oldWidth.doubleValue()) > 0.5) {
-                requestLayoutRefresh();
+                scheduleLayoutRefresh();
             }
         });
 
@@ -135,13 +139,13 @@ public class NoteCardView extends StackPane {
         widthProperty().addListener((obs, oldWidth, newWidth) -> {
             double w = newWidth.doubleValue();
             if (w > 0 && Math.abs(w - oldWidth.doubleValue()) > 0.5) {
-                javafx.application.Platform.runLater(this::requestLayoutRefresh);
+                scheduleLayoutRefresh();
             }
         });
 
         sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
-                javafx.application.Platform.runLater(this::requestLayoutRefresh);
+                scheduleLayoutRefresh();
             }
         });
 
@@ -229,6 +233,21 @@ public class NoteCardView extends StackPane {
     }
 
     /**
+     * Coalesce layout refresh requests onto a single FX pulse to avoid synchronous
+     * width/listener feedback loops that can freeze the UI thread.
+     */
+    private void scheduleLayoutRefresh() {
+        if (layoutRefreshPending.compareAndSet(false, true)) {
+            javafx.application.Platform.runLater(() -> {
+                layoutRefreshPending.set(false);
+                if (getScene() != null) {
+                    requestLayoutRefresh();
+                }
+            });
+        }
+    }
+
+    /**
      * Recalibrate text wrapping and relayout the card subtree.
      * Mirrors the layout flush that hover's setStyle() used to trigger implicitly.
      */
@@ -241,8 +260,7 @@ public class NoteCardView extends StackPane {
         if (w > 0) {
             syncTextMeasureWrappingWidth(w);
         }
-        applyCss();
-        layout();
+        requestLayout();
         updateContentAreaHeight();
     }
 
@@ -407,7 +425,18 @@ public class NoteCardView extends StackPane {
         updateThemeColors();
         updateContentTypography();
         cancelBorderAnimation();
-        javafx.application.Platform.runLater(this::requestLayoutRefresh);
+        scheduleLayoutRefresh();
+    }
+
+    /**
+     * Lightweight optimistic-resolve path: content is unchanged, only server metadata differs.
+     * Avoids TextArea relayout that can deadlock the FX thread during send completion.
+     */
+    public void resolveWithRealNote(LocalCacheService.NoteData realNote) {
+        this.noteData = realNote;
+        dateLabel.setText(DateTimeUtil.utcToLocalDisplay(realNote.createdAt));
+        String ch = (realNote.channel != null && !realNote.channel.isEmpty()) ? realNote.channel : "default";
+        channelLabel.setText("• " + ch);
     }
 
     /**
@@ -486,6 +515,18 @@ public class NoteCardView extends StackPane {
      * Called only by layoutBoundsProperty listeners — never manually.
      */
     private void updateContentAreaHeight() {
+        if (updatingContentHeight) {
+            return;
+        }
+        updatingContentHeight = true;
+        try {
+            updateContentAreaHeightImpl();
+        } finally {
+            updatingContentHeight = false;
+        }
+    }
+
+    private void updateContentAreaHeightImpl() {
         double textHeight = 0;
 
         // Prefer actual rendered Text node height — ground truth after skin load
@@ -543,6 +584,10 @@ public class NoteCardView extends StackPane {
                 // ease-out cubic: 前段快、后段慢，让用户立刻感受到反馈
                 double progress = 1.0 - Math.pow(1.0 - t, 3);
                 drawBorderProgress(progress);
+                if (t >= 1.0) {
+                    stop();
+                    borderTimer = null;
+                }
             }
         };
         borderTimer.start();
