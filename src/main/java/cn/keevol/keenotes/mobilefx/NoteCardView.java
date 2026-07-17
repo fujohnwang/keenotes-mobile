@@ -200,7 +200,7 @@ public class NoteCardView extends StackPane {
             }
         });
 
-        // Copied popup (positioned at top-right of the note content area)
+        // Copied popup (positioned at the center of the whole note card)
         copiedPopup = new Label("✓ Copied");
         copiedPopup.getStyleClass().add("copied-popup");
 
@@ -216,15 +216,14 @@ public class NoteCardView extends StackPane {
         copiedPopup.setVisible(false);
         copiedPopup.setOpacity(0);
         copiedPopup.setMouseTransparent(true);
-        StackPane.setAlignment(copiedPopup, Pos.TOP_RIGHT);
-        StackPane.setMargin(copiedPopup, new Insets(8, 8, 0, 0));
+        StackPane.setAlignment(copiedPopup, Pos.CENTER);
 
-        StackPane contentCopyArea = new StackPane(contentArea, copiedPopup);
+        StackPane contentCopyArea = new StackPane(contentArea);
         contentCopyArea.setMaxWidth(Double.MAX_VALUE);
 
         contentBox.getChildren().addAll(headerRow, contentCopyArea);
 
-        getChildren().add(contentBox);
+        getChildren().addAll(contentBox, copiedPopup);
 
         // Border animation canvas (on top, mouse transparent, does not affect layout)
         borderCanvas = new Canvas();
