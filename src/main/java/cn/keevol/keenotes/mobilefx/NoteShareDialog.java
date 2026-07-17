@@ -13,6 +13,8 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -189,9 +191,23 @@ public class NoteShareDialog extends Dialog<Void> {
 
         try {
             NotePosterRenderer.writePng(currentPoster, selected);
-            setStatus("海报已保存：" + selected.getName(), false);
+            if (copyPosterToClipboard()) {
+                setStatus("海报已保存，并已复制到剪切板：" + selected.getName(), false);
+            } else {
+                setStatus("海报已保存，但复制到剪切板失败：" + selected.getName(), true);
+            }
         } catch (Exception e) {
             setStatus("保存海报失败：" + e.getMessage(), true);
+        }
+    }
+
+    private boolean copyPosterToClipboard() {
+        try {
+            ClipboardContent clipboardContent = new ClipboardContent();
+            clipboardContent.putImage(NotePosterRenderer.toFxImage(currentPoster));
+            return Clipboard.getSystemClipboard().setContent(clipboardContent);
+        } catch (Exception e) {
+            return false;
         }
     }
 
