@@ -49,7 +49,6 @@
 .search-result-card {
     -fx-background-radius: 12px;
     -fx-border-radius: 12px;
-    -fx-cursor: hand;
 }
 
 .search-result-title {

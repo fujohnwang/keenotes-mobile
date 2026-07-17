@@ -4,6 +4,7 @@ module com.keenotes.mobile {
     requires javafx.graphics;
     requires javafx.base;
     requires java.sql;
+    requires java.desktop;
 
     // OkHttp WebSocket客户端 + HTTP请求
     requires okhttp3;

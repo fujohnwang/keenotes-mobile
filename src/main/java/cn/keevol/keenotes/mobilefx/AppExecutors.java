@@ -12,6 +12,7 @@ import java.util.concurrent.ThreadFactory;
 public final class AppExecutors {
 
     private static final ExecutorService UI_DB = Executors.newSingleThreadExecutor(namedDaemon("ui-db"));
+    private static final ExecutorService MEDIA = Executors.newSingleThreadExecutor(namedDaemon("media"));
 
     private AppExecutors() {
     }
@@ -28,8 +29,13 @@ public final class AppExecutors {
         UI_DB.execute(task);
     }
 
+    public static ExecutorService media() {
+        return MEDIA;
+    }
+
     public static void shutdown() {
         UI_DB.shutdownNow();
+        MEDIA.shutdownNow();
     }
 
     private static ThreadFactory namedDaemon(String name) {

@@ -91,7 +91,6 @@
     -fx-background-radius: 12px;
     -fx-border-color: -fx-border;
     -fx-border-radius: 12px;
-    -fx-cursor: hand;
 }
 
 .search-result-card:hover {

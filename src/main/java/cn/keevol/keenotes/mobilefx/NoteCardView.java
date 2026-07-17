@@ -8,10 +8,12 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
@@ -19,19 +21,22 @@ import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.SVGPath;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.stage.Window;
 import javafx.util.Duration;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Individual note card component for displaying a single note
- * Click card to copy entire content to clipboard
+ * Click note content area to copy entire content to clipboard
  * Select text with mouse, right-click or Ctrl+C to copy selection
  */
 public class NoteCardView extends StackPane {
@@ -43,6 +48,8 @@ public class NoteCardView extends StackPane {
     private final Text textMeasure;
     private final Label dateLabel;
     private final Label channelLabel;
+    private final Button shareButton;
+    private final SVGPath shareIcon;
 
     // Border progress animation
     private Canvas borderCanvas;
@@ -78,6 +85,7 @@ public class NoteCardView extends StackPane {
         // Header row: date and channel
         HBox headerRow = new HBox(12);
         headerRow.setAlignment(Pos.CENTER_LEFT);
+        headerRow.setMaxWidth(Double.MAX_VALUE);
 
         dateLabel = new Label(DateTimeUtil.utcToLocalDisplay(noteData.createdAt));
         dateLabel.getStyleClass().add("note-date");
@@ -93,7 +101,21 @@ public class NoteCardView extends StackPane {
         String secondaryColor = isDark ? "#8B949E" : "#57606A";
         channelLabel.setStyle("-fx-text-fill: " + secondaryColor + "; -fx-font-size: 12px;");
 
-        headerRow.getChildren().addAll(dateLabel, channelLabel);
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+
+        shareIcon = createShareIcon();
+        shareButton = new Button();
+        shareButton.setGraphic(shareIcon);
+        shareButton.setTooltip(new Tooltip("Share as poster or video"));
+        shareButton.setFocusTraversable(false);
+        shareButton.setOnAction(e -> {
+            e.consume();
+            showShareDialog();
+        });
+        updateShareButtonStyle();
+
+        headerRow.getChildren().addAll(dateLabel, channelLabel, headerSpacer, shareButton);
 
         // Full content using TextArea (read-only, selectable)
         contentArea = new TextArea(noteData.content);
@@ -167,19 +189,18 @@ public class NoteCardView extends StackPane {
             }
         });
 
-        // Click on TextArea (when no text selected) to copy all
+        // Click on TextArea (when no text selected) to copy all.
         contentArea.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 1) {
                 String selected = contentArea.getSelectedText();
                 if (selected == null || selected.isEmpty()) {
                     handleCopy();
+                    e.consume();
                 }
             }
         });
 
-        contentBox.getChildren().addAll(headerRow, contentArea);
-
-        // Copied popup (positioned at top-right)
+        // Copied popup (positioned at top-right of the note content area)
         copiedPopup = new Label("✓ Copied");
         copiedPopup.getStyleClass().add("copied-popup");
 
@@ -194,10 +215,16 @@ public class NoteCardView extends StackPane {
                         "-fx-font-size: 11px;");
         copiedPopup.setVisible(false);
         copiedPopup.setOpacity(0);
+        copiedPopup.setMouseTransparent(true);
         StackPane.setAlignment(copiedPopup, Pos.TOP_RIGHT);
         StackPane.setMargin(copiedPopup, new Insets(8, 8, 0, 0));
 
-        getChildren().addAll(contentBox, copiedPopup);
+        StackPane contentCopyArea = new StackPane(contentArea, copiedPopup);
+        contentCopyArea.setMaxWidth(Double.MAX_VALUE);
+
+        contentBox.getChildren().addAll(headerRow, contentCopyArea);
+
+        getChildren().add(contentBox);
 
         // Border animation canvas (on top, mouse transparent, does not affect layout)
         borderCanvas = new Canvas();
@@ -210,14 +237,6 @@ public class NoteCardView extends StackPane {
             borderCanvas.setWidth(newBounds.getWidth());
             borderCanvas.setHeight(newBounds.getHeight());
         });
-
-        // Click anywhere on card (outside TextArea) to copy all
-        setOnMouseClicked(e -> {
-            if (e.getButton() == MouseButton.PRIMARY) {
-                handleCopy();
-            }
-        });
-        setCursor(javafx.scene.Cursor.HAND);
 
         // Hover effect on card
         setOnMouseEntered(e -> {
@@ -474,6 +493,7 @@ public class NoteCardView extends StackPane {
                         "-fx-background-radius: 4; " +
                         "-fx-font-size: 11px; " +
                         "-fx-font-weight: bold;");
+        updateShareButtonStyle();
     }
 
     /**
@@ -507,6 +527,49 @@ public class NoteCardView extends StackPane {
         return "\"" + safeFontFamily
                 .replace("\\", "\\\\")
                 .replace("\"", "\\\"") + "\"";
+    }
+
+    private SVGPath createShareIcon() {
+        SVGPath icon = new SVGPath();
+        icon.setContent("M18 16.5 C17.2 16.5 16.5 16.8 16 17.3 L8.9 13.2 C9 12.8 9 12.4 9 12 C9 11.6 9 11.2 8.9 10.8 L16 6.7 C16.5 7.2 17.2 7.5 18 7.5 C19.7 7.5 21 6.2 21 4.5 C21 2.8 19.7 1.5 18 1.5 C16.3 1.5 15 2.8 15 4.5 C15 4.9 15.1 5.3 15.2 5.6 L8.1 9.7 C7.6 9.3 6.9 9 6 9 C4.3 9 3 10.3 3 12 C3 13.7 4.3 15 6 15 C6.9 15 7.6 14.7 8.1 14.3 L15.2 18.4 C15.1 18.7 15 19.1 15 19.5 C15 21.2 16.3 22.5 18 22.5 C19.7 22.5 21 21.2 21 19.5 C21 17.8 19.7 16.5 18 16.5 Z");
+        icon.setScaleX(0.58);
+        icon.setScaleY(0.58);
+        return icon;
+    }
+
+    private void updateShareButtonStyle() {
+        boolean isDark = ThemeService.getInstance().isDarkTheme();
+        String iconColor = isDark ? "#8B949E" : "#57606A";
+        String hoverBg = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(9, 105, 218, 0.08)";
+        shareIcon.setFill(Color.web(iconColor));
+        shareButton.setStyle(
+                "-fx-background-color: transparent; " +
+                        "-fx-background-radius: 16; " +
+                        "-fx-padding: 4 6; " +
+                        "-fx-min-width: 28; " +
+                        "-fx-min-height: 28; " +
+                        "-fx-cursor: hand;");
+        shareButton.setOnMouseEntered(e -> shareButton.setStyle(
+                "-fx-background-color: " + hoverBg + "; " +
+                        "-fx-background-radius: 16; " +
+                        "-fx-padding: 4 6; " +
+                        "-fx-min-width: 28; " +
+                        "-fx-min-height: 28; " +
+                        "-fx-cursor: hand;"));
+        shareButton.setOnMouseExited(e -> updateShareButtonStyle());
+    }
+
+    private void showShareDialog() {
+        Window owner = getScene() == null ? null : getScene().getWindow();
+        LocalCacheService.NoteData snapshot = new LocalCacheService.NoteData(
+                noteData.id,
+                noteData.content,
+                noteData.channel,
+                noteData.createdAt,
+                noteData.encryptedContent
+        );
+        NoteShareDialog dialog = new NoteShareDialog(owner, snapshot);
+        dialog.show();
     }
 
     /**
