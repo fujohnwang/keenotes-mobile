@@ -17,6 +17,7 @@ import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.FragmentOnThisDayBinding
+import cn.keevol.keenotes.share.NoteShareDialogFragment
 import cn.keevol.keenotes.ui.common.EnlargedNoteDismissGesture
 import cn.keevol.keenotes.ui.review.NotesAdapter
 import cn.keevol.keenotes.util.DateTimeUtil
@@ -31,7 +32,10 @@ class OnThisDayFragment : Fragment() {
     private var _binding: FragmentOnThisDayBinding? = null
     private val binding get() = _binding!!
 
-    private val notesAdapter = NotesAdapter { note -> showEnlargedNote(note) }
+    private val notesAdapter = NotesAdapter(
+        onEnlargeClick = { note -> showEnlargedNote(note) },
+        onShareClick = { note -> showShareDialog(note) }
+    )
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -111,6 +115,10 @@ class OnThisDayFragment : Fragment() {
             hideEnlargedNote()
         }
 
+        binding.enlargedNoteContainer.enlargedShareButton.setOnClickListener {
+            showShareDialog(note)
+        }
+
         binding.emptyText.visibility = View.GONE
         binding.notesRecyclerView.visibility = View.GONE
         container.visibility = View.VISIBLE
@@ -159,6 +167,10 @@ class OnThisDayFragment : Fragment() {
             setGravity(Gravity.CENTER, 0, 0)
             show()
         }
+    }
+
+    private fun showShareDialog(note: Note) {
+        NoteShareDialogFragment.show(parentFragmentManager, note)
     }
 
     override fun onDestroyView() {

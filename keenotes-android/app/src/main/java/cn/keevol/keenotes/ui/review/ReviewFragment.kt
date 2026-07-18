@@ -18,6 +18,7 @@ import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.FragmentReviewBinding
 import cn.keevol.keenotes.network.WebSocketService
+import cn.keevol.keenotes.share.NoteShareDialogFragment
 import cn.keevol.keenotes.ui.common.EnlargedNoteDismissGesture
 import cn.keevol.keenotes.util.ZeroWidthSteganography
 import kotlinx.coroutines.Job
@@ -33,7 +34,10 @@ class ReviewFragment : Fragment() {
     private var _binding: FragmentReviewBinding? = null
     private val binding get() = _binding!!
     
-    private val notesAdapter = NotesAdapter { note -> showEnlargedNote(note) }
+    private val notesAdapter = NotesAdapter(
+        onEnlargeClick = { note -> showEnlargedNote(note) },
+        onShareClick = { note -> showShareDialog(note) }
+    )
     private var currentPeriod = "7 days"
     private var notesJob: Job? = null
     private var dotsAnimationJob: Job? = null
@@ -369,6 +373,10 @@ class ReviewFragment : Fragment() {
         binding.enlargedNoteContainer.shrinkButton.setOnClickListener {
             hideEnlargedNote()
         }
+
+        binding.enlargedNoteContainer.enlargedShareButton.setOnClickListener {
+            showShareDialog(note)
+        }
         
         // Show enlarged, hide list
         binding.notesRecyclerView.visibility = View.GONE
@@ -414,6 +422,10 @@ class ReviewFragment : Fragment() {
             setGravity(Gravity.CENTER, 0, 0)
             show()
         }
+    }
+
+    private fun showShareDialog(note: Note) {
+        NoteShareDialogFragment.show(parentFragmentManager, note)
     }
     
     override fun onDestroyView() {

@@ -19,6 +19,7 @@ import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.FragmentSearchBinding
 import cn.keevol.keenotes.network.WebSocketService
+import cn.keevol.keenotes.share.NoteShareDialogFragment
 import cn.keevol.keenotes.ui.common.EnlargedNoteDismissGesture
 import cn.keevol.keenotes.ui.review.NotesAdapter
 import cn.keevol.keenotes.util.DateTimeUtil
@@ -34,7 +35,10 @@ class SearchFragment : Fragment() {
     private var _binding: FragmentSearchBinding? = null
     private val binding get() = _binding!!
     
-    private val notesAdapter = NotesAdapter { note -> showEnlargedNote(note) }
+    private val notesAdapter = NotesAdapter(
+        onEnlargeClick = { note -> showEnlargedNote(note) },
+        onShareClick = { note -> showShareDialog(note) }
+    )
     private var searchJob: Job? = null
     
     override fun onCreateView(
@@ -187,6 +191,10 @@ class SearchFragment : Fragment() {
             hideEnlargedNote()
         }
 
+        binding.enlargedNoteContainer.enlargedShareButton.setOnClickListener {
+            showShareDialog(note)
+        }
+
         binding.searchResultsRecyclerView.visibility = View.GONE
         container.visibility = View.VISIBLE
         container.alpha = 0f
@@ -224,6 +232,10 @@ class SearchFragment : Fragment() {
             setGravity(Gravity.CENTER, 0, 0)
             show()
         }
+    }
+
+    private fun showShareDialog(note: Note) {
+        NoteShareDialogFragment.show(parentFragmentManager, note)
     }
     
     private fun updateSyncChannelStatus(state: WebSocketService.ConnectionState) {

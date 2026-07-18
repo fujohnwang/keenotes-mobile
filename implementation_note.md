@@ -17,3 +17,8 @@
 - 分享 Dialog 使用隐藏的 `CANCEL_CLOSE` ButtonType 保留系统关闭行为；可见的“关闭”按钮只是自定义 toolbar 入口。
 - 默认保存名为 `keenotes-{note.id}-{yyyy-MM-dd}-{HHmmss}`，其中时间戳取打开保存面板时的本地时间。
 - 图片海报保存成功后会同时复制同一张图片到系统剪切板；视频保存不写剪切板。
+
+## Android 海报/视频分享记录
+
+- Android 端采用 Media3 Transformer 导出视频，不内置 ffmpeg；为减少 scoped storage 兼容分支，`minSdk` 提到 29。
+- 视频只保存到相册；海报支持保存到相册和系统分享，分享临时文件通过 FileProvider 暴露 content uri。

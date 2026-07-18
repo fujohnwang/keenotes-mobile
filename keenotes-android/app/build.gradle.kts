@@ -4,13 +4,15 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val media3Version = "1.10.1"
+
 android {
     namespace = "cn.keevol.keenotes"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "cn.keevol.keenotes"
-        minSdk = 26
+        minSdk = 29
         targetSdk = 35
         
         // Version from gradle properties or default
@@ -120,6 +122,11 @@ dependencies {
     
     // DataStore for preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+    // Media3 Transformer for poster video export
+    implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-effect:$media3Version")
+    implementation("androidx.media3:media3-transformer:$media3Version")
     
     // Crypto - BouncyCastle for Argon2
     implementation("org.bouncycastle:bcprov-jdk18on:1.77")

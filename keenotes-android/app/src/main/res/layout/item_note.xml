@@ -42,6 +42,16 @@
                 android:textColor="@color/text_secondary" />
 
             <ImageButton
+                android:id="@+id/shareButton"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_share"
+                android:scaleType="centerInside"
+                android:padding="5dp"
+                android:contentDescription="@string/share_note" />
+
+            <ImageButton
                 android:id="@+id/enlargeButton"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
