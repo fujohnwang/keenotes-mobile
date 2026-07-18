@@ -137,17 +137,17 @@ class NoteShareDialogFragment : DialogFragment() {
         }
         toolbar.addView(savePosterButton)
 
-        sharePosterButton = createIconButton(R.drawable.ic_share, "Share poster") {
-            sharePoster()
-        }
-        toolbar.addView(sharePosterButton)
-
         saveVideoButton = createIconButton(R.drawable.ic_video, "Save video") {
             saveVideo()
         }
         toolbar.addView(saveVideoButton)
 
-        closeButton = createIconButton(R.drawable.ic_close_fullscreen, "Close") {
+        sharePosterButton = createIconButton(R.drawable.ic_share, "Share poster") {
+            sharePoster()
+        }
+        toolbar.addView(sharePosterButton)
+
+        closeButton = createIconButton(R.drawable.ic_close, "Close") {
             dismissAllowingStateLoss()
         }
         toolbar.addView(closeButton)
@@ -245,7 +245,6 @@ class NoteShareDialogFragment : DialogFragment() {
     private fun refreshPreview() {
         renderJob?.cancel()
         setBusy(true)
-        showStatus("Rendering poster...", autoHide = false)
         val appContext = requireContext().applicationContext
         val noteSnapshot = note
         val hiddenSnapshot = hiddenMessage
@@ -257,7 +256,6 @@ class NoteShareDialogFragment : DialogFragment() {
                 }
                 currentPoster = poster
                 posterImageView.setImageBitmap(poster)
-                showStatus("Background: ${themeSnapshot.label}", autoHide = true)
             } catch (e: Exception) {
                 showStatus("Poster render failed", autoHide = false)
             } finally {

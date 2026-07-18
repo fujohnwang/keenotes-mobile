@@ -22,3 +22,4 @@
 
 - Android 端采用 Media3 Transformer 导出视频，不内置 ffmpeg；为减少 scoped storage 兼容分支，`minSdk` 提到 29。
 - 视频只保存到相册；海报支持保存到相册和系统分享，分享临时文件通过 FileProvider 暴露 content uri。
+- 预览打开/切换背景时不再显示水墨素材名称；关闭入口使用 X 图标，避免和缩小图标混淆。
