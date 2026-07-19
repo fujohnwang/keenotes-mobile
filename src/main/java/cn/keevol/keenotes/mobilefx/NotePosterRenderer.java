@@ -9,6 +9,7 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Font;
+import java.awt.FontFormatException;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.LinearGradientPaint;
@@ -27,6 +28,8 @@ import java.util.List;
 public final class NotePosterRenderer {
     public static final int EXPORT_WIDTH = 1080;
     public static final double ASPECT_RATIO = 9.0 / 16.0;
+    private static final String POSTER_FONT_RESOURCE = "/fonts/MiSans-Regular.ttf";
+    private static final Font BASE_POSTER_FONT = loadBasePosterFont();
 
     private static final int PAPER_RGB = 0xFDFCFB;
     private static final Color INK_TEXT = new Color(26, 24, 22);
@@ -65,9 +68,9 @@ public final class NotePosterRenderer {
         int contentLineSpacing = scaled(resolveContentLineSpacing(contentLength), scale);
         int footerFontSize = scaled(11, scale);
 
-        Font contentFont = new Font(Font.SERIF, Font.BOLD, contentFontSize);
-        Font footerFont = new Font(Font.SANS_SERIF, Font.PLAIN, footerFontSize);
-        Font badgeFont = new Font(Font.SANS_SERIF, Font.BOLD, footerFontSize);
+        Font contentFont = posterFont(Font.BOLD, contentFontSize);
+        Font footerFont = posterFont(Font.PLAIN, footerFontSize);
+        Font badgeFont = posterFont(Font.BOLD, footerFontSize);
 
         BufferedImage measureImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         Graphics2D measureGraphics = measureImage.createGraphics();
@@ -178,6 +181,21 @@ public final class NotePosterRenderer {
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+    }
+
+    private static Font posterFont(int style, int size) {
+        return BASE_POSTER_FONT.deriveFont(style, (float) size);
+    }
+
+    private static Font loadBasePosterFont() {
+        try (InputStream input = NotePosterRenderer.class.getResourceAsStream(POSTER_FONT_RESOURCE)) {
+            if (input != null) {
+                return Font.createFont(Font.TRUETYPE_FONT, input);
+            }
+        } catch (FontFormatException | IOException e) {
+            // Fall through to platform sans-serif if the bundled font cannot be loaded.
+        }
+        return new Font(Font.SANS_SERIF, Font.PLAIN, 12);
     }
 
     private static void paintPaperGrain(Graphics2D g, int width, int height, double scale) {

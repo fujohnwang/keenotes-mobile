@@ -17,9 +17,15 @@
 - 分享 Dialog 使用隐藏的 `CANCEL_CLOSE` ButtonType 保留系统关闭行为；可见的“关闭”按钮只是自定义 toolbar 入口。
 - 默认保存名为 `keenotes-{note.id}-{yyyy-MM-dd}-{HHmmss}`，其中时间戳取打开保存面板时的本地时间。
 - 图片海报保存成功后会同时复制同一张图片到系统剪切板；视频保存不写剪切板。
+- Java2D 海报正文/footer 显式加载 bundled `MiSans-Regular.ttf`，避免 logical font fallback 导致中英文标点 glyph 丢失。
 
 ## Android 海报/视频分享记录
 
 - Android 端采用 Media3 Transformer 导出视频，不内置 ffmpeg；为减少 scoped storage 兼容分支，`minSdk` 提到 29。
 - 视频只保存到相册；海报支持保存到相册和系统分享，分享临时文件通过 FileProvider 暴露 content uri。
 - 预览打开/切换背景时不再显示水墨素材名称；关闭入口使用 X 图标，避免和缩小图标混淆。
+
+## 开源前敏感历史清理记录
+
+- 2026-07-19：用 `git filter-branch` 删除误入历史的 `src/main/resources/fonts/NotoSansSC-Regular.ttf`，并将 `todos/overall_performance_optimization.md` 里的真实运行日志替换为 `[REDACTED]`。
+- 本机没有 `git filter-repo`，所以选择 `filter-branch`；清理前完整备份在 `/private/tmp/keenotes-mobile-before-sensitive-history-rewrite.bundle`，这个 bundle 仍包含旧敏感历史，不要上传。
