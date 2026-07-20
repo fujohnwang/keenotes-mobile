@@ -9,6 +9,7 @@ struct EnlargedNoteView: View {
     
     @State private var showCopiedAlert = false
     @State private var showSharePoster = false
+    @State private var showOverwriteDraftAlert = false
     @State private var dragOffset: CGFloat = 0
     
     private var isPad: Bool { DeviceType.isPad }
@@ -47,6 +48,15 @@ struct EnlargedNoteView: View {
                 Spacer()
 
                 HStack(spacing: 4) {
+                    Button(action: requestReviseAsNewNote) {
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: isPad ? 20 : 17))
+                            .foregroundColor(.secondary)
+                            .padding(8)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
                     Button(action: { showSharePoster = true }) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: isPad ? 20 : 17))
@@ -132,6 +142,14 @@ struct EnlargedNoteView: View {
                 onDismiss: { showSharePoster = false }
             )
         }
+        .alert("Overwrite current draft?", isPresented: $showOverwriteDraftAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Overwrite", role: .destructive) {
+                applyRevisionDraft()
+            }
+        } message: {
+            Text("Current input text will be replaced. The original note will not change.")
+        }
     }
     
     private func copyToClipboard() {
@@ -150,6 +168,20 @@ struct EnlargedNoteView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation { showCopiedAlert = false }
         }
+    }
+
+    private func requestReviseAsNewNote() {
+        if appState.noteDraftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            applyRevisionDraft()
+        } else {
+            showOverwriteDraftAlert = true
+        }
+    }
+
+    private func applyRevisionDraft() {
+        appState.noteDraftText = note.content
+        appState.selectedTab = 0
+        appState.subPageDismissTrigger += 1
     }
 
     private var dismissDragGesture: some Gesture {

@@ -4,13 +4,25 @@ import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.value.ChangeListener;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.SVGPath;
+import javafx.stage.Modality;
+import javafx.stage.StageStyle;
+import javafx.stage.Window;
 import javafx.util.Duration;
 
 import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
@@ -401,6 +413,7 @@ public class MainContentArea extends StackPane {
 
         // Create review notes panel
         reviewNotesPanel = new NotesDisplayPanel();
+        reviewNotesPanel.setOnReviseNote(this::handleReviseAsNewNote);
         VBox.setVgrow(reviewNotesPanel, Priority.ALWAYS);
 
         panel.getChildren().addAll(titleLabel, reviewNotesPanel);
@@ -418,6 +431,7 @@ public class MainContentArea extends StackPane {
         VBox.setMargin(titleLabel, new Insets(0, 0, 0, 16));
 
         onThisDayNotesPanel = new NotesDisplayPanel();
+        onThisDayNotesPanel.setOnReviseNote(this::handleReviseAsNewNote);
         VBox.setVgrow(onThisDayNotesPanel, Priority.ALWAYS);
 
         panel.getChildren().addAll(titleLabel, onThisDayNotesPanel);
@@ -548,6 +562,7 @@ public class MainContentArea extends StackPane {
 
         // Create search results panel
         searchResultsPanel = new NotesDisplayPanel();
+        searchResultsPanel.setOnReviseNote(this::handleReviseAsNewNote);
         VBox.setVgrow(searchResultsPanel, Priority.ALWAYS);
 
         panel.getChildren().addAll(searchInputPanel, searchResultsPanel);
@@ -621,6 +636,7 @@ public class MainContentArea extends StackPane {
 
         // Create notes display panel (will grow to fill remaining space)
         notesDisplayPanel = new NotesDisplayPanel();
+        notesDisplayPanel.setOnReviseNote(this::handleReviseAsNewNote);
         VBox.setVgrow(notesDisplayPanel, Priority.ALWAYS);
 
         panel.getChildren().addAll(pendingBanner, noteInputPanel, notesDisplayPanel);
@@ -751,6 +767,206 @@ public class MainContentArea extends StackPane {
 
         scrollPane.setContent(cardsContainer);
         pendingListView.getChildren().add(scrollPane);
+    }
+
+    private void handleReviseAsNewNote(LocalCacheService.NoteData note) {
+        if (note == null) {
+            return;
+        }
+
+        if (noteInputPanel.hasDraftText() && !confirmOverwriteDraft()) {
+            return;
+        }
+
+        if (showingPendingList) {
+            showingPendingList = false;
+            int idx = noteModePanel.getChildren().size() - 1;
+            noteModePanel.getChildren().set(idx, notesDisplayPanel);
+            VBox.setVgrow(notesDisplayPanel, Priority.ALWAYS);
+            loadRecentNotes();
+        }
+
+        noteInputPanel.replaceDraftText(note.content);
+
+        if (currentPanel == noteModePanel) {
+            noteInputPanel.requestInputFocus();
+        } else {
+            pendingNoteFocus = true;
+            showMode(DesktopMainView.ViewMode.NOTE);
+        }
+    }
+
+    private boolean confirmOverwriteDraft() {
+        Dialog<Boolean> dialog = new Dialog<>();
+        dialog.initStyle(StageStyle.TRANSPARENT);
+
+        Window owner = getScene() == null ? null : getScene().getWindow();
+        if (owner != null) {
+            dialog.initOwner(owner);
+            dialog.initModality(Modality.WINDOW_MODAL);
+        }
+
+        ButtonType cancelType = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().add(cancelType);
+        Node hiddenCancel = dialog.getDialogPane().lookupButton(cancelType);
+        if (hiddenCancel != null) {
+            hiddenCancel.setVisible(false);
+            hiddenCancel.setManaged(false);
+        }
+
+        dialog.getDialogPane().setContent(createOverwriteDraftDialogContent(dialog));
+        dialog.getDialogPane().setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+        dialog.setResultConverter(buttonType -> false);
+        dialog.setOnShown(e -> {
+            if (dialog.getDialogPane().getScene() != null) {
+                dialog.getDialogPane().getScene().setFill(Color.TRANSPARENT);
+            }
+        });
+
+        return dialog.showAndWait().orElse(false);
+    }
+
+    private VBox createOverwriteDraftDialogContent(Dialog<Boolean> dialog) {
+        VBox root = new VBox(18);
+        root.setPadding(new Insets(22));
+        root.setPrefWidth(420);
+        root.setStyle(resolveOverwriteDialogRootStyle());
+
+        DropShadow shadow = new DropShadow();
+        shadow.setColor(Color.rgb(0, 0, 0, ThemeService.getInstance().isDarkTheme() ? 0.42 : 0.18));
+        shadow.setRadius(28);
+        shadow.setOffsetY(14);
+        root.setEffect(shadow);
+
+        HBox header = new HBox(12);
+        header.setAlignment(Pos.TOP_LEFT);
+
+        StackPane iconBadge = new StackPane(createOverwriteDialogIcon());
+        iconBadge.setMinSize(38, 38);
+        iconBadge.setPrefSize(38, 38);
+        iconBadge.setMaxSize(38, 38);
+        iconBadge.setStyle(resolveOverwriteDialogIconBadgeStyle());
+        HBox.setMargin(iconBadge, new Insets(2, 0, 0, 0));
+
+        VBox copy = new VBox(6);
+        Label title = new Label("Replace current draft?");
+        title.setStyle(resolveOverwriteDialogTitleStyle());
+        Label message = new Label("This will fill the editor with this note. The original note stays unchanged.");
+        message.setWrapText(true);
+        message.setStyle(resolveOverwriteDialogMessageStyle());
+        copy.getChildren().addAll(title, message);
+        HBox.setHgrow(copy, Priority.ALWAYS);
+
+        header.getChildren().addAll(iconBadge, copy);
+
+        Button cancelButton = new Button("Cancel");
+        applyOverwriteDialogButtonStyle(cancelButton, false);
+        cancelButton.setOnAction(e -> {
+            dialog.setResult(false);
+            dialog.close();
+        });
+
+        Button replaceButton = new Button("Replace draft");
+        applyOverwriteDialogButtonStyle(replaceButton, true);
+        replaceButton.setDefaultButton(true);
+        replaceButton.setOnAction(e -> {
+            dialog.setResult(true);
+            dialog.close();
+        });
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox actions = new HBox(10, spacer, cancelButton, replaceButton);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+
+        root.getChildren().addAll(header, actions);
+        return root;
+    }
+
+    private SVGPath createOverwriteDialogIcon() {
+        SVGPath icon = new SVGPath();
+        icon.setContent("M3 17.25 V21 H6.75 L17.81 9.94 L14.06 6.19 L3 17.25 Z M20.71 7.04 C21.1 6.65 21.1 6.02 20.71 5.63 L18.37 3.29 C17.98 2.9 17.35 2.9 16.96 3.29 L15.13 5.12 L18.88 8.87 L20.71 7.04 Z");
+        icon.setScaleX(0.62);
+        icon.setScaleY(0.62);
+        icon.setFill(Color.web(ThemeService.getInstance().isDarkTheme() ? "#00D4FF" : "#0969DA"));
+        return icon;
+    }
+
+    private void applyOverwriteDialogButtonStyle(Button button, boolean primary) {
+        button.setFocusTraversable(false);
+        button.setMinHeight(34);
+        button.setStyle(resolveOverwriteDialogButtonStyle(primary, false));
+        button.setOnMouseEntered(e -> button.setStyle(resolveOverwriteDialogButtonStyle(primary, true)));
+        button.setOnMouseExited(e -> button.setStyle(resolveOverwriteDialogButtonStyle(primary, false)));
+    }
+
+    private String resolveOverwriteDialogRootStyle() {
+        boolean dark = ThemeService.getInstance().isDarkTheme();
+        String bg = dark ? "#161B22" : "#FFFFFF";
+        String border = dark ? "#30363D" : "#D0D7DE";
+        return "-fx-background-color: " + bg + ";"
+                + "-fx-border-color: " + border + ";"
+                + "-fx-border-width: 1;"
+                + "-fx-border-radius: 14;"
+                + "-fx-background-radius: 14;";
+    }
+
+    private String resolveOverwriteDialogIconBadgeStyle() {
+        boolean dark = ThemeService.getInstance().isDarkTheme();
+        String bg = dark ? "rgba(0, 212, 255, 0.14)" : "rgba(9, 105, 218, 0.10)";
+        String border = dark ? "rgba(0, 212, 255, 0.28)" : "rgba(9, 105, 218, 0.18)";
+        return "-fx-background-color: " + bg + ";"
+                + "-fx-border-color: " + border + ";"
+                + "-fx-border-width: 1;"
+                + "-fx-border-radius: 12;"
+                + "-fx-background-radius: 12;";
+    }
+
+    private String resolveOverwriteDialogTitleStyle() {
+        boolean dark = ThemeService.getInstance().isDarkTheme();
+        String text = dark ? "#E6EDF3" : "#24292F";
+        return "-fx-text-fill: " + text + ";"
+                + "-fx-font-size: 17px;"
+                + "-fx-font-weight: 700;";
+    }
+
+    private String resolveOverwriteDialogMessageStyle() {
+        boolean dark = ThemeService.getInstance().isDarkTheme();
+        String text = dark ? "#8B949E" : "#57606A";
+        return "-fx-text-fill: " + text + ";"
+                + "-fx-font-size: 13px;"
+                + "-fx-line-spacing: 2px;";
+    }
+
+    private String resolveOverwriteDialogButtonStyle(boolean primary, boolean hover) {
+        boolean dark = ThemeService.getInstance().isDarkTheme();
+        if (primary) {
+            String bg = hover ? (dark ? "#33DFFF" : "#0550AE") : (dark ? "#00D4FF" : "#0969DA");
+            String text = dark ? "#0D1117" : "#FFFFFF";
+            return "-fx-background-color: " + bg + ";"
+                    + "-fx-text-fill: " + text + ";"
+                    + "-fx-font-size: 13px;"
+                    + "-fx-font-weight: 700;"
+                    + "-fx-background-radius: 18;"
+                    + "-fx-border-radius: 18;"
+                    + "-fx-padding: 7 14;"
+                    + "-fx-cursor: hand;";
+        }
+
+        String bg = hover
+                ? (dark ? "rgba(255, 255, 255, 0.10)" : "rgba(9, 105, 218, 0.08)")
+                : (dark ? "rgba(255, 255, 255, 0.06)" : "#F6F8FA");
+        String border = dark ? "#30363D" : "#D0D7DE";
+        String text = dark ? "#E6EDF3" : "#24292F";
+        return "-fx-background-color: " + bg + ";"
+                + "-fx-text-fill: " + text + ";"
+                + "-fx-border-color: " + border + ";"
+                + "-fx-border-width: 1;"
+                + "-fx-font-size: 13px;"
+                + "-fx-background-radius: 18;"
+                + "-fx-border-radius: 18;"
+                + "-fx-padding: 7 14;"
+                + "-fx-cursor: hand;";
     }
 
     /**

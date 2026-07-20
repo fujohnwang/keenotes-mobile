@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 /**
@@ -47,6 +48,7 @@ public class NotesDisplayPanel extends VBox {
     private final VBox fixedHeaderContainer;
     private HBox headerRow;
     private Label countLabel;
+    private Consumer<LocalCacheService.NoteData> onReviseNote;
     private PauseTransition dotsAnimation;
     private String baseLoadingText;
 
@@ -157,6 +159,14 @@ public class NotesDisplayPanel extends VBox {
         if (registeredWebSocketService != null && webSocketSyncListener != null) {
             registeredWebSocketService.removeListener(webSocketSyncListener);
         }
+    }
+
+    public void setOnReviseNote(Consumer<LocalCacheService.NoteData> onReviseNote) {
+        this.onReviseNote = onReviseNote;
+    }
+
+    Consumer<LocalCacheService.NoteData> getOnReviseNote() {
+        return onReviseNote;
     }
 
     /**

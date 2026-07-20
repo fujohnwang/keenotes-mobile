@@ -193,6 +193,22 @@ public class NoteInputPanel extends VBox {
     public void clearInput() {
         noteInput.clear();
     }
+
+    /**
+     * Whether the input area currently contains user draft text.
+     */
+    public boolean hasDraftText() {
+        return !noteInput.getText().trim().isEmpty();
+    }
+
+    /**
+     * Replace the current draft with the supplied content and place the caret at the end.
+     */
+    public void replaceDraftText(String content) {
+        noteInput.setText(content == null ? "" : content);
+        noteInput.positionCaret(noteInput.getLength());
+        noteInput.requestFocus();
+    }
     
     /**
      * Show status message with fade-in animation (centered in input container)

@@ -41,6 +41,16 @@
                 android:textColor="@color/text_secondary" />
 
             <ImageButton
+                android:id="@+id/enlargedReviseButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_revise_note"
+                android:scaleType="centerInside"
+                android:padding="5dp"
+                android:contentDescription="@string/revise_note" />
+
+            <ImageButton
                 android:id="@+id/enlargedShareButton"
                 android:layout_width="36dp"
                 android:layout_height="36dp"

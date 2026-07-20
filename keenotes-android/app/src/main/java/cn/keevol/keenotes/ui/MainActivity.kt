@@ -26,6 +26,9 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
+    private companion object {
+        const val KEY_NOTE_DRAFT_TEXT = "note_draft_text"
+    }
     
     private lateinit var binding: ActivityMainBinding
     private lateinit var navController: NavController
@@ -39,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     /** Current main tab index (0=Note, 1=Review, 2=Settings), -1 for sub-pages */
     private var currentTabIndex = 0
     private val tabCount = 3
+    private var noteDraftText = ""
 
     // ---- 滑动手势拦截状态 ----
     /** 触摸起始坐标，用于判断是否为水平滑动 */
@@ -60,6 +64,7 @@ class MainActivity : AppCompatActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        noteDraftText = savedInstanceState?.getString(KEY_NOTE_DRAFT_TEXT).orEmpty()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
@@ -269,6 +274,16 @@ class MainActivity : AppCompatActivity() {
         binding.tabNote.performClick()
     }
 
+    fun getNoteDraftText(): String = noteDraftText
+
+    fun updateNoteDraftText(text: String) {
+        noteDraftText = text
+    }
+
+    fun clearNoteDraftText() {
+        noteDraftText = ""
+    }
+
     /**
      * 根据导航方向构建带滑动动画的 NavOptions。
      * @param forward true = 向左滑（进入右侧 tab），false = 向右滑（进入左侧 tab）
@@ -328,6 +343,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString(KEY_NOTE_DRAFT_TEXT, noteDraftText)
+        super.onSaveInstanceState(outState)
     }
     
     override fun onDestroy() {

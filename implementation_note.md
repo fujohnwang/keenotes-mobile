@@ -29,3 +29,12 @@
 
 - 2026-07-19：用 `git filter-branch` 删除误入历史的 `src/main/resources/fonts/NotoSansSC-Regular.ttf`，并将 `todos/overall_performance_optimization.md` 里的真实运行日志替换为 `[REDACTED]`。
 - 本机没有 `git filter-repo`，所以选择 `filter-branch`；清理前完整备份在 `/private/tmp/keenotes-mobile-before-sensitive-history-rewrite.bundle`，这个 bundle 仍包含旧敏感历史，不要上传。
+
+## 修订为新笔记回填记录
+
+- 最小化实现只在客户端 UI 层加 revise 入口：普通 note 卡片/放大视图把原文回填到输入区，旧 note 不变，发送仍走现有新增 note 链路。
+- 三端在输入区已有草稿时都要求确认覆盖；pending notes 不显示 revise 入口，避免和待发送队列语义混淆。
+- 桌面端覆盖确认从原生 `Alert` 改为无标题栏自定义 Dialog，沿用 KeeNotes 的主题色、圆角和主/次按钮层级；行为仍只是确认是否覆盖输入区草稿。
+- 桌面端 Dialog 的图标 badge 采用 top 对齐，而不是拉满文案高度；这样视觉重量更轻，避免左侧形成不必要的栏位。
+- Android 端把 Note 输入草稿提升到 `MainActivity` 的非持久化 UI 状态，并通过 `savedInstanceState` 保住同一次界面会话；修复 Fragment 重建导致滑动/点击切 tab 后草稿丢失，以及 revise 回填时误判输入框为空的问题。
+- Android 端 revise 的覆盖确认改为在来源页原地弹出；确认后才跳转输入页，取消不产生导航副作用，`NoteFragment` 仍保留兜底确认逻辑。

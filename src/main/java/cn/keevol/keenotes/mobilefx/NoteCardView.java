@@ -33,6 +33,7 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * Individual note card component for displaying a single note
@@ -50,6 +51,9 @@ public class NoteCardView extends StackPane {
     private final Label channelLabel;
     private final Button shareButton;
     private final SVGPath shareIcon;
+    private final Button reviseButton;
+    private final SVGPath reviseIcon;
+    private final Consumer<LocalCacheService.NoteData> onReviseNote;
 
     // Border progress animation
     private Canvas borderCanvas;
@@ -71,7 +75,12 @@ public class NoteCardView extends StackPane {
     private boolean updatingContentHeight = false;
 
     public NoteCardView(LocalCacheService.NoteData noteData) {
+        this(noteData, null);
+    }
+
+    public NoteCardView(LocalCacheService.NoteData noteData, Consumer<LocalCacheService.NoteData> onReviseNote) {
         this.noteData = noteData;
+        this.onReviseNote = onReviseNote;
         this.settings = SettingsService.getInstance();
 
         getStyleClass().add("search-result-card");
@@ -104,6 +113,21 @@ public class NoteCardView extends StackPane {
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
 
+        reviseIcon = createReviseIcon();
+        reviseButton = new Button();
+        reviseButton.setGraphic(reviseIcon);
+        reviseButton.setTooltip(new Tooltip("Revise as new note"));
+        reviseButton.setFocusTraversable(false);
+        boolean reviseEnabled = onReviseNote != null;
+        reviseButton.setVisible(reviseEnabled);
+        reviseButton.setManaged(reviseEnabled);
+        reviseButton.setOnAction(e -> {
+            e.consume();
+            if (this.onReviseNote != null) {
+                this.onReviseNote.accept(this.noteData);
+            }
+        });
+
         shareIcon = createShareIcon();
         shareButton = new Button();
         shareButton.setGraphic(shareIcon);
@@ -113,9 +137,9 @@ public class NoteCardView extends StackPane {
             e.consume();
             showShareDialog();
         });
-        updateShareButtonStyle();
+        updateActionButtonStyles();
 
-        headerRow.getChildren().addAll(dateLabel, channelLabel, headerSpacer, shareButton);
+        headerRow.getChildren().addAll(dateLabel, channelLabel, headerSpacer, reviseButton, shareButton);
 
         // Full content using TextArea (read-only, selectable)
         contentArea = new TextArea(noteData.content);
@@ -492,7 +516,7 @@ public class NoteCardView extends StackPane {
                         "-fx-background-radius: 4; " +
                         "-fx-font-size: 11px; " +
                         "-fx-font-weight: bold;");
-        updateShareButtonStyle();
+        updateActionButtonStyles();
     }
 
     /**
@@ -536,26 +560,39 @@ public class NoteCardView extends StackPane {
         return icon;
     }
 
-    private void updateShareButtonStyle() {
+    private SVGPath createReviseIcon() {
+        SVGPath icon = new SVGPath();
+        icon.setContent("M3 17.25 V21 H6.75 L17.81 9.94 L14.06 6.19 L3 17.25 Z M20.71 7.04 C21.1 6.65 21.1 6.02 20.71 5.63 L18.37 3.29 C17.98 2.9 17.35 2.9 16.96 3.29 L15.13 5.12 L18.88 8.87 L20.71 7.04 Z");
+        icon.setScaleX(0.62);
+        icon.setScaleY(0.62);
+        return icon;
+    }
+
+    private void updateActionButtonStyles() {
         boolean isDark = ThemeService.getInstance().isDarkTheme();
         String iconColor = isDark ? "#8B949E" : "#57606A";
         String hoverBg = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(9, 105, 218, 0.08)";
-        shareIcon.setFill(Color.web(iconColor));
-        shareButton.setStyle(
+        updateActionButtonStyle(reviseButton, reviseIcon, iconColor, hoverBg);
+        updateActionButtonStyle(shareButton, shareIcon, iconColor, hoverBg);
+    }
+
+    private void updateActionButtonStyle(Button button, SVGPath icon, String iconColor, String hoverBg) {
+        icon.setFill(Color.web(iconColor));
+        button.setStyle(
                 "-fx-background-color: transparent; " +
                         "-fx-background-radius: 16; " +
                         "-fx-padding: 4 6; " +
                         "-fx-min-width: 28; " +
                         "-fx-min-height: 28; " +
                         "-fx-cursor: hand;");
-        shareButton.setOnMouseEntered(e -> shareButton.setStyle(
+        button.setOnMouseEntered(e -> button.setStyle(
                 "-fx-background-color: " + hoverBg + "; " +
                         "-fx-background-radius: 16; " +
                         "-fx-padding: 4 6; " +
                         "-fx-min-width: 28; " +
                         "-fx-min-height: 28; " +
                         "-fx-cursor: hand;"));
-        shareButton.setOnMouseExited(e -> updateShareButtonStyle());
+        button.setOnMouseExited(e -> updateActionButtonStyles());
     }
 
     private void showShareDialog() {

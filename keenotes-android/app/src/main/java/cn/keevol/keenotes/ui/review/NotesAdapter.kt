@@ -26,7 +26,8 @@ import kotlinx.coroutines.runBlocking
 
 class NotesAdapter(
     private val onEnlargeClick: ((Note) -> Unit)? = null,
-    private val onShareClick: ((Note) -> Unit)? = null
+    private val onShareClick: ((Note) -> Unit)? = null,
+    private val onReviseClick: ((Note) -> Unit)? = null
 ) : ListAdapter<Note, NotesAdapter.NoteViewHolder>(NoteDiffCallback()) {
     
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NoteViewHolder {
@@ -35,7 +36,7 @@ class NotesAdapter(
             parent,
             false
         )
-        return NoteViewHolder(binding, onEnlargeClick, onShareClick)
+        return NoteViewHolder(binding, onEnlargeClick, onShareClick, onReviseClick)
     }
     
     override fun onBindViewHolder(holder: NoteViewHolder, position: Int) {
@@ -45,7 +46,8 @@ class NotesAdapter(
     class NoteViewHolder(
         private val binding: ItemNoteBinding,
         private val onEnlargeClick: ((Note) -> Unit)? = null,
-        private val onShareClick: ((Note) -> Unit)? = null
+        private val onShareClick: ((Note) -> Unit)? = null,
+        private val onReviseClick: ((Note) -> Unit)? = null
     ) : RecyclerView.ViewHolder(binding.root) {
         
         private var currentNote: Note? = null
@@ -64,6 +66,7 @@ class NotesAdapter(
             binding.contentText.text = note.content
 
             binding.shareButton.visibility = if (onShareClick == null) View.GONE else View.VISIBLE
+            binding.reviseButton.visibility = if (onReviseClick == null) View.GONE else View.VISIBLE
             binding.enlargeButton.visibility = if (onEnlargeClick == null) View.GONE else View.VISIBLE
             
             // Enlarge button
@@ -73,6 +76,10 @@ class NotesAdapter(
 
             binding.shareButton.setOnClickListener {
                 currentNote?.let { onShareClick?.invoke(it) }
+            }
+
+            binding.reviseButton.setOnClickListener {
+                currentNote?.let { onReviseClick?.invoke(it) }
             }
             
             // Setup interactions

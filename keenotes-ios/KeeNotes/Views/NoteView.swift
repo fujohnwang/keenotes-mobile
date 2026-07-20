@@ -595,7 +595,7 @@ struct PendingNotesListView: View {
             } else {
                 List {
                     ForEach(pendingNotes) { pendingNote in
-                        NoteRow(note: pendingNote.toNote())
+                        NoteRow(note: pendingNote.toNote(), allowsRevise: false)
                             .listRowInsets(EdgeInsets(top: 8, leading: horizontalPadding, bottom: 8, trailing: horizontalPadding))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)

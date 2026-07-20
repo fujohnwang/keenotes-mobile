@@ -36,7 +36,7 @@ public class NoteListCell extends ListCell<LocalCacheService.NoteData> {
                     && item.content.equals(card.getNoteData().content);
 
             if (card == null) {
-                card = new NoteCardView(item);
+                card = new NoteCardView(item, panel.getOnReviseNote());
             } else if (resolvingOptimistic) {
                 card.resolveWithRealNote(item);
                 wasOptimistic = false;

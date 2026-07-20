@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -20,7 +21,9 @@ import cn.keevol.keenotes.data.entity.Note
 import cn.keevol.keenotes.databinding.FragmentSearchBinding
 import cn.keevol.keenotes.network.WebSocketService
 import cn.keevol.keenotes.share.NoteShareDialogFragment
+import cn.keevol.keenotes.ui.MainActivity
 import cn.keevol.keenotes.ui.common.EnlargedNoteDismissGesture
+import cn.keevol.keenotes.ui.note.NoteFragment
 import cn.keevol.keenotes.ui.review.NotesAdapter
 import cn.keevol.keenotes.util.DateTimeUtil
 import cn.keevol.keenotes.util.ZeroWidthSteganography
@@ -37,7 +40,8 @@ class SearchFragment : Fragment() {
     
     private val notesAdapter = NotesAdapter(
         onEnlargeClick = { note -> showEnlargedNote(note) },
-        onShareClick = { note -> showShareDialog(note) }
+        onShareClick = { note -> showShareDialog(note) },
+        onReviseClick = { note -> reviseAsNewNote(note) }
     )
     private var searchJob: Job? = null
     
@@ -195,6 +199,10 @@ class SearchFragment : Fragment() {
             showShareDialog(note)
         }
 
+        binding.enlargedNoteContainer.enlargedReviseButton.setOnClickListener {
+            reviseAsNewNote(note)
+        }
+
         binding.searchResultsRecyclerView.visibility = View.GONE
         container.visibility = View.VISIBLE
         container.alpha = 0f
@@ -236,6 +244,33 @@ class SearchFragment : Fragment() {
 
     private fun showShareDialog(note: Note) {
         NoteShareDialogFragment.show(parentFragmentManager, note)
+    }
+
+    private fun reviseAsNewNote(note: Note) {
+        if ((activity as? MainActivity)?.getNoteDraftText().orEmpty().isBlank()) {
+            applyRevisionDraft(note, overwriteConfirmed = false)
+            return
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.overwrite_current_draft_title)
+            .setMessage(R.string.overwrite_current_draft_message)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.overwrite) { _, _ ->
+                applyRevisionDraft(note, overwriteConfirmed = true)
+            }
+            .show()
+    }
+
+    private fun applyRevisionDraft(note: Note, overwriteConfirmed: Boolean) {
+        parentFragmentManager.setFragmentResult(
+            NoteFragment.REVISION_DRAFT_REQUEST_KEY,
+            Bundle().apply {
+                putString(NoteFragment.REVISION_DRAFT_CONTENT_KEY, note.content)
+                putBoolean(NoteFragment.REVISION_DRAFT_OVERWRITE_CONFIRMED_KEY, overwriteConfirmed)
+            }
+        )
+        (activity as? MainActivity)?.navigateToNote()
     }
     
     private fun updateSyncChannelStatus(state: WebSocketService.ConnectionState) {

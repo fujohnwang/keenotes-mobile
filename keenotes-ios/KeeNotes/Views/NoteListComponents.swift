@@ -5,9 +5,11 @@ import UIKit
 struct NoteRow: View {
     let note: Note
     var onEnlarge: (() -> Void)? = nil
+    var allowsRevise: Bool = true
     @EnvironmentObject var appState: AppState
     @State private var showCopiedAlert = false
     @State private var showSharePoster = false
+    @State private var showOverwriteDraftAlert = false
     @Environment(\.colorScheme) private var colorScheme
 
     private var isPad: Bool { DeviceType.isPad }
@@ -40,6 +42,17 @@ struct NoteRow: View {
                 }
 
                 Spacer()
+
+                if allowsRevise {
+                    Button(action: requestReviseAsNewNote) {
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: isPad ? 14 : 12))
+                            .foregroundColor(Color(.systemGray2))
+                            .padding(6)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 Button(action: { showSharePoster = true }) {
                     Image(systemName: "square.and.arrow.up")
@@ -113,6 +126,14 @@ struct NoteRow: View {
                 onDismiss: { showSharePoster = false }
             )
         }
+        .alert("Overwrite current draft?", isPresented: $showOverwriteDraftAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Overwrite", role: .destructive) {
+                applyRevisionDraft()
+            }
+        } message: {
+            Text("Current input text will be replaced. The original note will not change.")
+        }
     }
 
     private func copyToClipboard() {
@@ -136,6 +157,20 @@ struct NoteRow: View {
                 showCopiedAlert = false
             }
         }
+    }
+
+    private func requestReviseAsNewNote() {
+        if appState.noteDraftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            applyRevisionDraft()
+        } else {
+            showOverwriteDraftAlert = true
+        }
+    }
+
+    private func applyRevisionDraft() {
+        appState.noteDraftText = note.content
+        appState.selectedTab = 0
+        appState.subPageDismissTrigger += 1
     }
 }
 

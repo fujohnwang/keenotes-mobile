@@ -1,9 +1,12 @@
 package cn.keevol.keenotes.ui.note
 
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
+import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -11,6 +14,7 @@ import androidx.navigation.fragment.findNavController
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.databinding.FragmentNoteBinding
+import cn.keevol.keenotes.ui.MainActivity
 import cn.keevol.keenotes.util.ZeroWidthSteganography
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
@@ -21,6 +25,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class NoteFragment : Fragment() {
+    companion object {
+        const val REVISION_DRAFT_REQUEST_KEY = "revision_draft_request"
+        const val REVISION_DRAFT_CONTENT_KEY = "revision_draft_content"
+        const val REVISION_DRAFT_OVERWRITE_CONFIRMED_KEY = "revision_draft_overwrite_confirmed"
+    }
     
     private var _binding: FragmentNoteBinding? = null
     private val binding get() = _binding!!
@@ -43,6 +52,8 @@ class NoteFragment : Fragment() {
         setupSearchButton()
         setupOverviewCard()
         setupNoteInput()
+        restoreNoteDraft()
+        setupRevisionDraftListener()
         setupSendButton()
         setupAutoFocusInput()
         setupKeyboardListener()
@@ -220,13 +231,66 @@ class NoteFragment : Fragment() {
     }
     
     private fun setupNoteInput() {
-        binding.noteInput.addTextChangedListener {
-            updateSendButtonState(!it.isNullOrBlank())
+        binding.noteInput.addTextChangedListener { text ->
+            val draft = text?.toString().orEmpty()
+            (activity as? MainActivity)?.updateNoteDraftText(draft)
+            updateSendButtonState(draft.isNotBlank())
+        }
+    }
+
+    private fun restoreNoteDraft() {
+        val draft = (activity as? MainActivity)?.getNoteDraftText().orEmpty()
+        if (draft.isEmpty()) {
+            return
+        }
+
+        binding.noteInput.setText(draft)
+        binding.noteInput.setSelection(binding.noteInput.text?.length ?: 0)
+        updateSendButtonState(true)
+    }
+
+    private fun setupRevisionDraftListener() {
+        parentFragmentManager.setFragmentResultListener(
+            REVISION_DRAFT_REQUEST_KEY,
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val content = bundle.getString(REVISION_DRAFT_CONTENT_KEY).orEmpty()
+            if (content.isEmpty() || _binding == null) return@setFragmentResultListener
+            val overwriteConfirmed = bundle.getBoolean(REVISION_DRAFT_OVERWRITE_CONFIRMED_KEY, false)
+            requestApplyRevisionDraft(content, overwriteConfirmed)
+        }
+    }
+
+    private fun requestApplyRevisionDraft(content: String, overwriteConfirmed: Boolean) {
+        if (overwriteConfirmed || binding.noteInput.text?.toString().orEmpty().isBlank()) {
+            applyRevisionDraft(content)
+            return
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.overwrite_current_draft_title)
+            .setMessage(R.string.overwrite_current_draft_message)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.overwrite) { _, _ ->
+                applyRevisionDraft(content)
+            }
+            .show()
+    }
+
+    private fun applyRevisionDraft(content: String) {
+        binding.noteInput.setText(content)
+        binding.noteInput.setSelection(binding.noteInput.text?.length ?: 0)
+        (activity as? MainActivity)?.updateNoteDraftText(content)
+        binding.noteInput.requestFocus()
+        binding.noteInput.post {
+            if (_binding == null || !isAdded) return@post
+            val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(binding.noteInput, InputMethodManager.SHOW_IMPLICIT)
         }
     }
     
     private fun setupSendButton() {
-        updateSendButtonState(false)
+        updateSendButtonState(binding.noteInput.text?.toString().orEmpty().isNotBlank())
         
         binding.btnSend.setOnClickListener {
             val content = binding.noteInput.text.toString().trim()
@@ -246,6 +310,7 @@ class NoteFragment : Fragment() {
         
         // Optimistic UI: clear input, confetti, clipboard immediately
         binding.noteInput.text?.clear()
+        (activity as? MainActivity)?.clearNoteDraftText()
         binding.noteInput.clearFocus()
         val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
         imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
