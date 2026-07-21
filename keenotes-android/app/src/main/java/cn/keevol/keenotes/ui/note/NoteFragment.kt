@@ -35,6 +35,7 @@ class NoteFragment : Fragment() {
     private val binding get() = _binding!!
 
     private var shouldShowOverviewCard = false // Track if overview card should be shown
+    private var isPreparingNote = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -301,17 +302,23 @@ class NoteFragment : Fragment() {
     }
 
     private fun updateSendButtonState(enabled: Boolean) {
-        binding.btnSend.isEnabled = enabled
-        binding.btnSend.alpha = if (enabled) 1.0f else 0.5f
+        val canSend = enabled && !isPreparingNote
+        binding.btnSend.isEnabled = canSend
+        binding.btnSend.alpha = if (canSend) 1.0f else 0.5f
     }
 
     private fun saveNote(content: String) {
+        if (isPreparingNote) return
+        isPreparingNote = true
+        updateSendButtonState(binding.noteInput.text?.toString().orEmpty().isNotBlank())
+
         val app = requireActivity().application as KeeNotesApp
 
         viewLifecycleOwner.lifecycleScope.launch {
             val preparedNote = try {
                 app.apiService.prepareNote(content)
             } catch (e: Exception) {
+                resetPreparingNoteState()
                 if (_binding != null) {
                     com.google.android.material.snackbar.Snackbar.make(
                         binding.root,
@@ -322,7 +329,10 @@ class NoteFragment : Fragment() {
                 return@launch
             }
 
-            if (_binding == null) return@launch
+            if (_binding == null) {
+                resetPreparingNoteState()
+                return@launch
+            }
 
             // Optimistic UI: clear input, confetti, clipboard immediately
             binding.noteInput.text?.clear()
@@ -330,7 +340,7 @@ class NoteFragment : Fragment() {
             binding.noteInput.clearFocus()
             val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
             imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
-            updateSendButtonState(false)
+            resetPreparingNoteState()
 
             // Copy to clipboard & fire confetti immediately (optimistic UI)
             if (app.settingsRepository.getCopyToClipboardOnPost()) {
@@ -368,6 +378,13 @@ class NoteFragment : Fragment() {
         }
     }
 
+    private fun resetPreparingNoteState() {
+        isPreparingNote = false
+        if (_binding != null) {
+            updateSendButtonState(binding.noteInput.text?.toString().orEmpty().isNotBlank())
+        }
+    }
+
     override fun onPause() {
         super.onPause()
         // 离开 NoteFragment 时主动隐藏键盘并清除焦点，防止切换到其他 tab 时出现键盘残影
@@ -380,6 +397,7 @@ class NoteFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        isPreparingNote = false
         _binding = null
     }
 }

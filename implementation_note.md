@@ -47,3 +47,4 @@
 - Android 编译环境差异较大，这轮只做源码改动，不在 Codex 环境跑 Android 编译验证。
 - JavaFX 端 HTTP/pending retry 出现网络失败时会主动标记 WebSocket suspect 并重连；`onFailure` 也会下发 disconnected，避免断网后 Sync Channel 长时间假绿。
 - iOS/Android 端也补了同类 suspect reconnect：HTTP POST 或 pending retry 网络失败后，主动取消当前 WebSocket、置 disconnected，并走既有重连后 pending 自动重试链路。
+- Android `Keep it` 点击入口加 prepare guard：同一条草稿在首次 prepare 完成前不会再次 prepare，prepare 成功后清空输入再释放 guard，避免快速连点生成多个 request_id。
