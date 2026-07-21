@@ -8,9 +8,9 @@ struct Note: Codable, FetchableRecord, PersistableRecord, Identifiable {
     var channel: String  // Source channel (e.g., mobile-ios, desktop-mac)
     var createdAt: String
     var syncedAt: Int64  // Timestamp when synced to local DB
-    
+
     static let databaseTableName = "notes"
-    
+
     enum Columns {
         static let id = Column(CodingKeys.id)
         static let content = Column(CodingKeys.content)
@@ -18,7 +18,7 @@ struct Note: Codable, FetchableRecord, PersistableRecord, Identifiable {
         static let createdAt = Column(CodingKeys.createdAt)
         static let syncedAt = Column(CodingKeys.syncedAt)
     }
-    
+
     // Custom initializer for creating notes from sync
     init(id: Int64, content: String, channel: String = "default", createdAt: String, syncedAt: Int64? = nil) {
         self.id = id
@@ -33,11 +33,11 @@ struct Note: Codable, FetchableRecord, PersistableRecord, Identifiable {
 struct SyncState: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "sync_state"
     static let singletonId = 1
-    
+
     var id: Int = singletonId
     var lastSyncId: Int64
     var lastSyncTime: String?
-    
+
     enum Columns {
         static let id = Column(CodingKeys.id)
         static let lastSyncId = Column(CodingKeys.lastSyncId)
@@ -51,20 +51,40 @@ struct PendingNote: Codable, FetchableRecord, MutablePersistableRecord, Identifi
     var content: String
     var channel: String
     var createdAt: String
-    
+    var encryptedContent: String?
+    var requestId: String?
+
     static let databaseTableName = "pending_notes"
-    
+
     enum Columns {
         static let id = Column(CodingKeys.id)
         static let content = Column(CodingKeys.content)
         static let channel = Column(CodingKeys.channel)
         static let createdAt = Column(CodingKeys.createdAt)
+        static let encryptedContent = Column(CodingKeys.encryptedContent)
+        static let requestId = Column(CodingKeys.requestId)
     }
-    
+
+    init(
+        id: Int64? = nil,
+        content: String,
+        channel: String,
+        createdAt: String,
+        encryptedContent: String? = nil,
+        requestId: String? = nil
+    ) {
+        self.id = id
+        self.content = content
+        self.channel = channel
+        self.createdAt = createdAt
+        self.encryptedContent = encryptedContent
+        self.requestId = requestId
+    }
+
     mutating func didInsert(_ inserted: InsertionSuccess) {
         id = inserted.rowID
     }
-    
+
     /// 转换为 Note 以复用 NoteRow 组件
     func toNote() -> Note {
         Note(id: id ?? 0, content: content, channel: channel, createdAt: createdAt)

@@ -262,8 +262,9 @@ public class WebSocketClientService {
                     logger.warning("WebSocket failure response: " + describeResponse(response));
                 }
                 isConnected.set(false);
-                notifyError(t.getMessage());
                 cleanupConnectionState();
+                notifyConnectionStatus(false);
+                notifyError(t.getMessage());
                 requestReconnect("failure");
             }
         };
@@ -319,6 +320,24 @@ public class WebSocketClientService {
         isOffline.set(false);
         cancelPendingReconnect();
         connect();
+    }
+
+    public void markConnectionSuspect(String reason) {
+        if (isShuttingDown.get()) {
+            return;
+        }
+
+        String safeReason = (reason == null || reason.isBlank()) ? "unknown" : reason;
+        logger.warning("Marking WebSocket connection suspect: " + safeReason);
+
+        reconnectAttempts = 0;
+        isOffline.set(false);
+
+        if (isConnected.get() || isConnecting.get()) {
+            forceReconnect(safeReason);
+        } else {
+            requestReconnect(safeReason);
+        }
     }
 
     /**
@@ -594,7 +613,7 @@ public class WebSocketClientService {
             long silentMs = System.currentTimeMillis() - lastMessageTime;
             if (silentMs > HEARTBEAT_TIMEOUT_SEC * 1000L) {
                 logger.warning("Heartbeat timeout (" + silentMs + "ms silent), forcing reconnect...");
-                forceReconnect();
+                forceReconnect("heartbeat-timeout");
                 return;
             }
 
@@ -604,7 +623,7 @@ public class WebSocketClientService {
                 boolean sent = ws.send("{\"type\":\"ping\"}");
                 if (!sent) {
                     logger.warning("Failed to send heartbeat ping, forcing reconnect...");
-                    forceReconnect();
+                    forceReconnect("heartbeat-send-failed");
                 }
             }
         }, HEARTBEAT_INTERVAL_SEC, HEARTBEAT_INTERVAL_SEC, TimeUnit.SECONDS);
@@ -622,7 +641,7 @@ public class WebSocketClientService {
     /**
      * 强制断开并触发重连（用于僵尸连接检测）
      */
-    private void forceReconnect() {
+    private void forceReconnect(String reason) {
         WebSocket ws = webSocket;
         webSocket = null;
         if (ws != null) {
@@ -632,7 +651,7 @@ public class WebSocketClientService {
         isConnecting.set(false);
         notifyConnectionStatus(false);
         cleanupConnectionState();
-        requestReconnect("heartbeat-timeout");
+        requestReconnect(reason);
     }
 
     /**

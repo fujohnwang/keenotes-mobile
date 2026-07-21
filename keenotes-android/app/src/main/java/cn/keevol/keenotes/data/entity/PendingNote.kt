@@ -13,7 +13,9 @@ data class PendingNote(
     val id: Long = 0,
     val content: String,
     val channel: String = "mobile-android",
-    val createdAt: String
+    val createdAt: String,
+    val encryptedContent: String? = null,
+    val requestId: String? = null
 ) {
     /** 转换为 Note 以复用 NotesAdapter / item_note.xml */
     fun toNote() = Note(

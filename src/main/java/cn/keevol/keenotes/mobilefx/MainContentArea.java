@@ -996,37 +996,49 @@ public class MainContentArea extends StackPane {
         noteInputPanel.setSendButtonEnabled(true);
         sending.set(false);
 
-        // 网络不可用：存入 pending，取消动画，反向移除卡片
-        if (!pendingService.isNetworkAvailable()) {
-            pendingService.savePendingNote(content, channel, ts);
-            removeOptimisticCard();
-            return;
-        }
-
-        // 网络可用：后台发送
-        apiService.postNote(content, channel, ts).thenAccept(result -> Platform.runLater(() -> {
-            if (result.success()) {
-                notesDisplayPanel.finishOptimisticRequest(tempNote);
-                // Copy to clipboard if enabled
-                if (SettingsService.getInstance().getCopyToClipboardOnPost()) {
-                    javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
-                    javafx.scene.input.ClipboardContent clipContent = new javafx.scene.input.ClipboardContent();
-                    String hiddenMessage = SettingsService.getInstance().getHiddenMessage();
-                    clipContent.putString(ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage));
-                    clipboard.setContent(clipContent);
-                }
-                // 边缘动画会在 handleNewNoteFromDb 匹配到远程同步数据时完成
-            } else {
-                // 发送失败：存入 pending，取消动画，反向移除卡片
-                if (notesDisplayPanel.consumeResolvedOptimistic(tempNote)) {
-                    logger.info("Skipping pending fallback because note was already resolved by realtime sync");
-                } else {
-                    pendingService.savePendingNote(content, channel, ts);
-                    removeOptimisticCard();
-                }
-                notesDisplayPanel.finishOptimisticRequest(tempNote);
+        apiService.prepareNote(content, channel, ts).thenAccept(preparedNote -> {
+            if (!pendingService.isNetworkAvailable()) {
+                pendingService.savePendingNote(preparedNote);
+                Platform.runLater(this::removeOptimisticCard);
+                return;
             }
-        }));
+
+            apiService.postPreparedNote(preparedNote).thenAccept(result -> Platform.runLater(() -> {
+                if (result.success()) {
+                    notesDisplayPanel.finishOptimisticRequest(tempNote);
+                    // Copy to clipboard if enabled
+                    if (SettingsService.getInstance().getCopyToClipboardOnPost()) {
+                        javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+                        javafx.scene.input.ClipboardContent clipContent = new javafx.scene.input.ClipboardContent();
+                        String hiddenMessage = SettingsService.getInstance().getHiddenMessage();
+                        clipContent.putString(ZeroWidthSteganography.embedIfNeeded(content, hiddenMessage));
+                        clipboard.setContent(clipContent);
+                    }
+                    // 边缘动画会在 handleNewNoteFromDb 匹配到远程同步数据时完成
+                } else {
+                    // 发送失败：存入 pending，取消动画，反向移除卡片
+                    if (result.networkError()) {
+                        ServiceManager.getInstance().getWebSocketService()
+                                .markConnectionSuspect("http-post-network-error");
+                    }
+                    if (notesDisplayPanel.consumeResolvedOptimistic(tempNote)) {
+                        logger.info("Skipping pending fallback because note was already resolved by realtime sync");
+                    } else {
+                        pendingService.savePendingNote(preparedNote);
+                        removeOptimisticCard();
+                    }
+                    notesDisplayPanel.finishOptimisticRequest(tempNote);
+                }
+            }));
+        }).exceptionally(e -> {
+            Platform.runLater(() -> {
+                noteInputPanel.replaceDraftText(content);
+                removeOptimisticCard();
+                notesDisplayPanel.finishOptimisticRequest(tempNote);
+                logger.warning("Failed to prepare note: " + e.getMessage());
+            });
+            return null;
+        });
     }
 
     /**

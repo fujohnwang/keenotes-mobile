@@ -199,6 +199,17 @@ class WebSocketService(
         _connectionState.value = ConnectionState.DISCONNECTED
         _syncState.value = SyncState.IDLE
     }
+
+    fun markConnectionSuspect(reason: String) {
+        Log.w(TAG, "Marking WebSocket connection suspect: $reason")
+        DebugLogger.log("WebSocket", "markConnectionSuspect: $reason")
+        isConnecting = false
+        webSocket?.cancel()
+        webSocket = null
+        _connectionState.value = ConnectionState.DISCONNECTED
+        _syncState.value = SyncState.IDLE
+        scheduleReconnect()
+    }
     
     /**
      * Reset internal state for reconnection with new configuration

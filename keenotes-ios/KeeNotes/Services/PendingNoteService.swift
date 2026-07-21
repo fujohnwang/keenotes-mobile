@@ -9,18 +9,18 @@ class PendingNoteService: ObservableObject {
     private let databaseService: DatabaseService
     private let apiService: ApiService
     private let webSocketService: WebSocketService
-    
+
     private var retryTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var isRetrying = false
-    
+
     private static let retryIntervalSeconds: TimeInterval = 30 * 60 // 30 minutes
-    
+
     init(databaseService: DatabaseService, apiService: ApiService, webSocketService: WebSocketService) {
         self.databaseService = databaseService
         self.apiService = apiService
         self.webSocketService = webSocketService
-        
+
         // WebSocket 重连成功时触发重试
         webSocketService.$connectionState
             .removeDuplicates()
@@ -30,7 +30,7 @@ class PendingNoteService: ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
+
     func startRetryScheduler() {
         guard retryTimer == nil else { return }
         retryTimer = Timer.scheduledTimer(
@@ -41,24 +41,36 @@ class PendingNoteService: ObservableObject {
         }
         print("[PendingNoteService] Retry scheduler started (interval: 30 min)")
     }
-    
+
     func stopRetryScheduler() {
         retryTimer?.invalidate()
         retryTimer = nil
     }
-    
+
     /// 暂存一条笔记到本地
     func savePendingNote(content: String, channel: String = "mobile-ios") {
         Task {
             do {
-                try await databaseService.insertPendingNote(content: content, channel: channel)
+                let preparedNote = try apiService.prepareNote(content: content, channel: channel)
+                try await databaseService.insertPendingNote(preparedNote)
                 print("[PendingNoteService] Note saved to pending")
             } catch {
                 print("[PendingNoteService] Failed to save pending note: \(error)")
             }
         }
     }
-    
+
+    func savePendingNote(_ preparedNote: PreparedNote) {
+        Task {
+            do {
+                try await databaseService.insertPendingNote(preparedNote)
+                print("[PendingNoteService] Prepared note saved to pending")
+            } catch {
+                print("[PendingNoteService] Failed to save prepared pending note: \(error)")
+            }
+        }
+    }
+
     /// 网络恢复时立即触发一次重试
     private func onNetworkRestored() {
         Task {
@@ -69,23 +81,38 @@ class PendingNoteService: ObservableObject {
             }
         }
     }
-    
+
     /// 逐条重试发送 pending notes
     private func retryPendingNotes() {
         guard !isRetrying else { return }
         isRetrying = true
-        
+
         Task {
             defer { isRetrying = false }
-            
+
             guard let pendingNotes = try? await databaseService.getPendingNotes(),
                   !pendingNotes.isEmpty else { return }
-            
+
             print("[PendingNoteService] Retrying \(pendingNotes.count) pending notes...")
-            
+
             for note in pendingNotes {
-                let result = await apiService.postNote(content: note.content)
-                
+                let result: ApiService.PostResult
+                if let encryptedContent = note.encryptedContent,
+                   let requestId = note.requestId,
+                   !encryptedContent.isEmpty,
+                   !requestId.isEmpty {
+                    let preparedNote = PreparedNote(
+                        content: note.content,
+                        encryptedContent: encryptedContent,
+                        channel: note.channel,
+                        createdAt: note.createdAt,
+                        requestId: requestId
+                    )
+                    result = await apiService.postPreparedNote(preparedNote)
+                } else {
+                    result = await apiService.postNote(content: note.content)
+                }
+
                 if result.success {
                     if let noteId = note.id {
                         try? await databaseService.deletePendingNote(id: noteId)
@@ -93,12 +120,15 @@ class PendingNoteService: ObservableObject {
                     }
                 } else {
                     print("[PendingNoteService] Retry failed: \(result.message), stopping")
+                    if result.networkError {
+                        webSocketService.markConnectionSuspect(reason: "pending-retry-network-error")
+                    }
                     break
                 }
             }
         }
     }
-    
+
     /// 检查网络是否可用
     var isNetworkAvailable: Bool {
         webSocketService.connectionState == .connected

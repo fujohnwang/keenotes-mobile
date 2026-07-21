@@ -266,8 +266,28 @@ public class LocalCacheService {
                             "  id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                             "  content TEXT NOT NULL, " +
                             "  channel TEXT DEFAULT 'desktop', " +
-                            "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                            "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                            "  encrypted_content TEXT, " +
+                            "  request_id TEXT" +
                             ")");
+            ensureColumnExists(stmt, "pending_notes", "encrypted_content", "TEXT");
+            ensureColumnExists(stmt, "pending_notes", "request_id", "TEXT");
+        }
+    }
+
+    private void ensureColumnExists(Statement stmt, String tableName, String columnName, String columnDefinition)
+            throws SQLException {
+        boolean exists = false;
+        try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + tableName + ")")) {
+            while (rs.next()) {
+                if (columnName.equalsIgnoreCase(rs.getString("name"))) {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+        if (!exists) {
+            stmt.executeUpdate("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition);
         }
     }
 
@@ -920,13 +940,24 @@ public class LocalCacheService {
     }
 
     public void insertPendingNote(String content, String channel, String createdAtUtc) throws SQLException {
+        insertPendingNote(content, channel, createdAtUtc, null, null);
+    }
+
+    public void insertPendingNote(ApiServiceV2.PreparedNote note) throws SQLException {
+        insertPendingNote(note.content(), note.channel(), note.createdAt(), note.encryptedContent(), note.requestId());
+    }
+
+    public void insertPendingNote(String content, String channel, String createdAtUtc,
+                                  String encryptedContent, String requestId) throws SQLException {
         ensureInitialized();
-        String sql = "INSERT INTO pending_notes (content, channel, created_at) VALUES (?, ?, ?)";
+        String sql = "INSERT INTO pending_notes (content, channel, created_at, encrypted_content, request_id) VALUES (?, ?, ?, ?, ?)";
         synchronized (dbLock) {
             try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
                 pstmt.setString(1, content);
                 pstmt.setString(2, channel);
                 pstmt.setString(3, DateTimeUtil.requireUtcStorageFormat(createdAtUtc));
+                pstmt.setString(4, encryptedContent);
+                pstmt.setString(5, requestId);
                 pstmt.executeUpdate();
             }
         }
@@ -936,7 +967,7 @@ public class LocalCacheService {
     public List<PendingNoteData> getPendingNotes() {
         ensureInitialized();
         List<PendingNoteData> notes = new ArrayList<>();
-        String sql = "SELECT id, content, channel, created_at FROM pending_notes ORDER BY created_at ASC";
+        String sql = "SELECT id, content, channel, created_at, encrypted_content, request_id FROM pending_notes ORDER BY created_at ASC";
         synchronized (dbLock) {
             try (Statement stmt = connection.createStatement();
                  ResultSet rs = stmt.executeQuery(sql)) {
@@ -945,7 +976,9 @@ public class LocalCacheService {
                             rs.getLong("id"),
                             rs.getString("content"),
                             rs.getString("channel"),
-                            rs.getString("created_at")
+                            rs.getString("created_at"),
+                            rs.getString("encrypted_content"),
+                            rs.getString("request_id")
                     ));
                 }
             } catch (SQLException e) {
@@ -985,12 +1018,30 @@ public class LocalCacheService {
         public final String content;
         public final String channel;
         public final String createdAt;
+        public final String encryptedContent;
+        public final String requestId;
 
         public PendingNoteData(long id, String content, String channel, String createdAt) {
+            this(id, content, channel, createdAt, null, null);
+        }
+
+        public PendingNoteData(long id, String content, String channel, String createdAt,
+                               String encryptedContent, String requestId) {
             this.id = id;
             this.content = content;
             this.channel = channel;
             this.createdAt = createdAt;
+            this.encryptedContent = encryptedContent;
+            this.requestId = requestId;
+        }
+
+        public boolean hasPreparedPayload() {
+            return encryptedContent != null && !encryptedContent.isBlank()
+                    && requestId != null && !requestId.isBlank();
+        }
+
+        public ApiServiceV2.PreparedNote toPreparedNote() {
+            return new ApiServiceV2.PreparedNote(content, encryptedContent, channel, createdAt, requestId);
         }
     }
 

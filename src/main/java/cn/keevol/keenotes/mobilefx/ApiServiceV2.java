@@ -7,11 +7,13 @@ import javax.net.ssl.*;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 
 /**
  * API Service V2 - 只保留POST功能
@@ -73,18 +75,25 @@ public class ApiServiceV2 {
         private final String message;
         private final String echoContent;
         private final Long noteId;
+        private final boolean networkError;
 
         public ApiResult(boolean success, String message, String echoContent, Long noteId) {
+            this(success, message, echoContent, noteId, false);
+        }
+
+        private ApiResult(boolean success, String message, String echoContent, Long noteId, boolean networkError) {
             this.success = success;
             this.message = message;
             this.echoContent = echoContent;
             this.noteId = noteId;
+            this.networkError = networkError;
         }
 
         public boolean success() { return success; }
         public String message() { return message; }
         public String echoContent() { return echoContent; }
         public Long noteId() { return noteId; }
+        public boolean networkError() { return networkError; }
 
         public static ApiResult success(String echoContent, Long noteId) {
             return new ApiResult(true, "Note saved successfully!", echoContent, noteId);
@@ -92,7 +101,18 @@ public class ApiServiceV2 {
         public static ApiResult failure(String message) {
             return new ApiResult(false, message, null, null);
         }
+        public static ApiResult networkFailure(String message) {
+            return new ApiResult(false, message, null, null, true);
+        }
     }
+
+    public record PreparedNote(
+            String content,
+            String encryptedContent,
+            String channel,
+            String createdAt,
+            String requestId
+    ) {}
 
     public CompletableFuture<ApiResult> postNote(String content) {
         return postNote(content, getDefaultChannel());
@@ -105,6 +125,76 @@ public class ApiServiceV2 {
 
     public CompletableFuture<ApiResult> postNote(String content, String channel, String utcTs) {
         return postNoteInternal(content, channel, utcTs, false);
+    }
+
+    public CompletableFuture<PreparedNote> prepareNote(String content, String channel, String utcTs) {
+        if (content == null || content.isBlank()) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Note content cannot be empty."));
+        }
+        if (!cryptoService.isEncryptionEnabled()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("PIN code not set."));
+        }
+
+        final String normalizedTs = DateTimeUtil.requireUtcStorageFormat(utcTs);
+        final String requestId = UUID.randomUUID().toString();
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                String encrypted = cryptoService.encrypt(content);
+                return new PreparedNote(content, encrypted, channel, normalizedTs, requestId);
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+        }, networkExecutor);
+    }
+
+    public CompletableFuture<ApiResult> postPreparedNote(PreparedNote note) {
+        if (note == null) {
+            return CompletableFuture.completedFuture(ApiResult.failure("Prepared note cannot be null."));
+        }
+
+        String endpointUrl = settings.getEndpointUrl();
+        String token = settings.getToken();
+
+        if (endpointUrl == null || endpointUrl.isBlank()) {
+            return CompletableFuture.completedFuture(ApiResult.failure("Endpoint URL not configured."));
+        }
+        if (token == null || token.isBlank()) {
+            return CompletableFuture.completedFuture(ApiResult.failure("Token not configured."));
+        }
+        if (note.encryptedContent() == null || note.encryptedContent().isBlank()) {
+            return CompletableFuture.completedFuture(ApiResult.failure("Prepared note content cannot be empty."));
+        }
+        if (note.requestId() == null || note.requestId().isBlank()) {
+            return CompletableFuture.completedFuture(ApiResult.failure("Prepared note request_id cannot be empty."));
+        }
+
+        final String normalizedTs = DateTimeUtil.requireUtcStorageFormat(note.createdAt());
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                String json = buildNoteJson(note.channel(), note.encryptedContent(), normalizedTs, note.requestId());
+
+                Request request = new Request.Builder()
+                        .url(endpointUrl)
+                        .header("Content-Type", "application/json")
+                        .header("Authorization", "Bearer " + token)
+                        .post(RequestBody.create(json, JSON))
+                        .build();
+
+                try (Response response = httpClient.newCall(request).execute()) {
+                    if (response.isSuccessful()) {
+                        String body = response.body() != null ? response.body().string() : "";
+                        return ApiResult.success(note.content(), parseNoteId(body));
+                    } else {
+                        return ApiResult.failure("Server error: " + response.code());
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ApiResult.networkFailure("Network error: " + e.getMessage());
+            }
+        }, networkExecutor);
     }
 
     /**
@@ -140,10 +230,7 @@ public class ApiServiceV2 {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String encrypted = cryptoService.encrypt(content);
-                String json = String.format(
-                    "{\"channel\":\"%s\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":true}",
-                    channel, escapeJson(encrypted), normalizedTs
-                );
+                String json = buildNoteJson(channel, encrypted, normalizedTs, null);
 
                 Request request = new Request.Builder()
                         .url(endpointUrl)
@@ -162,7 +249,7 @@ public class ApiServiceV2 {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-                return ApiResult.failure("Network error: " + e.getMessage());
+                return ApiResult.networkFailure("Network error: " + e.getMessage());
             }
         }, networkExecutor);
     }
@@ -174,7 +261,7 @@ public class ApiServiceV2 {
     private String getDefaultChannel() {
         String os = System.getProperty("os.name", "unknown").toLowerCase();
         String osType;
-        
+
         if (os.contains("mac") || os.contains("darwin")) {
             osType = "mac";
         } else if (os.contains("win")) {
@@ -184,7 +271,7 @@ public class ApiServiceV2 {
         } else {
             osType = "unknown";
         }
-        
+
         return "desktop-" + osType;
     }
 
@@ -196,6 +283,16 @@ public class ApiServiceV2 {
                 .replace("\r", "\\r")
                 .replace("\t", "\\t")
                 + "\"";
+    }
+
+    private String buildNoteJson(String channel, String encryptedText, String ts, String requestId) {
+        String requestIdJson = (requestId == null || requestId.isBlank())
+                ? ""
+                : ",\"request_id\":" + escapeJson(requestId);
+        return String.format(
+                "{\"channel\":%s,\"text\":%s,\"ts\":\"%s\",\"encrypted\":true%s}",
+                escapeJson(channel), escapeJson(encryptedText), ts, requestIdJson
+        );
     }
 
     private Long parseNoteId(String body) {
@@ -235,7 +332,7 @@ public class ApiServiceV2 {
     public boolean isEncryptionEnabled() {
         return cryptoService.isEncryptionEnabled();
     }
-    
+
     /**
      * Post note directly without encryption (for importing already encrypted data)
      * This method should ONLY be used by DataImportService
@@ -273,10 +370,7 @@ public class ApiServiceV2 {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String json = String.format(
-                    "{\"channel\":\"%s\",\"text\":%s,\"ts\":\"%s\",\"encrypted\":true}",
-                    channel, escapeJson(encryptedContent), normalizedTs
-                );
+                String json = buildNoteJson(channel, encryptedContent, normalizedTs, null);
 
                 Request request = new Request.Builder()
                         .url(endpointUrl)
@@ -295,7 +389,7 @@ public class ApiServiceV2 {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-                return ApiResult.failure("Network error: " + e.getMessage());
+                return ApiResult.networkFailure("Network error: " + e.getMessage());
             }
         }, networkExecutor);
     }

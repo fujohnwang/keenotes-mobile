@@ -313,6 +313,22 @@ struct NoteView: View {
 
     private func performSend() {
         let sentContent = appState.noteDraftText
+        let preparedNote: PreparedNote
+
+        do {
+            preparedNote = try appState.apiService.prepareNote(content: sentContent)
+        } catch {
+            errorMessage = error.localizedDescription
+            withAnimation(.spring()) { showErrorToast = true }
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                await MainActor.run {
+                    withAnimation(.spring()) { showErrorToast = false }
+                }
+            }
+            return
+        }
+
         appState.noteDraftText = ""
 
         // Trigger confetti + sound + haptic immediately for seamless feel (optimistic UI)
@@ -335,8 +351,8 @@ struct NoteView: View {
 
         // 网络不可用：直接暂存到本地
         if appState.webSocketService.connectionState != .connected {
-            appState.pendingNoteService.savePendingNote(content: sentContent)
-            
+            appState.pendingNoteService.savePendingNote(preparedNote)
+
             errorMessage = "📤 Saved locally, will auto-send when network restores"
             withAnimation(.spring()) { showErrorToast = true }
             Task {
@@ -350,13 +366,16 @@ struct NoteView: View {
 
         // Send in background silently
         Task {
-            let result = await appState.apiService.postNote(content: sentContent)
+            let result = await appState.apiService.postPreparedNote(preparedNote)
 
             await MainActor.run {
                 if !result.success {
                     // Send failed: save locally and show error
-                    appState.pendingNoteService.savePendingNote(content: sentContent)
-                    
+                    appState.pendingNoteService.savePendingNote(preparedNote)
+                    if result.networkError {
+                        appState.webSocketService.markConnectionSuspect(reason: "http-post-network-error")
+                    }
+
                     errorMessage = "📤 Send failed, saved locally"
                     withAnimation(.spring()) { showErrorToast = true }
                     Task {
@@ -393,7 +412,7 @@ struct NoteView: View {
                 keyboardVisible = false
             }
         }
-        
+
         let inputModeDidChangeObserver = NotificationCenter.default.addObserver(
             forName: UITextInputMode.currentInputModeDidChangeNotification,
             object: nil,
@@ -413,7 +432,7 @@ struct NoteView: View {
         keyboardObserverTokens.forEach(NotificationCenter.default.removeObserver)
         keyboardObserverTokens.removeAll()
     }
-    
+
     private func updateKeyboardLocale() {
         // Find the current first responder and get its keyboard language
         UIResponder._currentFirstResponder = nil
@@ -550,7 +569,7 @@ class NetworkMonitor: ObservableObject {
 // MARK: - UIResponder extension to find current first responder
 extension UIResponder {
     static weak var _currentFirstResponder: UIResponder?
-    
+
     @objc func captureFirstResponder(_ sender: Any?) {
         UIResponder._currentFirstResponder = self
     }
@@ -575,17 +594,17 @@ struct PendingNotesListView: View {
                     }
                     .font(.system(size: 14))
                 }
-                
+
                 Text("Pending Notes")
                     .font(.headline)
                     .padding(.leading, 8)
-                
+
                 Spacer()
             }
             .padding(.horizontal, horizontalPadding)
             .padding(.top, 8)
             .padding(.bottom, 12)
-            
+
             if pendingNotes.isEmpty {
                 Spacer()
                 Text("No pending notes")
@@ -606,7 +625,7 @@ struct PendingNotesListView: View {
         }
         .onAppear { loadPendingNotes() }
     }
-    
+
     private func loadPendingNotes() {
         Task {
             pendingNotes = (try? await appState.databaseService.getPendingNotes()) ?? []

@@ -38,3 +38,12 @@
 - 桌面端 Dialog 的图标 badge 采用 top 对齐，而不是拉满文案高度；这样视觉重量更轻，避免左侧形成不必要的栏位。
 - Android 端把 Note 输入草稿提升到 `MainActivity` 的非持久化 UI 状态，并通过 `savedInstanceState` 保住同一次界面会话；修复 Fragment 重建导致滑动/点击切 tab 后草稿丢失，以及 revise 回填时误判输入框为空的问题。
 - Android 端 revise 的覆盖确认改为在来源页原地弹出；确认后才跳转输入页，取消不产生导航副作用，`NoteFragment` 仍保留兜底确认逻辑。
+
+## request_id 客户端接入记录
+
+- 新发送链路先生成 `PreparedNote`，一次性完成加密、UTC 时间戳和 `request_id`，发送失败或离线时把同一份 encrypted payload 存入 pending，重试不再重新加密。
+- 本地旧 pending row 没有 `encryptedContent/requestId` 时继续走旧发送逻辑；这是升级兼容，不影响旧客户端，也不改远端旧数据。
+- pending 表新增列都是 nullable；iOS/JavaFX 运行时先查列再 `ALTER TABLE`，Android Room 4->5 migration 也加了 `PRAGMA table_info` guard，避免重复加列失败。
+- Android 编译环境差异较大，这轮只做源码改动，不在 Codex 环境跑 Android 编译验证。
+- JavaFX 端 HTTP/pending retry 出现网络失败时会主动标记 WebSocket suspect 并重连；`onFailure` 也会下发 disconnected，避免断网后 Sync Channel 长时间假绿。
+- iOS/Android 端也补了同类 suspect reconnect：HTTP POST 或 pending retry 网络失败后，主动取消当前 WebSocket、置 disconnected，并走既有重连后 pending 自动重试链路。

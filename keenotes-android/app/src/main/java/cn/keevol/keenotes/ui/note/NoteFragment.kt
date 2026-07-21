@@ -30,12 +30,12 @@ class NoteFragment : Fragment() {
         const val REVISION_DRAFT_CONTENT_KEY = "revision_draft_content"
         const val REVISION_DRAFT_OVERWRITE_CONFIRMED_KEY = "revision_draft_overwrite_confirmed"
     }
-    
+
     private var _binding: FragmentNoteBinding? = null
     private val binding get() = _binding!!
-    
+
     private var shouldShowOverviewCard = false // Track if overview card should be shown
-    
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -44,10 +44,10 @@ class NoteFragment : Fragment() {
         _binding = FragmentNoteBinding.inflate(inflater, container, false)
         return binding.root
     }
-    
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        
+
         setupOnThisDayButton()
         setupSearchButton()
         setupOverviewCard()
@@ -59,20 +59,20 @@ class NoteFragment : Fragment() {
         setupKeyboardListener()
         setupPendingBanner()
     }
-    
+
     private fun setupKeyboardListener() {
         // Listen for keyboard visibility changes using layout changes
         binding.root.viewTreeObserver.addOnGlobalLayoutListener {
             if (_binding == null || !isAdded) return@addOnGlobalLayoutListener
-            
+
             val rect = android.graphics.Rect()
             binding.root.getWindowVisibleDisplayFrame(rect)
             val screenHeight = binding.root.rootView.height
             val keypadHeight = screenHeight - rect.bottom
-            
+
             // If keyboard height is more than 15% of screen height, consider it visible
             val isKeyboardVisible = keypadHeight > screenHeight * 0.15
-            
+
             // Update overview card visibility based on keyboard state
             if (shouldShowOverviewCard) {
                 val newVisibility = if (isKeyboardVisible) View.GONE else View.VISIBLE
@@ -82,7 +82,7 @@ class NoteFragment : Fragment() {
             }
         }
     }
-    
+
     private fun setupPendingBanner() {
         val app = requireActivity().application as KeeNotesApp
 
@@ -128,10 +128,10 @@ class NoteFragment : Fragment() {
             }
         }
     }
-    
+
     private fun setupAutoFocusInput() {
         val app = requireActivity().application as KeeNotesApp
-        
+
         // Check if auto-focus is enabled and focus input
         viewLifecycleOwner.lifecycleScope.launch {
             val autoFocus = app.settingsRepository.autoFocusInputOnLaunch.first()
@@ -148,10 +148,10 @@ class NoteFragment : Fragment() {
             }
         }
     }
-    
+
     private fun setupOverviewCard() {
         val app = requireActivity().application as KeeNotesApp
-        
+
         // Observe showOverviewCard setting - use viewLifecycleOwner to auto-cancel when view is destroyed
         viewLifecycleOwner.lifecycleScope.launch {
             app.settingsRepository.showOverviewCard.collect { show ->
@@ -162,7 +162,7 @@ class NoteFragment : Fragment() {
                 }
             }
         }
-        
+
         // Observe note count - use viewLifecycleOwner to auto-cancel when view is destroyed
         viewLifecycleOwner.lifecycleScope.launch {
             app.database.noteDao().getNoteCountFlow().collect { count ->
@@ -172,7 +172,7 @@ class NoteFragment : Fragment() {
                         binding.overviewCardInclude.totalNotesValue.text = count.toString()
                     }
                 }
-                
+
                 // Always update first note date when note count changes
                 // Execute in IO context for database operations
                 if (count > 0) {
@@ -185,7 +185,7 @@ class NoteFragment : Fragment() {
                 }
             }
         }
-        
+
         // Observe first note date and calculate days - use viewLifecycleOwner to auto-cancel when view is destroyed
         viewLifecycleOwner.lifecycleScope.launch {
             app.settingsRepository.firstNoteDate.collect { firstDate ->
@@ -203,7 +203,7 @@ class NoteFragment : Fragment() {
             }
         }
     }
-    
+
     private fun calculateDaysUsing(firstDateStr: String): Int {
         return try {
             // Try multiple formats to handle both "2024-10-24 11:11:01" and "2024-10-24T11:11:01"
@@ -216,20 +216,20 @@ class NoteFragment : Fragment() {
                 val formatter = java.time.format.DateTimeFormatter.ISO_DATE_TIME
                 java.time.LocalDateTime.parse(firstDateStr, formatter).toLocalDate()
             }
-            
+
             val today = java.time.LocalDate.now()
             java.time.temporal.ChronoUnit.DAYS.between(firstDate, today).toInt() + 1
         } catch (e: Exception) {
             0
         }
     }
-    
+
     private fun setupSearchButton() {
         binding.btnSearch.setOnClickListener {
             findNavController().navigate(R.id.action_note_to_search)
         }
     }
-    
+
     private fun setupNoteInput() {
         binding.noteInput.addTextChangedListener { text ->
             val draft = text?.toString().orEmpty()
@@ -288,10 +288,10 @@ class NoteFragment : Fragment() {
             imm.showSoftInput(binding.noteInput, InputMethodManager.SHOW_IMPLICIT)
         }
     }
-    
+
     private fun setupSendButton() {
         updateSendButtonState(binding.noteInput.text?.toString().orEmpty().isNotBlank())
-        
+
         binding.btnSend.setOnClickListener {
             val content = binding.noteInput.text.toString().trim()
             if (content.isNotEmpty()) {
@@ -299,25 +299,40 @@ class NoteFragment : Fragment() {
             }
         }
     }
-    
+
     private fun updateSendButtonState(enabled: Boolean) {
         binding.btnSend.isEnabled = enabled
         binding.btnSend.alpha = if (enabled) 1.0f else 0.5f
     }
-    
+
     private fun saveNote(content: String) {
         val app = requireActivity().application as KeeNotesApp
-        
-        // Optimistic UI: clear input, confetti, clipboard immediately
-        binding.noteInput.text?.clear()
-        (activity as? MainActivity)?.clearNoteDraftText()
-        binding.noteInput.clearFocus()
-        val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
-        updateSendButtonState(false)
-        
-        // Copy to clipboard & fire confetti immediately (optimistic UI)
+
         viewLifecycleOwner.lifecycleScope.launch {
+            val preparedNote = try {
+                app.apiService.prepareNote(content)
+            } catch (e: Exception) {
+                if (_binding != null) {
+                    com.google.android.material.snackbar.Snackbar.make(
+                        binding.root,
+                        e.message ?: "Failed to prepare note",
+                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                    ).show()
+                }
+                return@launch
+            }
+
+            if (_binding == null) return@launch
+
+            // Optimistic UI: clear input, confetti, clipboard immediately
+            binding.noteInput.text?.clear()
+            (activity as? MainActivity)?.clearNoteDraftText()
+            binding.noteInput.clearFocus()
+            val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.hideSoftInputFromWindow(binding.noteInput.windowToken, 0)
+            updateSendButtonState(false)
+
+            // Copy to clipboard & fire confetti immediately (optimistic UI)
             if (app.settingsRepository.getCopyToClipboardOnPost()) {
                 val hiddenMessage = app.settingsRepository.getHiddenMessage()
                 val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -327,31 +342,32 @@ class NoteFragment : Fragment() {
             if (app.settingsRepository.confettiOnPostSuccess.first()) {
                 cn.keevol.keenotes.ui.widget.ConfettiHelper.fire(requireActivity())
             }
-        }
-        
-        // 网络不可用：直接暂存到本地
-        if (!app.pendingNoteService.isNetworkAvailable()) {
-            app.pendingNoteService.savePendingNote(content)
-            com.google.android.material.snackbar.Snackbar.make(
-                binding.root, "📤 Saved locally, will auto-send when network restores", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
-            ).show()
-            return
-        }
-        
-        // Send in background silently
-        viewLifecycleOwner.lifecycleScope.launch {
-            val result = app.apiService.postNote(content)
-            
+
+            // 网络不可用：直接暂存到本地
+            if (!app.pendingNoteService.isNetworkAvailable()) {
+                app.pendingNoteService.savePendingNote(preparedNote)
+                com.google.android.material.snackbar.Snackbar.make(
+                    binding.root, "📤 Saved locally, will auto-send when network restores", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                ).show()
+                return@launch
+            }
+
+            // Send in background silently
+            val result = app.apiService.postPreparedNote(preparedNote)
+
             if (_binding != null && !result.success) {
                 // 发送失败：暂存到本地
-                app.pendingNoteService.savePendingNote(content)
+                app.pendingNoteService.savePendingNote(preparedNote)
+                if (result.networkError) {
+                    app.webSocketService.markConnectionSuspect("http-post-network-error")
+                }
                 com.google.android.material.snackbar.Snackbar.make(
                     binding.root, "📤 Send failed, saved locally", com.google.android.material.snackbar.Snackbar.LENGTH_LONG
                 ).show()
             }
         }
     }
-    
+
     override fun onPause() {
         super.onPause()
         // 离开 NoteFragment 时主动隐藏键盘并清除焦点，防止切换到其他 tab 时出现键盘残影

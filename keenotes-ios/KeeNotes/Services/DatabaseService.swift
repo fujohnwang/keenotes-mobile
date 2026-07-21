@@ -4,13 +4,13 @@ import GRDB
 /// SQLite database service using GRDB
 class DatabaseService: ObservableObject {
     var dbQueue: DatabaseQueue?
-    
+
     @Published var noteCount: Int = 0
-    
+
     var isInitialized: Bool {
         dbQueue != nil
     }
-    
+
     func initialize() throws {
         let fileManager = FileManager.default
         let appSupport = try fileManager.url(
@@ -20,9 +20,9 @@ class DatabaseService: ObservableObject {
             create: true
         )
         let dbPath = appSupport.appendingPathComponent("keenotes.db")
-        
+
         dbQueue = try DatabaseQueue(path: dbPath.path)
-        
+
         try dbQueue?.write { db in
             // Create notes table
             try db.create(table: Note.databaseTableName, ifNotExists: true) { t in
@@ -32,12 +32,12 @@ class DatabaseService: ObservableObject {
                 t.column("createdAt", .text).notNull()
                 t.column("syncedAt", .integer).notNull().defaults(to: 0)
             }
-            
+
             // Migrate existing tables - add channel column if it doesn't exist
             if try db.tableExists(Note.databaseTableName) {
                 let columns = try db.columns(in: Note.databaseTableName)
                 let hasChannel = columns.contains { $0.name == "channel" }
-                
+
                 if !hasChannel {
                     print("[DB] Migrating notes table: adding channel column")
                     try db.alter(table: Note.databaseTableName) { t in
@@ -45,34 +45,56 @@ class DatabaseService: ObservableObject {
                     }
                 }
             }
-            
+
             // Create sync_state table
             try db.create(table: SyncState.databaseTableName, ifNotExists: true) { t in
                 t.column("id", .integer).primaryKey()
                 t.column("lastSyncId", .integer).notNull()
                 t.column("lastSyncTime", .text)
             }
-            
+
             // Create index on createdAt for faster sorting/querying
             try db.create(index: "idx_notes_createdAt", on: Note.databaseTableName, columns: ["createdAt"], ifNotExists: true)
-            
+
             // Create pending_notes table for offline cache
             try db.create(table: PendingNote.databaseTableName, ifNotExists: true) { t in
                 t.autoIncrementedPrimaryKey("id")
                 t.column("content", .text).notNull()
                 t.column("channel", .text).notNull().defaults(to: "mobile-ios")
                 t.column("createdAt", .text).notNull()
+                t.column("encryptedContent", .text)
+                t.column("requestId", .text)
+            }
+
+            if try db.tableExists(PendingNote.databaseTableName) {
+                let columns = try db.columns(in: PendingNote.databaseTableName)
+                let hasEncryptedContent = columns.contains { $0.name == "encryptedContent" }
+                let hasRequestId = columns.contains { $0.name == "requestId" }
+
+                if !hasEncryptedContent {
+                    print("[DB] Migrating pending_notes table: adding encryptedContent column")
+                    try db.alter(table: PendingNote.databaseTableName) { t in
+                        t.add(column: "encryptedContent", .text)
+                    }
+                }
+
+                if !hasRequestId {
+                    print("[DB] Migrating pending_notes table: adding requestId column")
+                    try db.alter(table: PendingNote.databaseTableName) { t in
+                        t.add(column: "requestId", .text)
+                    }
+                }
             }
         }
-        
+
         // Update note count
         Task { @MainActor in
             self.noteCount = (try? await getNoteCount()) ?? 0
         }
     }
-    
+
     // MARK: - Notes
-    
+
     func insertNote(_ note: Note) async throws {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
@@ -83,12 +105,12 @@ class DatabaseService: ObservableObject {
         // Refresh actual count from database
         await refreshNoteCount()
     }
-    
+
     func insertNotes(_ notes: [Note]) async throws {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
         }
-        
+
         let insertedCount = try await dbQueue.write { db in
             var count = 0
             for note in notes {
@@ -102,13 +124,13 @@ class DatabaseService: ObservableObject {
             }
             return count
         }
-        
+
         print("[DB] Successfully inserted \(insertedCount) of \(notes.count) notes")
-        
+
         // Refresh actual count from database
         await refreshNoteCount()
     }
-    
+
     func getAllNotes() async throws -> [Note] {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
@@ -117,7 +139,7 @@ class DatabaseService: ObservableObject {
             try Note.order(Note.Columns.createdAt.desc).fetchAll(db)
         }
     }
-    
+
     func getRecentNotes(limit: Int = 20) async throws -> [Note] {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
@@ -126,17 +148,17 @@ class DatabaseService: ObservableObject {
             try Note.order(Note.Columns.createdAt.desc).limit(limit).fetchAll(db)
         }
     }
-    
+
     func getNotesByPeriod(days: Int) async throws -> [Note] {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
         }
-        
+
         if days <= 0 {
             // "All" - return all notes
             return try await getAllNotes()
         }
-        
+
         return try await dbQueue.read { db in
             try Note
                 .filter(sql: "createdAt >= datetime('now', '-' || ? || ' days')", arguments: [days])
@@ -144,12 +166,12 @@ class DatabaseService: ObservableObject {
                 .fetchAll(db)
         }
     }
-    
+
     func getNotesByPeriodPaged(days: Int, limit: Int, offset: Int) async throws -> [Note] {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
         }
-        
+
         if days <= 0 {
             // "All" - paginated
             return try await dbQueue.read { db in
@@ -159,7 +181,7 @@ class DatabaseService: ObservableObject {
                     .fetchAll(db)
             }
         }
-        
+
         return try await dbQueue.read { db in
             try Note
                 .filter(sql: "createdAt >= datetime('now', '-' || ? || ' days')", arguments: [days])
@@ -168,24 +190,24 @@ class DatabaseService: ObservableObject {
                 .fetchAll(db)
         }
     }
-    
+
     func getNotesCountByPeriod(days: Int) async throws -> Int {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
         }
-        
+
         if days <= 0 {
             // "All"
             return try await getNoteCount()
         }
-        
+
         return try await dbQueue.read { db in
             try Note
                 .filter(sql: "createdAt >= datetime('now', '-' || ? || ' days')", arguments: [days])
                 .fetchCount(db)
         }
     }
-    
+
     func getNotesOnThisDay() async throws -> [Note] {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
@@ -259,7 +281,7 @@ class DatabaseService: ObservableObject {
                 .fetchAll(db)
         }
     }
-    
+
     func getNoteCount() async throws -> Int {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
@@ -268,7 +290,7 @@ class DatabaseService: ObservableObject {
             try Note.fetchCount(db)
         }
     }
-    
+
     func refreshNoteCount() async {
         do {
             let count = try await getNoteCount()
@@ -280,7 +302,7 @@ class DatabaseService: ObservableObject {
             print("[DB] Failed to refresh noteCount: \(error)")
         }
     }
-    
+
     func deleteAllNotes() async throws {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
@@ -294,7 +316,7 @@ class DatabaseService: ObservableObject {
         print("[DB] All notes deleted")
     }
     // MARK: - Analytics
-    
+
     /// Returns notes count grouped by year, sorted ascending by year
     func getNotesCountByYear() async throws -> [(year: Int, count: Int)] {
         guard let dbQueue = dbQueue else {
@@ -310,9 +332,9 @@ class DatabaseService: ObservableObject {
             return rows.map { (year: $0["year"] as Int, count: $0["count"] as Int) }
         }
     }
-    
+
     // MARK: - Sync State
-    
+
     func getSyncState() async throws -> SyncState? {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
@@ -321,12 +343,12 @@ class DatabaseService: ObservableObject {
             try SyncState.fetchOne(db, key: SyncState.singletonId)
         }
     }
-    
+
     func getLastSyncId() async throws -> Int64 {
         let state = try await getSyncState()
         return state?.lastSyncId ?? -1
     }
-    
+
     func updateSyncState(lastSyncId: Int64) async throws {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
@@ -337,7 +359,7 @@ class DatabaseService: ObservableObject {
             try state.save(db)
         }
     }
-    
+
     func clearSyncState() async throws {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
@@ -346,33 +368,49 @@ class DatabaseService: ObservableObject {
             try SyncState.deleteAll(db)
         }
     }
-    
+
     // MARK: - Pending Notes (Offline Cache)
-    
+
     @Published var pendingNoteCount: Int = 0
-    
+
     func insertPendingNote(content: String, channel: String = "mobile-ios") async throws {
         guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
-        
+
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         formatter.timeZone = TimeZone(abbreviation: "UTC")
         let now = formatter.string(from: Date())
-        
+
         _ = try await dbQueue.write { db in
             var note = PendingNote(content: content, channel: channel, createdAt: now)
             try note.insert(db)
         }
         await refreshPendingNoteCount()
     }
-    
+
+    func insertPendingNote(_ preparedNote: PreparedNote) async throws {
+        guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
+
+        _ = try await dbQueue.write { db in
+            var note = PendingNote(
+                content: preparedNote.content,
+                channel: preparedNote.channel,
+                createdAt: preparedNote.createdAt,
+                encryptedContent: preparedNote.encryptedContent,
+                requestId: preparedNote.requestId
+            )
+            try note.insert(db)
+        }
+        await refreshPendingNoteCount()
+    }
+
     func getPendingNotes() async throws -> [PendingNote] {
         guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
         return try await dbQueue.read { db in
             try PendingNote.order(PendingNote.Columns.createdAt.asc).fetchAll(db)
         }
     }
-    
+
     func deletePendingNote(id: Int64) async throws {
         guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
         try await dbQueue.write { db in
@@ -380,14 +418,14 @@ class DatabaseService: ObservableObject {
         }
         await refreshPendingNoteCount()
     }
-    
+
     func getPendingNoteCount() async throws -> Int {
         guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
         return try await dbQueue.read { db in
             try PendingNote.fetchCount(db)
         }
     }
-    
+
     func refreshPendingNoteCount() async {
         do {
             let count = try await getPendingNoteCount()
@@ -396,9 +434,9 @@ class DatabaseService: ObservableObject {
             print("[DB] Failed to refresh pendingNoteCount: \(error)")
         }
     }
-    
+
     // MARK: - Clear All
-    
+
     func clearAllData() async throws {
         guard let dbQueue = dbQueue else {
             throw DatabaseError.notInitialized
@@ -416,7 +454,7 @@ class DatabaseService: ObservableObject {
 
 enum DatabaseError: Error, LocalizedError {
     case notInitialized
-    
+
     var errorDescription: String? {
         switch self {
         case .notInitialized:

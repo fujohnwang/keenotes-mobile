@@ -118,6 +118,24 @@ class WebSocketService: NSObject, ObservableObject {
             UIApplication.shared.isIdleTimerDisabled = false
         }
     }
+
+    func markConnectionSuspect(reason: String) {
+        print("[WS] Marking connection suspect: \(reason)")
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        isConnecting = false
+
+        let task = webSocketTask
+        webSocketTask = nil
+        task?.cancel(with: .goingAway, reason: nil)
+
+        Task { @MainActor in
+            connectionState = .disconnected
+            syncStatus = .idle
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+        scheduleReconnect()
+    }
     
     func resetState() {
         lastSyncId = -1

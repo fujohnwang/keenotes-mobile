@@ -5,10 +5,6 @@ import cn.keevol.keenotes.data.dao.PendingNoteDao
 import cn.keevol.keenotes.data.entity.PendingNote
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 /**
  * 离线暂存笔记的调度服务
@@ -23,7 +19,6 @@ class PendingNoteService(
 ) {
     companion object {
         private const val TAG = "PendingNoteService"
-        private val TS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         private const val RETRY_INTERVAL_MS = 30L * 60 * 1000 // 30 minutes
     }
 
@@ -62,16 +57,22 @@ class PendingNoteService(
     fun savePendingNote(content: String, channel: String = "mobile-android") {
         scope.launch {
             try {
-                // Generate UTC timestamp: local time -> UTC -> format
-                val now = LocalDateTime.now()
-                    .atZone(ZoneId.systemDefault())
-                    .toOffsetDateTime()
-                    .withOffsetSameInstant(ZoneOffset.UTC)
-                    .format(TS_FORMATTER)
-                pendingNoteDao.insert(PendingNote(content = content, channel = channel, createdAt = now))
+                val preparedNote = apiService.prepareNote(content, channel)
+                pendingNoteDao.insert(preparedNote.toPendingNote())
                 Log.i(TAG, "Note saved to pending")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save pending note: ${e.message}", e)
+            }
+        }
+    }
+
+    fun savePendingNote(preparedNote: PreparedNote) {
+        scope.launch {
+            try {
+                pendingNoteDao.insert(preparedNote.toPendingNote())
+                Log.i(TAG, "Prepared note saved to pending")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save prepared pending note: ${e.message}", e)
             }
         }
     }
@@ -88,12 +89,27 @@ class PendingNoteService(
             Log.i(TAG, "Retrying ${pendingNotes.size} pending notes...")
 
             for (note in pendingNotes) {
-                val result = apiService.postNote(note.content)
+                val result = if (!note.encryptedContent.isNullOrEmpty() && !note.requestId.isNullOrEmpty()) {
+                    apiService.postPreparedNote(
+                        PreparedNote(
+                            content = note.content,
+                            encryptedContent = note.encryptedContent,
+                            channel = note.channel,
+                            createdAt = note.createdAt,
+                            requestId = note.requestId
+                        )
+                    )
+                } else {
+                    apiService.postNote(note.content)
+                }
                 if (result.success) {
                     pendingNoteDao.deleteById(note.id)
                     Log.i(TAG, "Pending note sent, id=${note.id}")
                 } else {
                     Log.w(TAG, "Retry failed: ${result.message}, stopping")
+                    if (result.networkError) {
+                        webSocketService.markConnectionSuspect("pending-retry-network-error")
+                    }
                     break
                 }
             }
@@ -110,5 +126,15 @@ class PendingNoteService(
     fun shutdown() {
         retryJob?.cancel()
         scope.cancel()
+    }
+
+    private fun PreparedNote.toPendingNote(): PendingNote {
+        return PendingNote(
+            content = content,
+            channel = channel,
+            createdAt = createdAt,
+            encryptedContent = encryptedContent,
+            requestId = requestId
+        )
     }
 }

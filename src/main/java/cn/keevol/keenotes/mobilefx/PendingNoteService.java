@@ -59,6 +59,16 @@ public class PendingNoteService {
         }
     }
 
+    public void savePendingNote(ApiServiceV2.PreparedNote note) {
+        try {
+            localCache.insertPendingNote(note);
+            logger.info("Prepared note saved to pending: "
+                    + note.content().substring(0, Math.min(20, note.content().length())) + "...");
+        } catch (Exception e) {
+            logger.warning("Failed to save prepared pending note: " + e.getMessage());
+        }
+    }
+
     /**
      * 获取所有待发送笔记
      */
@@ -114,15 +124,20 @@ public class PendingNoteService {
 
             for (LocalCacheService.PendingNoteData note : pendingNotes) {
                 try {
-                    ApiServiceV2.ApiResult result = apiService.postNote(
-                            note.content, note.channel, note.createdAt
-                    ).get(30, TimeUnit.SECONDS);
+                    ApiServiceV2.ApiResult result = note.hasPreparedPayload()
+                            ? apiService.postPreparedNote(note.toPreparedNote()).get(30, TimeUnit.SECONDS)
+                            : apiService.postNote(note.content, note.channel, note.createdAt)
+                                    .get(30, TimeUnit.SECONDS);
 
                     if (result.success()) {
                         localCache.deletePendingNote(note.id);
                         logger.info("Pending note sent successfully, id=" + note.id);
                     } else {
                         logger.warning("Pending note send failed, id=" + note.id + ": " + result.message());
+                        if (result.networkError()) {
+                            ServiceManager.getInstance().getWebSocketService()
+                                    .markConnectionSuspect("pending-retry-network-error");
+                        }
                         break; // 失败后停止，等下次重试
                     }
                 } catch (TimeoutException e) {
