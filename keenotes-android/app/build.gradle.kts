@@ -13,7 +13,7 @@ android {
     defaultConfig {
         applicationId = "cn.keevol.keenotes"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         
         // Version from gradle properties or default
         val versionNameProp = project.findProperty("versionName") as String? ?: "1.0.0"

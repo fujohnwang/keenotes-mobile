@@ -48,3 +48,4 @@
 - JavaFX 端 HTTP/pending retry 出现网络失败时会主动标记 WebSocket suspect 并重连；`onFailure` 也会下发 disconnected，避免断网后 Sync Channel 长时间假绿。
 - iOS/Android 端也补了同类 suspect reconnect：HTTP POST 或 pending retry 网络失败后，主动取消当前 WebSocket、置 disconnected，并走既有重连后 pending 自动重试链路。
 - Android `Keep it` 点击入口加 prepare guard：同一条草稿在首次 prepare 完成前不会再次 prepare，prepare 成功后清空输入再释放 guard，避免快速连点生成多个 request_id。
+- Android 发布包 `targetSdk` 从 35 提到 36，以满足 Google Play 2026-08-30 后的 API 36 要求；发布以 GitHub Actions 中固定的 Gradle 8.13 为准，本机系统 Gradle 9.4.0 不适合作为验证基准；仍需发布前做 Android 16 真机/模拟器回归。
