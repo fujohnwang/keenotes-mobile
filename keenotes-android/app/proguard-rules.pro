@@ -1,12 +1,11 @@
 # Add project specific ProGuard rules here.
 
-# Keep BouncyCastle classes for crypto
--keep class org.bouncycastle.** { *; }
+# BouncyCastle lightweight crypto APIs are referenced directly from CryptoService;
+# do not keep the whole provider package so R8 can remove unused algorithms.
 -dontwarn org.bouncycastle.**
 
-# Keep Room entities
--keep class cn.keevol.keenotes.data.entity.** { *; }
+# Room entities are accessed by generated code, not by app reflection.
 
-# Keep OkHttp
+# Suppress optional OkHttp/Okio platform warnings.
 -dontwarn okhttp3.**
 -dontwarn okio.**

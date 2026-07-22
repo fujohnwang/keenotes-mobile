@@ -11,8 +11,11 @@ import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.NavOptions
@@ -63,17 +66,53 @@ class MainActivity : AppCompatActivity() {
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         noteDraftText = savedInstanceState?.getString(KEY_NOTE_DRAFT_TEXT).orEmpty()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
+        setupEdgeToEdgeInsets()
         setupNavigation()
         setupCustomTabBar()
         setupSwipeGesture()
         checkConfigurationAndNavigate()
         connectWebSocket()
         observeSyncStateForScreenWake()
+    }
+
+    private fun setupEdgeToEdgeInsets() {
+        val navHostInitialPaddingLeft = binding.navHostFragment.paddingLeft
+        val navHostInitialPaddingTop = binding.navHostFragment.paddingTop
+        val navHostInitialPaddingRight = binding.navHostFragment.paddingRight
+        val navHostInitialPaddingBottom = binding.navHostFragment.paddingBottom
+
+        val dockInitialPaddingLeft = binding.dockContainer.paddingLeft
+        val dockInitialPaddingTop = binding.dockContainer.paddingTop
+        val dockInitialPaddingRight = binding.dockContainer.paddingRight
+        val dockInitialPaddingBottom = binding.dockContainer.paddingBottom
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
+            val systemInsets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+
+            binding.navHostFragment.setPadding(
+                navHostInitialPaddingLeft + systemInsets.left,
+                navHostInitialPaddingTop + systemInsets.top,
+                navHostInitialPaddingRight + systemInsets.right,
+                navHostInitialPaddingBottom
+            )
+            binding.dockContainer.setPadding(
+                dockInitialPaddingLeft + systemInsets.left,
+                dockInitialPaddingTop,
+                dockInitialPaddingRight + systemInsets.right,
+                dockInitialPaddingBottom + systemInsets.bottom
+            )
+
+            windowInsets
+        }
+        ViewCompat.requestApplyInsets(binding.root)
     }
     
     /**

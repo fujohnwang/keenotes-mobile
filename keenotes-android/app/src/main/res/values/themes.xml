@@ -10,8 +10,6 @@
         <item name="colorSurface">@color/surface</item>
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="colorError">@color/error</item>
-        <item name="android:statusBarColor">@color/surface</item>
-        <item name="android:navigationBarColor">@color/background</item>
     </style>
 
     <!-- Bottom Navigation Text Styles -->
