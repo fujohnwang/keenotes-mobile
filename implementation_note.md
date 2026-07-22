@@ -38,6 +38,7 @@
 - 桌面端 Dialog 的图标 badge 采用 top 对齐，而不是拉满文案高度；这样视觉重量更轻，避免左侧形成不必要的栏位。
 - Android 端把 Note 输入草稿提升到 `MainActivity` 的非持久化 UI 状态，并通过 `savedInstanceState` 保住同一次界面会话；修复 Fragment 重建导致滑动/点击切 tab 后草稿丢失，以及 revise 回填时误判输入框为空的问题。
 - Android 端 revise 的覆盖确认改为在来源页原地弹出；确认后才跳转输入页，取消不产生导航副作用，`NoteFragment` 仍保留兜底确认逻辑。
+- JavaFX 端 revise 从搜索/回顾等页面跳回 Take Note 时改走 `DesktopMainView` 的统一 mode 切换入口，避免内容区已切换但 sidebar 高亮仍停留在来源页面。
 
 ## request_id 客户端接入记录
 

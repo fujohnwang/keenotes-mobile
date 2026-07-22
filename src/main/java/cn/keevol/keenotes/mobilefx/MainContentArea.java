@@ -30,6 +30,7 @@ import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
+import java.util.function.Consumer;
 
 /**
  * Main content area that switches between different modes
@@ -100,8 +101,14 @@ public class MainContentArea extends StackPane {
     private final UiLoadCoordinator uiLoads = new UiLoadCoordinator();
     private final FxCoalescer syncIndicatorShowCoalescer = new FxCoalescer();
     private final FxCoalescer syncIndicatorHideCoalescer = new FxCoalescer();
+    private final Consumer<DesktopMainView.ViewMode> modeSwitchRequestHandler;
 
     public MainContentArea() {
+        this(null);
+    }
+
+    public MainContentArea(Consumer<DesktopMainView.ViewMode> modeSwitchRequestHandler) {
+        this.modeSwitchRequestHandler = modeSwitchRequestHandler;
         getStyleClass().add("main-content-area");
         setPadding(new Insets(16));
 
@@ -792,7 +799,15 @@ public class MainContentArea extends StackPane {
             noteInputPanel.requestInputFocus();
         } else {
             pendingNoteFocus = true;
-            showMode(DesktopMainView.ViewMode.NOTE);
+            requestModeSwitch(DesktopMainView.ViewMode.NOTE);
+        }
+    }
+
+    private void requestModeSwitch(DesktopMainView.ViewMode mode) {
+        if (modeSwitchRequestHandler != null) {
+            modeSwitchRequestHandler.accept(mode);
+        } else {
+            showMode(mode);
         }
     }
 

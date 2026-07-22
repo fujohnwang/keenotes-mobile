@@ -43,7 +43,7 @@ public class DesktopMainView extends BorderPane {
         
         // Create components
         sidebar = new SidebarView(this::onNavigationChanged);
-        mainContent = new MainContentArea();
+        mainContent = new MainContentArea(this::switchToMode);
         
         // Setup layout
         setupLayout();
