@@ -50,3 +50,5 @@
 - Android `Keep it` 点击入口加 prepare guard：同一条草稿在首次 prepare 完成前不会再次 prepare，prepare 成功后清空输入再释放 guard，避免快速连点生成多个 request_id。
 - Android 发布包 `targetSdk` 从 35 提到 36，以满足 Google Play 2026-08-30 后的 API 36 要求；Android 15+ 会系统强制 edge-to-edge，主 Activity 只在 API 35+ 给 NavHost/dock 应用 system bar inset，避免 AndroidX `enableEdgeToEdge()` helper 把 deprecated system bar API 打进 release 包。
 - Android 针对 Google Play warning 做第二轮处理：Material 升到 1.14.0 并移除 theme system bar color；AGP 升到 9.1.1、GitHub Actions/Wrapper Gradle 升到 9.3.1，移除旧 Kotlin Android plugin，使用 AGP built-in Kotlin + KSP 2.3.10；Room 升到 2.8.4 以匹配 Kotlin 2/KSP2，需 release CI 后做加密和数据库 smoke test。
+- Gradle 9 不再接受旧的动态 `archivesBaseName` project property；Android 输出基础名改用 `base.archivesName`，保留 `keenotes-android-{version}` 命名语义。
+- Android native build 和 release workflow 的 `checkout`/`setup-java`/`setup-android`/`setup-gradle` 升到 Node 24 runtime 对应 major，避免 GitHub Actions 的 Node 20 deprecation warning。

@@ -3,10 +3,17 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     id("com.android.application")
     id("com.google.devtools.ksp")
+    base
 }
 
 val media3Version = "1.10.1"
 val roomVersion = "2.8.4"
+val versionNameProp = project.findProperty("versionName") as String? ?: "1.0.0"
+val versionCodeProp = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
+
+base {
+    archivesName = "keenotes-android-$versionNameProp"
+}
 
 android {
     namespace = "cn.keevol.keenotes"
@@ -16,15 +23,8 @@ android {
         applicationId = "cn.keevol.keenotes"
         minSdk = 29
         targetSdk = 36
-        
-        // Version from gradle properties or default
-        val versionNameProp = project.findProperty("versionName") as String? ?: "1.0.0"
-        val versionCodeProp = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
         versionCode = versionCodeProp
         versionName = versionNameProp
-        
-        // Set APK output name
-        setProperty("archivesBaseName", "keenotes-android-$versionName")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
