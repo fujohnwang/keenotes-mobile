@@ -17,7 +17,7 @@ android_release() {
     if [[ -x "${REPO_ROOT}/keenotes-android/gradlew" ]]; then
       gradle_cmd="${REPO_ROOT}/keenotes-android/gradlew"
     else
-      die "Gradle not found. Install Gradle 8.13+ or use the project gradlew."
+      die "Gradle not found. Install Gradle 9.3.1+ or use the project gradlew."
     fi
   fi
 

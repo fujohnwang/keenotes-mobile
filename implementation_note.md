@@ -48,5 +48,5 @@
 - JavaFX 端 HTTP/pending retry 出现网络失败时会主动标记 WebSocket suspect 并重连；`onFailure` 也会下发 disconnected，避免断网后 Sync Channel 长时间假绿。
 - iOS/Android 端也补了同类 suspect reconnect：HTTP POST 或 pending retry 网络失败后，主动取消当前 WebSocket、置 disconnected，并走既有重连后 pending 自动重试链路。
 - Android `Keep it` 点击入口加 prepare guard：同一条草稿在首次 prepare 完成前不会再次 prepare，prepare 成功后清空输入再释放 guard，避免快速连点生成多个 request_id。
-- Android 发布包 `targetSdk` 从 35 提到 36，以满足 Google Play 2026-08-30 后的 API 36 要求；发布以 GitHub Actions 中固定的 Gradle 8.13 为准，本机系统 Gradle 9.4.0 不适合作为验证基准；仍需发布前做 Android 16 真机/模拟器回归。
-- Android 针对 Google Play 三个 warning 做保守处理：Activity 显式启用 edge-to-edge 并给 NavHost/dock 应用 system bar inset；Material 升到 1.14.0 并移除 theme 里的 system bar color；R8 开启 optimized resource shrinking，去掉 BouncyCastle/Room 的宽泛 keep rule，依赖直接引用和 Room 生成代码保活，需 release CI 后做加密和数据库 smoke test。
+- Android 发布包 `targetSdk` 从 35 提到 36，以满足 Google Play 2026-08-30 后的 API 36 要求；Android 15+ 会系统强制 edge-to-edge，主 Activity 只在 API 35+ 给 NavHost/dock 应用 system bar inset，避免 AndroidX `enableEdgeToEdge()` helper 把 deprecated system bar API 打进 release 包。
+- Android 针对 Google Play warning 做第二轮处理：Material 升到 1.14.0 并移除 theme system bar color；AGP 升到 9.1.1、GitHub Actions/Wrapper Gradle 升到 9.3.1，移除旧 Kotlin Android plugin，使用 AGP built-in Kotlin + KSP 2.3.10；Room 升到 2.8.4 以匹配 Kotlin 2/KSP2，需 release CI 后做加密和数据库 smoke test。

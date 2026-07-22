@@ -2,6 +2,7 @@ package cn.keevol.keenotes.ui
 
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
+import android.os.Build
 import android.os.Bundle
 import android.view.GestureDetector
 import android.view.MotionEvent
@@ -11,7 +12,6 @@ import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -31,6 +31,7 @@ import kotlin.math.abs
 class MainActivity : AppCompatActivity() {
     private companion object {
         const val KEY_NOTE_DRAFT_TEXT = "note_draft_text"
+        const val EDGE_TO_EDGE_ENFORCED_API = 35
     }
     
     private lateinit var binding: ActivityMainBinding
@@ -66,7 +67,6 @@ class MainActivity : AppCompatActivity() {
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         noteDraftText = savedInstanceState?.getString(KEY_NOTE_DRAFT_TEXT).orEmpty()
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -93,6 +93,10 @@ class MainActivity : AppCompatActivity() {
         val dockInitialPaddingBottom = binding.dockContainer.paddingBottom
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
+            if (Build.VERSION.SDK_INT < EDGE_TO_EDGE_ENFORCED_API) {
+                return@setOnApplyWindowInsetsListener windowInsets
+            }
+
             val systemInsets = windowInsets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
             )
