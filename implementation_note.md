@@ -18,6 +18,7 @@
 - 默认保存名为 `keenotes-{note.id}-{yyyy-MM-dd}-{HHmmss}`，其中时间戳取打开保存面板时的本地时间。
 - 图片海报保存成功后会同时复制同一张图片到系统剪切板；视频保存不写剪切板。
 - Java2D 海报正文/footer 显式加载 bundled `MiSans-Regular.ttf`，避免 logical font fallback 导致中英文标点 glyph 丢失。
+- 海报文本换行只保留原文中的真实空行，不再对每个普通换行额外插入空白行，排版更接近 iOS `Text(noteContent)`。
 
 ## Android 海报/视频分享记录
 

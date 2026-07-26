@@ -296,10 +296,11 @@ public final class NotePosterRenderer {
         List<String> lines = new ArrayList<>();
         String normalized = text.replace("\r\n", "\n").replace('\r', '\n');
         String[] paragraphs = normalized.split("\n", -1);
-        for (int i = 0; i < paragraphs.length; i++) {
-            wrapParagraph(paragraphs[i], metrics, maxWidth, lines);
-            if (i < paragraphs.length - 1) {
+        for (String paragraph : paragraphs) {
+            if (paragraph.isEmpty()) {
                 lines.add("");
+            } else {
+                wrapParagraph(paragraph, metrics, maxWidth, lines);
             }
         }
         while (!lines.isEmpty() && lines.get(lines.size() - 1).isEmpty()) {
