@@ -12,7 +12,9 @@ struct ReviewView: View {
     @State private var hasMoreData = true
     @State private var enlargedNote: Note? = nil
     @State private var showingAnalytics = false
+    @State private var preservesCurrentReviewAfterBackground = false
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
@@ -143,6 +145,7 @@ struct ReviewView: View {
                             .listStyle(.plain)
                             .modifier(ListBackgroundModifier())
                             .refreshable {
+                                preservesCurrentReviewAfterBackground = false
                                 await loadNotes()
                             }
                             .opacity(enlargedNote == nil ? 1 : 0)
@@ -193,7 +196,7 @@ struct ReviewView: View {
         .task(id: appState.databaseService.noteCount) {
             // Reload when noteCount changes, but only if we already have data
             // (avoids resetting scroll position on app resume with no actual changes)
-            guard !notes.isEmpty else { return }
+            guard !preservesCurrentReviewAfterBackground, !notes.isEmpty else { return }
             let currentCount = try? await appState.databaseService.getNotesCountByPeriod(days: periodDays[selectedPeriod])
             if let currentCount = currentCount, currentCount != totalCount {
                 await loadNotes()
@@ -201,12 +204,20 @@ struct ReviewView: View {
         }
         .task(id: appState.webSocketService.syncStatus) {
             // Reload when sync completes
-            if appState.webSocketService.syncStatus == .completed {
+            if !preservesCurrentReviewAfterBackground,
+               appState.webSocketService.syncStatus == .completed {
                 await loadNotes()
             }
         }
         .onChange(of: selectedPeriod) { _ in
+            preservesCurrentReviewAfterBackground = false
             Task { await loadNotes() }
+        }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .background {
+                // Keep the in-memory list and its scroll position unchanged after returning.
+                preservesCurrentReviewAfterBackground = true
+            }
         }
     }
 

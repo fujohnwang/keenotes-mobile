@@ -54,3 +54,8 @@
 - Android 针对 Google Play warning 做第二轮处理：Material 升到 1.14.0 并移除 theme system bar color；AGP 升到 9.1.1、GitHub Actions/Wrapper Gradle 升到 9.3.1，移除旧 Kotlin Android plugin，使用 AGP built-in Kotlin + KSP 2.3.10；Room 升到 2.8.4 以匹配 Kotlin 2/KSP2，需 release CI 后做加密和数据库 smoke test。
 - Gradle 9 不再接受旧的动态 `archivesBaseName` project property；Android 输出基础名改用 `base.archivesName`，保留 `keenotes-android-{version}` 命名语义。
 - Android native build 和 release workflow 的 `checkout`/`setup-java`/`setup-android`/`setup-gradle` 升到 Node 24 runtime 对应 major，避免 GitHub Actions 的 Node 20 deprecation warning。
+
+## iOS Review 前后台状态保持
+
+- Review 当前会话进入后台后冻结自动 reload，避免前台重连同步或 `noteCount` 更新销毁列表并重置滚动位置。
+- 下拉刷新或切换 period 会解除冻结；离开 Review tab 后视图按现有生命周期销毁，下次进入仍正常加载最新数据。
