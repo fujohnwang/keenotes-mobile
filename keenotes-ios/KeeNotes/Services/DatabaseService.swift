@@ -220,12 +220,10 @@ class DatabaseService: ObservableObject {
             return []
         }
 
-        let monthDay = String(format: "%02d-%02d", month, day)
-
         // Build UTC start/end for each past year's local "today"
         // Local midnight → UTC, local end-of-day → UTC
         var conditions: [String] = []
-        var arguments: [DatabaseValueConvertible] = []
+        var arguments: [String] = []
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -262,9 +260,10 @@ class DatabaseService: ObservableObject {
         guard !conditions.isEmpty else { return [] }
 
         let sql = conditions.joined(separator: " OR ")
+        let queryArguments = StatementArguments(arguments)
         return try await dbQueue.read { db in
             try Note
-                .filter(sql: sql, arguments: StatementArguments(arguments))
+                .filter(sql: sql, arguments: queryArguments)
                 .order(Note.Columns.createdAt.desc)
                 .fetchAll(db)
         }

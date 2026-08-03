@@ -59,3 +59,8 @@
 
 - Review 当前会话进入后台后冻结自动 reload，避免前台重连同步或 `noteCount` 更新销毁列表并重置滚动位置。
 - 下拉刷新或切换 period 会解除冻结；离开 Review tab 后视图按现有生命周期销毁，下次进入仍正常加载最新数据。
+- Review 右下新增常驻 scroll-to-top FAB，使用首条 note 的稳定 id 定位；点击只滚动当前内存列表，不触发 reload，放大 note 时隐藏。视觉采用 36pt material 圆形和非激活 tab 同款灰色 regular 图标，外层保留 48pt 点击区域，避免常驻辅助操作抢占主视觉。
+
+## iOS 构建 warning 清理
+
+- On This Day 查询删除未使用的 `monthDay`；进入 GRDB 的 `@Sendable` read closure 前，将动态参数冻结为不可变的 `StatementArguments`，查询语义不变并兼容 Swift 6 concurrency 检查。

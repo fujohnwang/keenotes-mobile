@@ -101,62 +101,94 @@ struct ReviewView: View {
                         }
                         Spacer()
                     } else {
-                        ZStack {
-                            List {
-                                ForEach(notes) { note in
-                                    NoteRow(note: note, onEnlarge: {
-                                        withAnimation(.easeInOut(duration: 0.25)) {
-                                            enlargedNote = note
-                                        }
-                                    })
-                                        .listRowInsets(EdgeInsets(top: 0, leading: horizontalPadding, bottom: 0, trailing: horizontalPadding))
-                                        .listRowSeparator(.hidden)
-                                        .listRowBackground(Color.clear)
-                                        .onAppear {
-                                            // Load more when approaching the end
-                                            if note.id == notes.last?.id && hasMoreData && !isLoadingMore {
-                                                Task {
-                                                    await loadMoreNotes()
+                        ScrollViewReader { scrollProxy in
+                            ZStack {
+                                List {
+                                    ForEach(notes) { note in
+                                        NoteRow(note: note, onEnlarge: {
+                                            withAnimation(.easeInOut(duration: 0.25)) {
+                                                enlargedNote = note
+                                            }
+                                        })
+                                            .id(note.id)
+                                            .listRowInsets(EdgeInsets(top: 0, leading: horizontalPadding, bottom: 0, trailing: horizontalPadding))
+                                            .listRowSeparator(.hidden)
+                                            .listRowBackground(Color.clear)
+                                            .onAppear {
+                                                // Load more when approaching the end
+                                                if note.id == notes.last?.id && hasMoreData && !isLoadingMore {
+                                                    Task {
+                                                        await loadMoreNotes()
+                                                    }
                                                 }
                                             }
+                                    }
+
+                                    // Loading indicator at bottom
+                                    if isLoadingMore {
+                                        HStack {
+                                            Spacer()
+                                            ProgressView()
+                                                .padding()
+                                            Spacer()
                                         }
-                                }
-
-                                // Loading indicator at bottom
-                                if isLoadingMore {
-                                    HStack {
-                                        Spacer()
-                                        ProgressView()
-                                            .padding()
-                                        Spacer()
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowSeparator(.hidden)
+                                        .listRowBackground(Color.clear)
                                     }
-                                    .listRowInsets(EdgeInsets())
-                                    .listRowSeparator(.hidden)
-                                    .listRowBackground(Color.clear)
+
+                                    // Bottom safe area spacer
+                                    Color.clear
+                                        .frame(height: 80)
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowSeparator(.hidden)
+                                        .listRowBackground(Color.clear)
                                 }
+                                .listStyle(.plain)
+                                .modifier(ListBackgroundModifier())
+                                .refreshable {
+                                    preservesCurrentReviewAfterBackground = false
+                                    await loadNotes()
+                                }
+                                .opacity(enlargedNote == nil ? 1 : 0)
+                                .allowsHitTesting(enlargedNote == nil)
 
-                                // Bottom safe area spacer
-                                Color.clear
-                                    .frame(height: 80)
-                                    .listRowInsets(EdgeInsets())
-                                    .listRowSeparator(.hidden)
-                                    .listRowBackground(Color.clear)
-                            }
-                            .listStyle(.plain)
-                            .modifier(ListBackgroundModifier())
-                            .refreshable {
-                                preservesCurrentReviewAfterBackground = false
-                                await loadNotes()
-                            }
-                            .opacity(enlargedNote == nil ? 1 : 0)
-                            .allowsHitTesting(enlargedNote == nil)
-
-                            // Enlarged note overlay (List stays alive underneath, preserving scroll position)
-                            if let enlarged = enlargedNote {
-                                EnlargedNoteView(note: enlarged) {
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        enlargedNote = nil
+                                // Enlarged note overlay (List stays alive underneath, preserving scroll position)
+                                if let enlarged = enlargedNote {
+                                    EnlargedNoteView(note: enlarged) {
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            enlargedNote = nil
+                                        }
                                     }
+                                }
+                            }
+                            .overlay(alignment: .bottomTrailing) {
+                                if enlargedNote == nil {
+                                    Button {
+                                        guard let firstNoteID = notes.first?.id else { return }
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            scrollProxy.scrollTo(firstNoteID, anchor: .top)
+                                        }
+                                    } label: {
+                                        Image(systemName: "arrow.up")
+                                            .font(.system(size: 15, weight: .regular))
+                                            .foregroundColor(.gray)
+                                            .frame(width: 36, height: 36)
+                                            .background(.ultraThinMaterial)
+                                            .clipShape(Circle())
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.06), lineWidth: 0.5)
+                                            )
+                                            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.22 : 0.08), radius: 6, x: 0, y: 2)
+                                            .frame(width: 48, height: 48)
+                                            .contentShape(Circle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Scroll to top")
+                                    .accessibilityHint("Scrolls to the first note in the current review list")
+                                    .padding(.trailing, 20)
+                                    .padding(.bottom, 90)
                                 }
                             }
                         }
