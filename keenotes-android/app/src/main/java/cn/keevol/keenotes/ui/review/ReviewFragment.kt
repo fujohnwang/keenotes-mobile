@@ -134,6 +134,10 @@ class ReviewFragment : Fragment() {
                 }
             })
         }
+
+        binding.scrollToTopButton.setOnClickListener {
+            binding.notesRecyclerView.smoothScrollToPosition(0)
+        }
     }
     
     private fun setupSyncChannelStatus() {
@@ -215,6 +219,7 @@ class ReviewFragment : Fragment() {
                     binding.notesRecyclerView.visibility = View.VISIBLE
                     notesAdapter.submitList(loadedNotes.toList())
                 }
+                updateScrollToTopButtonVisibility()
                 
                 updateCountText(totalCount, currentPeriod)
             } catch (e: Exception) {
@@ -355,6 +360,19 @@ class ReviewFragment : Fragment() {
         }
         binding.countText.text = "$count note(s)$periodInfo"
     }
+
+    private fun updateScrollToTopButtonVisibility() {
+        if (_binding == null) return
+
+        val isShowingEnlargedNote =
+            binding.enlargedNoteContainer.root.visibility == View.VISIBLE
+        binding.scrollToTopButton.visibility =
+            if (loadedNotes.isNotEmpty() && !isShowingEnlargedNote) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
+    }
     
     private fun startDotsAnimation() {
         stopDotsAnimation()
@@ -409,6 +427,7 @@ class ReviewFragment : Fragment() {
         
         // Show enlarged, hide list
         binding.notesRecyclerView.visibility = View.GONE
+        binding.scrollToTopButton.visibility = View.GONE
         container.visibility = View.VISIBLE
         container.alpha = 0f
         container.animate().alpha(1f).setDuration(200).start()
@@ -422,6 +441,7 @@ class ReviewFragment : Fragment() {
             if (_binding != null) {
                 container.visibility = View.GONE
                 binding.notesRecyclerView.visibility = View.VISIBLE
+                updateScrollToTopButtonVisibility()
             }
         }.start()
     }

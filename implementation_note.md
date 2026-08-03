@@ -69,3 +69,4 @@
 
 - Review 可见期间监听宿主 Activity 的 `ON_STOP`，进入后台后冻结 sync complete 与 note count 驱动的自动列表更新；切换 period 或重新进入 Review 会按原流程解除冻结并加载。
 - 只覆盖 Activity/进程仍存活的 warm app 切换；系统杀进程后的恢复继续走现有初始化流程。
+- Review 右下新增与 iOS 一致的常驻 scroll-to-top：36dp 弱化圆形、48dp 点击区和非激活 tab 灰色箭头；点击只平滑滚动当前列表，不 reload，空列表或放大 note 时隐藏。

@@ -36,6 +36,7 @@
     <string name="share_note">Share note</string>
     <string name="revise_note">Revise as new note</string>
     <string name="shrink_note">Shrink note</string>
+    <string name="scroll_to_top">Scroll to top</string>
     <string name="overwrite_current_draft_title">Overwrite current draft?</string>
     <string name="overwrite_current_draft_message">Current input text will be replaced. The original note will not change.</string>
     <string name="overwrite">Overwrite</string>

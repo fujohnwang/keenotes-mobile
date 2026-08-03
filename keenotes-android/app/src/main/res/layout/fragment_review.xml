@@ -195,6 +195,32 @@
             android:layout_height="match_parent"
             android:visibility="gone" />
 
+        <FrameLayout
+            android:id="@+id/scrollToTopButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="end|bottom"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="16dp"
+            android:clickable="true"
+            android:contentDescription="@string/scroll_to_top"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_scroll_to_top_button"
+                android:elevation="2dp"
+                android:importantForAccessibility="no"
+                android:padding="10dp"
+                android:src="@drawable/ic_arrow_up"
+                app:tint="@color/text_secondary" />
+
+        </FrameLayout>
+
     </FrameLayout>
 
 </LinearLayout>
