@@ -64,3 +64,8 @@
 ## iOS 构建 warning 清理
 
 - On This Day 查询删除未使用的 `monthDay`；进入 GRDB 的 `@Sendable` read closure 前，将动态参数冻结为不可变的 `StatementArguments`，查询语义不变并兼容 Swift 6 concurrency 检查。
+
+## Android Review 前后台状态保持
+
+- Review 可见期间监听宿主 Activity 的 `ON_STOP`，进入后台后冻结 sync complete 与 note count 驱动的自动列表更新；切换 period 或重新进入 Review 会按原流程解除冻结并加载。
+- 只覆盖 Activity/进程仍存活的 warm app 切换；系统杀进程后的恢复继续走现有初始化流程。

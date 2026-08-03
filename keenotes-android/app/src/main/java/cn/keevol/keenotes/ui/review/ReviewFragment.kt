@@ -11,6 +11,8 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.navigation.fragment.findNavController
@@ -45,6 +47,12 @@ class ReviewFragment : Fragment() {
     private var currentPeriod = "7 days"
     private var notesJob: Job? = null
     private var dotsAnimationJob: Job? = null
+    private var preservesCurrentReviewAfterBackground = false
+    private val activityLifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onStop(owner: LifecycleOwner) {
+            preservesCurrentReviewAfterBackground = true
+        }
+    }
     
     // Pagination state
     private val loadedNotes = mutableListOf<cn.keevol.keenotes.data.entity.Note>()
@@ -63,7 +71,9 @@ class ReviewFragment : Fragment() {
     
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        
+
+        preservesCurrentReviewAfterBackground = false
+        requireActivity().lifecycle.addObserver(activityLifecycleObserver)
         setupAnalyticsButton()
         setupPeriodSelector()
         setupRecyclerView()
@@ -84,6 +94,7 @@ class ReviewFragment : Fragment() {
         
         binding.periodToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
+                preservesCurrentReviewAfterBackground = false
                 currentPeriod = when (checkedId) {
                     R.id.period7Days -> "7 days"
                     R.id.period30Days -> "30 days"
@@ -154,10 +165,10 @@ class ReviewFragment : Fragment() {
                 if (_binding != null) {
                     updateSyncingIndicator(syncState)
                     // Reload when sync completes
-                    if (syncState == WebSocketService.SyncState.COMPLETED) {
-                        loadedNotes.clear()
-                        hasMoreData = true
-                        loadInitialNotes()
+                    if (!preservesCurrentReviewAfterBackground &&
+                        syncState == WebSocketService.SyncState.COMPLETED
+                    ) {
+                        loadInitialNotes(isAutomaticReload = true)
                     }
                 }
             }
@@ -167,7 +178,11 @@ class ReviewFragment : Fragment() {
         var previousCount = 0
         viewLifecycleOwner.lifecycleScope.launch {
             app.database.noteDao().getNoteCountFlow().collectLatest { count ->
-                if (_binding != null && previousCount > 0 && count > previousCount) {
+                if (_binding != null &&
+                    !preservesCurrentReviewAfterBackground &&
+                    previousCount > 0 &&
+                    count > previousCount
+                ) {
                     // New notes arrived - load and add them at top
                     loadNewNotesAtTop(previousCount, count)
                 }
@@ -176,7 +191,7 @@ class ReviewFragment : Fragment() {
         }
     }
     
-    private fun loadInitialNotes() {
+    private fun loadInitialNotes(isAutomaticReload: Boolean = false) {
         val app = requireActivity().application as KeeNotesApp
         val days = getDaysForPeriod(currentPeriod)
         
@@ -187,6 +202,8 @@ class ReviewFragment : Fragment() {
                 
                 // Load first page
                 val notes = app.database.noteDao().getNotesForReviewPaged(days, pageSize, 0)
+
+                if (isAutomaticReload && preservesCurrentReviewAfterBackground) return@launch
                 
                 loadedNotes.clear()
                 loadedNotes.addAll(notes)
@@ -207,6 +224,8 @@ class ReviewFragment : Fragment() {
     }
     
     private fun loadNewNotesAtTop(previousCount: Int, newCount: Int) {
+        if (preservesCurrentReviewAfterBackground) return
+
         val app = requireActivity().application as KeeNotesApp
         val days = getDaysForPeriod(currentPeriod)
         
@@ -217,6 +236,8 @@ class ReviewFragment : Fragment() {
                 
                 // Load the newest notes (they should be at the top)
                 val newNotes = app.database.noteDao().getNotesForReviewPaged(days, newNotesCount, 0)
+
+                if (preservesCurrentReviewAfterBackground) return@launch
                 
                 if (newNotes.isNotEmpty()) {
                     // Filter out notes that are already in the list
@@ -464,6 +485,7 @@ class ReviewFragment : Fragment() {
     }
     
     override fun onDestroyView() {
+        activity?.lifecycle?.removeObserver(activityLifecycleObserver)
         super.onDestroyView()
         notesJob?.cancel()
         stopDotsAnimation()
