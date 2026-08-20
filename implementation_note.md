@@ -17,6 +17,7 @@
 - 分享 Dialog 使用隐藏的 `CANCEL_CLOSE` ButtonType 保留系统关闭行为；可见的“关闭”按钮只是自定义 toolbar 入口。
 - 默认保存名为 `keenotes-{note.id}-{yyyy-MM-dd}-{HHmmss}`，其中时间戳取打开保存面板时的本地时间。
 - 图片海报保存成功后会同时复制同一张图片到系统剪切板；视频保存不写剪切板。
+- 分享 Dialog 新增“复制海报”入口，只把当前预览海报写入系统剪切板，不落盘，保留“保存海报”原有的保存后自动复制行为。
 - Java2D 海报正文/footer 显式加载 bundled `MiSans-Regular.ttf`，避免 logical font fallback 导致中英文标点 glyph 丢失。
 - 海报文本换行只保留原文中的真实空行，不再对每个普通换行额外插入空白行，排版更接近 iOS `Text(noteContent)`。
 

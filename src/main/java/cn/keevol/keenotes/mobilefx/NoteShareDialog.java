@@ -43,6 +43,7 @@ public class NoteShareDialog extends Dialog<Void> {
     private final ImageView posterPreview = new ImageView();
     private final Label statusLabel = new Label();
     private final ProgressIndicator progressIndicator = new ProgressIndicator();
+    private Button copyPosterButton;
     private Button savePosterButton;
     private Button saveVideoButton;
     private Button cycleThemeButton;
@@ -109,6 +110,10 @@ public class NoteShareDialog extends Dialog<Void> {
         cycleThemeButton.setTooltip(new Tooltip("切换水墨背景"));
         cycleThemeButton.setOnAction(e -> cycleTheme());
 
+        copyPosterButton = createToolbarButton("复制海报", createCopyIcon());
+        copyPosterButton.setTooltip(new Tooltip("复制海报到剪切板"));
+        copyPosterButton.setOnAction(e -> copyPoster());
+
         savePosterButton = createToolbarButton("保存海报", createDownloadIcon());
         savePosterButton.setTooltip(new Tooltip("保存 PNG 海报"));
         savePosterButton.setOnAction(e -> savePoster());
@@ -124,7 +129,7 @@ public class NoteShareDialog extends Dialog<Void> {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox toolbar = new HBox(8, cycleThemeButton, spacer, savePosterButton, saveVideoButton, closeButton);
+        HBox toolbar = new HBox(8, cycleThemeButton, spacer, copyPosterButton, savePosterButton, saveVideoButton, closeButton);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         return toolbar;
     }
@@ -151,8 +156,12 @@ public class NoteShareDialog extends Dialog<Void> {
             currentPoster = NotePosterRenderer.renderPosterImage(noteData, hiddenMessage, inkTheme);
             posterPreview.setImage(NotePosterRenderer.toFxImage(currentPoster));
             setStatus("当前背景：" + inkTheme.getLabel(), false);
+            copyPosterButton.setDisable(false);
+            savePosterButton.setDisable(false);
+            saveVideoButton.setDisable(!NotePosterVideoExporter.isFfmpegAvailable());
         } catch (Exception e) {
             setStatus("海报预览生成失败：" + e.getMessage(), true);
+            copyPosterButton.setDisable(true);
             savePosterButton.setDisable(true);
             saveVideoButton.setDisable(true);
         }
@@ -170,6 +179,21 @@ public class NoteShareDialog extends Dialog<Void> {
         inkTheme = inkTheme.next();
         refreshPreview();
         configureVideoAvailability();
+    }
+
+    private void copyPoster() {
+        if (currentPoster == null) {
+            refreshPreview();
+        }
+        if (currentPoster == null) {
+            return;
+        }
+
+        if (copyPosterToClipboard()) {
+            setStatus("海报已复制到剪切板。", false);
+        } else {
+            setStatus("复制海报到剪切板失败。", true);
+        }
     }
 
     private void savePoster() {
@@ -262,6 +286,7 @@ public class NoteShareDialog extends Dialog<Void> {
         progressIndicator.setVisible(busy);
         progressIndicator.setManaged(busy);
         cycleThemeButton.setDisable(busy);
+        copyPosterButton.setDisable(busy);
         savePosterButton.setDisable(busy);
         saveVideoButton.setDisable(busy || !NotePosterVideoExporter.isFfmpegAvailable());
     }
@@ -292,6 +317,10 @@ public class NoteShareDialog extends Dialog<Void> {
 
     private SVGPath createDownloadIcon() {
         return createIcon("M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z");
+    }
+
+    private SVGPath createCopyIcon() {
+        return createIcon("M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z");
     }
 
     private SVGPath createVideoIcon() {
