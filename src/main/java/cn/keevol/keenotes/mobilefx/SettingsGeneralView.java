@@ -255,7 +255,8 @@ public class SettingsGeneralView extends VBox {
                         delay.play();
                     });
                 } catch (Exception e) {
-                    System.err.println("[SettingsGeneralView] Reinitialization failed: " + e.getMessage());
+                    System.err.println("[SettingsGeneralView] Reinitialization failed: "
+                            + e.getClass().getName());
                     javafx.application.Platform.runLater(() -> {
                         statusLabel.setText("Settings saved, but reconnection failed");
                         statusLabel.getStyleClass().removeAll("error", "success");

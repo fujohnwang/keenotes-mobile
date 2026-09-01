@@ -982,7 +982,7 @@ public class LocalCacheService {
                     ));
                 }
             } catch (SQLException e) {
-                e.printStackTrace();
+                logger.warning("Failed to load pending notes: " + e.getClass().getName());
             }
         }
         return notes;
@@ -1007,7 +1007,7 @@ public class LocalCacheService {
                  ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM pending_notes")) {
                 if (rs.next()) return rs.getInt(1);
             } catch (SQLException e) {
-                e.printStackTrace();
+                logger.warning("Failed to count pending notes: " + e.getClass().getName());
             }
         }
         return 0;

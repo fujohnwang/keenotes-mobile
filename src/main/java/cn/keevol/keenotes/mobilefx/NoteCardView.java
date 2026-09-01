@@ -34,6 +34,8 @@ import javafx.util.Duration;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Individual note card component for displaying a single note
@@ -41,6 +43,8 @@ import java.util.function.Consumer;
  * Select text with mouse, right-click or Ctrl+C to copy selection
  */
 public class NoteCardView extends StackPane {
+
+    private static final Logger logger = AppLogger.getLogger(NoteCardView.class);
 
     private LocalCacheService.NoteData noteData;
     private final Label copiedPopup;
@@ -192,6 +196,8 @@ public class NoteCardView extends StackPane {
         sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
                 scheduleLayoutRefresh();
+            } else {
+                cancelBorderAnimation();
             }
         });
 
@@ -673,19 +679,29 @@ public class NoteCardView extends StackPane {
      */
     public void startBorderAnimation() {
         borderStartNanos = System.nanoTime();
-        if (borderTimer != null)
-            borderTimer.stop();
+        stopBorderTimer();
         borderTimer = new AnimationTimer() {
             @Override
             public void handle(long now) {
-                double elapsed = (now - borderStartNanos) / 1_000_000_000.0;
-                double t = Math.min(elapsed / BORDER_ANIM_DURATION, 1.0);
-                // ease-out cubic: 前段快、后段慢，让用户立刻感受到反馈
-                double progress = 1.0 - Math.pow(1.0 - t, 3);
-                drawBorderProgress(progress);
-                if (t >= 1.0) {
+                try {
+                    double elapsed = (now - borderStartNanos) / 1_000_000_000.0;
+                    double t = Math.min(elapsed / BORDER_ANIM_DURATION, 1.0);
+                    // ease-out cubic: 前段快、后段慢，让用户立刻感受到反馈
+                    double progress = 1.0 - Math.pow(1.0 - t, 3);
+                    drawBorderProgress(progress);
+                    if (t >= 1.0) {
+                        stop();
+                        if (borderTimer == this) {
+                            borderTimer = null;
+                        }
+                    }
+                } catch (Throwable error) {
                     stop();
-                    borderTimer = null;
+                    if (borderTimer == this) {
+                        borderTimer = null;
+                    }
+                    clearBorderCanvas();
+                    logger.log(Level.SEVERE, "Border AnimationTimer failed and was stopped", error);
                 }
             }
         };
@@ -696,9 +712,7 @@ public class NoteCardView extends StackPane {
      * 远程同步到达，完成边缘动画闭环后停止。
      */
     public void completeBorderAnimation() {
-        if (borderTimer != null) {
-            borderTimer.stop();
-        }
+        stopBorderTimer();
         // 直接画满一圈，然后淡出
         drawBorderProgress(1.0);
         FadeTransition fadeOut = new FadeTransition(Duration.millis(600), borderCanvas);
@@ -715,11 +729,16 @@ public class NoteCardView extends StackPane {
      * 发送失败，停止动画并清除画布。
      */
     public void cancelBorderAnimation() {
-        if (borderTimer != null) {
-            borderTimer.stop();
-            borderTimer = null;
-        }
+        stopBorderTimer();
         clearBorderCanvas();
+    }
+
+    private void stopBorderTimer() {
+        AnimationTimer timer = borderTimer;
+        borderTimer = null;
+        if (timer != null) {
+            timer.stop();
+        }
     }
 
     /**

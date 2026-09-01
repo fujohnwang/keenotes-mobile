@@ -76,3 +76,19 @@
 
 - 桌面编译/打包基线升级为 JDK 25 + JavaFX 25.0.2，GitHub Actions 统一使用 `setup-java@v6`；Android 仍保持 JDK 17。
 - `dependency-reduced-pom.xml` 是旧 shade 构建遗留且不参与当前 Maven 构建，本轮不手工同步该生成物。
+
+## JavaFX 长驻稳定性第一批
+
+- note 列表刷新改为两阶段提交：查询和分页参数先独立准备，成功后用一次 `setAll` 原子替换；加载/失败期间保留旧列表和 optimistic note。
+- 主页面与 Settings 子页面先同步提交可见状态，fade-in 只做 88%→100% 的装饰，不再承载页面切换或 focus 时机。
+- 新增全局 uncaught handler、前台 FX queue/pulse watchdog、App Nap gap 抑制、窗口生命周期日志和限频线程快照；watchdog 失焦即停，不制造后台常驻 pulse。
+- `AnimationTimer` 在完成、异常和脱离 Scene 时严格 stop；import 状态的 FX Thread `sleep` 改为可取消的 `PauseTransition`。
+
+## JavaFX 长驻稳定性第二批
+
+- WebSocket heartbeat 改用 OkHttp protocol ping/pong（30s），不再把“长时间没有业务消息”误判为僵尸连接，也移除了独立 heartbeat scheduler。
+- 连接状态由 `connectionGeneration + WebSocket identity` 双重校验；旧 socket 的迟到 open/message/close/failure 无权清理新连接，重连始终只有一个可取消的 `ScheduledFuture`；退避计数收到首条有效服务端消息后才清零，避免 open/close storm 永远停在首档重试。
+- `disconnect`/shutdown 会先失效当前 generation，再关闭 socket；listener 回调增加异常隔离，单个 UI listener 失败不会打断重连状态机。
+- 网络恢复后的 pending-note 查询/重试改投递到独立 scheduler，避免在 OkHttp WebSocket 回调线程里同步访问数据库；scheduler 的 start/shutdown 做了互斥和 rejection 兜底，周期任务也隔离异常，避免单次 DB 错误永久取消后续重试。
+- 删除 token 前缀、URL、WebSocket accept、原始 payload、note 明文和 pending note 摘要日志；formatter 对 Bearer、secret key/value、URL query、JSON content 再做兜底脱敏。旧日志文件不会被追溯改写。
+- 为兼容现有自托管 endpoint，本轮没有改变原有 TLS certificate/hostname 验证策略；应另开安全迁移项处理，避免与连接状态改造混在一起。

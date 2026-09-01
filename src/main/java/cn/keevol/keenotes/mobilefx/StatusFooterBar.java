@@ -1,5 +1,7 @@
 package cn.keevol.keenotes.mobilefx;
 
+import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -8,6 +10,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.util.Duration;
 
 /**
  * Bottom status bar showing connection status.
@@ -21,6 +24,7 @@ public class StatusFooterBar extends HBox {
     private final Circle syncChannelIndicator;
     private final Label syncChannelLabel;
     private final Label importStatusLabel;
+    private final PauseTransition importStatusHideDelay;
     
     public StatusFooterBar() {
         getStyleClass().add("status-footer-bar");
@@ -50,6 +54,9 @@ public class StatusFooterBar extends HBox {
         importStatusLabel.getStyleClass().add("status-label");
         importStatusLabel.setVisible(false);
         importStatusLabel.setManaged(false);
+
+        importStatusHideDelay = new PauseTransition(Duration.seconds(5));
+        importStatusHideDelay.setOnFinished(event -> hideImportStatus());
         
         getChildren().addAll(syncChannel, spacer, importStatusLabel);
         
@@ -80,9 +87,14 @@ public class StatusFooterBar extends HBox {
      * Set import status
      */
     public void setImportStatus(String text, boolean inProgress) {
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(() -> setImportStatus(text, inProgress));
+            return;
+        }
+
+        importStatusHideDelay.stop();
         if (text == null || text.isEmpty()) {
-            importStatusLabel.setVisible(false);
-            importStatusLabel.setManaged(false);
+            hideImportStatus();
         } else {
             importStatusLabel.setText("Import: " + text);
             importStatusLabel.setStyle(inProgress ? 
@@ -92,18 +104,17 @@ public class StatusFooterBar extends HBox {
             
             // Auto-hide after 5 seconds if not in progress
             if (!inProgress) {
-                javafx.application.Platform.runLater(() -> {
-                    try {
-                        Thread.sleep(5000);
-                        javafx.application.Platform.runLater(() -> {
-                            importStatusLabel.setVisible(false);
-                            importStatusLabel.setManaged(false);
-                        });
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                });
+                importStatusHideDelay.playFromStart();
             }
         }
+    }
+
+    public void dispose() {
+        importStatusHideDelay.stop();
+    }
+
+    private void hideImportStatus() {
+        importStatusLabel.setVisible(false);
+        importStatusLabel.setManaged(false);
     }
 }

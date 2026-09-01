@@ -3,6 +3,7 @@ package cn.keevol.keenotes.mobilefx;
 import cn.keevol.keenotes.utils.SimpleForwardServer;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
 import javafx.scene.Scene;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.image.Image;
@@ -10,18 +11,24 @@ import javafx.scene.text.Font;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public class Main extends Application {
 
+    private static final Logger logger = AppLogger.getLogger(Main.class);
+
     private DesktopMainView mainView;
+    private FxRuntimeMonitor runtimeMonitor;
+    private ChangeListener<ThemeService.Theme> themeListener;
 
     @Override
     public void start(Stage stage) {
-        // 添加启动日志
-        System.out.println("[Main] Application starting...");
-        System.out.println("[Main] Java version: " + System.getProperty("java.version"));
-        System.out.println("[Main] OS: " + System.getProperty("os.name") + " " + System.getProperty("os.version"));
-        System.out.println("[Main] User home: " + System.getProperty("user.home"));
-        System.out.println("[Main] JavaFX version: " + System.getProperty("javafx.version", "unknown"));
+        AppLogger.installGlobalUncaughtExceptionHandler();
+        AppLogger.installCurrentThreadUncaughtExceptionHandler();
+        logger.info("Application starting; Java=" + System.getProperty("java.version")
+                + ", JavaFX=" + System.getProperty("javafx.version", "unknown")
+                + ", OS=" + System.getProperty("os.name") + " " + System.getProperty("os.version"));
 
         // Load Chinese font
         loadCustomFont();
@@ -40,9 +47,8 @@ public class Main extends Application {
         loadThemeCSS(scene);
 
         // Listen for theme changes
-        ThemeService.getInstance().currentThemeProperty().addListener((obs, oldTheme, newTheme) -> {
-            Platform.runLater(() -> loadThemeCSS(scene));
-        });
+        themeListener = (obs, oldTheme, newTheme) -> Platform.runLater(() -> loadThemeCSS(scene));
+        ThemeService.getInstance().currentThemeProperty().addListener(themeListener);
 
         stage.setTitle("KeeNotes (" + cn.keevol.keenotes.mobilefx.generated.BuildInfo.VERSION + ")");
         stage.setScene(scene);
@@ -60,6 +66,9 @@ public class Main extends Application {
         // 居中显示窗口，确保titlebar可见
         stage.setX(screenBounds.getMinX() + (screenBounds.getWidth() - sceneWidth) / 2);
         stage.setY(screenBounds.getMinY() + (screenBounds.getHeight() - sceneHeight) / 2);
+
+        runtimeMonitor = new FxRuntimeMonitor(stage);
+        runtimeMonitor.start();
 
         // 显示UI - 这是最重要的，用户应该立即看到界面
         stage.show();
@@ -167,8 +176,17 @@ public class Main extends Application {
 
     @Override
     public void stop() {
-        System.out.println("Application stopping...");
+        logger.info("Application stopping");
         try {
+            if (runtimeMonitor != null) {
+                runtimeMonitor.stop();
+                runtimeMonitor = null;
+            }
+            if (themeListener != null) {
+                ThemeService.getInstance().currentThemeProperty().removeListener(themeListener);
+                themeListener = null;
+            }
+
             // Dispose UI component listeners (prevents listener leaks on singleton services)
             if (mainView != null) {
                 mainView.dispose();
@@ -183,17 +201,15 @@ public class Main extends Application {
             // Stop other services
             ServiceManager.getInstance().shutdown();
         } catch (Exception e) {
-            System.err.println("Error during shutdown: " + e.getMessage());
-            e.printStackTrace();
+            logger.log(Level.SEVERE, "Error during shutdown", e);
         }
-        System.out.println("Application stopped.");
+        logger.info("Application stopped");
     }
 
     private void loadCustomFont() {
         String fontResourcePath = "/fonts/MiSans-Regular.ttf";
 
-        try {
-            var fontStream = getClass().getResourceAsStream(fontResourcePath);
+        try (var fontStream = getClass().getResourceAsStream(fontResourcePath)) {
             if (fontStream == null) {
                 System.err.println("Font resource not found: " + fontResourcePath);
                 return;
@@ -201,7 +217,6 @@ public class Main extends Application {
 
             // Desktop: load directly from stream
             Font font = Font.loadFont(fontStream, 14);
-            fontStream.close();
             if (font != null) {
                 System.out.println("Loaded font from stream: " + font.getName());
                 return;
@@ -231,6 +246,8 @@ public class Main extends Application {
     }
 
     public static void main(String[] args) {
+        AppLogger.installGlobalUncaughtExceptionHandler();
+
         // Maven 启动时会读取系统代理并写入 JVM 属性，需要在应用启动前清除
         // 避免翻墙软件的 SOCKS 代理影响应用网络连接
         System.setProperty("java.net.useSystemProxies", "false");

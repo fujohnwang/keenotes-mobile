@@ -1123,20 +1123,23 @@ public class MainContentArea extends StackPane {
 
         localCache = result.cache;
         registerLocalCacheListener();
-        displayedNoteIds.clear();
 
         if (result.totalCount == 0) {
+            displayedNoteIds.clear();
             notesDisplayPanel.showEmptyState("No notes found");
         } else {
             notesDisplayPanel.displayNotesWithPagination(result.totalCount, localCache, 0, null,
                     notes -> {
+                        displayedNoteIds.clear();
                         for (var note : notes) {
                             displayedNoteIds.add(note.id);
                         }
+                        logger.info("Note list atomically committed: total=" + result.totalCount
+                                + ", initialBatch=" + notes.size()
+                                + ", trackingIds=" + displayedNoteIds.size());
                     });
         }
-        logger.info("Note list loaded with " + result.totalCount + " total notes, tracking "
-                + displayedNoteIds.size() + " IDs"
+        logger.info("Note list load requested with " + result.totalCount + " total notes"
                 + ", noteModePanel.opacity=" + noteModePanel.getOpacity()
                 + ", noteModePanel.visible=" + noteModePanel.isVisible());
     }
@@ -1157,7 +1160,8 @@ public class MainContentArea extends StackPane {
     }
 
     /**
-     * Switch to a different mode with fade animation
+     * Switch mode state immediately. The fade-in is visual decoration only and is
+     * never responsible for hiding the old panel or committing currentPanel.
      */
     public void showMode(DesktopMainView.ViewMode mode) {
         VBox targetPanel = switch (mode) {
@@ -1169,68 +1173,67 @@ public class MainContentArea extends StackPane {
         };
 
         if (targetPanel == currentPanel) {
+            stopActiveFadeTransitions();
+            targetPanel.setVisible(true);
+            targetPanel.setOpacity(1.0);
+            applyPendingFocus(targetPanel);
             return;
         }
 
         stopActiveFadeTransitions();
 
-        // Fade out current panel
-        activeFadeOut = new FadeTransition(Duration.millis(150), currentPanel);
-        FadeTransition fadeOut = activeFadeOut;
-        fadeOut.setFromValue(1.0);
-        fadeOut.setToValue(0.0);
-        fadeOut.setOnFinished(e -> {
-            if (fadeOut != activeFadeOut) {
-                return;
+        // Commit all business/UI state synchronously before starting any animation.
+        VBox[] panels = { noteModePanel, searchModePanel, reviewModePanel, onThisDayModePanel, settingsModePanel };
+        for (VBox panel : panels) {
+            panel.setVisible(panel == targetPanel);
+            panel.setOpacity(1.0);
+        }
+        currentPanel = targetPanel;
+
+        applyPendingFocus(targetPanel);
+
+        // Keep the target readable even if JavaFX never advances another pulse.
+        targetPanel.setOpacity(0.88);
+        activeFadeIn = new FadeTransition(Duration.millis(150), targetPanel);
+        FadeTransition fadeIn = activeFadeIn;
+        fadeIn.setFromValue(0.88);
+        fadeIn.setToValue(1.0);
+        fadeIn.setOnFinished(event -> {
+            if (fadeIn == activeFadeIn) {
+                targetPanel.setOpacity(1.0);
+                activeFadeIn = null;
             }
-            currentPanel.setVisible(false);
-
-            // Fade in target panel
-            targetPanel.setVisible(true);
-            targetPanel.setOpacity(0.0);
-
-            activeFadeIn = new FadeTransition(Duration.millis(150), targetPanel);
-            FadeTransition fadeIn = activeFadeIn;
-            fadeIn.setFromValue(0.0);
-            fadeIn.setToValue(1.0);
-
-            fadeIn.setOnFinished(ev -> {
-                if (fadeIn != activeFadeIn) {
-                    return;
-                }
-                // 兜底：确保 opacity 为 1.0（防止动画异常未完成）
-                if (targetPanel.getOpacity() < 1.0) {
-                    logger.warning("fadeIn finished but opacity="
-                            + targetPanel.getOpacity() + ", forcing to 1.0");
-                    targetPanel.setOpacity(1.0);
-                }
-                // Focus search input after animation completes
-                if (targetPanel == searchModePanel && pendingSearchFocus) {
-                    pendingSearchFocus = false;
-                    searchInputPanel.requestSearchFocus();
-                }
-                // Focus note input after animation completes
-                if (targetPanel == noteModePanel && pendingNoteFocus) {
-                    pendingNoteFocus = false;
-                    noteInputPanel.requestInputFocus();
-                }
-            });
-
-            fadeIn.play();
-
-            currentPanel = targetPanel;
         });
-        fadeOut.play();
+        fadeIn.play();
     }
 
     private void stopActiveFadeTransitions() {
-        if (activeFadeOut != null) {
-            activeFadeOut.stop();
-            activeFadeOut = null;
-        }
         if (activeFadeIn != null) {
+            Node animatedNode = activeFadeIn.getNode();
             activeFadeIn.stop();
+            if (animatedNode != null) {
+                animatedNode.setOpacity(1.0);
+            }
             activeFadeIn = null;
+        }
+    }
+
+    private void applyPendingFocus(VBox targetPanel) {
+        if (targetPanel == searchModePanel && pendingSearchFocus) {
+            pendingSearchFocus = false;
+            Platform.runLater(() -> {
+                if (currentPanel == searchModePanel) {
+                    searchInputPanel.requestSearchFocus();
+                }
+            });
+        }
+        if (targetPanel == noteModePanel && pendingNoteFocus) {
+            pendingNoteFocus = false;
+            Platform.runLater(() -> {
+                if (currentPanel == noteModePanel) {
+                    noteInputPanel.requestInputFocus();
+                }
+            });
         }
     }
 
@@ -1239,7 +1242,6 @@ public class MainContentArea extends StackPane {
     // Flag to track if note input focus is pending
     private boolean pendingNoteFocus = false;
 
-    private FadeTransition activeFadeOut;
     private FadeTransition activeFadeIn;
 
     /**

@@ -1,13 +1,12 @@
 package cn.keevol.keenotes.mobilefx;
 
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.*;
 
 /**
  * 统一日志工具，基于 JDK java.util.logging。
- * 日志同时输出到控制台和文件 (~/.keenotes/keenotes.log)。
+ * 日志同时输出到控制台和文件 (~/keenotes.log)。
  * 文件采用滚动策略：单文件最大 2MB，保留 3 个历史文件。
  */
 public final class AppLogger {
@@ -18,6 +17,8 @@ public final class AppLogger {
 
     private static volatile boolean initialized = false;
     private static final Logger ROOT = Logger.getLogger("cn.keevol.keenotes");
+    private static final AtomicBoolean UNCAUGHT_HANDLER_INSTALLED = new AtomicBoolean(false);
+    private static final ThreadLocal<Boolean> HANDLING_UNCAUGHT = ThreadLocal.withInitial(() -> false);
 
     private AppLogger() {}
 
@@ -32,8 +33,58 @@ public final class AppLogger {
         return getLogger(clazz.getName());
     }
 
+    /** Install a process-wide last-resort exception logger before JavaFX starts. */
+    public static void installGlobalUncaughtExceptionHandler() {
+        ensureInitialized();
+        if (UNCAUGHT_HANDLER_INSTALLED.compareAndSet(false, true)) {
+            Thread.setDefaultUncaughtExceptionHandler(AppLogger::handleUncaughtException);
+            ROOT.info("Global uncaught exception handler installed");
+        }
+    }
+
+    /** JavaFX may use a thread-specific handler, so bind the FX thread explicitly. */
+    public static void installCurrentThreadUncaughtExceptionHandler() {
+        ensureInitialized();
+        Thread.currentThread().setUncaughtExceptionHandler(AppLogger::handleUncaughtException);
+        ROOT.info("Uncaught exception handler installed for thread=" + Thread.currentThread().getName());
+    }
+
+    private static void handleUncaughtException(Thread thread, Throwable error) {
+        if (Boolean.TRUE.equals(HANDLING_UNCAUGHT.get())) {
+            System.err.println(SensitiveLogRedactor.redact(
+                    "[AppLogger] Recursive uncaught exception on " + thread.getName() + ": " + error));
+            return;
+        }
+
+        HANDLING_UNCAUGHT.set(true);
+        try {
+            ensureInitialized();
+            ROOT.log(Level.SEVERE, "Uncaught exception on thread=" + thread.getName()
+                    + " state=" + thread.getState(), error);
+            if ("JavaFX Application Thread".equals(thread.getName())) {
+                RuntimeDiagnostics.logThreadSnapshot(ROOT, "uncaught FX exception");
+            }
+        } catch (Throwable loggingFailure) {
+            System.err.println(SensitiveLogRedactor.redact(
+                    "[AppLogger] Failed to log uncaught exception: " + loggingFailure));
+            System.err.print(redactedStackTrace(error));
+        } finally {
+            HANDLING_UNCAUGHT.remove();
+        }
+    }
+
     private static synchronized void ensureInitialized() {
         if (initialized) return;
+
+        ROOT.setLevel(Level.ALL);
+        ROOT.setUseParentHandlers(false);
+
+        // Console logging remains available even if file creation fails.
+        ConsoleHandler consoleHandler = new ConsoleHandler();
+        consoleHandler.setFormatter(new CompactFormatter());
+        consoleHandler.setLevel(Level.ALL);
+        ROOT.addHandler(consoleHandler);
+
         try {
             String logDir = resolveLogDir();
             String logPath = logDir + File.separator + LOG_FILE_NAME;
@@ -43,28 +94,25 @@ public final class AppLogger {
             fileHandler.setLevel(Level.ALL);
 
             ROOT.addHandler(fileHandler);
-            ROOT.setLevel(Level.ALL);
-
-            // 避免日志向父 Logger 重复传播到默认 ConsoleHandler
-            ROOT.setUseParentHandlers(false);
-
-            // 添加一个精简的 ConsoleHandler（保留控制台输出，方便开发调试）
-            ConsoleHandler consoleHandler = new ConsoleHandler();
-            consoleHandler.setFormatter(new CompactFormatter());
-            consoleHandler.setLevel(Level.ALL);
-            ROOT.addHandler(consoleHandler);
-
-            initialized = true;
             ROOT.info("AppLogger initialized, log file: " + logPath);
         } catch (Exception e) {
-            System.err.println("[AppLogger] Failed to initialize file logging: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println(SensitiveLogRedactor.redact(
+                    "[AppLogger] Failed to initialize file logging: " + e.getMessage()));
+            System.err.print(redactedStackTrace(e));
+            ROOT.log(Level.WARNING, "File logging unavailable; console logging remains active", e);
+        } finally {
             initialized = true; // 即使失败也标记，避免反复重试
         }
     }
 
     private static String resolveLogDir() {
         return System.getProperty("user.home");
+    }
+
+    private static String redactedStackTrace(Throwable error) {
+        java.io.StringWriter writer = new java.io.StringWriter();
+        error.printStackTrace(new java.io.PrintWriter(writer));
+        return SensitiveLogRedactor.redact(writer.toString());
     }
 
     /**
@@ -97,7 +145,7 @@ public final class AppLogger {
                 record.getThrown().printStackTrace(new java.io.PrintWriter(sw));
                 sb.append(sw);
             }
-            return sb.toString();
+            return SensitiveLogRedactor.redact(sb.toString());
         }
     }
 }

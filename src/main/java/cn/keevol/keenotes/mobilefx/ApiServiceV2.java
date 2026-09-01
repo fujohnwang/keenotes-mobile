@@ -14,6 +14,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 /**
  * API Service V2 - 只保留POST功能
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class ApiServiceV2 {
 
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final Logger logger = AppLogger.getLogger(ApiServiceV2.class);
 
     private final OkHttpClient httpClient;
     private final ExecutorService networkExecutor;
@@ -191,8 +193,7 @@ public class ApiServiceV2 {
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                return ApiResult.networkFailure("Network error: " + e.getMessage());
+                return safeNetworkFailure(e);
             }
         }, networkExecutor);
     }
@@ -248,8 +249,7 @@ public class ApiServiceV2 {
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                return ApiResult.networkFailure("Network error: " + e.getMessage());
+                return safeNetworkFailure(e);
             }
         }, networkExecutor);
     }
@@ -388,9 +388,17 @@ public class ApiServiceV2 {
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                return ApiResult.networkFailure("Network error: " + e.getMessage());
+                return safeNetworkFailure(e);
             }
         }, networkExecutor);
+    }
+
+    private ApiResult safeNetworkFailure(Throwable error) {
+        Throwable current = error;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        logger.warning("Note API request failed: " + current.getClass().getName());
+        return ApiResult.networkFailure("Network request failed.");
     }
 }

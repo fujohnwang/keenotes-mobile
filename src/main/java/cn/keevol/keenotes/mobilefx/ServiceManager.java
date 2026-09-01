@@ -237,9 +237,6 @@ public class ServiceManager {
                 System.out.println("[ServiceManager] Shutting down old WebSocket service...");
                 webSocketService.shutdown();
                 webSocketService = null; // 重置引用，强制重新创建
-                
-                // 等待断开完成
-                Thread.sleep(200);
             }
             
             // 2. 重置本地缓存
@@ -269,9 +266,9 @@ public class ServiceManager {
             System.out.println("[ServiceManager] Service reinitialization completed");
             
         } catch (Exception e) {
-            System.err.println("[ServiceManager] Service reinitialization failed: " + e.getMessage());
-            e.printStackTrace();
-            notifyStatusChanged("reinit_error", "重新初始化失败: " + e.getMessage());
+            System.err.println("[ServiceManager] Service reinitialization failed: "
+                    + e.getClass().getName());
+            notifyStatusChanged("reinit_error", "重新初始化失败");
             throw new RuntimeException("Service reinitialization failed", e);
         }
     }

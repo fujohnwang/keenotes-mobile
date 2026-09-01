@@ -16,7 +16,7 @@ import java.util.logging.Logger;
  * - WebSocket重连时立即触发重试
  */
 public class PendingNoteService {
-    private static final Logger logger = Logger.getLogger(PendingNoteService.class.getName());
+    private static final Logger logger = AppLogger.getLogger(PendingNoteService.class);
     private static final long RETRY_INTERVAL_MINUTES = 30;
 
     private static PendingNoteService instance;
@@ -53,19 +53,18 @@ public class PendingNoteService {
     public void savePendingNote(String content, String channel, String createdAtUtc) {
         try {
             localCache.insertPendingNote(content, channel, createdAtUtc);
-            logger.info("Note saved to pending: " + content.substring(0, Math.min(20, content.length())) + "...");
+            logger.info("Note saved to pending queue");
         } catch (Exception e) {
-            logger.warning("Failed to save pending note: " + e.getMessage());
+            logger.warning("Failed to save pending note: " + failureType(e));
         }
     }
 
     public void savePendingNote(ApiServiceV2.PreparedNote note) {
         try {
             localCache.insertPendingNote(note);
-            logger.info("Prepared note saved to pending: "
-                    + note.content().substring(0, Math.min(20, note.content().length())) + "...");
+            logger.info("Prepared note saved to pending queue");
         } catch (Exception e) {
-            logger.warning("Failed to save prepared pending note: " + e.getMessage());
+            logger.warning("Failed to save prepared pending note: " + failureType(e));
         }
     }
 
@@ -79,7 +78,7 @@ public class PendingNoteService {
     /**
      * 启动定时重试调度器
      */
-    public void startRetryScheduler() {
+    public synchronized void startRetryScheduler() {
         if (retryScheduler != null && !retryScheduler.isShutdown()) {
             return;
         }
@@ -101,11 +100,27 @@ public class PendingNoteService {
      * WebSocket 重连成功时调用，立即触发一次重试
      */
     public void onNetworkRestored() {
-        if (localCache.getPendingNoteCount() > 0) {
-            logger.info("Network restored, triggering pending note retry");
-            if (retryScheduler != null && !retryScheduler.isShutdown()) {
-                retryScheduler.submit(this::retryPendingNotes);
-            }
+        final ScheduledExecutorService scheduler;
+        synchronized (this) {
+            scheduler = retryScheduler;
+        }
+        if (scheduler == null || scheduler.isShutdown()) {
+            return;
+        }
+
+        try {
+            scheduler.submit(() -> {
+                try {
+                    if (localCache.getPendingNoteCount() > 0) {
+                        logger.info("Network restored, triggering pending note retry");
+                        retryPendingNotes();
+                    }
+                } catch (Exception e) {
+                    logger.warning("Failed to inspect pending notes after network restore: " + failureType(e));
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            logger.fine("Pending note retry skipped because scheduler is stopping");
         }
     }
 
@@ -144,10 +159,12 @@ public class PendingNoteService {
                     logger.warning("Pending note send timeout, id=" + note.id);
                     break;
                 } catch (Exception e) {
-                    logger.warning("Pending note send error, id=" + note.id + ": " + e.getMessage());
+                    logger.warning("Pending note send error, id=" + note.id + ": " + failureType(e));
                     break;
                 }
             }
+        } catch (Exception e) {
+            logger.warning("Pending note retry cycle failed: " + failureType(e));
         } finally {
             retrying.set(false);
         }
@@ -161,10 +178,15 @@ public class PendingNoteService {
     }
 
     public void shutdown() {
-        if (retryScheduler != null && !retryScheduler.isShutdown()) {
-            retryScheduler.shutdownNow();
+        final ScheduledExecutorService scheduler;
+        synchronized (this) {
+            scheduler = retryScheduler;
+            retryScheduler = null;
+        }
+        if (scheduler != null && !scheduler.isShutdown()) {
+            scheduler.shutdownNow();
             try {
-                if (!retryScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
                     logger.warning("Pending note retry did not terminate in 5s");
                 }
             } catch (InterruptedException e) {
@@ -172,5 +194,13 @@ public class PendingNoteService {
             }
             logger.info("Pending note retry scheduler stopped");
         }
+    }
+
+    private String failureType(Throwable error) {
+        Throwable current = error;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current.getClass().getName();
     }
 }

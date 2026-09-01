@@ -24,6 +24,7 @@ public class SettingsView extends BorderPane {
     private VBox debugView;
 
     private VBox currentView;
+    private FadeTransition activeFadeIn;
 
     public SettingsView(Runnable onBack) {
         this.onBack = onBack;
@@ -68,6 +69,7 @@ public class SettingsView extends BorderPane {
      * Release sub-view resources. Call when settings is no longer needed.
      */
     public void dispose() {
+        stopActiveFadeIn();
         dataImportView.dispose();
     }
 
@@ -84,29 +86,7 @@ public class SettingsView extends BorderPane {
             default -> generalView;
         };
 
-        if (targetView == currentView) {
-            return;
-        }
-
-        // Fade out current view
-        FadeTransition fadeOut = new FadeTransition(Duration.millis(150), currentView);
-        fadeOut.setFromValue(1.0);
-        fadeOut.setToValue(0.0);
-        fadeOut.setOnFinished(e -> {
-            currentView.setVisible(false);
-
-            // Fade in target view
-            targetView.setVisible(true);
-            targetView.setOpacity(0.0);
-
-            FadeTransition fadeIn = new FadeTransition(Duration.millis(150), targetView);
-            fadeIn.setFromValue(0.0);
-            fadeIn.setToValue(1.0);
-            fadeIn.play();
-
-            currentView = targetView;
-        });
-        fadeOut.play();
+        switchViewImmediately(targetView);
     }
 
     private VBox createFooter() {
@@ -126,18 +106,7 @@ public class SettingsView extends BorderPane {
             clickCount[0]++;
 
             if (clickCount[0] >= 7 && !debugView.isVisible()) {
-                // Switch to debug view
-                debugView.setVisible(true);
-                debugView.setOpacity(0.0);
-
-                currentView.setVisible(false);
-
-                FadeTransition fadeIn = new FadeTransition(Duration.millis(150), debugView);
-                fadeIn.setFromValue(0.0);
-                fadeIn.setToValue(1.0);
-                fadeIn.play();
-
-                currentView = debugView;
+                switchViewImmediately(debugView);
             }
         });
         copyrightLabel.setStyle("-fx-cursor: hand;");
@@ -151,6 +120,46 @@ public class SettingsView extends BorderPane {
         footer.getStyleClass().add("footer-fixed");
 
         return footer;
+    }
+
+    private void switchViewImmediately(VBox targetView) {
+        if (targetView == currentView) {
+            stopActiveFadeIn();
+            targetView.setVisible(true);
+            targetView.setOpacity(1.0);
+            return;
+        }
+
+        stopActiveFadeIn();
+        currentView.setVisible(false);
+        currentView.setOpacity(1.0);
+        targetView.setVisible(true);
+        targetView.setOpacity(0.88);
+        currentView = targetView;
+
+        activeFadeIn = new FadeTransition(Duration.millis(150), targetView);
+        FadeTransition fadeIn = activeFadeIn;
+        fadeIn.setFromValue(0.88);
+        fadeIn.setToValue(1.0);
+        fadeIn.setOnFinished(event -> {
+            if (fadeIn == activeFadeIn) {
+                targetView.setOpacity(1.0);
+                activeFadeIn = null;
+            }
+        });
+        fadeIn.play();
+    }
+
+    private void stopActiveFadeIn() {
+        if (activeFadeIn == null) {
+            return;
+        }
+        javafx.scene.Node animatedNode = activeFadeIn.getNode();
+        activeFadeIn.stop();
+        if (animatedNode != null) {
+            animatedNode.setOpacity(1.0);
+        }
+        activeFadeIn = null;
     }
 
     private VBox createDebugView() {
@@ -239,9 +248,9 @@ public class SettingsView extends BorderPane {
                         .append(System.lineSeparator());
                 snapshot.append("service.webSocketConnected=").append(serviceManager.isWebSocketConnected())
                         .append(System.lineSeparator());
-                snapshot.append("ws.connected=").append(ws.isConnected()).append(System.lineSeparator());
-                snapshot.append("ws.syncing=").append(ws.isSyncing()).append(System.lineSeparator());
-                snapshot.append("ws.offline=").append(ws.isOffline()).append(System.lineSeparator());
+                snapshot.append(ws.buildDiagnosticsState()).append(System.lineSeparator());
+                snapshot.append(System.lineSeparator())
+                        .append(RuntimeDiagnostics.buildThreadSnapshot("manual diagnostics"));
 
                 javafx.application.Platform.runLater(() -> {
                     javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();

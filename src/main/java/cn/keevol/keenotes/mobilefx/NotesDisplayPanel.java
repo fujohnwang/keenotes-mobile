@@ -73,8 +73,9 @@ public class NotesDisplayPanel extends VBox {
 
     // Generation counter: prevents stale background thread callbacks from modifying
     // UI
-    private int loadGeneration = 0;
+    private volatile int loadGeneration = 0;
     private volatile Future<?> dbLoadFuture;
+    private boolean initialLoadPending = false;
 
     // Optimistic card tracking
     private LocalCacheService.NoteData optimisticNoteData = null;
@@ -89,6 +90,15 @@ public class NotesDisplayPanel extends VBox {
     private final ChangeListener<String> noteFontFamilyListener;
     private WebSocketClientService.SyncListener webSocketSyncListener;
     private WebSocketClientService registeredWebSocketService;
+
+    private record PaginationRequest(
+            int generation,
+            int totalCount,
+            LocalCacheService localCache,
+            int reviewDays,
+            String headerText,
+            Consumer<List<LocalCacheService.NoteData>> noteLoadCallback) {
+    }
 
     public NotesDisplayPanel() {
         getStyleClass().add("notes-display-panel");
@@ -177,7 +187,7 @@ public class NotesDisplayPanel extends VBox {
         if (vbar != null) {
             vbar.valueProperty().addListener((obs, oldVal, newVal) -> {
                 if (newVal.doubleValue() >= 0.9 && !isLoadingMore
-                        && useTruePagination && loadedFromDbCount < totalNoteCount) {
+                        && !initialLoadPending && useTruePagination && loadedFromDbCount < totalNoteCount) {
                     loadMoreNotesFromDb();
                 }
             });
@@ -404,67 +414,58 @@ public class NotesDisplayPanel extends VBox {
             java.util.function.Consumer<java.util.List<LocalCacheService.NoteData>> noteLoadCallback) {
         cancelDbLoad();
         stopDotsAnimation();
-        noteItems.clear();
-        renderedRealNoteIds.clear();
-        hideStatus();
-        showListView();
         loadGeneration++;
+        int generation = loadGeneration;
+        isLoadingMore = false;
 
         if (totalCount == 0) {
+            initialLoadPending = false;
             showEmptyState("No notes found");
             useTruePagination = false;
             loadedFromDbCount = 0;
             return;
         }
 
-        useTruePagination = true;
-        this.totalNoteCount = totalCount;
-        this.localCache = localCache;
-        this.reviewDays = days;
-        this.noteLoadCallback = noteLoadCallback;
-        loadedFromDbCount = 0;
-
         String countText = totalCount + " note(s)";
         if (periodInfo != null && !periodInfo.isEmpty()) {
             countText += " - " + periodInfo;
         }
-        createHeaderRow(countText);
-
-        loadInitialNotesFromDb();
+        PaginationRequest request = new PaginationRequest(
+                generation, totalCount, localCache, days, countText, noteLoadCallback);
+        initialLoadPending = true;
+        loadInitialNotesFromDb(request, 0);
     }
 
     /**
      * Load initial batch of notes from database
      */
-    private void loadInitialNotesFromDb() {
-        loadInitialNotesFromDb(0);
-    }
-
-    private void loadInitialNotesFromDb(int retryAttempt) {
-        final int gen = loadGeneration;
+    private void loadInitialNotesFromDb(PaginationRequest request, int retryAttempt) {
+        final int gen = request.generation();
         final int currentRetryAttempt = retryAttempt;
         cancelDbLoad();
         dbLoadFuture = AppExecutors.submitUiDb(() -> {
             try {
                 logger.info("loadInitialNotesFromDb start: gen=" + gen
                         + ", retryAttempt=" + currentRetryAttempt
-                        + ", totalNoteCount=" + totalNoteCount
-                        + ", reviewDays=" + reviewDays);
+                        + ", totalNoteCount=" + request.totalCount()
+                        + ", reviewDays=" + request.reviewDays());
                 List<LocalCacheService.NoteData> notes;
-                if (reviewDays == PAGINATION_MODE_ON_THIS_DAY) {
-                    notes = localCache.getNotesOnThisDayPaged(0, 20);
-                } else if (reviewDays > 0) {
-                    notes = localCache.getNotesForReviewPaged(reviewDays, 0, 20);
+                if (request.reviewDays() == PAGINATION_MODE_ON_THIS_DAY) {
+                    notes = request.localCache().getNotesOnThisDayPaged(0, 20);
+                } else if (request.reviewDays() > 0) {
+                    notes = request.localCache().getNotesForReviewPaged(request.reviewDays(), 0, 20);
                 } else {
-                    notes = localCache.getNotesPaged(0, 20);
+                    notes = request.localCache().getNotesPaged(0, 20);
                 }
                 if (Thread.currentThread().isInterrupted() || gen != loadGeneration) {
                     return null;
                 }
-                Platform.runLater(() -> applyInitialNotesFromDb(gen, currentRetryAttempt, notes));
+                Platform.runLater(() -> applyInitialNotesFromDb(request, currentRetryAttempt, notes));
             } catch (Exception e) {
                 if (!Thread.currentThread().isInterrupted() && gen == loadGeneration) {
                     Platform.runLater(() -> {
+                        initialLoadPending = false;
+                        dbLoadFuture = null;
                         logger.severe("loadInitialNotesFromDb ERROR (retryAttempt="
                                 + currentRetryAttempt + "): " + e.getMessage());
                         showError("Error loading notes: " + e.getMessage());
@@ -475,7 +476,11 @@ public class NotesDisplayPanel extends VBox {
         });
     }
 
-    private void applyInitialNotesFromDb(int gen, int currentRetryAttempt, List<LocalCacheService.NoteData> notes) {
+    private void applyInitialNotesFromDb(
+            PaginationRequest request,
+            int currentRetryAttempt,
+            List<LocalCacheService.NoteData> notes) {
+        int gen = request.generation();
         if (gen != loadGeneration) {
             logger.info("loadInitialNotesFromDb: stale generation, skipping"
                     + " (gen=" + gen + ", current=" + loadGeneration + ")");
@@ -483,26 +488,41 @@ public class NotesDisplayPanel extends VBox {
         }
 
         logger.info("loadInitialNotesFromDb: loaded " + notes.size()
-                + " notes from DB (totalNoteCount=" + totalNoteCount + ")");
+                + " notes from DB (totalNoteCount=" + request.totalCount() + ")");
 
-        if (noteLoadCallback != null) {
-            noteLoadCallback.accept(notes);
-        }
-
-        if (totalNoteCount > 0 && notes.isEmpty()) {
-            logger.warning("loadInitialNotesFromDb mismatch: totalNoteCount=" + totalNoteCount
+        if (request.totalCount() > 0 && notes.isEmpty()) {
+            logger.warning("loadInitialNotesFromDb mismatch: totalNoteCount=" + request.totalCount()
                     + ", loaded=0, retryAttempt=" + currentRetryAttempt);
             if (currentRetryAttempt == 0) {
                 logger.warning("loadInitialNotesFromDb scheduling one-shot retry");
-                loadInitialNotesFromDb(1);
+                loadInitialNotesFromDb(request, 1);
                 return;
             }
+            initialLoadPending = false;
+            dbLoadFuture = null;
             showError("Failed to load notes from cache. Please retry.");
             return;
         }
 
-        appendUniqueNotes(notes);
+        // Commit pagination metadata and list content together on the FX thread.
+        useTruePagination = true;
+        totalNoteCount = request.totalCount();
+        localCache = request.localCache();
+        reviewDays = request.reviewDays();
+        noteLoadCallback = request.noteLoadCallback();
+        initialLoadPending = false;
+        stopDotsAnimation();
+        hideStatus();
+        showListView();
+        createHeaderRow(request.headerText());
+        replaceNotesAtomically(notes);
         loadedFromDbCount = notes.size();
+        dbLoadFuture = null;
+
+        if (request.noteLoadCallback() != null) {
+            request.noteLoadCallback().accept(notes);
+        }
+
         logger.info("loadInitialNotesFromDb: rendered " + notes.size()
                 + " notes via ListView, noteItems.size=" + noteItems.size());
     }
@@ -523,13 +543,14 @@ public class NotesDisplayPanel extends VBox {
     }
 
     public void displayNotes(List<LocalCacheService.NoteData> notes, String periodInfo) {
+        cancelDbLoad();
         stopDotsAnimation();
-        noteItems.clear();
-        renderedRealNoteIds.clear();
-        hideStatus();
-        showListView();
         loadGeneration++;
+        initialLoadPending = false;
         useTruePagination = false;
+        totalNoteCount = 0;
+        loadedFromDbCount = 0;
+        noteLoadCallback = null;
 
         if (notes == null || notes.isEmpty()) {
             showEmptyState("No notes found");
@@ -540,9 +561,10 @@ public class NotesDisplayPanel extends VBox {
         if (periodInfo != null && !periodInfo.isEmpty()) {
             countText += " - " + periodInfo;
         }
+        hideStatus();
+        showListView();
         createHeaderRow(countText);
-
-        appendUniqueNotes(notes);
+        replaceNotesAtomically(notes);
     }
 
     /**
@@ -727,8 +749,19 @@ public class NotesDisplayPanel extends VBox {
      * Show loading state with animated dots
      */
     public void showLoading(String message) {
-        // Don't clear noteItems — keep old data visible in case loading fails.
-        // displayNotesWithPagination() will clear and repopulate on success.
+        // A refresh is two-phase: keep the committed list visible until replacement data
+        // is ready. This avoids a blank list if the DB load or the render pulse stalls.
+        if (!noteItems.isEmpty()) {
+            stopDotsAnimation();
+            hideStatus();
+            showListView();
+            if (headerRow != null) {
+                fixedHeaderContainer.setVisible(true);
+                fixedHeaderContainer.setManaged(true);
+            }
+            return;
+        }
+
         listView.setVisible(false);
         listView.setManaged(false);
         fixedHeaderContainer.setVisible(false);
@@ -748,6 +781,14 @@ public class NotesDisplayPanel extends VBox {
      * Show empty state
      */
     public void showEmptyState(String message) {
+        cancelDbLoad();
+        loadGeneration++;
+        initialLoadPending = false;
+        isLoadingMore = false;
+        useTruePagination = false;
+        totalNoteCount = 0;
+        loadedFromDbCount = 0;
+        noteLoadCallback = null;
         stopDotsAnimation();
         noteItems.clear();
         renderedRealNoteIds.clear();
@@ -774,15 +815,31 @@ public class NotesDisplayPanel extends VBox {
      * Show error state
      */
     public void showError(String message) {
+        cancelDbLoad();
+        loadGeneration++;
+        initialLoadPending = false;
+        isLoadingMore = false;
         stopDotsAnimation();
-        noteItems.clear();
-        renderedRealNoteIds.clear();
-        listView.setVisible(false);
-        listView.setManaged(false);
-        fixedHeaderContainer.setVisible(false);
-        fixedHeaderContainer.setManaged(false);
-        headerRow = null;
-        countLabel = null;
+
+        // Failed refreshes must not destroy the last committed list.
+        if (!noteItems.isEmpty()) {
+            showListView();
+            if (headerRow != null) {
+                fixedHeaderContainer.setVisible(true);
+                fixedHeaderContainer.setManaged(true);
+            }
+        } else {
+            useTruePagination = false;
+            totalNoteCount = 0;
+            loadedFromDbCount = 0;
+            noteLoadCallback = null;
+            listView.setVisible(false);
+            listView.setManaged(false);
+            fixedHeaderContainer.setVisible(false);
+            fixedHeaderContainer.setManaged(false);
+            headerRow = null;
+            countLabel = null;
+        }
 
         statusLabel.setText(message);
         statusLabel.getStyleClass().setAll("status-label", "error");
@@ -795,6 +852,13 @@ public class NotesDisplayPanel extends VBox {
      * Clear all content
      */
     public void clear() {
+        cancelDbLoad();
+        initialLoadPending = false;
+        isLoadingMore = false;
+        useTruePagination = false;
+        totalNoteCount = 0;
+        loadedFromDbCount = 0;
+        noteLoadCallback = null;
         stopDotsAnimation();
         noteItems.clear();
         renderedRealNoteIds.clear();
@@ -843,6 +907,35 @@ public class NotesDisplayPanel extends VBox {
 
         noteItems.addAll(filteredNotes);
         filteredNotes.forEach(this::trackRenderedNote);
+    }
+
+    /**
+     * Prepare a complete replacement off-list, then publish it through one setAll()
+     * mutation so ListView never observes a clear-but-not-yet-repopulated state.
+     */
+    private void replaceNotesAtomically(List<LocalCacheService.NoteData> notes) {
+        List<LocalCacheService.NoteData> replacement = new ArrayList<>(notes.size() + 1);
+        Set<Long> replacementIds = new HashSet<>();
+
+        // A DB refresh must not make an in-flight optimistic note disappear.
+        if (optimisticNoteData != null && noteItems.contains(optimisticNoteData)) {
+            replacement.add(optimisticNoteData);
+        }
+
+        for (LocalCacheService.NoteData note : notes) {
+            if (note == optimisticNoteData && replacement.contains(note)) {
+                continue;
+            }
+            if (isRealNote(note) && !replacementIds.add(note.id)) {
+                logger.fine("Filtered duplicate note from replacement batch, id=" + note.id);
+                continue;
+            }
+            replacement.add(note);
+        }
+
+        noteItems.setAll(replacement);
+        renderedRealNoteIds.clear();
+        replacement.forEach(this::trackRenderedNote);
     }
 
     private List<LocalCacheService.NoteData> filterUniqueNotes(List<LocalCacheService.NoteData> notes) {
