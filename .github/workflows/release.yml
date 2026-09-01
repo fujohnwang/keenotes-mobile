@@ -38,11 +38,11 @@ jobs:
           APP_VERSION=$(echo $VERSION | cut -d. -f1-3)
           echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Setup Java 21 # github 更高jdk不支持
-        uses: actions/setup-java@v5
+      - name: Setup Java 25
+        uses: actions/setup-java@v6
         with:
           distribution: "temurin"
-          java-version: "21"
+          java-version: "25"
 
       - name: Generate BuildInfo
         shell: bash
@@ -155,11 +155,11 @@ jobs:
           APP_VERSION=$(echo $VERSION | cut -d. -f1-3)
           echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Setup Java 21
-        uses: actions/setup-java@v5
+      - name: Setup Java 25
+        uses: actions/setup-java@v6
         with:
           distribution: "temurin"
-          java-version: "21"
+          java-version: "25"
 
       - name: Generate BuildInfo
         run: |
@@ -809,11 +809,11 @@ jobs:
           APP_VERSION=$(echo $VERSION | cut -d. -f1-3)
           echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Setup Java 21
-        uses: actions/setup-java@v5
+      - name: Setup Java 25
+        uses: actions/setup-java@v6
         with:
           distribution: "temurin"
-          java-version: "21"
+          java-version: "25"
 
       - name: Generate BuildInfo
         run: |
@@ -908,7 +908,7 @@ jobs:
           echo "versionCode=$VERSION_CODE" >> $GITHUB_OUTPUT
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: "17"
           distribution: "temurin"

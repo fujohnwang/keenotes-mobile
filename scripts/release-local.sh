@@ -20,8 +20,8 @@
 #   RELEASE_REPO                    Default: fujohnwang/keenotes-releases
 #
 # Prerequisites:
-#   - JDK 21 (desktop) / JDK 17 (Android)
-#   - Maven, jpackage (included in JDK 21+)
+#   - JDK 25 (desktop) / JDK 17 (Android)
+#   - Maven, jpackage (included in JDK 25)
 #   - macOS: Xcode command line tools (for signed/notarized builds)
 #   - gh CLI (for --publish)
 
@@ -53,7 +53,7 @@ Environment (optional):
   KNS_ADMIN_TOKEN                                Update version API after publish
   RELEASE_REPO                                   Default: fujohnwang/keenotes-releases
 
-Prerequisites: JDK 21, Maven, jpackage; gh CLI for --publish
+Prerequisites: JDK 25, Maven, jpackage; gh CLI for --publish
 
 EOF
   cat <<'EOF'
