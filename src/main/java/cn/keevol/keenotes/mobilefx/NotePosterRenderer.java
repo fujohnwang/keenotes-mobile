@@ -137,8 +137,8 @@ public final class NotePosterRenderer {
 
     public static String formatPosterDate(String createdAt) {
         String local = DateTimeUtil.utcToLocalDisplay(createdAt);
-        if (local != null && local.length() >= 10) {
-            return local.substring(0, 10);
+        if (local != null && local.length() >= 16) {
+            return local.substring(0, 16);
         }
         return local == null || local.isBlank() ? "" : local;
     }

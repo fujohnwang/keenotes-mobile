@@ -177,7 +177,7 @@ object NotePosterRenderer {
 
     fun formatPosterDate(createdAt: String): String {
         val local = DateTimeUtil.utcToLocalDisplay(createdAt)
-        return if (local.length >= 10) local.substring(0, 10) else local
+        return if (local.length >= 16) local.substring(0, 16) else local
     }
 
     fun exportHeightFor(width: Int): Int = ceil(width / ASPECT_RATIO).toInt()

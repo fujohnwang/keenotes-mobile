@@ -54,16 +54,20 @@ enum Theme {
         return createdAt
     }
 
-    /// Format a note date for share posters: date only, no time.
+    /// Format a note date and time for share posters, to minute precision.
     static func formatPosterDate(_ createdAt: String) -> String? {
         let inputFormatter = DateFormatter()
+        inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+        inputFormatter.calendar = Calendar(identifier: .gregorian)
         inputFormatter.timeZone = TimeZone(identifier: "UTC")
 
         for format in ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss"] {
             inputFormatter.dateFormat = format
             if let date = inputFormatter.date(from: createdAt) {
                 let outputFormatter = DateFormatter()
-                outputFormatter.dateFormat = "yyyy-MM-dd"
+                outputFormatter.locale = Locale(identifier: "en_US_POSIX")
+                outputFormatter.calendar = Calendar(identifier: .gregorian)
+                outputFormatter.dateFormat = "yyyy-MM-dd HH:mm"
                 outputFormatter.timeZone = TimeZone.current
                 return outputFormatter.string(from: date)
             }

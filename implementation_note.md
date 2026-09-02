@@ -20,6 +20,7 @@
 - 分享 Dialog 新增“复制海报”入口，只把当前预览海报写入系统剪切板，不落盘，保留“保存海报”原有的保存后自动复制行为。
 - Java2D 海报正文/footer 显式加载 bundled `MiSans-Regular.ttf`，避免 logical font fallback 导致中英文标点 glyph 丢失。
 - 海报文本换行只保留原文中的真实空行，不再对每个普通换行额外插入空白行，排版更接近 iOS `Text(noteContent)`。
+- 三端海报 footer 的创建时间统一显示为本地时间 `yyyy-MM-dd HH:mm`，精确到分钟以兼顾信息量和横向空间。
 
 ## Android 海报/视频分享记录
 
