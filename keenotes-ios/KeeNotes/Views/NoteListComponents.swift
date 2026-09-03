@@ -1,5 +1,7 @@
+import Photos
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 /// Shared note card used by Review, Search and On This Day lists.
 struct NoteRow: View {
@@ -390,9 +392,19 @@ struct NoteSharePosterOverlay: View {
                                 )
                                 .frame(width: displayWidth)
                                 .fixedSize(horizontal: false, vertical: true)
-                                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius: PosterShareRenderer.cornerRadius,
+                                        style: .continuous
+                                    )
+                                )
                                 .shadow(color: Color.black.opacity(0.25), radius: 24, x: 0, y: 12)
-                                .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                                .contentShape(
+                                    RoundedRectangle(
+                                        cornerRadius: PosterShareRenderer.cornerRadius,
+                                        style: .continuous
+                                    )
+                                )
 
                                 Button(action: cycleInkTheme) {
                                     HStack(spacing: 4) {
@@ -563,7 +575,7 @@ struct NoteSharePosterContent: View {
     }
 
     private var posterCornerRadius: CGFloat {
-        32
+        PosterShareRenderer.cornerRadius
     }
 
     var body: some View {
@@ -677,19 +689,41 @@ private struct PaperGrainOverlay: View {
     }
 }
 
-private final class PosterImageSaver: NSObject, ObservableObject {
+private final class PosterImageSaver: ObservableObject {
     @Published var toastMessage: String?
     private(set) var lastSaveSucceeded = false
-    private var completion: (() -> Void)?
 
     func save(_ image: UIImage, completion: @escaping () -> Void) {
-        self.completion = completion
-        UIImageWriteToSavedPhotosAlbum(
-            image,
-            self,
-            #selector(saveCompleted(_:didFinishSavingWithError:contextInfo:)),
-            nil
-        )
+        let finish: (Bool) -> Void = { [weak self] succeeded in
+            DispatchQueue.main.async {
+                self?.lastSaveSucceeded = succeeded
+                self?.showMessage(succeeded ? "Saved to Photos" : "Save failed")
+                completion()
+            }
+        }
+
+        guard let pngData = image.pngData() else {
+            finish(false)
+            return
+        }
+
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized || status == .limited else {
+                finish(false)
+                return
+            }
+
+            let options = PHAssetResourceCreationOptions()
+            options.originalFilename = "keenotes-poster-\(UUID().uuidString).png"
+            options.uniformTypeIdentifier = UTType.png.identifier
+
+            PHPhotoLibrary.shared().performChanges({
+                let request = PHAssetCreationRequest.forAsset()
+                request.addResource(with: .photo, data: pngData, options: options)
+            }, completionHandler: { succeeded, error in
+                finish(succeeded && error == nil)
+            })
+        }
     }
 
     func showMessage(_ message: String) {
@@ -700,15 +734,6 @@ private final class PosterImageSaver: NSObject, ObservableObject {
             withAnimation {
                 self.toastMessage = nil
             }
-        }
-    }
-
-    @objc private func saveCompleted(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
-        DispatchQueue.main.async {
-            self.lastSaveSucceeded = error == nil
-            self.showMessage(self.lastSaveSucceeded ? "Saved to Photos" : "Save failed")
-            self.completion?()
-            self.completion = nil
         }
     }
 }

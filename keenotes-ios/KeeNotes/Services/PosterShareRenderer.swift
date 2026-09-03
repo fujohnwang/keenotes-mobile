@@ -4,6 +4,7 @@ import UIKit
 enum PosterShareRenderer {
     static let exportWidth: CGFloat = 390
     static let aspectRatio: CGFloat = 9.0 / 16.0
+    static let cornerRadius: CGFloat = 32
 
     static func exportHeight(for width: CGFloat) -> CGFloat {
         width / aspectRatio
@@ -28,15 +29,40 @@ enum PosterShareRenderer {
         .frame(width: width)
         .fixedSize(horizontal: false, vertical: true)
 
+        let renderedImage: UIImage?
         if #available(iOS 16.0, *) {
             let renderer = ImageRenderer(content: poster)
             renderer.scale = UIScreen.main.scale
             renderer.proposedSize = ProposedViewSize(width: width, height: nil)
             renderer.isOpaque = false
-            return renderer.uiImage
+            renderedImage = renderer.uiImage
+        } else {
+            renderedImage = PosterHostingRenderer.render(
+                view: poster,
+                width: width,
+                minimumHeight: minimumHeight
+            )
         }
 
-        return PosterHostingRenderer.render(view: poster, width: width, minimumHeight: minimumHeight)
+        guard let renderedImage else {
+            return nil
+        }
+        return applyingTransparentRoundedCorners(to: renderedImage)
+    }
+
+    private static func applyingTransparentRoundedCorners(to image: UIImage) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = image.scale
+        format.opaque = false
+
+        let bounds = CGRect(origin: .zero, size: image.size)
+        return UIGraphicsImageRenderer(size: image.size, format: format).image { _ in
+            UIBezierPath(
+                roundedRect: bounds,
+                cornerRadius: cornerRadius
+            ).addClip()
+            image.draw(in: bounds)
+        }
     }
 }
 

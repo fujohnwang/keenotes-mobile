@@ -21,6 +21,7 @@
 - Java2D 海报正文/footer 显式加载 bundled `MiSans-Regular.ttf`，避免 logical font fallback 导致中英文标点 glyph 丢失。
 - 海报文本换行只保留原文中的真实空行，不再对每个普通换行额外插入空白行，排版更接近 iOS `Text(noteContent)`。
 - 三端海报 footer 的创建时间统一显示为本地时间 `yyyy-MM-dd HH:mm`，精确到分钟以兼顾信息量和横向空间。
+- iOS 海报在 `UIImage` 导出出口显式应用透明圆角 alpha clip，并通过 PhotoKit 写入 PNG 原始 resource；两层约束分别保证像素透明与保存时不发生隐式格式转换。
 
 ## Android 海报/视频分享记录
 
