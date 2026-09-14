@@ -27,6 +27,7 @@ public class SidebarView extends VBox {
     
     // Overview card
     private final OverviewCard overviewCard;
+    private final SidebarCompanionsView companions = new SidebarCompanionsView();
 
     // Navigation buttons
     private NavigationButton noteButton;
@@ -76,6 +77,7 @@ public class SidebarView extends VBox {
      * Remove all listeners registered on singleton services.
      */
     public void dispose() {
+        companions.dispose();
         if (onThisDayVisibilityDebounce != null) {
             onThisDayVisibilityDebounce.stop();
             onThisDayVisibilityDebounce = null;
@@ -140,9 +142,8 @@ public class SidebarView extends VBox {
         // Add top margin to navigation group for breathing room
         VBox.setMargin(navigationGroup, new Insets(12, 0, 0, 0));
         
-        // Spacer
-        Region spacer = new Region();
-        VBox.setVgrow(spacer, Priority.ALWAYS);
+        // Decorative companions use the existing flexible space without squeezing navigation.
+        VBox.setVgrow(companions, Priority.ALWAYS);
         
         // Update notification area (initially hidden)
         VBox updateNotification = createUpdateNotification();
@@ -154,7 +155,7 @@ public class SidebarView extends VBox {
             logoArea,
             overviewCard,
             navigationGroup,
-            spacer,
+            companions,
             updateNotification
         );
     }

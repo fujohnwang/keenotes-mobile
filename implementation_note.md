@@ -94,3 +94,10 @@
 - 网络恢复后的 pending-note 查询/重试改投递到独立 scheduler，避免在 OkHttp WebSocket 回调线程里同步访问数据库；scheduler 的 start/shutdown 做了互斥和 rejection 兜底，周期任务也隔离异常，避免单次 DB 错误永久取消后续重试。
 - 删除 token 前缀、URL、WebSocket accept、原始 payload、note 明文和 pending note 摘要日志；formatter 对 Bearer、secret key/value、URL query、JSON content 再做兜底脱敏。旧日志文件不会被追溯改写。
 - 为兼容现有自托管 endpoint，本轮没有改变原有 TLS certificate/hostname 验证策略；应另开安全迁移项处理，避免与连接状态改造混在一起。
+
+## JavaFX 侧边栏鼠标跟随
+
+- 按用户要求恢复最初的底部横排：Star、Ghost、Cyclops、Cactus、Crowned 五个小角色固定顺序、紧凑错落排列，路径和眼睛坐标使用原生 JavaFX 节点。不再随机位置、大小或顺序；复用原侧边栏 spacer，空间不足时整组缩小或隐藏。
+- Scene 内移动/拖动鼠标驱动瞳孔平滑跟随，移出窗口回正；运动收敛即停止 `AnimationTimer`，隐藏、失焦、最小化、脱离 Scene 时停止并回正。切换 Scene/Window 或 dispose 时移除旧监听，dispose 可重复调用，并在侧边栏其他清理操作之前执行。
+- 保留参考配色；瞳孔位移限制在眼白内，Star 高光随瞳孔一起移动。无新增运行时依赖。
+- JDK 25 离线 Maven 编译通过；按用户要求，最终鼠标交互效果留给手工验证。
