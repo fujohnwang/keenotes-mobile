@@ -59,6 +59,11 @@ final class SidebarCompanionsView extends Region {
     private final EventHandler<MouseEvent> pointerHandler = event -> {
         if (canAnimate()) {
             pointer = new Point2D(event.getSceneX(), event.getSceneY());
+            // Blink only after a quiet interval; movement reopens the eyes and restarts the wait.
+            for (BlinkAnimation blink : blinkAnimations.values()) {
+                blink.stop();
+                blink.schedule();
+            }
             requestMotion();
         }
     };
