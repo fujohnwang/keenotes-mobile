@@ -1,5 +1,6 @@
 package cn.keevol.keenotes.mobilefx;
 
+import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -24,6 +25,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
+import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.awt.image.BufferedImage;
@@ -208,7 +210,7 @@ public class NoteShareDialog extends Dialog<Void> {
         chooser.setTitle("保存海报");
         chooser.setInitialFileName(defaultFileName(".png"));
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG Image", "*.png"));
-        File selected = chooser.showSaveDialog(owner);
+        File selected = showSaveDialog(chooser);
         if (selected == null) {
             return;
         }
@@ -252,7 +254,7 @@ public class NoteShareDialog extends Dialog<Void> {
         chooser.setTitle("保存视频");
         chooser.setInitialFileName(defaultFileName(".mp4"));
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("MP4 Video", "*.mp4"));
-        File selected = chooser.showSaveDialog(owner);
+        File selected = showSaveDialog(chooser);
         if (selected == null) {
             return;
         }
@@ -280,6 +282,37 @@ public class NoteShareDialog extends Dialog<Void> {
             setStatus("视频生成失败：" + message, true);
         });
         AppExecutors.media().execute(exportTask);
+    }
+
+    private File showSaveDialog(FileChooser chooser) {
+        Window dialogWindow = resolveDialogWindow();
+        try {
+            return chooser.showSaveDialog(dialogWindow);
+        } finally {
+            restoreDialogFocus(dialogWindow);
+        }
+    }
+
+    private Window resolveDialogWindow() {
+        if (getDialogPane().getScene() != null && getDialogPane().getScene().getWindow() != null) {
+            return getDialogPane().getScene().getWindow();
+        }
+        return owner;
+    }
+
+    private void restoreDialogFocus(Window dialogWindow) {
+        if (dialogWindow == null) {
+            return;
+        }
+        Platform.runLater(() -> {
+            if (!dialogWindow.isShowing()) {
+                return;
+            }
+            if (dialogWindow instanceof Stage stage) {
+                stage.toFront();
+            }
+            dialogWindow.requestFocus();
+        });
     }
 
     private void setBusy(boolean busy) {

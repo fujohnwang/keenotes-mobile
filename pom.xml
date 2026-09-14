@@ -27,6 +27,13 @@
 
     <dependencies>
 
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- OkHttp WebSocket Client -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>

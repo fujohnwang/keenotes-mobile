@@ -9,7 +9,6 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Font;
-import java.awt.FontFormatException;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.LinearGradientPaint;
@@ -28,8 +27,6 @@ import java.util.List;
 public final class NotePosterRenderer {
     public static final int EXPORT_WIDTH = 1080;
     public static final double ASPECT_RATIO = 9.0 / 16.0;
-    private static final String POSTER_FONT_RESOURCE = "/fonts/MiSans-Regular.ttf";
-    private static final Font BASE_POSTER_FONT = loadBasePosterFont();
 
     private static final int PAPER_RGB = 0xFDFCFB;
     private static final Color INK_TEXT = new Color(26, 24, 22);
@@ -107,8 +104,18 @@ public final class NotePosterRenderer {
         paintPaperGrain(g, width, height, scale);
         paintInkTheme(g, inkTheme, contentLength, width, height);
         paintVignette(g, width, height);
-        paintContent(g, lines, contentFont, contentMetrics, cardPadding, textY, lineAdvance);
-        paintFooter(g, author, posterDate, footerFont, badgeFont, cardPadding, footerY, footerHeight, footerVerticalPadding, width);
+
+        BufferedImage textLayer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D textGraphics = textLayer.createGraphics();
+        try {
+            configureGraphics(textGraphics);
+            paintContent(textGraphics, lines, contentFont, contentMetrics, cardPadding, textY, lineAdvance);
+        } finally {
+            textGraphics.dispose();
+        }
+        g.drawImage(textLayer, 0, 0, null);
+        paintFooter(g, author, posterDate, footerFont, badgeFont,
+                cardPadding, footerY, footerHeight, footerVerticalPadding, width);
 
         g.setColor(DIVIDER);
         g.fillRect(0, footerY, width, dividerHeight);
@@ -184,18 +191,7 @@ public final class NotePosterRenderer {
     }
 
     private static Font posterFont(int style, int size) {
-        return BASE_POSTER_FONT.deriveFont(style, (float) size);
-    }
-
-    private static Font loadBasePosterFont() {
-        try (InputStream input = NotePosterRenderer.class.getResourceAsStream(POSTER_FONT_RESOURCE)) {
-            if (input != null) {
-                return Font.createFont(Font.TRUETYPE_FONT, input);
-            }
-        } catch (FontFormatException | IOException e) {
-            // Fall through to platform sans-serif if the bundled font cannot be loaded.
-        }
-        return new Font(Font.SANS_SERIF, Font.PLAIN, 12);
+        return new Font(Font.SANS_SERIF, style, size);
     }
 
     private static void paintPaperGrain(Graphics2D g, int width, int height, double scale) {
@@ -238,13 +234,22 @@ public final class NotePosterRenderer {
         g.fillRect(0, 0, width, height);
     }
 
-    private static void paintContent(Graphics2D g, List<String> lines, Font font, FontMetrics metrics, int x, int y, int lineAdvance) {
-        g.setFont(font);
-        g.setColor(INK_TEXT);
-        int baseline = y + metrics.getAscent();
+    private static void paintContent(
+            Graphics2D g,
+            List<String> lines,
+            Font font,
+            FontMetrics metrics,
+            int x,
+            int y,
+            int lineAdvance
+    ) {
         if (lines.isEmpty()) {
             return;
         }
+
+        g.setFont(font);
+        g.setColor(INK_TEXT);
+        int baseline = y + metrics.getAscent();
         for (String line : lines) {
             g.drawString(line, x, baseline);
             baseline += lineAdvance;
@@ -264,32 +269,49 @@ public final class NotePosterRenderer {
             int width
     ) {
         String leftText = author == null ? posterDate : author + " · " + posterDate;
-        g.setFont(footerFont);
-        FontMetrics footerMetrics = g.getFontMetrics();
-        int baseline = footerY + footerVerticalPadding + footerMetrics.getAscent();
+        BufferedImage footerTextLayer = new BufferedImage(width, footerHeight, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D footerTextGraphics = footerTextLayer.createGraphics();
+        try {
+            configureGraphics(footerTextGraphics);
+            footerTextGraphics.setFont(footerFont);
+            FontMetrics footerMetrics = footerTextGraphics.getFontMetrics();
+            int baseline = footerVerticalPadding + footerMetrics.getAscent();
 
-        g.setFont(badgeFont);
-        FontMetrics badgeMetrics = g.getFontMetrics();
-        String badgeText = "KeeNotes";
-        int badgeHorizontalPadding = Math.max(10, badgeMetrics.getHeight() / 2);
-        int badgeVerticalPadding = Math.max(5, badgeMetrics.getHeight() / 4);
-        int badgeWidth = badgeMetrics.stringWidth(badgeText) + badgeHorizontalPadding * 2;
-        int badgeHeight = badgeMetrics.getHeight() + badgeVerticalPadding * 2;
-        int badgeX = width - cardPadding - badgeWidth;
-        int badgeY = footerY + (footerHeight - badgeHeight) / 2;
-        int badgeArc = badgeHeight;
+            footerTextGraphics.setFont(badgeFont);
+            FontMetrics badgeMetrics = footerTextGraphics.getFontMetrics();
+            String badgeText = "KeeNotes";
+            int badgeHorizontalPadding = Math.max(10, badgeMetrics.getHeight() / 2);
+            int badgeVerticalPadding = Math.max(5, badgeMetrics.getHeight() / 4);
+            int badgeWidth = badgeMetrics.stringWidth(badgeText) + badgeHorizontalPadding * 2;
+            int badgeHeight = badgeMetrics.getHeight() + badgeVerticalPadding * 2;
+            int badgeX = width - cardPadding - badgeWidth;
+            int badgeY = footerY + (footerHeight - badgeHeight) / 2;
+            int badgeArc = badgeHeight;
 
-        g.setColor(BADGE_FILL);
-        g.fillRoundRect(badgeX, badgeY, badgeWidth, badgeHeight, badgeArc, badgeArc);
-        g.setColor(BADGE_STROKE);
-        g.drawRoundRect(badgeX, badgeY, badgeWidth, badgeHeight, badgeArc, badgeArc);
-        g.setColor(new Color(26, 24, 22, 148));
-        g.drawString(badgeText, badgeX + badgeHorizontalPadding, badgeY + badgeVerticalPadding + badgeMetrics.getAscent());
+            g.setColor(BADGE_FILL);
+            g.fillRoundRect(badgeX, badgeY, badgeWidth, badgeHeight, badgeArc, badgeArc);
+            g.setColor(BADGE_STROKE);
+            g.drawRoundRect(badgeX, badgeY, badgeWidth, badgeHeight, badgeArc, badgeArc);
+            g.setFont(badgeFont);
+            g.setColor(new Color(26, 24, 22, 148));
+            g.drawString(badgeText, badgeX + badgeHorizontalPadding,
+                    badgeY + badgeVerticalPadding + badgeMetrics.getAscent());
 
-        g.setFont(footerFont);
-        g.setColor(FOOTER_TEXT);
-        int availableLeftWidth = Math.max(0, badgeX - cardPadding - Math.max(12, footerMetrics.getHeight()));
-        g.drawString(ellipsize(leftText, footerMetrics, availableLeftWidth), cardPadding, baseline);
+            footerTextGraphics.setFont(footerFont);
+            footerTextGraphics.setColor(INK_TEXT);
+            int availableLeftWidth = Math.max(0, badgeX - cardPadding - Math.max(12, footerMetrics.getHeight()));
+            footerTextGraphics.drawString(ellipsize(leftText, footerMetrics, availableLeftWidth), cardPadding, baseline);
+        } finally {
+            footerTextGraphics.dispose();
+        }
+
+        Composite previousComposite = g.getComposite();
+        try {
+            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, FOOTER_TEXT.getAlpha() / 255f));
+            g.drawImage(footerTextLayer, 0, footerY, null);
+        } finally {
+            g.setComposite(previousComposite);
+        }
     }
 
     private static List<String> wrapText(String text, FontMetrics metrics, int maxWidth) {

@@ -78,6 +78,7 @@ public class SidebarView extends VBox {
      */
     public void dispose() {
         companions.dispose();
+        companions.visibleProperty().unbind();
         if (onThisDayVisibilityDebounce != null) {
             onThisDayVisibilityDebounce.stop();
             onThisDayVisibilityDebounce = null;
@@ -106,6 +107,8 @@ public class SidebarView extends VBox {
         
         // Bind visibility to settings property (reactive)
         SettingsService settings = SettingsService.getInstance();
+        // Keep the flexible spacer managed when characters are hidden.
+        companions.visibleProperty().bind(settings.showSidebarCharactersProperty());
         overviewCard.visibleProperty().bind(settings.showOverviewCardProperty());
         overviewCard.managedProperty().bind(settings.showOverviewCardProperty());
         settings.showOnThisDayInYearsPastProperty().addListener(onThisDaySettingListener);

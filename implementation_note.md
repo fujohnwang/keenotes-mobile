@@ -18,7 +18,8 @@
 - 默认保存名为 `keenotes-{note.id}-{yyyy-MM-dd}-{HHmmss}`，其中时间戳取打开保存面板时的本地时间。
 - 图片海报保存成功后会同时复制同一张图片到系统剪切板；视频保存不写剪切板。
 - 分享 Dialog 新增“复制海报”入口，只把当前预览海报写入系统剪切板，不落盘，保留“保存海报”原有的保存后自动复制行为。
-- Java2D 海报正文/footer 显式加载 bundled `MiSans-Regular.ttf`，避免 logical font fallback 导致中英文标点 glyph 丢失。
+- Java2D 海报文字改用系统 logical `SansSerif` 以启用 Unicode/emoji font fallback；正文与 footer 文字分别先绘制到透明 ARGB layer 再合成，footer 通过整层 alpha 保留原有淡色效果，规避 macOS JDK 在不透明 buffer 或半透明文字颜色上丢失彩色 emoji。代价是各系统中文字形可能略有差异。
+- 分享 Dialog 中的海报/视频 FileChooser 改以 Dialog 自身窗口为 owner，原生保存面板返回后在 FX event queue 恢复 Dialog 层级与焦点；不设置全局 always-on-top。
 - 海报文本换行只保留原文中的真实空行，不再对每个普通换行额外插入空白行，排版更接近 iOS `Text(noteContent)`。
 - 三端海报 footer 的创建时间统一显示为本地时间 `yyyy-MM-dd HH:mm`，精确到分钟以兼顾信息量和横向空间。
 - iOS 海报在 `UIImage` 导出出口显式应用透明圆角 alpha clip，并通过 PhotoKit 写入 PNG 原始 resource；两层约束分别保证像素透明与保存时不发生隐式格式转换。
@@ -98,7 +99,13 @@
 ## JavaFX 侧边栏鼠标跟随
 
 - 按用户要求恢复最初的底部横排：Star、Ghost、Cyclops、Cactus、Crowned 五个小角色固定顺序、紧凑错落排列，路径和眼睛坐标使用原生 JavaFX 节点。不再随机位置、大小或顺序；复用原侧边栏 spacer，空间不足时整组缩小或隐藏。
+- Preferences 新增 `Show Sidebar Characters`，默认开启，使用 `show.sidebar.characters` 保存选择并通过 BooleanProperty 即时控制可见性；关闭后保留弹性 spacer、停止跟随与眨眼，重新开启时按现有窗口状态恢复，侧边栏 dispose 时解除设置绑定。
 - Scene 内移动/拖动鼠标驱动瞳孔平滑跟随，移出窗口回正；运动收敛即停止 `AnimationTimer`，隐藏、失焦、最小化、脱离 Scene 时停止并回正。切换 Scene/Window 或 dispose 时移除旧监听，dispose 可重复调用，并在侧边栏其他清理操作之前执行。
 - 保留参考配色；瞳孔位移限制在眼白内，Star 高光随瞳孔一起移动。无新增运行时依赖。
 - 鼠标移动或拖动时保持睁眼跟随，并重置各角色的眨眼倒计时；静止后各自随机等待 3–7 秒眨眼，持续静止则继续随机眨眼，两眼同步、单次约 205ms。复用 `PauseTransition` 和短 `Timeline` 在 FX 线程执行；隐藏、失焦、最小化、脱离 Scene 或 dispose 时取消等待和眨眼并恢复睁眼，重新可见且获焦后重新计时；眨眼缩放与瞳孔方向坐标分离。
 - JDK 25 离线 Maven 编译通过；按用户要求，最终鼠标交互效果留给手工验证。
+
+## iOS IAP 与凭据历史计划（2026-09-14）
+
+- 本轮仅新增实施计划书，未修改功能代码。IAP 采用独立年订阅/token，通用输入与 Save Settings 保持主入口；历史显示 endpoint、token 尾 4 位、通用/IAP tag，二次确认后启用。
+- 计划先实现 Keychain 历史保留，再接 IAP；凭据历史不备份笔记。tuple 变化且有 pending 时暂缓切换，避免跨账户发送；价格、Product ID 与 ASC 选项待配置。

@@ -32,6 +32,7 @@ public class SettingsService {
     private static final String KEY_SEARCH_SHORTCUT = "shortcut.search";
     private static final String KEY_SEND_SHORTCUT = "shortcut.send";
     private static final String KEY_SHOW_OVERVIEW_CARD = "show.overview.card";
+    private static final String KEY_SHOW_SIDEBAR_CHARACTERS = "show.sidebar.characters";
     private static final String KEY_FIRST_NOTE_DATE = "first.note.date";
     private static final String KEY_THEME = "ui.theme";
     private static final String KEY_NOTE_FONT_SIZE = "note.font.size";
@@ -67,6 +68,7 @@ public class SettingsService {
 
     // JavaFX Property for reactive binding
     private final BooleanProperty showOverviewCardProperty = new SimpleBooleanProperty(true);
+    private final BooleanProperty showSidebarCharactersProperty = new SimpleBooleanProperty(true);
     private final IntegerProperty noteFontSizeProperty = new SimpleIntegerProperty(DEFAULT_NOTE_FONT_SIZE);
     private final StringProperty noteFontFamilyProperty = new SimpleStringProperty(DEFAULT_NOTE_FONT_FAMILY);
     private final BooleanProperty showSyncChannelStatusProperty = new SimpleBooleanProperty(false);
@@ -78,6 +80,7 @@ public class SettingsService {
         loadSettings();
         // Initialize property from loaded settings
         showOverviewCardProperty.set(getShowOverviewCard());
+        showSidebarCharactersProperty.set(getShowSidebarCharacters());
         noteFontSizeProperty.set(getNoteFontSize());
         noteFontFamilyProperty.set(getEffectiveNoteFontFamily());
         showSyncChannelStatusProperty.set(getShowSyncChannelStatus());
@@ -257,6 +260,19 @@ public class SettingsService {
 
     public BooleanProperty showOverviewCardProperty() {
         return showOverviewCardProperty;
+    }
+
+    public boolean getShowSidebarCharacters() {
+        return Boolean.parseBoolean(properties.getProperty(KEY_SHOW_SIDEBAR_CHARACTERS, "true"));
+    }
+
+    public void setShowSidebarCharacters(boolean enabled) {
+        properties.setProperty(KEY_SHOW_SIDEBAR_CHARACTERS, String.valueOf(enabled));
+        showSidebarCharactersProperty.set(enabled);
+    }
+
+    public BooleanProperty showSidebarCharactersProperty() {
+        return showSidebarCharactersProperty;
     }
 
     public boolean getShowOnThisDayInYearsPast() {

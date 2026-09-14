@@ -19,6 +19,7 @@ public class SettingsPreferencesView extends VBox {
     private final SettingsService settings;
     private final ToggleSwitch copyToClipboardToggle;
     private final ToggleSwitch showOverviewCardToggle;
+    private final ToggleSwitch showSidebarCharactersToggle;
     private final ToggleSwitch showOnThisDayToggle;
     private final ToggleSwitch showSyncChannelStatusToggle;
     private final ToggleSwitch themeToggle;
@@ -48,6 +49,16 @@ public class SettingsPreferencesView extends VBox {
         showOverviewCardToggle = new ToggleSwitch();
         showOverviewCardToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
             settings.setShowOverviewCard(newVal);
+            settings.save();
+        });
+
+        // Show Sidebar Characters toggle
+        showSidebarCharactersToggle = new ToggleSwitch();
+        showSidebarCharactersToggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (loadingSettings) {
+                return;
+            }
+            settings.setShowSidebarCharacters(newVal);
             settings.save();
         });
 
@@ -151,6 +162,7 @@ public class SettingsPreferencesView extends VBox {
         getChildren().addAll(
             createToggleRow("Copy to clipboard on post success", copyToClipboardToggle),
             createToggleRow("Show Overview Card", showOverviewCardToggle),
+            createToggleRow("Show Sidebar Characters", showSidebarCharactersToggle),
             createToggleRow("On this day in years past", showOnThisDayToggle),
             createToggleRow("Show Sync Channel Status", showSyncChannelStatusToggle),
             createToggleRow("Light Theme", themeToggle),
@@ -217,6 +229,7 @@ public class SettingsPreferencesView extends VBox {
         try {
             copyToClipboardToggle.setSelected(settings.getCopyToClipboardOnPost());
             showOverviewCardToggle.setSelected(settings.getShowOverviewCard());
+            showSidebarCharactersToggle.setSelected(settings.getShowSidebarCharacters());
             showOnThisDayToggle.setSelected(settings.getShowOnThisDayInYearsPast());
             showSyncChannelStatusToggle.setSelected(settings.getShowSyncChannelStatus());
             themeToggle.setSelected(ThemeService.getInstance().getCurrentTheme() == ThemeService.Theme.LIGHT);
