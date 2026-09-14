@@ -1,7 +1,15 @@
 package cn.keevol.keenotes.mobilefx;
 
+import javafx.animation.Animation;
 import javafx.animation.AnimationTimer;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.PauseTransition;
+import javafx.animation.Timeline;
 import javafx.beans.InvalidationListener;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.event.EventHandler;
 import javafx.geometry.Point2D;
@@ -18,9 +26,13 @@ import javafx.scene.shape.StrokeLineJoin;
 import javafx.scene.transform.Scale;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import javafx.util.Duration;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /** Decorative companions that occupy only the sidebar's remaining space. */
 final class SidebarCompanionsView extends Region {
@@ -32,6 +44,7 @@ final class SidebarCompanionsView extends Region {
     private final Group artwork = new Group();
     private final Scale artworkScale = new Scale(1, 1, 0, 0);
     private final List<Eye> eyes = new ArrayList<>();
+    private final Map<Group, BlinkAnimation> blinkAnimations = new LinkedHashMap<>();
     private Scene observedScene;
     private Window observedWindow;
     private Point2D pointer;
@@ -41,11 +54,7 @@ final class SidebarCompanionsView extends Region {
 
     private final ChangeListener<Scene> sceneListener = (obs, oldScene, newScene) -> observeScene(newScene);
     private final ChangeListener<Window> windowListener = (obs, oldWindow, newWindow) -> observeWindow(newWindow);
-    private final InvalidationListener visibilityListener = obs -> {
-        if (!canAnimate()) {
-            resetEyes();
-        }
-    };
+    private final InvalidationListener visibilityListener = obs -> updateAnimationState();
     private final InvalidationListener positionListener = obs -> requestMotion();
     private final EventHandler<MouseEvent> pointerHandler = event -> {
         if (canAnimate()) {
@@ -79,7 +88,7 @@ final class SidebarCompanionsView extends Region {
                     stopMotion();
                 }
             } catch (RuntimeException error) {
-                stopMotion();
+                resetEyes();
                 throw error;
             }
         }
@@ -110,9 +119,8 @@ final class SidebarCompanionsView extends Region {
         artworkScale.setY(scale);
         artwork.setLayoutX((getWidth() - ART_WIDTH * scale) / 2);
         artwork.setLayoutY(getHeight() - ART_HEIGHT * scale);
-        if (!canAnimate()) {
-            resetEyes();
-        } else if (pointer != null) {
+        updateAnimationState();
+        if (pointer != null) {
             requestMotion();
         }
     }
@@ -152,6 +160,17 @@ final class SidebarCompanionsView extends Region {
                 stage.iconifiedProperty().addListener(visibilityListener);
             }
         }
+        updateAnimationState();
+    }
+
+    private void updateAnimationState() {
+        if (!canAnimate()) {
+            resetEyes();
+            return;
+        }
+        for (BlinkAnimation blink : blinkAnimations.values()) {
+            blink.schedule();
+        }
     }
 
     private boolean canAnimate() {
@@ -185,6 +204,9 @@ final class SidebarCompanionsView extends Region {
     private void resetEyes() {
         stopMotion();
         pointer = null;
+        for (BlinkAnimation blink : blinkAnimations.values()) {
+            blink.stop();
+        }
         for (Eye eye : eyes) {
             eye.pupil.setTranslateX(0);
             eye.pupil.setTranslateY(0);
@@ -242,6 +264,7 @@ final class SidebarCompanionsView extends Region {
         character.setId("companion-" + name.toLowerCase(java.util.Locale.ROOT));
         character.setLayoutX(x);
         character.setLayoutY(y);
+        blinkAnimations.put(character, new BlinkAnimation());
         artwork.getChildren().add(character);
         return character;
     }
@@ -268,12 +291,56 @@ final class SidebarCompanionsView extends Region {
             highlight.setOpacity(0.85);
             pupil.getChildren().add(highlight);
         }
-        Group eye = new Group(white, pupil);
+        Group appearance = new Group(white, pupil);
+        Scale eyelidScale = new Scale(1, 1, 0, 0);
+        eyelidScale.yProperty().bind(blinkAnimations.get(character).openness);
+        appearance.getTransforms().add(eyelidScale);
+        // Keep the gaze coordinate system independent from the eyelid's vertical compression.
+        Group eye = new Group(appearance);
         eye.setLayoutX(x);
         eye.setLayoutY(y);
         character.getChildren().add(eye);
         // Keep the entire pupil inside the inner edge of the eye's outline.
         eyes.add(new Eye(eye, pupil, Math.min(range, radius - 2.5 - pupilRadius)));
+    }
+
+    private final class BlinkAnimation {
+        private final DoubleProperty openness = new SimpleDoubleProperty(1);
+        private final PauseTransition wait = new PauseTransition();
+        private final Timeline blink = new Timeline(
+                new KeyFrame(Duration.ZERO, new KeyValue(openness, 1)),
+                new KeyFrame(Duration.millis(65), new KeyValue(openness, 0.08, Interpolator.EASE_IN)),
+                new KeyFrame(Duration.millis(100), new KeyValue(openness, 0.08)),
+                new KeyFrame(Duration.millis(205), new KeyValue(openness, 1, Interpolator.EASE_OUT)));
+
+        private BlinkAnimation() {
+            wait.setOnFinished(event -> {
+                if (canAnimate()) {
+                    blink.playFromStart();
+                } else {
+                    stop();
+                }
+            });
+            blink.setOnFinished(event -> schedule());
+        }
+
+        private void schedule() {
+            if (!canAnimate()) {
+                stop();
+                return;
+            }
+            if (wait.getStatus() != Animation.Status.STOPPED || blink.getStatus() != Animation.Status.STOPPED) {
+                return;
+            }
+            wait.setDuration(Duration.seconds(ThreadLocalRandom.current().nextDouble(3, 7)));
+            wait.playFromStart();
+        }
+
+        private void stop() {
+            wait.stop();
+            blink.stop();
+            openness.set(1);
+        }
     }
 
     private record Eye(Group origin, Group pupil, double range) {
