@@ -16,10 +16,13 @@ import javafx.geometry.Point2D;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
@@ -29,6 +32,7 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,17 +42,22 @@ import java.util.concurrent.ThreadLocalRandom;
 final class SidebarCompanionsView extends Region {
     private static final double ART_WIDTH = 570;
     private static final double ART_HEIGHT = 198;
+    private static final long BOUNCE_INTERVAL_NANOS = 90_000_000L;
     private static final Color INK = Color.web("#111111");
     private static final Color SKY = Color.web("#8ac5f4");
 
     private final Group artwork = new Group();
+    private final Rectangle viewportClip = new Rectangle();
     private final Scale artworkScale = new Scale(1, 1, 0, 0);
     private final List<Eye> eyes = new ArrayList<>();
     private final Map<Group, BlinkAnimation> blinkAnimations = new LinkedHashMap<>();
+    private final List<BounceAnimation> bounceAnimations = new ArrayList<>();
+    private final EnumSet<KeyCode> pressedKeys = EnumSet.noneOf(KeyCode.class);
     private Scene observedScene;
     private Window observedWindow;
     private Point2D pointer;
     private long lastPulse;
+    private long lastBounce;
     private boolean running;
     private boolean disposed;
 
@@ -56,6 +65,41 @@ final class SidebarCompanionsView extends Region {
     private final ChangeListener<Window> windowListener = (obs, oldWindow, newWindow) -> observeWindow(newWindow);
     private final InvalidationListener visibilityListener = obs -> updateAnimationState();
     private final InvalidationListener positionListener = obs -> requestMotion();
+    private final InvalidationListener bouncePositionListener = obs -> {
+        // Keep looking at the pointer while the character's coordinate system moves.
+        if (pointer != null) {
+            requestMotion();
+        }
+    };
+    private final EventHandler<KeyEvent> keyHandler = event -> {
+        if (!canAnimate()) {
+            pressedKeys.clear();
+            return;
+        }
+        if (event.getEventType() == KeyEvent.KEY_PRESSED) {
+            // Track ignored shortcuts and throttled presses too, so release cannot replay them.
+            pressedKeys.add(event.getCode());
+        } else if (pressedKeys.remove(event.getCode())) {
+            return;
+        }
+        // macOS IME composition can suppress PRESSED while still delivering RELEASED.
+        // Only an unmatched release triggers the fallback; no text/IME state is observed.
+        if (event.getCode().isModifierKey()
+                || event.isControlDown() || event.isAltDown() || event.isMetaDown()) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (lastBounce != 0 && now - lastBounce < BOUNCE_INTERVAL_NANOS) {
+            return;
+        }
+        List<BounceAnimation> available = bounceAnimations.stream()
+                .filter(bounce -> bounce.jump.getStatus() == Animation.Status.STOPPED).toList();
+        if (!available.isEmpty()
+                && available.get(ThreadLocalRandom.current().nextInt(available.size())).play()) {
+            lastBounce = now;
+        }
+        // Observe only: typing and keyboard shortcuts retain their normal event handling.
+    };
     private final EventHandler<MouseEvent> pointerHandler = event -> {
         if (canAnimate()) {
             pointer = new Point2D(event.getSceneX(), event.getSceneY());
@@ -105,6 +149,7 @@ final class SidebarCompanionsView extends Region {
         setFocusTraversable(false);
         setMinSize(0, 0);
         setPrefSize(0, 0);
+        setClip(viewportClip);
         artwork.setManaged(false);
         artwork.getTransforms().add(artworkScale);
         createCharacters();
@@ -117,6 +162,9 @@ final class SidebarCompanionsView extends Region {
 
     @Override
     protected void layoutChildren() {
+        // Also contains a jump if the sidebar is resized while it is in progress.
+        viewportClip.setWidth(getWidth());
+        viewportClip.setHeight(getHeight());
         double scale = Math.min(1, Math.min(getWidth() / ART_WIDTH, getHeight() / ART_HEIGHT));
         // Below this size the eyes become unreadable. Navigation always gets priority.
         artwork.setVisible(scale >= 0.26);
@@ -135,6 +183,8 @@ final class SidebarCompanionsView extends Region {
         if (observedScene != null) {
             observedScene.removeEventFilter(MouseEvent.MOUSE_MOVED, pointerHandler);
             observedScene.removeEventFilter(MouseEvent.MOUSE_DRAGGED, pointerHandler);
+            observedScene.removeEventFilter(KeyEvent.KEY_PRESSED, keyHandler);
+            observedScene.removeEventFilter(KeyEvent.KEY_RELEASED, keyHandler);
             observedScene.removeEventHandler(MouseEvent.MOUSE_EXITED, exitHandler);
             observedScene.windowProperty().removeListener(windowListener);
         }
@@ -143,6 +193,8 @@ final class SidebarCompanionsView extends Region {
         if (scene != null) {
             scene.addEventFilter(MouseEvent.MOUSE_MOVED, pointerHandler);
             scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, pointerHandler);
+            scene.addEventFilter(KeyEvent.KEY_PRESSED, keyHandler);
+            scene.addEventFilter(KeyEvent.KEY_RELEASED, keyHandler);
             scene.addEventHandler(MouseEvent.MOUSE_EXITED, exitHandler);
             scene.windowProperty().addListener(windowListener);
         }
@@ -209,6 +261,11 @@ final class SidebarCompanionsView extends Region {
     private void resetEyes() {
         stopMotion();
         pointer = null;
+        lastBounce = 0;
+        pressedKeys.clear();
+        for (BounceAnimation bounce : bounceAnimations) {
+            bounce.stop();
+        }
         for (BlinkAnimation blink : blinkAnimations.values()) {
             blink.stop();
         }
@@ -224,6 +281,9 @@ final class SidebarCompanionsView extends Region {
         visibleProperty().removeListener(visibilityListener);
         localToSceneTransformProperty().removeListener(positionListener);
         observeScene(null);
+        for (BounceAnimation bounce : bounceAnimations) {
+            bounce.character.translateYProperty().removeListener(bouncePositionListener);
+        }
     }
 
     private void createCharacters() {
@@ -270,6 +330,7 @@ final class SidebarCompanionsView extends Region {
         character.setLayoutX(x);
         character.setLayoutY(y);
         blinkAnimations.put(character, new BlinkAnimation());
+        bounceAnimations.add(new BounceAnimation(character));
         artwork.getChildren().add(character);
         return character;
     }
@@ -307,6 +368,44 @@ final class SidebarCompanionsView extends Region {
         character.getChildren().add(eye);
         // Keep the entire pupil inside the inner edge of the eye's outline.
         eyes.add(new Eye(eye, pupil, Math.min(range, radius - 2.5 - pupilRadius)));
+    }
+
+    private final class BounceAnimation {
+        private final Group character;
+        private final Timeline jump = new Timeline();
+
+        private BounceAnimation(Group character) {
+            this.character = character;
+            character.translateYProperty().addListener(bouncePositionListener);
+        }
+
+        private boolean play() {
+            double scale = artworkScale.getY();
+            if (scale <= 0) {
+                return false;
+            }
+            // Work in artwork coordinates and keep a two-pixel margin above the character.
+            double headroom = (artwork.getLayoutY() - 2) / scale
+                    + character.getLayoutY() + character.getBoundsInLocal().getMinY();
+            double height = Math.min(ThreadLocalRandom.current().nextDouble(18, 42), headroom);
+            if (height * scale < 1) {
+                return false;
+            }
+            double millis = ThreadLocalRandom.current().nextDouble(300, 420);
+            jump.getKeyFrames().setAll(
+                    new KeyFrame(Duration.ZERO, new KeyValue(character.translateYProperty(), 0)),
+                    new KeyFrame(Duration.millis(millis * 0.45),
+                            new KeyValue(character.translateYProperty(), -height, Interpolator.EASE_OUT)),
+                    new KeyFrame(Duration.millis(millis),
+                            new KeyValue(character.translateYProperty(), 0, Interpolator.EASE_IN)));
+            jump.playFromStart();
+            return true;
+        }
+
+        private void stop() {
+            jump.stop();
+            character.setTranslateY(0);
+        }
     }
 
     private final class BlinkAnimation {
