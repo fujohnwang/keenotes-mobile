@@ -378,6 +378,16 @@
     -fx-padding: 12 0;
 }
 
+.sidebar-navigation-scroll {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.sidebar-navigation-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
 /* Floating pill-style navigation buttons */
 .navigation-button {
     -fx-background-radius: 10px;

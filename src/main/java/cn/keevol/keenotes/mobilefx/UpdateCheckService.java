@@ -2,129 +2,169 @@ package cn.keevol.keenotes.mobilefx;
 
 import cn.keevol.keenotes.mobilefx.generated.BuildInfo;
 import io.vertx.core.json.JsonObject;
+import javafx.animation.PauseTransition;
+import javafx.concurrent.Service;
+import javafx.concurrent.Task;
+import javafx.util.Duration;
+import okhttp3.Call;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
-/**
- * Service for checking application updates
- */
-public class UpdateCheckService {
-    
+/** Background update check. Create, start and close on the JavaFX Application Thread. */
+public final class UpdateCheckService implements AutoCloseable {
+    private static final Logger logger = AppLogger.getLogger(UpdateCheckService.class);
     private static final String VERSION_API_URL = "https://kns.afoo.me/version/latest";
-    private static final String CURRENT_VERSION = BuildInfo.VERSION;
-    
+    private static final int MAX_ATTEMPTS = 4;
+
+    private final String currentVersion;
     private final OkHttpClient httpClient;
+    private final Duration retryDelay;
+    private final PauseTransition delay;
+    private final Service<UpdateInfo> check;
     private UpdateListener listener;
-    
+    private Call activeCall;
+    private int attempts;
+    private boolean started;
+    private boolean closed;
+
     public UpdateCheckService() {
-        this.httpClient = new OkHttpClient.Builder()
+        this(BuildInfo.VERSION, new OkHttpClient.Builder()
                 .connectTimeout(5, TimeUnit.SECONDS)
                 .readTimeout(5, TimeUnit.SECONDS)
-                .build();
+                .callTimeout(15, TimeUnit.SECONDS)
+                .build(), Duration.seconds(3), Duration.seconds(30));
     }
-    
-    /**
-     * Check for updates in background thread
-     */
+
+    // Takes ownership of the client; injectable delays keep retry/cancellation tests local and fast.
+    UpdateCheckService(String currentVersion, OkHttpClient httpClient,
+                       Duration initialDelay, Duration retryDelay) {
+        this.currentVersion = currentVersion;
+        this.httpClient = httpClient;
+        this.retryDelay = retryDelay;
+        delay = new PauseTransition(initialDelay);
+        check = new Service<>() {
+            @Override
+            protected Task<UpdateInfo> createTask() {
+                // Created on the FX thread so close() can cancel even a not-yet-executed call.
+                Call call = httpClient.newCall(new Request.Builder().url(VERSION_API_URL).build());
+                activeCall = call;
+                return new Task<>() {
+                    @Override
+                    protected UpdateInfo call() throws Exception {
+                        try (Response response = call.execute()) {
+                            if (!response.isSuccessful()) {
+                                throw new IOException("HTTP " + response.code());
+                            }
+                            if (response.body() == null) {
+                                throw new IOException("Empty update response");
+                            }
+                            JsonObject json = new JsonObject(response.body().string());
+                            String version = json.getString("version");
+                            String url = json.getString("url");
+                            if (version == null || version.isBlank() || url == null || url.isBlank()) {
+                                throw new IOException("Update response is missing version or URL");
+                            }
+                            return isNewerVersion(version, currentVersion) ? new UpdateInfo(version, url) : null;
+                        }
+                    }
+                };
+            }
+        };
+        delay.setOnFinished(event -> {
+            if (!closed) {
+                attempts++;
+                logger.info("Checking for updates: current=" + currentVersion + ", attempt=" + attempts);
+                check.restart();
+            }
+        });
+        check.setOnSucceeded(event -> {
+            activeCall = null;
+            if (closed) {
+                return;
+            }
+            UpdateInfo update = check.getValue();
+            logger.info(update == null ? "Already on latest version" : "New version available: " + update.version());
+            if (update != null && listener != null) {
+                listener.onUpdateAvailable(update.version(), update.url());
+            }
+        });
+        check.setOnFailed(event -> {
+            activeCall = null;
+            if (closed) {
+                return;
+            }
+            boolean retry = attempts < MAX_ATTEMPTS;
+            logger.warning("Update check failed (attempt " + attempts + "): "
+                    + check.getException().getMessage()
+                    + (retry ? "; retrying in " + retryDelay.toSeconds() + " seconds" : "; retry limit reached"));
+            if (retry) {
+                delay.setDuration(retryDelay);
+                delay.playFromStart();
+            }
+        });
+    }
+
+    /** Schedule one check, with bounded retries on failure. Repeated starts are ignored. */
     public void checkForUpdates() {
-        // Skip check for dev builds
-        if ("dev".equals(CURRENT_VERSION)) {
-            System.out.println("[UpdateCheck] Skipping update check for dev build");
+        if (closed || started) {
             return;
         }
-        
-        Thread checkThread = new Thread(() -> {
-            try {
-                System.out.println("[UpdateCheck] Checking for updates... Current version: " + CURRENT_VERSION);
-                
-                Request request = new Request.Builder()
-                        .url(VERSION_API_URL)
-                        .get()
-                        .build();
-                
-                try (Response response = httpClient.newCall(request).execute()) {
-                    if (!response.isSuccessful()) {
-                        System.err.println("[UpdateCheck] Failed to check updates: HTTP " + response.code());
-                        return;
-                    }
-                    
-                    String body = response.body().string();
-                    JsonObject json = new JsonObject(body);
-                    
-                    String latestVersion = json.getString("version");
-                    String downloadUrl = json.getString("url");
-                    
-                    System.out.println("[UpdateCheck] Latest version: " + latestVersion);
-                    
-                    if (isNewerVersion(latestVersion, CURRENT_VERSION)) {
-                        System.out.println("[UpdateCheck] New version available: " + latestVersion);
-                        notifyUpdateAvailable(latestVersion, downloadUrl);
-                    } else {
-                        System.out.println("[UpdateCheck] Already on latest version");
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("[UpdateCheck] Error checking for updates: " + e.getMessage());
-            }
-        }, "UpdateCheck");
-        
-        checkThread.setDaemon(true);
-        checkThread.start();
-    }
-    
-    /**
-     * Compare two semantic versions
-     * Returns true if latest > current
-     */
-    private boolean isNewerVersion(String latest, String current) {
-        try {
-            String[] latestParts = latest.split("\\.");
-            String[] currentParts = current.split("\\.");
-            
-            int maxLength = Math.max(latestParts.length, currentParts.length);
-            
-            for (int i = 0; i < maxLength; i++) {
-                int latestPart = i < latestParts.length ? Integer.parseInt(latestParts[i]) : 0;
-                int currentPart = i < currentParts.length ? Integer.parseInt(currentParts[i]) : 0;
-                
-                if (latestPart > currentPart) {
-                    return true;
-                } else if (latestPart < currentPart) {
-                    return false;
-                }
-            }
-            
-            return false; // Versions are equal
-        } catch (Exception e) {
-            System.err.println("[UpdateCheck] Error comparing versions: " + e.getMessage());
-            return false;
+        started = true;
+        if ("dev".equals(currentVersion)) {
+            logger.info("Skipping update check for dev build");
+            return;
         }
+        delay.playFromStart();
     }
-    
-    /**
-     * Notify listener about available update
-     */
-    private void notifyUpdateAvailable(String version, String url) {
-        if (listener != null) {
-            javafx.application.Platform.runLater(() -> {
-                listener.onUpdateAvailable(version, url);
-            });
+
+    private static boolean isNewerVersion(String latest, String current) {
+        String[] latestParts = latest.split("\\.", -1);
+        String[] currentParts = current.split("\\.", -1);
+        // Invalid responses must fail the Task and trigger retries, not masquerade as "up to date".
+        int[] latestNumbers = java.util.Arrays.stream(latestParts).mapToInt(Integer::parseInt).toArray();
+        int[] currentNumbers = java.util.Arrays.stream(currentParts).mapToInt(Integer::parseInt).toArray();
+        for (int i = 0; i < Math.max(latestNumbers.length, currentNumbers.length); i++) {
+            int latestPart = i < latestNumbers.length ? latestNumbers[i] : 0;
+            int currentPart = i < currentNumbers.length ? currentNumbers[i] : 0;
+            if (latestPart != currentPart) {
+                return latestPart > currentPart;
+            }
         }
+        return false;
     }
-    
-    /**
-     * Set update listener
-     */
+
     public void setUpdateListener(UpdateListener listener) {
         this.listener = listener;
     }
-    
-    /**
-     * Listener interface for update notifications
-     */
+
+    @Override
+    public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        delay.stop();
+        delay.setOnFinished(null);
+        check.cancel();
+        if (activeCall != null) {
+            activeCall.cancel();
+            activeCall = null;
+        }
+        check.setOnSucceeded(null);
+        check.setOnFailed(null);
+        listener = null;
+        httpClient.dispatcher().cancelAll();
+        httpClient.connectionPool().evictAll();
+        httpClient.dispatcher().executorService().shutdown();
+    }
+
+    private record UpdateInfo(String version, String url) {}
+
     public interface UpdateListener {
         void onUpdateAvailable(String version, String downloadUrl);
     }

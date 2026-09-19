@@ -20,6 +20,7 @@ public class Main extends Application {
 
     private DesktopMainView mainView;
     private FxRuntimeMonitor runtimeMonitor;
+    private UpdateCheckService updateChecker;
     private ChangeListener<ThemeService.Theme> themeListener;
 
     @Override
@@ -140,25 +141,14 @@ public class Main extends Application {
             connectThread.setDaemon(true);
             connectThread.start();
             
-            // 4. 检查更新（在异步线程，延迟3秒启动）
-            Thread updateCheckThread = new Thread(() -> {
-                try {
-                    Thread.sleep(3000); // Wait 3 seconds after startup
-                    System.out.println("Checking for updates...");
-                    UpdateCheckService updateChecker = new UpdateCheckService();
-                    updateChecker.setUpdateListener((version, url) -> {
-                        System.out.println("[UpdateCheck] Notifying UI about update: " + version);
-                        if (mainView != null && mainView.getSidebar() != null) {
-                            mainView.getSidebar().showUpdateNotification(version, url);
-                        }
-                    });
-                    updateChecker.checkForUpdates();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+            // 4. Service 在后台检查；启动延迟和失败重试由可取消的 FX timer 管理。
+            updateChecker = new UpdateCheckService();
+            updateChecker.setUpdateListener((version, url) -> {
+                if (mainView != null && mainView.getSidebar() != null) {
+                    mainView.getSidebar().showUpdateNotification(version, url);
                 }
             });
-            updateCheckThread.setDaemon(true);
-            updateCheckThread.start();
+            updateChecker.checkForUpdates();
         });
     }
 
@@ -178,6 +168,10 @@ public class Main extends Application {
     public void stop() {
         logger.info("Application stopping");
         try {
+            if (updateChecker != null) {
+                updateChecker.close();
+                updateChecker = null;
+            }
             if (runtimeMonitor != null) {
                 runtimeMonitor.stop();
                 runtimeMonitor = null;

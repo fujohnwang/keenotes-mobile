@@ -5,6 +5,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.animation.PauseTransition;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
@@ -142,14 +143,23 @@ public class SidebarView extends VBox {
         VBox navigationGroup = new VBox(6, noteButton, reviewButton, reviewPeriodsPanel, searchButton, settingsButton, settingsSubPanel);
         navigationGroup.getStyleClass().add("navigation-group");
         
-        // Add top margin to navigation group for breathing room
-        VBox.setMargin(navigationGroup, new Insets(12, 0, 0, 0));
+        // Only navigation scrolls when space is tight; the update notice stays in view.
+        ScrollPane navigationScroll = new ScrollPane(navigationGroup);
+        navigationScroll.getStyleClass().add("sidebar-navigation-scroll");
+        navigationScroll.setFitToWidth(true);
+        navigationScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        navigationScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        navigationScroll.setMinHeight(0);
+        navigationScroll.setMaxHeight(Region.USE_PREF_SIZE);
+        VBox.setMargin(navigationScroll, new Insets(12, 0, 0, 0));
         
         // Decorative companions use the existing flexible space without squeezing navigation.
         VBox.setVgrow(companions, Priority.ALWAYS);
         
         // Update notification area (initially hidden)
         VBox updateNotification = createUpdateNotification();
+        updateNotification.setMinHeight(Region.USE_PREF_SIZE);
+        updateNotification.setMaxHeight(Region.USE_PREF_SIZE);
         updateNotification.setVisible(false);
         updateNotification.setManaged(false);
         
@@ -157,7 +167,7 @@ public class SidebarView extends VBox {
         getChildren().addAll(
             logoArea,
             overviewCard,
-            navigationGroup,
+            navigationScroll,
             companions,
             updateNotification
         );
