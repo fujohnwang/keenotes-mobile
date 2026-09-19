@@ -1,0 +1,63 @@
+{
+  "resultBundle": "/Users/af/workspace.javafx/keenotes-mobile/test-results/iap-20260919/review-build3/regression.xcresult",
+  "summary": {
+    "devicesAndConfigurations": [
+      {
+        "device": {
+          "architecture": "arm64",
+          "deviceId": "6A3B455A-6971-4FF1-A64D-B71160B1F2A9",
+          "deviceName": "iPhone 17",
+          "modelName": "iPhone 17",
+          "osBuildNumber": "23F77",
+          "osVersion": "26.5",
+          "platform": "iOS Simulator"
+        },
+        "expectedFailures": 0,
+        "failedTests": 2,
+        "passedTests": 33,
+        "skippedTests": 0,
+        "testPlanConfiguration": {
+          "configurationId": "1",
+          "configurationName": "Test Scheme Action"
+        }
+      }
+    ],
+    "environmentDescription": "KeeNotes · Built with macOS 27.0",
+    "expectedFailures": 0,
+    "failedTests": 2,
+    "finishTime": 1789816796.281,
+    "passedTests": 33,
+    "result": "Failed",
+    "runtimeWarnings": [],
+    "skippedTests": 0,
+    "startTime": 1789816423.898,
+    "statistics": [],
+    "testFailures": [
+      {
+        "failureText": "XCTAssertTrue failed",
+        "targetName": "KeeNotesUITests",
+        "testIdentifier": 31,
+        "testIdentifierString": "SettingsFlowUITests/testIAPInterfaceUsesEnglishWhenRegionIsChina()",
+        "testIdentifierURL": "test://com.apple.xcode/KeeNotes/KeeNotesUITests/SettingsFlowUITests/testIAPInterfaceUsesEnglishWhenRegionIsChina",
+        "testName": "testIAPInterfaceUsesEnglishWhenRegionIsChina()"
+      },
+      {
+        "failureText": "XCTAssertTrue failed",
+        "targetName": "KeeNotesUITests",
+        "testIdentifier": 32,
+        "testIdentifierString": "SettingsFlowUITests/testIAPInterfaceUsesSimplifiedChineseWhenRegionIsUS()",
+        "testIdentifierURL": "test://com.apple.xcode/KeeNotes/KeeNotesUITests/SettingsFlowUITests/testIAPInterfaceUsesSimplifiedChineseWhenRegionIsUS",
+        "testName": "testIAPInterfaceUsesSimplifiedChineseWhenRegionIsUS()"
+      }
+    ],
+    "title": "Test - KeeNotes",
+    "topInsights": [
+      {
+        "category": "Longest Test Runs",
+        "impact": "75% of duration",
+        "text": "1 longest test run with outlier durations exceeding 4.72s (three standard deviations)"
+      }
+    ],
+    "totalTestCount": 35
+  }
+}

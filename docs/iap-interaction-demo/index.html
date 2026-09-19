@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>KeeNotes · IAP 交互演示</title>
+  <style>
+    :root { --ink:#172436; --muted:#64748a; --blue:#064bb5; --blue-soft:#eaf1ff; --line:#dce4ee; --paper:#fff; --canvas:#f5f8fc; --branch:#92713f; --shadow:0 10px 28px #2138560c; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+    button, input { font:inherit; }
+    button, a { -webkit-tap-highlight-color:transparent; }
+    button { cursor:pointer; }
+    button:disabled { cursor:default; opacity:.4; }
+    button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline:3px solid #82b3ff; outline-offset:4px; }
+    button { color:inherit; }
+    .page-head { padding:32px 40px 20px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+    h1 { margin:0; font-size:30px; font-weight:650; line-height:1.3; letter-spacing:-1px; }
+    .subtitle { margin:8px 0 0; color:var(--muted); font-size:14px; }
+    .asset-count { text-align:right; flex-shrink:0; color:var(--muted); font-size:12px; }
+    .asset-count strong { display:block; font-size:24px; color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+    .notice { margin:0 40px 24px; padding:12px 16px; border-left:3px solid #9cb8df; background:#f5f8fd; color:#4a5e79; font-size:12px; line-height:1.8; }
+    .notice strong { color:#294664; font-weight:600; }
+    .controls { border-block:1px solid var(--line); padding:14px 40px; display:flex; gap:20px; align-items:center; justify-content:space-between; background:white; }
+    .playback, .zoom { display:flex; align-items:center; gap:10px; }
+    .button { display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid var(--line); border-radius:8px; padding:8px 13px; background:white; color:var(--ink); font-size:13px; font-weight:550; text-decoration:none; white-space:nowrap; }
+    .button:hover:not(:disabled) { background:#f4f7fc; border-color:#bdcbdf; }
+    .button.primary { color:white; background:var(--blue); border-color:var(--blue); }
+    .button.primary:hover:not(:disabled) { background:#003c94; }
+    .button.icon { padding:8px; }
+    .icon svg, .button svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+    .step-counter { min-width:54px; text-align:center; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+    .zoom { gap:8px; color:var(--muted); font-size:12px; }
+    .zoom input { width:94px; accent-color:var(--blue); }
+    #zoom-value { width:35px; text-align:right; font-variant-numeric:tabular-nums; }
+    .step-nav { display:flex; flex-wrap:wrap; gap:3px 8px; margin:0; padding:13px 40px; list-style:none; border-bottom:1px solid var(--line); }
+    .step-nav button { border:0; border-radius:5px; background:transparent; color:var(--muted); padding:6px 8px; font-size:12px; white-space:nowrap; }
+    .step-nav button:hover { background:#f3f6fa; }
+    .step-nav button[aria-current="step"] { color:var(--blue); background:var(--blue-soft); font-weight:600; }
+    .step-nav span { margin-right:7px; font-variant-numeric:tabular-nums; opacity:.65; }
+    .step-nav li:last-child { margin-left:auto; }
+    .step-nav li:last-child button { border:1px dashed #cfb68e; padding:5px 9px; }
+    .canvas-shell { background:var(--canvas); position:relative; }
+    .canvas-hint { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:12px 40px; font-size:11px; color:var(--muted); border-bottom:1px solid #e7edf5; }
+    .legend { display:flex; gap:18px; align-items:center; }
+    .legend span { display:inline-flex; align-items:center; gap:7px; }
+    .legend i { width:23px; border-top:2px solid var(--blue); display:inline-block; }
+    .legend .branch-key { border-top:2px dashed var(--branch); }
+    .viewport { height:640px; max-height:70vh; min-height:380px; overflow:auto; overscroll-behavior:contain; scrollbar-color:#b2c2d8 #eaf0f7; background-image:radial-gradient(#ced9e8 .75px,transparent .75px); background-size:20px 20px; }
+    .canvas-size { position:relative; }
+    .canvas { position:absolute; left:0; top:0; width:2920px; height:936px; transform-origin:0 0; }
+    .flow-arrows { position:absolute; inset:0; overflow:visible; }
+    .flow-arrows .connection { fill:none; stroke:var(--blue); stroke-width:2; }
+    .flow-arrows .branch-line { stroke:var(--branch); stroke-dasharray:6 5; }
+    .flow-arrows a { cursor:pointer; }
+    .flow-arrows a:hover .connection, .flow-arrows a:focus .connection { stroke-width:4; }
+    .flow-arrows .hit-area { fill:none; stroke:transparent; stroke-width:22; }
+    .edge-label rect { fill:white; stroke:var(--line); stroke-width:1; }
+    .edge-label text { fill:var(--blue); font-size:12px; font-weight:550; text-anchor:middle; }
+    .edge-label.branch-label text { fill:#77582e; }
+    .edge-label.branch-label rect { stroke:#dbc8ab; }
+    .node { width:248px; position:absolute; top:172px; }
+    .node-heading { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+    .node-number { display:flex; width:30px; height:30px; flex-shrink:0; align-items:center; justify-content:center; border:1px solid #d1dcea; border-radius:50%; background:white; color:#6b7d93; font-size:12px; font-weight:600; }
+    .node-heading button { padding:0; border:0; text-align:left; background:transparent; font-size:17px; letter-spacing:-.3px; font-weight:650; }
+    .node[aria-current="step"] .node-number { background:var(--blue); border-color:var(--blue); color:white; }
+    .node[aria-current="step"] .node-heading { color:var(--blue); }
+    .capture { position:relative; display:block; width:248px; height:539px; border:1px solid #d7e0ec; border-radius:17px; background:white; padding:0; overflow:hidden; box-shadow:var(--shadow); }
+    .capture:hover { border-color:#8daddc; box-shadow:0 14px 30px #254f9020; }
+    .node[aria-current="step"] .capture { outline:3px solid #95baff; outline-offset:5px; }
+    .capture img { display:block; width:100%; height:100%; object-fit:contain; background:white; }
+    .capture img[hidden], [hidden] { display:none !important; }
+    .placeholder { display:flex; height:100%; padding:24px; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:#fafbfd; color:#77869b; }
+    .placeholder svg { width:35px; height:35px; margin-bottom:16px; fill:none; stroke:#9aaac0; stroke-width:1.2; }
+    .placeholder strong { font-size:15px; font-weight:550; color:#586c88; }
+    .placeholder span { margin-top:8px; font-size:12px; line-height:1.8; }
+    .placeholder code { margin-top:20px; color:#8c99ac; font:10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+    .shot-note { margin:11px 0 0; display:flex; align-items:center; justify-content:space-between; color:#728199; font-size:10px; }
+    .shot-state { color:#947241; }
+    .shot-state.ready { color:#34735c; }
+    .node-description { margin:13px 0 0; color:#4c607b; font-size:12px; line-height:1.85; }
+    .node-description strong { color:#2a4567; font-weight:600; }
+    .inspector { padding:21px 40px 24px; display:grid; grid-template-columns:minmax(230px,1fr) minmax(320px,1.1fr); gap:30px; border-top:1px solid var(--line); }
+    .inspector h2 { font-size:17px; line-height:1.4; margin:0 0 7px; letter-spacing:-.3px; }
+    .inspector p { margin:0; color:var(--muted); font-size:13px; line-height:1.85; }
+    .actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+    .actions .branch-action { color:#795d35; border-color:#d9c8ad; }
+    .purchase-appendix { padding:28px 40px 32px; border-top:1px solid var(--line); background:#fafcfe; }
+    .purchase-appendix h2 { margin:0 0 8px; font-size:20px; letter-spacing:-.4px; font-weight:650; }
+    .appendix-intro { max-width:880px; margin:0; font-size:13px; line-height:1.9; color:var(--muted); }
+    .appendix-flow { display:grid; grid-template-columns:minmax(160px,185px) 145px minmax(260px,460px); gap:24px; align-items:center; margin-top:22px; }
+    .appendix-shot { margin:0; }
+    .appendix-shot a { display:block; border:1px solid #d7e0ec; border-radius:12px; overflow:hidden; background:white; box-shadow:var(--shadow); }
+    .appendix-shot img { display:block; width:100%; height:auto; }
+    .appendix-shot figcaption { margin-top:10px; color:var(--muted); font-size:11px; line-height:1.8; }
+    .appendix-arrow { color:var(--blue); text-align:center; font-size:12px; }
+    .appendix-arrow svg { display:block; width:100%; height:24px; margin-top:8px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+    .appendix-result { padding:22px 24px; background:white; border:1px solid var(--line); border-radius:12px; }
+    .appendix-result h3 { margin:0; color:#236344; font-size:21px; font-weight:650; }
+    .appendix-meta { margin:5px 0 15px; color:var(--muted); font-size:11px; }
+    .appendix-result ul { padding-left:18px; margin:0; font-size:13px; color:#3e546e; line-height:1.9; }
+    .appendix-result li + li { margin-top:5px; }
+    .appendix-result code { font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace; color:#385577; }
+    .appendix-boundary { margin:16px 0 0; padding-top:13px; border-top:1px solid #e9eef5; font-size:11px; line-height:1.8; color:var(--muted); }
+    .appendix-sources { margin:10px 0 0; font-size:10px; line-height:1.8; color:#7b899d; }
+    .appendix-sources a { color:#5b7496; text-underline-offset:3px; overflow-wrap:anywhere; }
+    .language-appendix { padding:28px 40px 32px; border-top:1px solid var(--line); }
+    .language-appendix h2 { margin:0 0 8px; font-size:20px; letter-spacing:-.4px; }
+    .language-group { margin-top:23px; }
+    .language-group h3 { margin:0 0 12px; font-size:14px; font-weight:600; }
+    .language-grid { display:grid; grid-template-columns:repeat(4,minmax(110px,175px)); gap:18px; }
+    .language-grid .appendix-shot { width:100%; }
+    .language-grid figcaption { text-align:center; }
+    .evidence-note { margin:20px 0 0; color:var(--muted); font-size:12px; line-height:1.85; }
+    .evidence-note a { color:var(--blue); text-underline-offset:3px; }
+    footer { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; border-top:1px solid #edf1f6; padding:14px 40px 22px; color:#8591a3; font-size:11px; }
+    footer button { border:0; padding:0; background:transparent; color:#5b7496; font-size:11px; text-decoration:underline; text-underline-offset:3px; }
+    dialog { max-width:min(920px,calc(100vw - 32px)); width:820px; max-height:calc(100vh - 32px); border:1px solid #dce4ee; border-radius:16px; padding:0; color:var(--ink); box-shadow:0 30px 100px #0a204840; }
+    dialog::backdrop { background:#12223bd9; backdrop-filter:blur(4px); }
+    .modal-head { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:17px 22px; border-bottom:1px solid var(--line); }
+    .modal-head h2 { font-size:17px; margin:0; }
+    .modal-head p { margin:3px 0 0; font-size:11px; color:var(--muted); }
+    .modal-body { overflow:auto; max-height:calc(100vh - 172px); background:#edf2f8; text-align:center; padding:22px; }
+    .modal-body img { display:block; width:auto; max-width:100%; height:auto; max-height:calc(100vh - 230px); margin:auto; object-fit:contain; border-radius:10px; box-shadow:0 8px 25px #1d365826; }
+    .modal-body.native img { max-height:none; width:100%; }
+    .modal-placeholder { min-height:360px; border-radius:10px; }
+    .modal-foot { padding:12px 22px; display:flex; justify-content:space-between; gap:10px; align-items:center; font-size:11px; color:var(--muted); }
+    .modal-foot button { background:none; border:0; padding:0; font-size:12px; color:var(--blue); text-decoration:underline; text-underline-offset:3px; }
+    @media (min-height:1050px) { .viewport { height:740px; } }
+    @media (max-width:760px) {
+      .page-head { padding:24px 20px 17px; gap:15px; align-items:flex-start; }
+      h1 { font-size:24px; letter-spacing:-.7px; }
+      .subtitle { font-size:12px; max-width:28em; }
+      .asset-count { font-size:10px; }
+      .asset-count strong { font-size:21px; }
+      .notice { margin:0 20px 20px; font-size:11px; }
+      .controls { padding:12px 20px; flex-wrap:wrap; gap:12px; }
+      .zoom { margin-left:auto; }
+      .step-nav { padding:10px 15px; gap:2px; }
+      .step-nav li:last-child { margin-left:0; }
+      .step-nav button { font-size:11px; }
+      .canvas-hint { padding:10px 20px; font-size:10px; }
+      .viewport { height:540px; min-height:340px; }
+      .inspector { padding:20px; grid-template-columns:1fr; gap:16px; }
+      .actions { justify-content:flex-start; }
+      .purchase-appendix, .language-appendix { padding:24px 20px; }
+      .language-grid { grid-template-columns:repeat(2,minmax(110px,175px)); gap:16px; }
+      .appendix-flow { grid-template-columns:1fr; gap:16px; justify-items:center; }
+      .appendix-shot { width:185px; max-width:100%; }
+      .appendix-arrow { display:flex; gap:10px; align-items:center; }
+      .appendix-arrow svg { width:32px; height:24px; margin:0; transform:rotate(90deg); }
+      .appendix-result { width:100%; max-width:460px; padding:20px; }
+      footer { padding:14px 20px 20px; }
+    }
+    @media (prefers-reduced-motion:reduce) { *, *::before, *::after { scroll-behavior:auto !important; } }
+  </style>
+</head>
+<body>
+  <header class="page-head">
+    <div><h1>KeeNotes · IAP 交互演示</h1><p class="subtitle">购买填入凭据，保存后启用；历史切换由你再次确认。</p></div>
+    <div class="asset-count"><strong id="asset-count">0 / 8</strong>流程图截图已载入</div>
+  </header>
+  <aside class="notice" aria-label="演示范围">
+    <strong>主流程：模拟器实际截图；购买与凭据交付使用本地 fixture。</strong>不代表 Apple Sandbox 实际购买或远程连接成功。<br>
+    正式计划 <strong>US$8/年</strong>，截图中的 <strong>$1.00/年仅为 fixture 测试值</strong>。本次 1.9.0（3）主线 1–7 使用英文系统；迟到分支 8 使用中文系统。
+  </aside>
+  <main>
+    <section class="controls" aria-label="流程演示控制">
+      <div class="playback">
+        <button class="button primary" id="start">开始主线演示</button>
+        <button class="button icon" id="previous" aria-label="上一步"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button>
+        <span class="step-counter" id="step-counter" aria-live="polite">1 / 7</span>
+        <button class="button icon" id="next" aria-label="下一步"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5"/></svg></button>
+      </div>
+      <div class="zoom"><label for="zoom">画布缩放</label><input id="zoom" type="range" min="10" max="125" step="5" value="75"><output id="zoom-value" for="zoom">75%</output><button class="button" id="overview">全览</button></div>
+    </section>
+    <nav aria-label="截图节点"><ol class="step-nav" id="step-nav"></ol></nav>
+    <section class="canvas-shell" aria-label="IAP 与凭据历史流程图">
+      <div class="canvas-hint"><span>横向滚动浏览 · 点击箭头跳转 · 点击截图放大</span><span class="legend"><span><i></i>主线</span><span><i class="branch-key"></i>取消 / 迟到结果</span></span></div>
+      <div class="viewport" id="viewport" tabindex="0" aria-label="可横向滚动的截图流程画布">
+        <div class="canvas-size" id="canvas-size"><div class="canvas" id="canvas"><svg class="flow-arrows" id="flow-arrows" width="2920" height="936" viewBox="0 0 2920 936" aria-label="操作连线"></svg></div></div>
+      </div>
+    </section>
+    <section class="inspector" aria-live="polite" aria-atomic="true">
+      <div><h2 id="detail-title"></h2><p id="detail-copy"></p></div><div class="actions" id="actions"></div>
+    </section>
+    <section class="language-appendix" aria-labelledby="language-title">
+      <h2 id="language-title">系统语言验证</h2>
+      <p class="appendix-intro">语言跟随系统语言，不根据地区推断。以下为同一台 iPhone 17 / iOS 26.5 的真实补跑截图；英文配中国地区、简体中文配美国地区。点击图片查看原图。</p>
+      <div class="language-group"><h3>English · 中国地区</h3><div class="language-grid">
+        <figure class="appendix-shot"><a href="screenshots/language-en-settings.png" target="_blank" rel="noopener" aria-label="放大English · 中国地区：设置入口"><img src="screenshots/language-en-settings.png" alt="English · 中国地区下的设置入口，实际模拟器截图" loading="lazy" width="1206" height="2622"></a><figcaption>设置入口</figcaption></figure>
+        <figure class="appendix-shot"><a href="screenshots/language-en-subscription.png" target="_blank" rel="noopener" aria-label="放大English · 中国地区：订阅页"><img src="screenshots/language-en-subscription.png" alt="English · 中国地区下的订阅页，实际模拟器截图" loading="lazy" width="1206" height="2622"></a><figcaption>订阅页</figcaption></figure>
+        <figure class="appendix-shot"><a href="screenshots/language-en-history.png" target="_blank" rel="noopener" aria-label="放大English · 中国地区：凭据历史"><img src="screenshots/language-en-history.png" alt="English · 中国地区下的凭据历史，实际模拟器截图" loading="lazy" width="1206" height="2622"></a><figcaption>凭据历史</figcaption></figure>
+        <figure class="appendix-shot"><a href="screenshots/language-en-confirm.png" target="_blank" rel="noopener" aria-label="放大English · 中国地区：确认切换"><img src="screenshots/language-en-confirm.png" alt="English · 中国地区下的确认切换，实际模拟器截图" loading="lazy" width="1206" height="2622"></a><figcaption>确认切换</figcaption></figure>
+      </div></div>
+      <div class="language-group"><h3>简体中文 · 美国地区</h3><div class="language-grid">
+        <figure class="appendix-shot"><a href="screenshots/language-zh-Hans-settings.png" target="_blank" rel="noopener" aria-label="放大简体中文 · 美国地区：设置入口"><img src="screenshots/language-zh-Hans-settings.png" alt="简体中文 · 美国地区下的设置入口，实际模拟器截图" loading="lazy" width="1206" height="2622"></a><figcaption>设置入口</figcaption></figure>
+        <figure class="appendix-shot"><a href="screenshots/language-zh-Hans-subscription.png" target="_blank" rel="noopener" aria-label="放大简体中文 · 美国地区：订阅页"><img src="screenshots/language-zh-Hans-subscription.png" alt="简体中文 · 美国地区下的订阅页，实际模拟器截图" loading="lazy" width="1206" height="2622"></a><figcaption>订阅页</figcaption></figure>
+        <figure class="appendix-shot"><a href="screenshots/language-zh-Hans-history.png" target="_blank" rel="noopener" aria-label="放大简体中文 · 美国地区：凭据历史"><img src="screenshots/language-zh-Hans-history.png" alt="简体中文 · 美国地区下的凭据历史，实际模拟器截图" loading="lazy" width="1206" height="2622"></a><figcaption>凭据历史</figcaption></figure>
+        <figure class="appendix-shot"><a href="screenshots/language-zh-Hans-confirm.png" target="_blank" rel="noopener" aria-label="放大简体中文 · 美国地区：确认切换"><img src="screenshots/language-zh-Hans-confirm.png" alt="简体中文 · 美国地区下的确认切换，实际模拟器截图" loading="lazy" width="1206" height="2622"></a><figcaption>确认切换</figcaption></figure>
+      </div></div>
+      <p class="evidence-note">1.9.0（3）业务/UI 首轮 33 通过、2 失败；失败仅为这两项语言测试的键盘遮挡与滚动定位。修正测试交互后补跑 2/2 通过，35 个不同用例均已取得通过结果。原失败证据保留。页面截图只取对应测试最新的通过记录，语言截图与主线不是同一次购买。<br>来源：<a href="evidence/screenshots.json" target="_blank" rel="noopener">逐图来源与 SHA-256</a> · <a href="evidence/screenshot-run-summary.json" target="_blank" rel="noopener">两轮原始结果摘要</a> · <a href="overview.png" target="_blank" rel="noopener">截图连线总览</a></p>
+    </section>
+    <section class="purchase-appendix" aria-labelledby="appendix-title">
+      <h2 id="appendix-title">系统购买弹窗验证</h2>
+      <p class="appendix-intro">这是独立的 <strong>SystemAppleStore 本地测试</strong>，与上方 fixture 主线不是同一场购买，也不是 Apple Sandbox。系统界面明确提示 <strong>For testing purposes only</strong>、<strong>You will not be charged</strong>；交易环境为 <strong>Environment: Xcode</strong>。</p>
+      <div class="appendix-flow">
+        <figure class="appendix-shot">
+          <a href="screenshots/09-xcode-purchase.png" target="_blank" rel="noopener" aria-label="打开系统本地购买弹窗原始截图，可放大查看">
+            <img src="screenshots/09-xcode-purchase.png" alt="Xcode 本地年订阅购买弹窗：$1.00 per year，For testing purposes only，You will not be charged" loading="lazy" width="1206" height="2622">
+          </a>
+          <figcaption>真实系统购买弹窗 · 点击放大<br>测试价 $1.00/年，不会扣费。此图仅展示本地购买界面，不证明凭据已交付。</figcaption>
+        </figure>
+        <div class="appendix-arrow">确认测试订阅<svg viewBox="0 0 145 24" aria-hidden="true"><path d="M2 12h139m-8-7 8 7-8 7"/></svg></div>
+        <div class="appendix-result">
+          <h3>本地测试 1 / 1 通过</h3>
+          <p class="appendix-meta">既有记录 · 18:25 · Xcode 26.6 / iOS 26.5</p>
+          <ul>
+            <li>收到 <code>verified</code> 交易，<code>environment = Xcode</code>。</li>
+            <li><code>transactionId = originalTransactionId = 2</code>。</li>
+            <li>交付前，<code>unfinished</code> 包含该交易。</li>
+            <li>本地凭据写入后 <code>finish</code> 1 次；随后 <code>unfinished</code> 为空。</li>
+          </ul>
+          <p class="appendix-boundary">结果来自独立测试及诊断记录，交付使用本地测试依赖。此记录不证明 Apple 服务器交付、Sandbox 购买或远程连接成功，也不包含后续运行的测试结果。</p>
+          <p class="appendix-sources">记录来源：<a href="evidence/gui-summary.json" target="_blank" rel="noopener">gui-summary.json</a> · <a href="evidence/gui-safe-skdiag.json" target="_blank" rel="noopener">gui-safe-skdiag.json</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer><span>演示跳转只改变此页面的选中节点，不操作 App、不发起购买。</span><button id="reload-assets">重新读取截图</button></footer>
+  <noscript><p style="padding:20px 40px">请启用 JavaScript 以查看流程节点、截图和交互连线。此页面不需要网络连接。</p></noscript>
+  <dialog id="lightbox" aria-labelledby="modal-title">
+    <div class="modal-head"><div><h2 id="modal-title"></h2><p id="modal-description">模拟器实际截图 · 本地 fixture 演示</p></div><button class="button icon" id="close-modal" aria-label="关闭截图"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div>
+    <div class="modal-body" id="modal-body"><img id="modal-image" alt="" hidden><div class="placeholder modal-placeholder" id="modal-placeholder"><strong>实际截图待采集</strong><span>文件就位后即可查看该节点。<br>当前没有生成或拼接替代截图。</span><code id="modal-filename"></code></div></div>
+    <div class="modal-foot"><span id="modal-caption"></span><button id="native-size" hidden>放大查看细节</button></div>
+  </dialog>
+  <script>
+    'use strict';
+    // Only local screenshots are loaded. This diagram never calls an app or service.
+    const nodes = [
+      { id:1, title:'设置入口', file:'01-settings.png', summary:'保留通用 endpoint、token、PIN 与 Save Settings。右上角新增订阅入口。', detail:'现有输入与保存方式继续适用于各个购买渠道。点击右上角 Subscription（订阅），进入独立页面；打开页面本身不会替换配置。' },
+      { id:2, title:'订阅页', file:'02-subscription.png', summary:'年订阅、恢复购买与重试交付。成功交付后，可将凭据填入设置草稿。', detail:'本地 fixture 展示年订阅操作。购买交付时若页面仍有效，返回设置填入 endpoint、token；PIN 保留。恢复购买与重试交付入口同样在此页。' },
+      { id:3, title:'IAP 已填，尚未保存', file:'03-filled.png', summary:'只填入 endpoint、token，保留 PIN。当前使用的连接配置仍未改变。', detail:'可见“Credentials filled. Save to start using them.”（凭据已填入，保存后开始使用）。完整 tuple 保存成功之前，不新增相应历史记录，也不把草稿作为当前连接配置。' },
+      { id:4, title:'保存成功', file:'04-saved.png', summary:'点击 Save Settings，完整配置保存成功，进入 Keychain 历史并尝试连接。', detail:'可见“Configuration saved. See connection status below.”（配置已保存，连接状态见下方）。保存成功证明配置已落地；实际连接结果需要查看连接状态，此图不宣称远程服务已连接。' },
+      { id:5, title:'凭据历史', file:'05-history.png', summary:'显示 endpoint、token 最后 4 位、通用 / IAP 标签，以及当前使用标记。PIN 不显示。', detail:'本机成功保存过的完整 tuple 可以重新选择。点选条目会先弹出确认框，此时还没有替换配置。不同 PIN 的完整 tuple 可以作为不同条目保留。' },
+      { id:6, title:'确认切换', file:'06-confirm.png', summary:'二次确认后才替换完整 tuple。取消返回历史，保留当前配置与草稿。', detail:'确认框标题为“Switch configuration?”（确认切换配置）。选择 Switch（确认切换）会保存所选 tuple 并重新连接；选择 Cancel（取消）不改变设置草稿、当前配置或历史。' },
+      { id:7, title:'切换完成', file:'07-switched.png', summary:'完整配置已替换并自动保存，无需再点击 Save Settings。连接结果仍以状态为准。', detail:'可见“Configuration switched. See connection status below.”（配置已切换，连接状态见下方）。endpoint、token 与 PIN 一起切换，历史的当前使用标记随之更新；其他历史条目仍保留。' },
+      { id:8, title:'迟到结果保留草稿', file:'08-late-draft.png', summary:'交付等待时关闭订阅页并编辑草稿。结果随后到达，已编辑内容不会被自动覆盖。', detail:'这一分支由受控延迟 fixture 验证：交付等待中关闭页面，编辑草稿后回到前台，才放行交付。此截图展示保留的草稿；交易完成本身还需结合测试断言核对。' }
+    ];
+    const edges = [
+      { from:1, to:2, label:'点右上角“订阅”' },
+      { from:2, to:3, label:'购买并交付成功' },
+      { from:3, to:4, label:'Save Settings' },
+      { from:4, to:5, label:'点“历史”' },
+      { from:5, to:6, label:'选择一个条目' },
+      { from:6, to:7, label:'确认切换' },
+      { from:2, to:1, label:'完成 / 关闭，原草稿保留', branch:true, lane:103 },
+      { from:6, to:5, label:'取消，不替换', branch:true, lane:103 },
+      { from:2, to:8, label:'交付等待中关闭页面 → 编辑草稿 → 结果迟到', branch:true, lane:35 },
+      { from:7, to:5, label:'再看历史与当前使用标记', branch:true, lane:875 },
+      { from:8, to:2, label:'主动打开订阅，可再选择“填入连接凭据”', branch:true, lane:920 }
+    ];
+    const NS = 'http://www.w3.org/2000/svg';
+    const width = 2920, height = 936, nodeWidth = 248, pitch = 368, left = 48;
+    const x = id => left + (id - 1) * pitch;
+    const $ = id => document.getElementById(id);
+    let selected = 1, scale = .75, showingOverview = false, modalNode = null;
+    const loaded = new Set();
+    const motion = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    const placeholderIcon = '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="5" width="30" height="30" rx="5"/><circle cx="14" cy="14" r="3"/><path d="m6 30 10-10 7 7 5-5 7 7"/></svg>';
+
+    nodes.forEach(node => {
+      const li = document.createElement('li');
+      const navButton = document.createElement('button');
+      navButton.innerHTML = '<span>' + String(node.id).padStart(2,'0') + '</span>' + node.title;
+      navButton.dataset.node = node.id;
+      navButton.addEventListener('click', () => select(node.id));
+      li.append(navButton); $('step-nav').append(li);
+      const article = document.createElement('article');
+      article.className = 'node'; article.id = 'node-' + node.id;
+      article.style.left = x(node.id) + 'px'; article.setAttribute('aria-label', node.title);
+      article.innerHTML = '<div class="node-heading"><span class="node-number">' + String(node.id).padStart(2,'0') + '</span><button>' + node.title + '</button></div>' +
+        '<button class="capture" aria-label="放大查看：' + node.title + '"><img alt="' + node.title + '，iPhone 模拟器实际截图" hidden><span class="placeholder">' + placeholderIcon + '<strong>实际截图待采集</strong><span>等待此步骤的真实画面<br>不会使用示意图替代</span><code>screenshots/' + node.file + '</code></span></button>' +
+        '<div class="shot-note"><span>点击截图查看细节</span><span class="shot-state">待采集</span></div><p class="node-description">' + node.summary + '</p>';
+      article.querySelector('.node-heading button').addEventListener('click', () => select(node.id));
+      article.querySelector('.capture').addEventListener('click', () => openImage(node.id));
+      const img = article.querySelector('img');
+      img.addEventListener('load', () => imageState(node.id, true));
+      img.addEventListener('error', () => imageState(node.id, false));
+      $('canvas').append(article);
+      img.src = 'screenshots/' + node.file;
+    });
+
+    function imageState(id, ready) {
+      const article = $('node-' + id);
+      article.querySelector('img').hidden = !ready;
+      article.querySelector('.placeholder').hidden = ready;
+      const state = article.querySelector('.shot-state');
+      state.textContent = ready ? '实际截图' : '待采集';
+      state.classList.toggle('ready', ready);
+      ready ? loaded.add(id) : loaded.delete(id);
+      $('asset-count').textContent = loaded.size + ' / 8';
+      if (modalNode === id && $('lightbox').open) updateModal();
+    }
+
+    function svgElement(tag, attributes) {
+      const el = document.createElementNS(NS, tag);
+      Object.entries(attributes).forEach(([key,value]) => el.setAttribute(key, value));
+      return el;
+    }
+    const defs = svgElement('defs', {});
+    ['main','branch'].forEach(type => {
+      const marker = svgElement('marker', {id:'arrow-' + type, viewBox:'0 0 10 10', refX:9, refY:5, markerWidth:7, markerHeight:7, orient:'auto-start-reverse'});
+      marker.append(svgElement('path', {d:'M 1 1 L 9 5 L 1 9', fill:'none', stroke:type === 'main' ? '#064bb5' : '#92713f', 'stroke-width':1.6, 'stroke-linecap':'round', 'stroke-linejoin':'round'}));
+      defs.append(marker);
+    });
+    $('flow-arrows').append(defs);
+    edges.forEach(edge => {
+      const link = svgElement('a', {href:'#node-' + edge.to, tabindex:0, 'aria-label':nodes[edge.from - 1].title + '：' + edge.label + '，跳转至' + nodes[edge.to - 1].title});
+      let path, labelX, labelY;
+      if (edge.branch) {
+        const startX = x(edge.from) + nodeWidth / 2, endX = x(edge.to) + nodeWidth / 2;
+        const bottom = edge.lane > 800, y = bottom ? 825 : 159;
+        path = `M ${startX} ${y} V ${edge.lane} H ${endX} V ${y}`;
+        labelX = (startX + endX) / 2; labelY = edge.lane;
+      } else {
+        const startX = x(edge.from) + nodeWidth + 8, endX = x(edge.to) - 10;
+        path = `M ${startX} 459 H ${endX}`;
+        labelX = (startX + endX) / 2; labelY = 432;
+      }
+      link.append(svgElement('path', {d:path, class:'hit-area'}));
+      link.append(svgElement('path', {d:path, class:'connection' + (edge.branch ? ' branch-line' : ''), 'marker-end':'url(#arrow-' + (edge.branch ? 'branch' : 'main') + ')'}));
+      const labelWidth = edge.branch ? edge.label.length * 12 + 26 : Math.min(118, edge.label.length * 11 + 18);
+      const label = svgElement('g', {class:'edge-label' + (edge.branch ? ' branch-label' : '')});
+      label.append(svgElement('rect', {x:labelX - labelWidth / 2, y:labelY - 15, width:labelWidth, height:29, rx:7}));
+      const text = svgElement('text', {x:labelX, y:labelY + 4}); text.textContent = edge.label; label.append(text); link.append(label);
+      link.addEventListener('click', event => { event.preventDefault(); select(edge.to); });
+      $('flow-arrows').append(link);
+    });
+
+    function select(id, pan = true) {
+      selected = id;
+      document.querySelectorAll('[data-node]').forEach(button => button.setAttribute('aria-current', Number(button.dataset.node) === id ? 'step' : 'false'));
+      nodes.forEach(node => $('node-' + node.id).setAttribute('aria-current', node.id === id ? 'step' : 'false'));
+      const node = nodes[id - 1];
+      $('detail-title').textContent = String(id).padStart(2,'0') + ' · ' + node.title;
+      $('detail-copy').textContent = node.detail;
+      $('step-counter').textContent = id === 8 ? '支线' : id + ' / 7';
+      $('previous').disabled = id === 1;
+      $('next').disabled = id === 7;
+      $('start').textContent = id === 1 ? '开始主线演示' : '重走主线';
+      $('actions').replaceChildren();
+      edges.filter(edge => edge.from === id).forEach(edge => {
+        const button = document.createElement('button');
+        button.className = 'button' + (edge.branch ? ' branch-action' : ' primary');
+        button.textContent = edge.label;
+        button.addEventListener('click', () => select(edge.to));
+        $('actions').append(button);
+      });
+      if (pan) {
+        if (showingOverview) setScale(.75, false);
+        const viewport = $('viewport');
+        viewport.scrollTo({left:Math.max(0,(x(id) + nodeWidth / 2) * scale - viewport.clientWidth / 2), top:Math.max(0,145 * scale - 12), behavior:motion()});
+      }
+    }
+    function setScale(value, keepNode = true) {
+      scale = value; showingOverview = false;
+      $('canvas').style.transform = 'scale(' + scale + ')';
+      $('canvas-size').style.width = width * scale + 'px';
+      $('canvas-size').style.height = height * scale + 'px';
+      $('zoom').value = Math.max(10, Math.round(scale * 100));
+      $('zoom-value').textContent = Math.round(scale * 100) + '%';
+      if (keepNode) select(selected);
+    }
+    function overview() {
+      setScale(Math.min(.75, $('viewport').clientWidth / width), false);
+      showingOverview = true;
+      $('viewport').scrollTo({left:0, top:0, behavior:motion()});
+    }
+    $('zoom').addEventListener('input', event => setScale(Number(event.target.value) / 100));
+    $('overview').addEventListener('click', overview);
+    $('start').addEventListener('click', () => select(1));
+    $('previous').addEventListener('click', () => select(selected === 8 ? 2 : Math.max(1,selected - 1)));
+    $('next').addEventListener('click', () => select(selected === 8 ? 2 : Math.min(7,selected + 1)));
+    $('viewport').addEventListener('keydown', event => {
+      if (event.target !== $('viewport')) return;
+      if (event.key === 'ArrowRight') { event.preventDefault(); select(selected === 8 ? 2 : Math.min(7,selected + 1)); }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); select(selected === 8 ? 2 : Math.max(1,selected - 1)); }
+    });
+    window.addEventListener('resize', () => { if (showingOverview) overview(); });
+    $('reload-assets').addEventListener('click', () => {
+      nodes.forEach(node => { $('node-' + node.id).querySelector('img').src = 'screenshots/' + node.file + '?reload=' + Date.now(); });
+    });
+    function updateModal() {
+      const node = nodes[modalNode - 1], ready = loaded.has(modalNode);
+      $('modal-title').textContent = String(node.id).padStart(2,'0') + ' · ' + node.title;
+      $('modal-description').textContent = ready ? '模拟器实际截图 · 本地 fixture 演示' : '尚未采集该步骤的实际截图';
+      $('modal-image').hidden = !ready; $('modal-placeholder').hidden = ready; $('native-size').hidden = !ready;
+      if (ready) { $('modal-image').src = $('node-' + node.id).querySelector('img').src; $('modal-image').alt = node.title + '的实际截图'; }
+      else { $('modal-image').removeAttribute('src'); }
+      $('modal-filename').textContent = 'screenshots/' + node.file;
+      $('modal-caption').textContent = ready ? '连接成功与 Apple 服务器交付需另行验证。' : '文件就位后，点击页面底部“重新读取截图”。';
+    }
+    function openImage(id) {
+      modalNode = id; $('modal-body').classList.remove('native'); $('native-size').textContent = '放大查看细节';
+      updateModal(); $('lightbox').showModal();
+    }
+    $('close-modal').addEventListener('click', () => $('lightbox').close());
+    $('lightbox').addEventListener('click', event => { if (event.target === $('lightbox')) { const r = $('lightbox').getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) $('lightbox').close(); } });
+    $('lightbox').addEventListener('close', () => { modalNode = null; });
+    $('native-size').addEventListener('click', () => { const expanded = $('modal-body').classList.toggle('native'); $('native-size').textContent = expanded ? '适应窗口' : '放大查看细节'; });
+    setScale(.75, false); select(1, false);
+  </script>
+</body>
+</html>

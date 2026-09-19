@@ -32,12 +32,45 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: cn.keevol.keenotes
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
-        MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: "1.9.0"
+        DEVELOPMENT_TEAM: NG744CF46S
+        # Configure published values only after ASC/backend setup; no placeholder production SKU.
+        IAP_ANNUAL_PRODUCT_ID: "cn.keevol.keenotes.remote.yearly"
+        IAP_PRODUCTION_PROVISION_URL: "https://kns.afoo.me/iap/apple/provision"
+        IAP_SANDBOX_PROVISION_URL: "https://kns.afoo.me/iap/apple/sandbox/provision"
+        IAP_TERMS_URL: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+        IAP_PRIVACY_URL: "https://kns.afoo.me/privacy"
+        CURRENT_PROJECT_VERSION: 3
         SWIFT_OBJC_BRIDGING_HEADER: KeeNotes/CArgon2/KeeNotes-Bridging-Header.h
         CLANG_ENABLE_MODULES: YES
     dependencies:
       - package: GRDB
+
+  KeeNotesTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: KeeNotesTests
+        excludes: [LocalAnnual.storekit]
+      - path: KeeNotesTests/LocalAnnual.storekit
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cn.keevol.keenotes.tests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: KeeNotes
+  KeeNotesUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [KeeNotesUITests]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cn.keevol.keenotes.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: KeeNotes
+    dependencies:
+      - target: KeeNotes
 
 schemes:
   KeeNotes:
@@ -48,9 +81,24 @@ schemes:
       config: Debug
     test:
       config: Debug
+      targets: [KeeNotesTests, KeeNotesUITests]
     profile:
       config: Release
     analyze:
       config: Debug
     archive:
       config: Release
+
+  KeeNotesLocalStoreKit:
+    build:
+      targets:
+        KeeNotes: all
+    run:
+      config: Debug
+      storeKitConfiguration: KeeNotesTests/LocalAnnual.storekit
+    test:
+      config: Debug
+      targets:
+        - name: KeeNotesTests
+          parallelizable: false
+          selectedTests: [LocalStoreKitTests]

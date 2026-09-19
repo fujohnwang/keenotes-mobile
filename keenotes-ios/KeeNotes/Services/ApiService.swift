@@ -6,6 +6,7 @@ struct PreparedNote {
     let channel: String
     let createdAt: String
     let requestId: String
+    var configurationGeneration: UUID? = nil
 }
 
 enum ApiServiceError: LocalizedError {
@@ -26,11 +27,14 @@ enum ApiServiceError: LocalizedError {
 }
 
 /// REST API service for posting notes
+@MainActor
 class ApiService {
     private let settingsService: SettingsService
     private let cryptoService: CryptoService
+    private let injectedSession: URLSession?
 
     private lazy var session: URLSession = {
+        if let injectedSession { return injectedSession }
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 30
@@ -38,9 +42,10 @@ class ApiService {
         return URLSession(configuration: config, delegate: TrustAllDelegate(), delegateQueue: nil)
     }()
 
-    init(settingsService: SettingsService, cryptoService: CryptoService) {
+    init(settingsService: SettingsService, cryptoService: CryptoService, session: URLSession? = nil) {
         self.settingsService = settingsService
         self.cryptoService = cryptoService
+        self.injectedSession = session
     }
 
     struct PostResult {
@@ -91,11 +96,16 @@ class ApiService {
             encryptedContent: encrypted,
             channel: channel,
             createdAt: ts,
-            requestId: UUID().uuidString
+            requestId: UUID().uuidString,
+            configurationGeneration: settingsService.access.generation
         )
     }
 
     func postPreparedNote(_ note: PreparedNote) async -> PostResult {
+        let generation = settingsService.access.generation
+        guard note.configurationGeneration == generation else {
+            return PostResult(success: false, message: ConfigurationError.staleOperation.localizedDescription, noteId: nil, echoContent: nil)
+        }
         guard !settingsService.endpointUrl.isEmpty, !settingsService.token.isEmpty else {
             return PostResult(success: false, message: "Please configure server settings first", noteId: nil, echoContent: nil)
         }
@@ -122,6 +132,9 @@ class ApiService {
 
             let (data, response) = try await session.data(for: request)
 
+            guard generation == settingsService.access.generation else {
+                return PostResult(success: false, message: ConfigurationError.staleOperation.localizedDescription, noteId: nil, echoContent: nil)
+            }
             guard let httpResponse = response as? HTTPURLResponse else {
                 return PostResult(success: false, message: "Invalid response", noteId: nil, echoContent: nil)
             }

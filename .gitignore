@@ -39,3 +39,9 @@ target/
 gluonfx/
 archives/ios-screenshots/
 dist/
+
+# Local KeeNotes Apple IAP credentials; never commit.
+/.secrets/
+
+# Local IAP diagnostic evidence; never commit.
+/test-results/iap-20260919/

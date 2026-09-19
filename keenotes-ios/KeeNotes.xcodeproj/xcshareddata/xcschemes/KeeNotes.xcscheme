@@ -37,6 +37,26 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F34C649F53DF05F9C94C1202"
+               BuildableName = "KeeNotesTests.xctest"
+               BlueprintName = "KeeNotesTests"
+               ReferencedContainer = "container:KeeNotes.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "0B24096A09872EC2423BC3F6"
+               BuildableName = "KeeNotesUITests.xctest"
+               BlueprintName = "KeeNotesUITests"
+               ReferencedContainer = "container:KeeNotes.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

@@ -4,6 +4,8 @@ import GRDB
 /// SQLite database service using GRDB
 class DatabaseService: ObservableObject {
     var dbQueue: DatabaseQueue?
+    private let pathOverride: String?
+    init(path: String? = nil) { pathOverride = path }
 
     @Published var noteCount: Int = 0
 
@@ -11,7 +13,7 @@ class DatabaseService: ObservableObject {
         dbQueue != nil
     }
 
-    func initialize() throws {
+    func initialize(path: String? = nil) throws {
         let fileManager = FileManager.default
         let appSupport = try fileManager.url(
             for: .applicationSupportDirectory,
@@ -21,9 +23,10 @@ class DatabaseService: ObservableObject {
         )
         let dbPath = appSupport.appendingPathComponent("keenotes.db")
 
-        dbQueue = try DatabaseQueue(path: dbPath.path)
+        dbQueue = try DatabaseQueue(path: path ?? pathOverride ?? dbPath.path)
 
         try dbQueue?.write { db in
+            try db.execute(sql: "CREATE TABLE IF NOT EXISTS configuration_transition (id TEXT NOT NULL)")
             // Create notes table
             try db.create(table: Note.databaseTableName, ifNotExists: true) { t in
                 t.column("id", .integer).primaryKey()
@@ -91,6 +94,21 @@ class DatabaseService: ObservableObject {
         Task { @MainActor in
             self.noteCount = (try? await getNoteCount()) ?? 0
         }
+    }
+
+    /// Cache reset and transition ID commit in ONE SQLite transaction. Replaying after
+    /// a process exit is a no-op, including when the final Keychain write failed.
+    func applyConfigurationTransition(id: UUID, replaceNotes: Bool) async throws {
+        guard let dbQueue else { throw DatabaseError.notInitialized }
+        try await dbQueue.write { db in
+            if try String.fetchOne(db, sql: "SELECT id FROM configuration_transition LIMIT 1") == id.uuidString { return }
+            guard try PendingNote.fetchCount(db) == 0 else { throw ConfigurationError.pendingNotes }
+            if replaceNotes { try Note.deleteAll(db) }
+            try SyncState.deleteAll(db)
+            try db.execute(sql: "DELETE FROM configuration_transition")
+            try db.execute(sql: "INSERT INTO configuration_transition (id) VALUES (?)", arguments: [id.uuidString])
+        }
+        await refreshNoteCount()
     }
 
     // MARK: - Notes
@@ -387,10 +405,11 @@ class DatabaseService: ObservableObject {
         await refreshPendingNoteCount()
     }
 
-    func insertPendingNote(_ preparedNote: PreparedNote) async throws {
+    @discardableResult
+    func insertPendingNote(_ preparedNote: PreparedNote) async throws -> Int64 {
         guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
 
-        _ = try await dbQueue.write { db in
+        let id = try await dbQueue.write { db in
             var note = PendingNote(
                 content: preparedNote.content,
                 channel: preparedNote.channel,
@@ -399,8 +418,10 @@ class DatabaseService: ObservableObject {
                 requestId: preparedNote.requestId
             )
             try note.insert(db)
+            return db.lastInsertedRowID
         }
         await refreshPendingNoteCount()
+        return id
     }
 
     func getPendingNotes() async throws -> [PendingNote] {
@@ -457,7 +478,7 @@ enum DatabaseError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notInitialized:
-            return "Database not initialized"
+            return NSLocalizedString("Database not initialized", comment: "IAP and connection configuration")
         }
     }
 }

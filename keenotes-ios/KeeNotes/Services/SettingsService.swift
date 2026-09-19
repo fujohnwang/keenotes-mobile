@@ -4,9 +4,13 @@ import SwiftUI
 /// Service for managing app settings.
 /// Sensitive credentials (token, encryptionPassword) are stored in Keychain.
 /// Non-sensitive preferences remain in UserDefaults.
+@MainActor
 class SettingsService: ObservableObject {
-    private let defaults = UserDefaults.standard
-    private let keychain = KeychainService.shared
+    private let defaults: UserDefaults
+    let credentialsStore: CredentialsStore
+    let access = ConfigurationAccess()
+    @Published private(set) var history: [CredentialHistoryEntry] = []
+    @Published private(set) var configurationError: String?
     
     private enum Keys {
         static let endpointUrl = "endpoint_url"
@@ -26,35 +30,39 @@ class SettingsService: ObservableObject {
         static let keychainMigrated = "keychain_migrated"
     }
     
-    @Published var endpointUrl: String {
-        didSet { defaults.set(endpointUrl, forKey: Keys.endpointUrl) }
+    @Published private(set) var endpointUrl: String
+    @Published private(set) var token: String
+    @Published private(set) var encryptionPassword: String
+
+    var configuration: ConnectionConfiguration {
+        ConnectionConfiguration(endpoint: endpointUrl, token: token, pin: encryptionPassword)
     }
-    
-    /// Tracks whether the last Keychain write succeeded.
-    /// SettingsView should check this after calling saveSettings().
-    @Published private(set) var lastSaveError: String?
-    
-    /// When true, didSet skips Keychain writes (saveSettings handles persistence itself).
-    private var suppressKeychainWrite = false
-    
-    @Published var token: String {
-        didSet {
-            guard !suppressKeychainWrite else { return }
-            if !keychain.save(token, forAccount: Keys.token) {
-                print("[SettingsService] WARNING: Failed to save token to Keychain")
-            }
+
+    func reloadCredentials() throws {
+        do {
+            try credentialsStore.load()
+            publishCredentials()
+            configurationError = nil
+        } catch {
+            configurationError = error.localizedDescription
+            throw error
         }
     }
-    
-    @Published var encryptionPassword: String {
-        didSet {
-            guard !suppressKeychainWrite else { return }
-            if !keychain.save(encryptionPassword, forAccount: Keys.encryptionPassword) {
-                print("[SettingsService] WARNING: Failed to save encryption password to Keychain")
-            }
+
+    func publishCredentials() {
+        if let current = credentialsStore.envelope?.current {
+            endpointUrl = current.endpoint
+            token = current.token
+            encryptionPassword = current.pin
         }
+        history = credentialsStore.envelope?.history ?? []
     }
-    
+
+    func deleteHistory(id: UUID) throws {
+        try credentialsStore.delete(id: id)
+        publishCredentials()
+    }
+
     @Published var reviewDays: Int {
         didSet { defaults.set(reviewDays, forKey: Keys.reviewDays) }
     }
@@ -124,7 +132,9 @@ class SettingsService: ObservableObject {
         }
     }
     
-    init() {
+    init(defaults: UserDefaults = .standard, storage: SecureStringStorage = KeychainService.shared) {
+        self.defaults = defaults
+        self.credentialsStore = CredentialsStore(storage: storage, defaults: defaults)
         // Initialize non-sensitive settings from UserDefaults
         self.endpointUrl = defaults.string(forKey: Keys.endpointUrl) ?? "https://kns.afoo.me"
         
@@ -146,58 +156,9 @@ class SettingsService: ObservableObject {
         self.token = ""
         self.encryptionPassword = ""
         
-        // Migrate from UserDefaults to Keychain if needed
-        migrateToKeychainIfNeeded()
-        
-        // Load sensitive credentials from Keychain
-        self.token = keychain.load(account: Keys.token) ?? ""
-        self.encryptionPassword = keychain.load(account: Keys.encryptionPassword) ?? ""
+        try? reloadCredentials()
     }
-    
-    /// One-time migration: move token & encryptionPassword from UserDefaults to Keychain.
-    /// Idempotent — safe to call multiple times. Only imports old values when Keychain is empty.
-    /// If Keychain already has values (e.g. reinstall preserving Keychain), just cleans up UserDefaults.
-    private func migrateToKeychainIfNeeded() {
-        guard !defaults.bool(forKey: Keys.keychainMigrated) else { return }
-        
-        print("[SettingsService] Starting Keychain migration...")
-        var allSucceeded = true
-        
-        // Migrate token
-        if let oldToken = defaults.string(forKey: Keys.token), !oldToken.isEmpty {
-            if keychain.load(account: Keys.token) != nil {
-                // Keychain already has a value — keep it, just clean up UserDefaults
-                defaults.removeObject(forKey: Keys.token)
-                print("[SettingsService] Token already in Keychain, cleaned UserDefaults")
-            } else if keychain.save(oldToken, forAccount: Keys.token) {
-                defaults.removeObject(forKey: Keys.token)
-                print("[SettingsService] Token migrated to Keychain")
-            } else {
-                print("[SettingsService] WARNING: Failed to migrate token — keeping in UserDefaults")
-                allSucceeded = false
-            }
-        }
-        
-        // Migrate encryptionPassword
-        if let oldPassword = defaults.string(forKey: Keys.encryptionPassword), !oldPassword.isEmpty {
-            if keychain.load(account: Keys.encryptionPassword) != nil {
-                defaults.removeObject(forKey: Keys.encryptionPassword)
-                print("[SettingsService] Encryption password already in Keychain, cleaned UserDefaults")
-            } else if keychain.save(oldPassword, forAccount: Keys.encryptionPassword) {
-                defaults.removeObject(forKey: Keys.encryptionPassword)
-                print("[SettingsService] Encryption password migrated to Keychain")
-            } else {
-                print("[SettingsService] WARNING: Failed to migrate encryption password — keeping in UserDefaults")
-                allSucceeded = false
-            }
-        }
-        
-        if allSucceeded {
-            defaults.set(true, forKey: Keys.keychainMigrated)
-            print("[SettingsService] Keychain migration completed")
-        }
-    }
-    
+
     var isConfigured: Bool {
         !endpointUrl.isEmpty && !token.isEmpty && !encryptionPassword.isEmpty
     }
@@ -206,38 +167,4 @@ class SettingsService: ObservableObject {
         !encryptionPassword.isEmpty
     }
     
-    /// Save all connection settings atomically.
-    /// Writes Keychain first; only updates memory/UserDefaults on full success.
-    /// On failure, nothing changes — caller should check `lastSaveError`.
-    func saveSettings(endpoint: String, token: String, password: String) {
-        lastSaveError = nil
-        
-        let oldToken = self.token
-        
-        // 1. Write token to Keychain
-        guard keychain.save(token, forAccount: Keys.token) else {
-            lastSaveError = "Failed to save token to Keychain"
-            print("[SettingsService] WARNING: \(lastSaveError!)")
-            return
-        }
-        
-        // 2. Write password to Keychain
-        guard keychain.save(password, forAccount: Keys.encryptionPassword) else {
-            // Roll back token — if rollback also fails, report both
-            if !keychain.save(oldToken, forAccount: Keys.token) {
-                lastSaveError = "Failed to save encryption password to Keychain; token rollback also failed — Keychain may be inconsistent"
-            } else {
-                lastSaveError = "Failed to save encryption password to Keychain"
-            }
-            print("[SettingsService] WARNING: \(lastSaveError!)")
-            return
-        }
-        
-        // 3. Keychain succeeded — now update memory (suppress didSet Keychain writes)
-        suppressKeychainWrite = true
-        self.endpointUrl = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.token = token
-        self.encryptionPassword = password
-        suppressKeychainWrite = false
-    }
 }

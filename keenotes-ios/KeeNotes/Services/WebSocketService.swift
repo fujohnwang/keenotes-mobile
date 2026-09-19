@@ -2,496 +2,213 @@ import Foundation
 import Combine
 import UIKit
 
-/// WebSocket service for real-time sync
-/// Matches JavaFX/Android WebSocketClientService logic
-class WebSocketService: NSObject, ObservableObject {
-    
-    enum ConnectionState {
-        case disconnected
-        case connecting
-        case connected
-    }
-    
-    enum SyncStatus {
-        case idle
-        case syncing
-        case completed
-    }
-    
-    @Published var connectionState: ConnectionState = .disconnected
-    @Published var syncStatus: SyncStatus = .idle
-    
+@MainActor
+final class WebSocketService: NSObject, ObservableObject {
+    enum ConnectionState { case disconnected, connecting, connected }
+    enum SyncStatus { case idle, syncing, completed }
+    @Published private(set) var connectionState: ConnectionState = .disconnected
+    @Published private(set) var syncStatus: SyncStatus = .idle
+
     private let settingsService: SettingsService
-    private let cryptoService: CryptoService
+    private let decoder = WebSocketMessageDecoder()
     private let databaseService: DatabaseService
-    
     private var webSocketTask: URLSessionWebSocketTask?
     private var session: URLSession!
     private let clientId = UUID().uuidString
-    
+    private var epoch = UUID()
     private var lastSyncId: Int64 = -1
     private var cachedPassword: String?
-    
-    // Batch sync progress tracking
-    private var expectedBatches = 0
-    private var receivedBatches = 0
-    
-    private var isConnecting = false
+    private var connectionTask: Task<Void, Never>?
+    private var receiveTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
-    
+
     init(settingsService: SettingsService, cryptoService: CryptoService, databaseService: DatabaseService) {
         self.settingsService = settingsService
-        self.cryptoService = cryptoService
         self.databaseService = databaseService
         super.init()
-        
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = true
-        self.session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        session = URLSession(configuration: config, delegate: WebSocketDelegate(owner: self), delegateQueue: nil)
     }
-    
+
+    deinit { connectionTask?.cancel(); receiveTask?.cancel(); reconnectTask?.cancel(); session?.invalidateAndCancel() }
+
     func connect() {
+        guard settingsService.access.isReady, settingsService.isConfigured,
+              connectionState == .disconnected, webSocketTask == nil else { return }
         reconnectTask?.cancel()
-        reconnectTask = nil
-        
-        guard !isConnecting, webSocketTask == nil, connectionState == .disconnected else {
-            print("[WS] Already connected or connecting, skipping")
-            return
-        }
-        
-        guard !settingsService.endpointUrl.isEmpty, !settingsService.token.isEmpty else {
-            print("[WS] Not configured, skipping connection")
-            return
-        }
-        
-        isConnecting = true
-        Task { @MainActor in
-            connectionState = .connecting
-        }
-        
-        Task {
-            // Cache encryption password before connection
-            cachedPassword = settingsService.encryptionPassword.isEmpty ? nil : settingsService.encryptionPassword
-            print("[WS] Cached encryption password: \(cachedPassword != nil ? "yes" : "no")")
-            
-            // Load last sync ID
-            lastSyncId = (try? await databaseService.getLastSyncId()) ?? -1
-            print("[WS] Loaded lastSyncId: \(lastSyncId)")
-            
-            // Build WebSocket URL
-            guard let wsUrl = buildWebSocketUrl() else {
-                print("[WS] Failed to build WebSocket URL")
-                await MainActor.run {
-                    self.isConnecting = false
-                    self.connectionState = .disconnected
-                }
-                return
+        connectionState = .connecting
+        let operation = epoch
+        let configuration = settingsService.configuration
+        cachedPassword = configuration.pin
+        connectionTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let cursor = try await databaseService.getLastSyncId()
+                guard operation == epoch, settingsService.access.isReady, !Task.isCancelled else { return }
+                lastSyncId = cursor
+                guard var components = URLComponents(string: configuration.endpoint) else { throw ConfigurationError.invalidInput }
+                components.scheme = components.scheme == "https" ? "wss" : "ws"
+                if components.path.isEmpty || components.path == "/" { components.path = "/ws" }
+                else if !components.path.hasSuffix("/ws") { components.path += "/ws" }
+                guard let url = components.url else { throw ConfigurationError.invalidInput }
+                var request = URLRequest(url: url)
+                request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
+                request.setValue("\(components.scheme == "wss" ? "https" : "http")://\(components.host ?? "")", forHTTPHeaderField: "Origin")
+                let socket = session.webSocketTask(with: request)
+                webSocketTask = socket
+                socket.resume()
+            } catch {
+                guard operation == epoch else { return }
+                disconnect()
+                scheduleReconnect()
             }
-            
-            print("[WS] Connecting to: \(wsUrl)")
-            
-            var request = URLRequest(url: wsUrl)
-            request.setValue("Bearer \(settingsService.token)", forHTTPHeaderField: "Authorization")
-            
-            // Build origin header
-            if let components = URLComponents(string: settingsService.endpointUrl) {
-                let scheme = components.scheme == "wss" || components.scheme == "https" ? "https" : "http"
-                let origin = "\(scheme)://\(components.host ?? "")"
-                request.setValue(origin, forHTTPHeaderField: "Origin")
-            }
-            
-            let task = session.webSocketTask(with: request)
-            webSocketTask = task
-            task.resume()
         }
     }
-    
+
     func disconnect() {
-        reconnectTask?.cancel()
-        reconnectTask = nil
-        isConnecting = false
-        webSocketTask?.cancel(with: .goingAway, reason: nil)
+        epoch = UUID()
+        connectionTask?.cancel(); connectionTask = nil
+        receiveTask?.cancel(); receiveTask = nil
+        reconnectTask?.cancel(); reconnectTask = nil
+        let old = webSocketTask
         webSocketTask = nil
-        Task { @MainActor in
-            connectionState = .disconnected
-            syncStatus = .idle
-            UIApplication.shared.isIdleTimerDisabled = false
-        }
+        old?.cancel(with: .goingAway, reason: nil)
+        connectionState = .disconnected
+        resetState()
     }
 
-    func markConnectionSuspect(reason: String) {
-        print("[WS] Marking connection suspect: \(reason)")
-        reconnectTask?.cancel()
-        reconnectTask = nil
-        isConnecting = false
-
-        let task = webSocketTask
-        webSocketTask = nil
-        task?.cancel(with: .goingAway, reason: nil)
-
-        Task { @MainActor in
-            connectionState = .disconnected
-            syncStatus = .idle
-            UIApplication.shared.isIdleTimerDisabled = false
-        }
-        scheduleReconnect()
-    }
-    
     func resetState() {
         lastSyncId = -1
         cachedPassword = nil
-        expectedBatches = 0
-        receivedBatches = 0
-        Task { @MainActor in
-            syncStatus = .idle
-        }
+        syncStatus = .idle
+        UIApplication.shared.isIdleTimerDisabled = false
     }
-    
-    private func buildWebSocketUrl() -> URL? {
-        guard var components = URLComponents(string: settingsService.endpointUrl) else {
-            return nil
-        }
-        
-        // Convert scheme to ws/wss
-        if components.scheme == "https" {
-            components.scheme = "wss"
-        } else if components.scheme == "http" {
-            components.scheme = "ws"
-        }
-        
-        // Append /ws if needed
-        var path = components.path
-        if path.isEmpty || path == "/" {
-            path = "/ws"
-        } else if !path.hasSuffix("/ws") {
-            path = "\(path)/ws"
-        }
-        components.path = path
-        
-        return components.url
-    }
-    
-    private func sendHandshake() {
-        let handshake: [String: Any] = [
-            "type": "handshake",
-            "client_id": clientId,
-            "last_sync_id": lastSyncId
-        ]
-        
-        guard let data = try? JSONSerialization.data(withJSONObject: handshake),
-              let message = String(data: data, encoding: .utf8) else {
-            return
-        }
-        
-        print("[WS] Sending handshake: \(message)")
-        webSocketTask?.send(.string(message)) { error in
-            if let error = error {
-                print("[WS] Failed to send handshake: \(error)")
-            } else {
-                print("[WS] Handshake sent successfully")
-            }
-        }
-    }
-    
-    private func receiveMessage() {
-        guard let currentTask = webSocketTask else { return }
-        
-        currentTask.receive { [weak self] result in
-            guard let self = self else { return }
-            
-            // 验证 task 仍然是当前活跃的，避免旧 task 的 callback 访问已释放的资源
-            guard currentTask === self.webSocketTask else {
-                print("[WS] Ignoring receive callback from stale WebSocket task")
-                return
-            }
-            
-            switch result {
-            case .success(let message):
-                switch message {
-                case .string(let text):
-                    self.handleMessage(text)
-                case .data(let data):
-                    if let text = String(data: data, encoding: .utf8) {
-                        self.handleMessage(text)
+
+    func markConnectionSuspect(reason: String) { disconnect(); scheduleReconnect() }
+
+    private func receive(from socket: URLSessionWebSocketTask) {
+        let operation = epoch
+        receiveTask = Task { [weak self] in
+            do {
+                while !Task.isCancelled {
+                    let message = try await socket.receive()
+                    guard let self, operation == self.epoch, socket === self.webSocketTask else { return }
+                    let data: Data
+                    switch message {
+                    case .string(let text): data = Data(text.utf8)
+                    case .data(let bytes): data = bytes
+                    @unknown default: continue
                     }
-                @unknown default:
-                    break
+                    try await self.handleMessage(data, operation: operation)
                 }
-                // Continue receiving
-                self.receiveMessage()
-                
-            case .failure(let error):
-                print("[WS] Receive error: \(error)")
-                Task { @MainActor in
-                    self.isConnecting = false
-                    self.webSocketTask = nil
-                    self.connectionState = .disconnected
-                }
+            } catch {
+                guard let self, operation == self.epoch, socket === self.webSocketTask else { return }
+                self.disconnect()
                 self.scheduleReconnect()
             }
         }
     }
-    
-    private func handleMessage(_ text: String) {
-        print("[WS] Received: \(text.prefix(200))...")
-        
-        guard let data = text.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = json["type"] as? String else {
-            return
-        }
-        
-        // Process messages synchronously to maintain order
-        // Use DispatchQueue.main.sync to block until processing completes
-        let semaphore = DispatchSemaphore(value: 0)
-        
-        Task {
-            defer { semaphore.signal() }
-            
-            switch type {
-            case "sync_batch":
-                await self.handleSyncBatch(json)
-            case "sync_complete":
-                await self.handleSyncComplete(json)
-            case "realtime_update":
-                await self.handleRealtimeUpdate(json)
-            case "ping":
-                self.sendPong()
-            case "pong":
-                print("[WS] Received pong")
-            case "error":
-                let errorMsg = json["message"] as? String ?? "Unknown error"
-                print("[WS] Server error: \(errorMsg)")
-            case "new_note_ack":
-                let id = json["id"] as? Int64 ?? -1
-                print("[WS] Server acknowledged new note with id=\(id)")
-            default:
-                print("[WS] Unknown message type: \(type)")
-            }
-        }
-        
-        // Wait for processing to complete before returning
-        semaphore.wait()
-    }
-    
-    private func handleSyncBatch(_ json: [String: Any]) async {
-        let batchId = json["batch_id"] as? Int ?? 0
-        let totalBatches = json["total_batches"] as? Int ?? 1
-        
-        print("[WS] handleSyncBatch: batch \(batchId) of \(totalBatches)")
-        
-        await MainActor.run {
+
+    /// Await processing in receive order, without blocking a URLSession queue or the UI.
+    /// The lease also covers the SQLite work after suspension points.
+    private func handleMessage(_ data: Data, operation: UUID) async throws {
+        guard operation == epoch, let lease = try? settingsService.access.begin() else { return }
+        defer { settingsService.access.end(lease) }
+        let password = cachedPassword
+        let message = try await decoder.decode(data, password: password)
+        guard operation == epoch, !Task.isCancelled else { return }
+        switch message {
+        case .batch(let notes):
             syncStatus = .syncing
             UIApplication.shared.isIdleTimerDisabled = true
-        }
-        
-        if expectedBatches == 0 {
-            expectedBatches = totalBatches
-            print("[WS] Starting new sync, expecting \(totalBatches) batches")
-        }
-        
-        guard let notesArray = json["notes"] as? [[String: Any]] else {
-            print("[WS] No notes array in sync_batch")
-            return
-        }
-        
-        print("[WS] Processing \(notesArray.count) notes in batch")
-        
-        var batchNotes: [Note] = []
-        var maxNoteId: Int64 = -1
-        
-        for noteJson in notesArray {
-            if let note = parseNote(noteJson) {
-                batchNotes.append(note)
-                if note.id > maxNoteId {
-                    maxNoteId = note.id
-                }
+            try await databaseService.insertNotes(notes)
+            guard operation == epoch else { return }
+            if let maxID = notes.map(\.id).max(), maxID > lastSyncId {
+                try await databaseService.updateSyncState(lastSyncId: maxID)
+                guard operation == epoch else { return }
+                lastSyncId = maxID
             }
-        }
-        
-        // 立即写入 DB（增量持久化）
-        if !batchNotes.isEmpty {
-            do {
-                try await databaseService.insertNotes(batchNotes)
-                print("[WS] Batch \(batchId): inserted \(batchNotes.count) notes to DB")
-            } catch {
-                print("[WS] Failed to insert batch \(batchId): \(error)")
+        case .complete(let cursor, let total):
+            if cursor > 0, total > 0 {
+                try await databaseService.updateSyncState(lastSyncId: cursor)
+                guard operation == epoch else { return }
+                lastSyncId = cursor
             }
-        }
-        
-        // 更新 last_sync_id 为该 batch 中最大的 note ID（断点续传）
-        if maxNoteId > 0 {
-            do {
-                try await databaseService.updateSyncState(lastSyncId: maxNoteId)
-                lastSyncId = maxNoteId
-                print("[WS] Batch \(batchId): updated lastSyncId to \(maxNoteId)")
-            } catch {
-                print("[WS] Failed to update lastSyncId after batch \(batchId): \(error)")
-            }
-        }
-        
-        receivedBatches += 1
-        print("[WS] Batch \(batchId)/\(totalBatches) complete: success=\(batchNotes.count)")
-    }
-    
-    private func handleSyncComplete(_ json: [String: Any]) async {
-        let totalSynced = json["total_synced"] as? Int ?? 0
-        let newLastSyncId = json["last_sync_id"] as? Int64 ?? -1
-        
-        print("[WS] handleSyncComplete: totalSynced=\(totalSynced), newLastSyncId=\(newLastSyncId)")
-        
-        do {
-            // 以服务器返回的 last_sync_id 为准做最终更新
-            if totalSynced > 0 && newLastSyncId > 0 {
-                try await databaseService.updateSyncState(lastSyncId: newLastSyncId)
-                lastSyncId = newLastSyncId
-                print("[WS] Updated lastSyncId to: \(newLastSyncId)")
-            }
-        } catch {
-            print("[WS] Failed to update lastSyncId on sync complete: \(error)")
-        }
-        
-        expectedBatches = 0
-        receivedBatches = 0
-        
-        await MainActor.run {
+            guard operation == epoch else { return }
             syncStatus = .completed
             UIApplication.shared.isIdleTimerDisabled = false
-        }
-        print("[WS] Sync complete: \(totalSynced) notes processed")
-    }
-    
-    private func handleRealtimeUpdate(_ json: [String: Any]) async {
-        guard let noteJson = json["note"] as? [String: Any],
-              let note = parseNote(noteJson) else {
-            return
-        }
-        
-        do {
-            try await databaseService.insertNote(note)
-            
-            if note.id > lastSyncId {
-                lastSyncId = note.id
-                try await databaseService.updateSyncState(lastSyncId: note.id)
-                print("[WS] Updated lastSyncId to \(note.id) after realtime update")
-            }
-            
-            print("[WS] Realtime update: note \(note.id)")
-        } catch {
-            print("[WS] Failed to save realtime note: \(error)")
-        }
-    }
-    
-    private func parseNote(_ json: [String: Any]) -> Note? {
-        guard let id = json["id"] as? Int64,
-              let encryptedContent = json["content"] as? String else {
-            return nil
-        }
-        
-        let createdAt = json["created_at"] as? String ?? json["createdAt"] as? String ?? ""
-        let channel = json["channel"] as? String ?? "default"
-        
-        let content: String
-        if let password = cachedPassword {
+        case .realtime(let note):
             do {
-                content = try cryptoService.decryptWithPassword(encryptedContent, password: password)
-                print("[WS] Decrypted note \(id) successfully")
-            } catch {
-                print("[WS] Failed to decrypt note \(id): \(error), storing encrypted content")
-                content = encryptedContent
-            }
-        } else {
-            print("[WS] No encryption password, using raw content for note \(id)")
-            content = encryptedContent
-        }
-        
-        return Note(id: id, content: content, channel: channel, createdAt: createdAt)
-    }
-    
-    private func sendPong() {
-        let pong = "{\"type\":\"pong\"}"
-        webSocketTask?.send(.string(pong)) { error in
-            if let error = error {
-                print("[WS] Failed to send pong: \(error)")
-            }
-        }
-    }
-    
-    private func scheduleReconnect() {
-        reconnectTask?.cancel()
-        reconnectTask = Task {
-            try? await Task.sleep(nanoseconds: 5_000_000_000)  // 5 seconds
-            guard !Task.isCancelled else { return }
-            
-            await MainActor.run {
-                if self.connectionState == .disconnected,
-                   UIApplication.shared.applicationState == .active,
-                   self.settingsService.isConfigured {
-                    print("[WS] Attempting reconnect...")
-                    self.connect()
+                try await databaseService.insertNote(note)
+                guard operation == epoch else { return }
+                if note.id > lastSyncId {
+                    try await databaseService.updateSyncState(lastSyncId: note.id)
+                    guard operation == epoch else { return }
+                    lastSyncId = note.id
                 }
             }
+        case .ping: webSocketTask?.send(.string("{\"type\":\"pong\"}")) { _ in }
+        default: break
+        }
+    }
+
+    private func scheduleReconnect() {
+        guard settingsService.access.isReady else { return }
+        reconnectTask?.cancel()
+        let operation = epoch
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled, let self, self.epoch == operation,
+                  UIApplication.shared.applicationState == .active else { return }
+            self.connect()
         }
     }
 }
 
-// MARK: - URLSessionDelegate
 extension WebSocketService: URLSessionWebSocketDelegate {
-    func urlSession(
-        _ session: URLSession,
-        webSocketTask: URLSessionWebSocketTask,
-        didOpenWithProtocol protocol: String?
-    ) {
-        guard webSocketTask === self.webSocketTask else {
-            print("[WS] Ignoring didOpen from stale WebSocket task")
-            return
+    nonisolated func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
+        Task { @MainActor [weak self] in
+            guard let self, webSocketTask === self.webSocketTask, settingsService.access.isReady else { return }
+            self.connectionState = .connected
+            let body: [String: Any] = ["type": "handshake", "client_id": self.clientId, "last_sync_id": self.lastSyncId]
+            if let data = try? JSONSerialization.data(withJSONObject: body) {
+                webSocketTask.send(.string(String(decoding: data, as: UTF8.self))) { _ in }
+            }
+            self.receive(from: webSocketTask)
         }
-        
-        print("[WS] WebSocket opened")
-        isConnecting = false
-        Task { @MainActor in
-            connectionState = .connected
-        }
-        
-        sendHandshake()
-        receiveMessage()
     }
-    
-    func urlSession(
-        _ session: URLSession,
-        webSocketTask: URLSessionWebSocketTask,
-        didCloseWith closeCode: URLSessionWebSocketTask.CloseCode,
-        reason: Data?
-    ) {
-        guard webSocketTask === self.webSocketTask else {
-            print("[WS] Ignoring didClose from stale WebSocket task")
-            return
+    nonisolated func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask,
+                               didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        Task { @MainActor [weak self] in
+            guard let self, webSocketTask === self.webSocketTask else { return }
+            self.disconnect()
+            self.scheduleReconnect()
         }
-        
-        let reasonText = reason.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-        print("[WS] WebSocket closed: code=\(closeCode.rawValue), reason=\(reasonText)")
-        
-        self.webSocketTask = nil
-        isConnecting = false
-        Task { @MainActor in
-            connectionState = .disconnected
-            syncStatus = .idle
-            UIApplication.shared.isIdleTimerDisabled = false
-        }
-        scheduleReconnect()
     }
-    
-    func urlSession(
-        _ session: URLSession,
-        didReceive challenge: URLAuthenticationChallenge,
-        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-    ) {
-        // Trust all certificates for development
+    nonisolated func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
+                               completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        // Preserve existing self-hosted endpoint compatibility. IAP uses a separate,
+        // standard TLS-verifying URLSession and never uses this delegate.
         if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-           let serverTrust = challenge.protectionSpace.serverTrust {
-            completionHandler(.useCredential, URLCredential(trust: serverTrust))
-        } else {
-            completionHandler(.performDefaultHandling, nil)
-        }
+           let trust = challenge.protectionSpace.serverTrust { completionHandler(.useCredential, URLCredential(trust: trust)) }
+        else { completionHandler(.performDefaultHandling, nil) }
+    }
+}
+
+// URLSession retains its delegate. Keep the delegate's link back to the owner weak.
+private final class WebSocketDelegate: NSObject, URLSessionWebSocketDelegate {
+    weak var owner: WebSocketService?
+    init(owner: WebSocketService) { self.owner = owner }
+    func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
+        owner?.urlSession(session, webSocketTask: webSocketTask, didOpenWithProtocol: `protocol`)
+    }
+    func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        owner?.urlSession(session, webSocketTask: webSocketTask, didCloseWith: closeCode, reason: reason)
+    }
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
+                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        if let owner { owner.urlSession(session, didReceive: challenge, completionHandler: completionHandler) }
+        else { completionHandler(.performDefaultHandling, nil) }
     }
 }

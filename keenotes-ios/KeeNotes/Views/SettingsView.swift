@@ -3,16 +3,21 @@ import SwiftUI
 /// Settings view with configuration options and easter egg
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
+    var body: some View { SettingsForm(draft: appState.settingsDraft) }
+}
+
+private struct SettingsForm: View {
+    @ObservedObject var draft: SettingsDraft
+    @EnvironmentObject var appState: AppState
 
     // Adaptive layout based on device
     private var isPad: Bool { DeviceType.isPad }
     private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
     @Environment(\.colorScheme) private var colorScheme
 
-    @State private var endpointUrl = ""
-    @State private var token = ""
-    @State private var password = ""
-    @State private var confirmPassword = ""
+    @State private var showHistory = false
+    @State private var showSubscription = false
+    @State private var saving = false
 
     @State private var statusMessage = ""
     @State private var isSuccess = true
@@ -22,6 +27,7 @@ struct SettingsView: View {
     
     // 向导状态
     @State private var showWizard = false
+    @State private var wizardTask: Task<Void, Never>?
     
     // 焦点状态
     @FocusState private var focusedField: String?
@@ -31,11 +37,11 @@ struct SettingsView: View {
 
     // Computed property for Save button enabled state
     private var isSaveEnabled: Bool {
-        let e = endpointUrl.trimmingCharacters(in: .whitespaces)
-        let t = token.trimmingCharacters(in: .whitespaces)
-        let p = password.trimmingCharacters(in: .whitespaces)
-        let c = confirmPassword.trimmingCharacters(in: .whitespaces)
-        return !e.isEmpty && !t.isEmpty && !p.isEmpty && !c.isEmpty && password == confirmPassword
+        let e = draft.endpoint.trimmingCharacters(in: .whitespaces)
+        let t = draft.token.trimmingCharacters(in: .whitespaces)
+        let p = draft.pin.trimmingCharacters(in: .whitespaces)
+        let c = draft.confirmPin.trimmingCharacters(in: .whitespaces)
+        return !e.isEmpty && !t.isEmpty && !p.isEmpty && !c.isEmpty && draft.pin == draft.confirmPin
     }
 
     // Easter egg state
@@ -51,22 +57,57 @@ struct SettingsView: View {
             NavigationView {
                 ScrollViewReader { scrollProxy in
                 VStack(spacing: 0) {
-                    TopHeaderView(title: "KeeNotes Settings")
+                    TopHeaderView(title: NSLocalizedString("KeeNotes Settings", comment: "Settings title"))
                         .padding(.horizontal, horizontalPadding)
                         .padding(.top, 6)
                         .padding(.bottom, 2)
 
                 Form {
                     // Server configuration
-                    Section(header: Text("Server Configuration").modifier(Theme.SectionHeaderStyle())) {
-                    TextField("Endpoint URL", text: $endpointUrl)
+                    Section(header: HStack(spacing: 8) {
+                        Text("Server Configuration")
+                            .modifier(Theme.SectionHeaderStyle())
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button {
+                            showWizard = false; focusedField = nil; showHistory = true
+                        } label: {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                                .padding(6)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text("History"))
+                        .accessibilityIdentifier("credentialHistory")
+                        Spacer(minLength: 0)
+                        Button {
+                            showWizard = false; focusedField = nil; showSubscription = true
+                        } label: {
+                            Text("Purchase")
+                                .fixedSize(horizontal: true, vertical: false)
+                                .font(.footnote)
+                                .foregroundColor(.white)
+                        }
+                        .accessibilityIdentifier("subscriptionEntry")
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.brandColor)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.roundedRectangle)
+                    .controlSize(.small)
+                    .tint(.gray)
+                    .textCase(nil)) {
+                    TextField("Endpoint URL", text: $draft.endpoint)
+                        .accessibilityIdentifier("endpointInput")
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                         .font(.system(size: isPad ? 17 : 17))
                         .listRowBackground(Color.clear)
 
-                    SecureField("Token", text: $token)
+                    SecureField("Token", text: $draft.token)
+                        .accessibilityIdentifier("tokenInput")
                         .textContentType(.init(rawValue: ""))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -81,7 +122,8 @@ struct SettingsView: View {
                         footer: Text("E2E encryption password. Must match across all devices.")
                             .font(.system(size: 12))
                             .foregroundColor(Color(.systemGray3))) {
-                    SecureField("Password", text: $password)
+                    SecureField("Password", text: $draft.pin)
+                        .accessibilityIdentifier("pinInput")
                         .textContentType(.init(rawValue: ""))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -90,7 +132,8 @@ struct SettingsView: View {
                         .focused($focusedField, equals: "encryptionPassword")
                         .listRowBackground(Color.clear)
 
-                    SecureField("Confirm Password", text: $confirmPassword)
+                    SecureField("Confirm Password", text: $draft.confirmPin)
+                        .accessibilityIdentifier("confirmPinInput")
                         .textContentType(.init(rawValue: ""))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -116,11 +159,30 @@ struct SettingsView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(isSaveEnabled ? Theme.brandColor : Color(.systemGray4))
                     )
-                    .disabled(!isSaveEnabled)
+                    .disabled(!isSaveEnabled || saving || appState.configurationCoordinator.isApplying)
+                    .accessibilityIdentifier("saveSettings")
 
+                    Text(connectionDescription)
+                        .accessibilityIdentifier("connectionStatus")
+                        .font(.caption).foregroundColor(.secondary)
+                        .listRowBackground(Color.clear)
+                    if let error = appState.configurationCoordinator.errorMessage ?? appState.settingsService.configurationError {
+                        Text(error).foregroundColor(.red)
+                        Button("Retry Local Recovery") {
+                            Task {
+                                do {
+                                    try await appState.configurationCoordinator.recover()
+                                    appState.webSocketService.connect()
+                                    statusMessage = ""
+                                    isSuccess = true
+                                } catch { statusMessage = error.localizedDescription; isSuccess = false }
+                            }
+                        }
+                    }
                     // Status message
                     if !statusMessage.isEmpty {
                         Text(statusMessage)
+                            .accessibilityIdentifier("configurationStatus")
                             .font(.system(size: (isPad ? 14 : 13)))
                             .foregroundColor(isSuccess ? Theme.brandColor : .red)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -250,6 +312,22 @@ struct SettingsView: View {
                 .modifier(FormBackgroundModifier(colorScheme: colorScheme))
                 .navigationBarHidden(true)
                 .onAppear(perform: loadSettings)
+                .onDisappear { wizardTask?.cancel(); draft.invalidateDelivery() }
+                .onChange(of: showSubscription) { opened in coordinateWizard(sheetOpened: opened) }
+                .onChange(of: showHistory) { opened in coordinateWizard(sheetOpened: opened) }
+                .sheet(isPresented: $showSubscription) {
+                    SubscriptionView(service: appState.purchaseService, draft: draft) {
+                        statusMessage = NSLocalizedString("Credentials filled. Save to start using them.", comment: "IAP and connection configuration")
+                        isSuccess = true
+                        showSubscription = false
+                    }
+                }
+                .sheet(isPresented: $showHistory) {
+                    CredentialHistoryView {
+                        statusMessage = NSLocalizedString("Configuration switched. See connection status below.", comment: "IAP and connection configuration")
+                        isSuccess = true
+                    }
+                }
                 .sheet(isPresented: $showDebugView) {
                     DebugView()
                 }
@@ -279,23 +357,23 @@ struct SettingsView: View {
                 fieldFrames: fieldFrames,
                 settingsService: appState.settingsService,
                 onFocusField: { fieldId in
-                    focusedField = fieldId
+                    if !showSubscription && !showHistory { focusedField = fieldId }
                 }
             )
         }
     }
 
     private func loadSettings() {
-        // Ensure we're on the main thread when accessing @Published properties
-        DispatchQueue.main.async {
-            endpointUrl = appState.settingsService.endpointUrl
-            token = appState.settingsService.token
-            password = appState.settingsService.encryptionPassword
-            confirmPassword = appState.settingsService.encryptionPassword
-            hiddenMessageDraft = appState.settingsService.hiddenMessage
-            
-            // 检查并显示向导
-            checkAndShowWizard()
+        draft.loadOnce(appState.settingsService.configuration)
+        hiddenMessageDraft = appState.settingsService.hiddenMessage
+        checkAndShowWizard()
+    }
+
+    private var connectionDescription: String {
+        switch appState.webSocketService.connectionState {
+        case .connected: return NSLocalizedString("Connected", comment: "IAP and connection configuration")
+        case .connecting: return NSLocalizedString("Connecting…", comment: "IAP and connection configuration")
+        case .disconnected: return NSLocalizedString("Not connected. Your saved local configuration is preserved.", comment: "IAP and connection configuration")
         }
     }
 
@@ -305,121 +383,17 @@ struct SettingsView: View {
     }
 
     private func saveSettings() {
-        print("[Settings] saveSettings called")
-
-        // Validate password match
-        guard password == confirmPassword else {
-            print("[Settings] Password mismatch")
-            statusMessage = "Passwords do not match"
-            isSuccess = false
-            password = ""
-            confirmPassword = ""
-            return
-        }
-
-        let oldEndpoint = appState.settingsService.endpointUrl
-        let oldToken = appState.settingsService.token
-        let oldPassword = appState.settingsService.encryptionPassword
-        let wasConfigured = !oldEndpoint.isEmpty && !oldToken.isEmpty
-
-        let endpointChanged = oldEndpoint != endpointUrl
-        let tokenChanged = oldToken != token
-        let passwordChanged = oldPassword != password
-        let configurationChanged = endpointChanged || tokenChanged || passwordChanged
-
-        print("[Settings] Configuration: endpoint=\(endpointChanged), token=\(tokenChanged), password=\(passwordChanged)")
-
-        // Save settings
-        appState.settingsService.saveSettings(
-            endpoint: endpointUrl,
-            token: token,
-            password: password
-        )
-        
-        // Check if Keychain write failed
-        if let error = appState.settingsService.lastSaveError {
-            print("[Settings] Keychain save failed: \(error)")
-            statusMessage = "Save failed: \(error)"
-            isSuccess = false
-            return
-        }
-        print("[Settings] Settings saved successfully")
-
-        // Update status message
-        let msg = password.isEmpty ? "Settings saved ✓" : "Settings saved ✓ (E2E encryption enabled)"
-
-        if configurationChanged && wasConfigured {
-            statusMessage = "Configuration changed, reconnecting..."
-            isSuccess = true
-            print("[Settings] Configuration changed, reconnecting...")
-
-            // Reset and reconnect
-            Task {
-                do {
-                    print("[Settings] Disconnecting WebSocket...")
-                    appState.webSocketService.disconnect()
-                    appState.webSocketService.resetState()
-
-                    print("[Settings] Clearing sync state...")
-                    try await appState.databaseService.clearSyncState()
-
-                    if endpointChanged || tokenChanged {
-                        print("[Settings] Deleting all notes (endpoint/token changed)...")
-                        try await appState.databaseService.deleteAllNotes()
-                    }
-
-                    if !endpointUrl.isEmpty && !token.isEmpty {
-                        print("[Settings] Reconnecting WebSocket...")
-                        try? await Task.sleep(nanoseconds: 500_000_000)
-                        appState.webSocketService.connect()
-                        await MainActor.run {
-                            statusMessage = "\(msg) (Reconnected)"
-                            // Switch to Note tab after 500ms delay
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                appState.selectedTab = 0
-                            }
-                        }
-                    } else {
-                        await MainActor.run {
-                            statusMessage = msg
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                appState.selectedTab = 0
-                            }
-                        }
-                    }
-                    print("[Settings] Reconnection complete")
-                } catch {
-                    print("[Settings] ERROR during reconnection: \(error)")
-                    await MainActor.run {
-                        statusMessage = "Error: \(error.localizedDescription)"
-                        isSuccess = false
-                    }
-                }
-            }
-        } else if !wasConfigured && !endpointUrl.isEmpty && !token.isEmpty {
-            // First time configuration
-            print("[Settings] First time configuration")
-            statusMessage = msg
-            isSuccess = true
-            appState.webSocketService.connect()
-            // Switch to Note tab after 500ms delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                appState.selectedTab = 0
-            }
-        } else {
-            print("[Settings] Normal save, reconnecting...")
-            statusMessage = msg
-            isSuccess = true
-
-            // Reconnect if configured
-            appState.webSocketService.disconnect()
-            if !endpointUrl.isEmpty && !token.isEmpty {
-                appState.webSocketService.connect()
-            }
-            // Switch to Note tab after 500ms delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                appState.selectedTab = 0
-            }
+        guard !saving, draft.pin == draft.confirmPin else { return }
+        let target = draft.configuration
+        draft.invalidateDelivery()
+        saving = true
+        Task {
+            defer { saving = false }
+            do {
+                try await appState.configurationCoordinator.apply(target, source: appState.purchaseService.credentialsStore.source(for: target))
+                statusMessage = NSLocalizedString("Configuration saved. See connection status below.", comment: "IAP and connection configuration")
+                isSuccess = true
+            } catch { statusMessage = error.localizedDescription; isSuccess = false }
         }
     }
 
@@ -438,13 +412,19 @@ struct SettingsView: View {
         }
     }
     
+    private func coordinateWizard(sheetOpened: Bool) {
+        wizardTask?.cancel()
+        if sheetOpened { showWizard = false; focusedField = nil }
+        else { checkAndShowWizard() }
+    }
+
     private func checkAndShowWizard() {
-        // 检查是否需要显示向导
-        if !appState.settingsService.isConfigured {
-            // 延迟显示，确保界面已渲染
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                showWizard = true
-            }
+        wizardTask?.cancel()
+        guard !appState.settingsService.isConfigured else { showWizard = false; return }
+        wizardTask = Task {
+            do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return }
+            guard !Task.isCancelled, !showSubscription, !showHistory else { return }
+            showWizard = true
         }
     }
 }

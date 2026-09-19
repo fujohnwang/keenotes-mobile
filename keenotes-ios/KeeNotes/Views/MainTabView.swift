@@ -18,17 +18,17 @@ struct MainTabView: View {
             Group {
                 switch appState.selectedTab {
                 case 0:
-                    NoteView()
+                    NoteView().id(appState.configurationRevision)
                 case 1:
-                    ReviewView()
+                    ReviewView().id(appState.configurationRevision)
                 case 2:
                     SettingsView()
                 default:
-                    NoteView()
+                    NoteView().id(appState.configurationRevision)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .id(appState.selectedTab) // force view identity change for transition
+            .id(appState.selectedTab) // Preserve Settings feedback while replacing account-specific note views.
             .transition(.asymmetric(
                 insertion: .move(edge: swipeDirection == .left ? .trailing : .leading),
                 removal: .move(edge: swipeDirection == .left ? .leading : .trailing)

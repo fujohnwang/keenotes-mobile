@@ -31,6 +31,8 @@ struct KeeNotesApp: App {
         case .active:
             // App became active (foreground)
             print("[App] Became active, reconnecting WebSocket if needed")
+            appState.purchaseService.start()
+            appState.purchaseService.refresh()
             if appState.settingsService.isConfigured {
                 appState.webSocketService.connect()
             }
@@ -59,15 +61,35 @@ class AppState: ObservableObject {
     /// Incremented to signal sub-pages to dismiss themselves
     @Published var subPageDismissTrigger = 0
     @Published var onThisDayNotes: [Note] = []
+    @Published private(set) var configurationRevision = UUID()
     /// Draft text in NoteView input — survives tab switches
     @Published var noteDraftText = ""
     
     // Services
-    let settingsService = SettingsService()
+    let settingsService: SettingsService
+    let settingsDraft = SettingsDraft()
+    private var purchaseOverride: StoreKitPurchaseService?
+    lazy var purchaseService: StoreKitPurchaseService = {
+        let service = purchaseOverride ?? StoreKitPurchaseService()
+        service.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
+        return service
+    }()
+    lazy var configurationCoordinator: ConnectionConfigurationCoordinator = {
+        let coordinator = ConnectionConfigurationCoordinator(settings: settingsService, database: databaseService,
+            disconnect: { [weak self] in self?.webSocketService.disconnect() },
+            connect: { [weak self] in self?.webSocketService.connect() },
+            didChange: { [weak self] in
+                self?.onThisDayNotes = []
+                self?.configurationRevision = UUID()
+                self?.subPageDismissTrigger += 1
+            })
+        coordinator.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
+        return coordinator
+    }()
     lazy var cryptoService = CryptoService(passwordProvider: { [weak self] in
         self?.settingsService.encryptionPassword
     })
-    let databaseService = DatabaseService()
+    let databaseService: DatabaseService
     lazy var apiService = ApiService(
         settingsService: settingsService,
         cryptoService: cryptoService
@@ -89,7 +111,8 @@ class AppState: ObservableObject {
         let service = PendingNoteService(
             databaseService: databaseService,
             apiService: apiService,
-            webSocketService: webSocketService
+            webSocketService: webSocketService,
+            access: settingsService.access
         )
         service.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -99,7 +122,23 @@ class AppState: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     
-    init() {
+    init(settings: SettingsService? = nil, database: DatabaseService = DatabaseService()) {
+        #if DEBUG
+        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--ui-test-fixture"),
+           ProcessInfo.processInfo.arguments.indices.contains(index + 1),
+           let fixture = try? UITestFixture.make(mode: ProcessInfo.processInfo.arguments[index + 1]) {
+            settingsService = fixture.settings
+            databaseService = fixture.database
+            purchaseOverride = fixture.purchase
+            selectedTab = 2
+        } else {
+            settingsService = settings ?? SettingsService()
+            databaseService = database
+        }
+        #else
+        settingsService = settings ?? SettingsService()
+        databaseService = database
+        #endif
         // Forward settings changes
         settingsService.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -130,27 +169,24 @@ class AppState: ObservableObject {
         guard !isInitialized else { return }
         
         print("[AppState] Starting initialization...")
+        purchaseService.start()
         
         do {
             try databaseService.initialize()
             print("[AppState] Database initialized")
             
-            // Initialize firstNoteDate if needed - delay to ensure DB is ready
             Task {
-                // Small delay to ensure database is fully ready
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                await initializeFirstNoteDate()
+                do {
+                    try await configurationCoordinator.recover()
+                    settingsDraft.loadOnce(settingsService.configuration)
+                    await initializeFirstNoteDate()
+                    pendingNoteService.startRetryScheduler()
+                    await databaseService.refreshPendingNoteCount()
+                    await loadOnThisDayNotes()
+                    webSocketService.connect()
+                } catch { /* Coordinator exposes recoverable error in Settings. */ }
             }
-            
-            // Start pending note retry scheduler
-            pendingNoteService.startRetryScheduler()
-            
-            // Refresh pending note count
-            Task { await databaseService.refreshPendingNoteCount() }
-            
-            // Query "On this day" notes (once at launch)
-            Task { await loadOnThisDayNotes() }
-            
+
             isInitialized = true
         } catch {
             print("Failed to initialize: \(error)")
@@ -167,8 +203,10 @@ class AppState: ObservableObject {
             return
         }
         
+        let generation = settingsService.access.generation
         do {
             let count = try await databaseService.getNoteCount()
+            guard settingsService.access.isReady, settingsService.access.generation == generation else { return }
             print("[AppState] Note count: \(count)")
             
             if count > 0 {
@@ -180,7 +218,7 @@ class AppState: ObservableObject {
                     
                     print("[AppState] Oldest note date from DB: \(oldestDate ?? "nil")")
                     
-                    if let oldestDate = oldestDate {
+                    if let oldestDate = oldestDate, settingsService.access.isReady, settingsService.access.generation == generation, settingsService.firstNoteDate == nil {
                         settingsService.firstNoteDate = oldestDate
                         print("[AppState] ✓ Initialized firstNoteDate: \(oldestDate)")
                     }
@@ -195,14 +233,17 @@ class AppState: ObservableObject {
         }
     }
     
-    private func loadOnThisDayNotes() async {
+    func loadOnThisDayNotes(query: (() async throws -> [Note])? = nil) async {
         guard settingsService.showOnThisDayInYearsPast else {
             onThisDayNotes = []
             return
         }
 
+        let generation = settingsService.access.generation
+        guard settingsService.access.isReady else { return }
         do {
-            let notes = try await databaseService.getNotesOnThisDay()
+            let notes = try await (query ?? { try await self.databaseService.getNotesOnThisDay() })()
+            guard settingsService.access.isReady, settingsService.access.generation == generation, settingsService.showOnThisDayInYearsPast else { return }
             print("[AppState] On this day: \(notes.count) note(s)")
             onThisDayNotes = notes
         } catch {
@@ -211,16 +252,8 @@ class AppState: ObservableObject {
     }
 
     func reconnect() {
+        guard settingsService.access.isReady else { return }
         webSocketService.disconnect()
-        webSocketService.resetState()
-        
-        Task {
-            try? await databaseService.clearSyncState()
-            
-            if !settingsService.endpointUrl.isEmpty && !settingsService.token.isEmpty {
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                webSocketService.connect()
-            }
-        }
+        webSocketService.connect()
     }
 }

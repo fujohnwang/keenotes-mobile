@@ -8,6 +8,7 @@ struct NoteView: View {
     @State private var showSuccessToast = false
     @State private var showErrorToast = false
     @State private var errorMessage = ""
+    @State private var toastRevision = UUID()
     @State private var isPosting = false
     @State private var showingPendingList = false
     @State private var showingSearch = false
@@ -66,6 +67,7 @@ struct NoteView: View {
                     // Full-screen canvas: TextEditor as Layer 1
                     ZStack(alignment: .bottom) {
                         TextEditor(text: $appState.noteDraftText)
+                            .accessibilityIdentifier("noteInput")
                             .focused($isTextFieldFocused)
                             .modifier(TextEditorBackgroundModifier(colorScheme: colorScheme))
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -262,6 +264,7 @@ struct NoteView: View {
                         Image(systemName: "exclamationmark.circle.fill")
                             .foregroundColor(.white)
                         Text(errorMessage)
+                            .accessibilityIdentifier("noteErrorToast")
                             .foregroundColor(.white)
                             .font(.subheadline)
                             .lineLimit(2)
@@ -276,6 +279,12 @@ struct NoteView: View {
             }
         }
         .navigationViewStyle(.stack)
+        .task(id: toastRevision) {
+            guard showErrorToast else { return }
+            do { try await Task.sleep(nanoseconds: 3_000_000_000) } catch { return }
+            guard !Task.isCancelled else { return }
+            withAnimation(.spring()) { showErrorToast = false }
+        }
     }
 
     private var topHeader: some View {
@@ -311,80 +320,43 @@ struct NoteView: View {
         performSend()
     }
 
+    private func showToast(_ message: String) {
+        errorMessage = message
+        toastRevision = UUID()
+        withAnimation(.spring()) { showErrorToast = true }
+    }
+
     private func performSend() {
         let sentContent = appState.noteDraftText
-        let preparedNote: PreparedNote
-
-        do {
-            preparedNote = try appState.apiService.prepareNote(content: sentContent)
-        } catch {
-            errorMessage = error.localizedDescription
-            withAnimation(.spring()) { showErrorToast = true }
-            Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                await MainActor.run {
-                    withAnimation(.spring()) { showErrorToast = false }
-                }
-            }
-            return
-        }
-
+        let lease: UUID
+        do { lease = try appState.settingsService.access.begin() }
+        catch { showToast(error.localizedDescription); return }
+        let prepared: PreparedNote
+        do { prepared = try appState.apiService.prepareNote(content: sentContent) }
+        catch { appState.settingsService.access.end(lease); showToast(error.localizedDescription); return }
         appState.noteDraftText = ""
-
-        // Trigger confetti + sound + haptic immediately for seamless feel (optimistic UI)
+        // Preserve the existing optimistic feedback and clipboard behavior, including offline sends.
         if appState.settingsService.confettiOnPostSuccess {
             showSuccessToast = true
-            // Haptic feedback
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
-            // System sound (short chime)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             AudioServicesPlaySystemSound(1001)
         }
-
-        // Copy to clipboard eagerly
         if appState.settingsService.copyToClipboardOnPost {
             UIPasteboard.general.string = ZeroWidthSteganography.embedIfNeeded(
-                content: sentContent,
-                hiddenMessage: appState.settingsService.hiddenMessage
-            )
+                content: sentContent, hiddenMessage: appState.settingsService.hiddenMessage)
         }
-
-        // 网络不可用：直接暂存到本地
-        if appState.webSocketService.connectionState != .connected {
-            appState.pendingNoteService.savePendingNote(preparedNote)
-
-            errorMessage = "📤 Saved locally, will auto-send when network restores"
-            withAnimation(.spring()) { showErrorToast = true }
-            Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                await MainActor.run {
-                    withAnimation(.spring()) { showErrorToast = false }
-                }
-            }
-            return
-        }
-
-        // Send in background silently
+        let online = appState.webSocketService.connectionState == .connected
         Task {
-            let result = await appState.apiService.postPreparedNote(preparedNote)
-
-            await MainActor.run {
-                if !result.success {
-                    // Send failed: save locally and show error
-                    appState.pendingNoteService.savePendingNote(preparedNote)
-                    if result.networkError {
-                        appState.webSocketService.markConnectionSuspect(reason: "http-post-network-error")
-                    }
-
-                    errorMessage = "📤 Send failed, saved locally"
-                    withAnimation(.spring()) { showErrorToast = true }
-                    Task {
-                        try? await Task.sleep(nanoseconds: 3_000_000_000)
-                        await MainActor.run {
-                            withAnimation(.spring()) { showErrorToast = false }
-                        }
-                    }
+            defer { appState.settingsService.access.end(lease) }
+            do {
+                switch try await appState.pendingNoteService.deliver(prepared, online: online) {
+                case .sent: break
+                case .queued: showToast(NSLocalizedString("📤 Saved locally, will auto-send when network restores", comment: "IAP and connection configuration"))
+                case .sentAwaitingCleanup: showToast(NSLocalizedString("Your note was sent. Local confirmation cleanup will be retried; do not send it again.", comment: "IAP and connection configuration"))
                 }
+            } catch {
+                appState.noteDraftText = sentContent + (appState.noteDraftText.isEmpty ? "" : "\n" + appState.noteDraftText)
+                showToast(String(format: NSLocalizedString("Save failed. Your input is preserved: %@", comment: "IAP and connection configuration"), error.localizedDescription))
             }
         }
     }

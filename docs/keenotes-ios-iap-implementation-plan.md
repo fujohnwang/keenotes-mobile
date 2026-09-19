@@ -1,7 +1,7 @@
 # KeeNotes iOS IAP 与凭据历史实施计划书
 
 日期：2026-09-14  
-状态：待实施；产品范围与交互约束已经讨论确认，本文中的内部模块、数据结构和阶段安排为实施建议。
+状态：两端代码已实施并集成，本地验收通过，真实 Apple 环境配置与端到端验收待完成；结果见验收记录。本文保留实施时的模块设计和阶段安排。
 
 ## 1. 目标与已确认范围
 
@@ -9,15 +9,17 @@
 
 | 项目 | 已确认规则 |
 | --- | --- |
-| 商品 | 首版仅一个自动续订年订阅；价格和最终 Product ID 待配置。 |
+| 商品 | 首版仅一个自动续订年订阅；用户暂定 US$8/年（USD，2026-09-14 确认），尚未写入 ASC；最终 Product ID 及区域价格配置待完成。 |
 | 服务端 | Apple 购买交付与通知处理放在 keenotes-remote-workers。 |
 | 渠道关系 | Gumroad 与 IAP 使用独立订阅链路、身份映射和 token；不绑定、不合并、不迁移两者云端数据。 |
 | 客户端主入口 | 现有 endpoint、token、加密密码输入及 Save Settings 继续作为通用主流程。 |
+| UI 导航 | 2026-09-19 更新：Purchase／购买与 History／历史与 Server Configuration 标题放在同一行；Purchase 使用小号系统按钮，打开独立 sheet；不增加顶部 segment。 |
 | 功能可用性 | 客户端不以 StoreKit 购买状态限制原有功能；所填凭据的访问权限由对应服务端判断。 |
 | IAP 填入 | 主动购买或恢复成功后填入 endpoint、token，保留用户的加密密码；仍需 Save Settings 才启用。 |
 | 后台更新 | 续订、交易监听和启动恢复只维护购买与交付信息，不覆盖当前配置或正在编辑的表单。 |
 | 凭据历史 | 本设备 Save 成功的完整 `(endpoint, token, pin)` 存入 Keychain；支持所有渠道。 |
 | 历史列表 | 显示 endpoint、token 最后 4 位、来源 tag「通用 / IAP」及当前使用标记；PIN 不显示。 |
+| 历史入口 | 放在 Server Configuration 标题右侧，打开独立历史 sheet。 |
 | 时间戳 | 可在内部用于排序，首版界面不展示。 |
 | 历史启用 | 点击条目先弹确认框；二次确认后替换完整配置、保存并自动连接，无需再点 Save。 |
 | 删除历史 | 支持删除历史条目；只删除本机历史，不撤销远端凭据、取消订阅或删除笔记。 |
@@ -26,9 +28,11 @@
 
 本文中的 `pin` 对应现有代码的 `encryptionPassword`，是用户设置的 E2EE 加密密码，不是 Apple 发放的密码。IAP 服务端不生成、接收或保存 PIN。
 
-## 2. 当前代码事实与接入位置
+## 2. 实施前代码基线与接入位置
 
-以下判断来自当前源码；任务记录和 Apple 文档用于补充背景。未核对 ASC 在线商品、价格、审核状态或生产数据库内容，也未在本轮运行功能测试。
+本节记录实施前的代码基线；实施后结果以 [验收记录](keenotes-ios-iap-acceptance.md) 和当前源码为准。2026-09-14 用户补充：停止 Simulator 测试，不下载运行时，后续设备验证仅允许联机 ip17。
+
+以下判断来自实施前源码；任务记录和 Apple 文档用于补充背景。后续 ASC 检查、本地测试及集成结果已单独记录，不将本节历史判断视为实施后的现状。
 
 | 现状 | 代码依据 | 实施影响 |
 | --- | --- | --- |
@@ -57,7 +61,11 @@
 
 ### 3.2 IAP 购买及主动恢复
 
-设置页增加年订阅区域，包含商品价格与周期、购买、恢复购买、管理订阅及交付状态。购买入口在尚未设置 token/PIN 时也可使用，并与首次配置向导协调，避免被向导遮挡。
+UI 决策于 2026-09-19 更新：Purchase／购买与 History／历史与 Server Configuration 标题放在同一行，统一归入连接配置区域。Purchase 与 History 使用同一小号系统 bordered 圆角按钮及 footnote 字号，移除撑高标签的最小高度；Purchase 使用50%透明度主题蓝底，History 浅灰底，视觉层级为 Save Settings > Purchase > History；配置标题取消强制换行，紧接历史记录图标按钮，Purchase 靠右；图标保留本地化辅助功能名称。设置页顶部恢复纯标题；购买仍打开独立 sheet，保留 Server Configuration、Encryption、Save Settings 和 Preferences 的现有顺序，Save Settings 继续作为主要按钮。
+
+订阅 sheet 按远程服务说明、年订阅价格与周期、购买按钮、恢复购买与管理订阅组织内容，并显示购买及交付状态。已有购买时提供「填入连接凭据」操作。面向用户的入口名称使用「订阅」及对应本地化文案，不直接使用技术缩写 IAP；具体按钮样式在实施时沿用现有主题，并验证窄屏标题布局和可访问性标签。
+
+购买入口在尚未设置 token/PIN 时也可使用，并与首次配置向导协调，避免被向导遮挡。打开、关闭 sheet 保留原表单草稿和当前连接。用户主动购买或恢复完成并成功交付后，关闭订阅 sheet、返回设置页填入凭据，提示「凭据已填入，保存后开始使用」；仍需用户点击 Save Settings。若发生下文所述的迟到结果冲突，则保留已购信息并提供主动填入入口，不自动覆盖表单。
 
 ```mermaid
 flowchart TD
@@ -78,12 +86,12 @@ flowchart TD
 
 ### 3.3 凭据历史与二次确认
 
-在通用配置附近提供历史入口。示意条目内容为：`endpoint · …ABCD · 通用/IAP · 当前使用`，其中 `ABCD` 为 token 最后 4 位。列表不显示 PIN，也不提供完整 token 的默认展示。
+在 Server Configuration 标题右侧提供「历史」入口，点击打开独立历史 sheet。示意条目内容为：`endpoint · …ABCD · 通用/IAP · 当前使用`，其中 `ABCD` 为 token 最后 4 位。列表不显示 PIN，也不提供完整 token 的默认展示。
 
 1. 用户点击历史条目，弹出确认框；此时表单、已保存配置、连接和最近使用排序均不变化。
 2. 确认框显示目标 endpoint、token 尾号和 tag，提示切换会替换当前连接配置并重新连接；目标为另一服务空间时说明本地已同步缓存将重新加载。
 3. 用户点击「取消」后保留当前输入、配置和连接。
-4. 用户点击「确认切换」后执行切换保护，通过后填入完整 endpoint/token/PIN，同时填入确认密码，保存并连接。
+4. 用户点击「确认切换」后执行切换保护，通过并完成本地应用后关闭历史 sheet，设置表单填入完整 endpoint/token/PIN 及确认密码，敏感字段沿用当前 SecureField 展示，自动连接；无需再点击 Save Settings。保护检查或本地应用失败时保留历史页并显示原因。
 5. 本地应用失败时不展示切换成功；网络连接失败时保留已经成功保存的目标配置和历史，显示实际连接状态。
 
 PIN 不展示在历史条目或确认框中。二次确认授权的是本次切换，不绕过待发送笔记检查。
@@ -159,7 +167,7 @@ PIN 不展示在历史条目或确认框中。二次确认授权的是本次切�
 
 `expires_at` 统一为 UTC Unix 秒，交易原始日期按 Apple 毫秒字段保存并显式转换。`provisioning_seconds` 是激活传播等待提示，不是授予的订阅时长，也不保证届时网络必定恢复。失败响应使用稳定错误码，区分无效交易、无有效权益、配置错误和可重试故障；包含凭据的响应禁止缓存。
 
-生产接口与 Sandbox 接口固定配置，不从用户可编辑的同步 endpoint 推导。请求中的 environment 仅供路由选择；服务器必须独立验证签名中的环境、应用和产品。客户端不持有 Apple 服务端私钥或管理员凭据。
+生产接口与 Sandbox 接口固定配置，不从用户可编辑的同步 endpoint 推导。服务端固定路径选择环境，请求中的 environment 仅校验一致性；服务器独立验证签名中的环境、应用和产品。客户端不持有 Apple 服务端私钥或管理员凭据。
 
 ### 5.2 Apple 身份、交易及固定 token
 
@@ -210,7 +218,7 @@ D1 是 Apple 权益事实来源，KV 与 DO 授权是可重建结果。记录权
 
 RVXFlare 使用 Apple 官方 Server Library，并已有 Workers 运行时适配。先验证按请求动态加载、`nodejs_compat` 和 fetch 适配在 KeeNotes 中可用，再决定必要的兼容日期与依赖升级，不直接整体覆盖现有配置。
 
-Sandbox 和 Production 分开部署，使用独立 D1、KV、DO 与通知地址；服务器每个环境只接受该环境交易。发行构建也必须能将 Apple Sandbox 交易路由到 Sandbox 服务，不能简单按 Debug/Release 区分交易环境。
+2026-09-14 用户将部署方式调整为同一生产 Worker 和现有 D1/KV/DO 处理 Production 与真实 Sandbox；不新建测试资源。采用固定的两套交付/通知路径，身份和 token 按环境隔离，Sandbox 笔记属于独立测试身份。每条服务端路径仅接受相符环境的已验签交易；cron 按环境分别对账。发行构建也必须能按交易环境选择 Sandbox 路径，不能简单按 Debug/Release 区分。最新路径见集成契约。
 
 本地 StoreKit Configuration 用于客户端购买状态测试，不能把本地测试签名当作 Apple Sandbox 验签通过。真实验签、续订与回调在真实 Sandbox 中验收。
 
@@ -223,8 +231,8 @@ Sandbox 和 Production 分开部署，使用独立 D1、KV、DO 与通知地址�
 | iOS：新增 `ConnectionCredentialsStore.swift` | 版本化 Keychain 当前配置、历史、来源、去重和旧配置迁移。 |
 | iOS：新增 `ConnectionConfigurationCoordinator.swift` | 通用保存、历史启用、发送暂停、配置版本校验和切换失败恢复。 |
 | iOS：新增 `StoreKitPurchaseService.swift` | StoreKit 商品、购买、恢复、监听、交付客户端及必要的已购缓存。 |
-| iOS：新增 `CredentialHistoryView.swift`、`SubscriptionSection.swift` | 历史条目和二次确认、年订阅与交付状态。 |
-| iOS：调整 SettingsView / SettingsService / KeychainService / AppState | 接入新模块，保留现有通用输入与保存入口；Keychain 读取错误可区分。 |
+| iOS：新增 `CredentialHistoryView.swift`、`SubscriptionView.swift` | 两个独立 sheet：历史条目和二次确认；年订阅、恢复购买与交付状态。 |
+| iOS：调整 SettingsView / SettingsService / KeychainService / AppState | 复用 TopHeaderView 右侧位置增加订阅入口，在 Server Configuration 标题右侧增加历史入口；接入 sheet 并保留草稿、现有通用输入与保存入口；Keychain 读取错误可区分。 |
 | iOS：按需调整 WebSocketService / PendingNoteService / ApiService / DatabaseService | 配置切换期间的发送协调、旧回调隔离、同步状态更新与启动恢复。 |
 | iOS：project.yml、Xcode project、Info.plist、测试配置 | 注册源码与测试，配置商品 ID、两套交付地址和 IAP capability；核对实际工程生成方式。 |
 | Workers：新增 Apple 路由、验签、权益模块及数据库 migration | 接口、唯一约束、交易周期、事件记录、授权更新与补偿对账。 |
@@ -240,7 +248,7 @@ FooSnippets 和 RVXFlare 作为参考，不在本次计划中修改。Android、
 | A：冻结契约与建立验证基线 | 确认接口字段、错误码、历史存储迁移与切换规则；确认现有构建和测试入口；验证 Apple SDK 的 Workers 兼容性。 | 两端共享接口约定；现有问题与新增问题可区分；完成运行时验证。 |
 | B：通用凭据历史 | 先实现当前配置迁移、历史存储/列表/删除、二次确认与统一保存切换。 | 不依赖 IAP 即可保存和切换现有远程凭据；旧配置可找回；无串发和迟到覆盖。 |
 | C：Apple 服务端 | 实现独立身份、验签、幂等发放、通知、权益执行及补偿对账。 | Sandbox 中同一身份始终同一 token；到期/退款覆盖 HTTP 和现有 WS；旧订阅回归通过。 |
-| D：iOS IAP 集成 | 商品与购买界面、主动恢复、后台交易监听、交付缓存及表单填入。 | 已购信息不丢失；填表不等于启用；保存后进入通用历史；不影响其他渠道凭据。 |
+| D：iOS IAP 集成 | 配置区购买入口与独立购买 sheet、主动恢复、后台交易监听、交付缓存及表单填入。 | 现有设置主页面结构保留；sheet 开关不丢草稿；已购信息不丢失；填表不等于启用；保存后进入通用历史；不影响其他渠道凭据。 |
 | E：端到端与发布准备 | 真实 Sandbox/TestFlight 回归；配置正式商品、回调和构建；准备审核材料。 | 下表关键用例通过，提交物可审阅，生产与测试环境隔离核对完成。 |
 
 先落地历史，再接入 IAP，使原凭据保留成为购买流程的前置保障。实施期间持续简短更新 implementation_note.md；代码提交由用户自行处理。
@@ -251,6 +259,7 @@ FooSnippets 和 RVXFlare 作为参考，不在本次计划中修改。Android、
 | --- | --- |
 | 旧配置升级 | 已有完整配置被保留；迁移重试不重复；写入失败不删除旧值；用户删除历史后重启不自动恢复被删条目。 |
 | 通用保存 | 其他渠道与 IAP 均可手动输入并保存；相同 tuple 去重；不同 PIN 分条；服务器离线仍区分本地保存与连接状态。 |
+| 导航与草稿 | 配置标题与 Purchase、History 同行；Purchase 打开独立 sheet；主页面没有新增 segment 或内嵌购买区。取消或直接关闭 sheet 不丢草稿、不切换连接；主动购买交付成功返回填表，仍需 Save。 |
 | 历史展示 | 仅显示 endpoint、token 最后 4 位、通用/IAP tag、当前使用标记；不显示 PIN 或时间戳；尾号不用于条目身份判定。 |
 | 历史确认 | 点击条目只弹框；取消无表单/连接/排序副作用；确认后完整替换并自动连接；连点和旧弹框不会重复切换。 |
 | 保存失败 | Keychain 拒绝访问、读取失败、写入失败、数据库切换失败和切换中退出均可恢复，不混用两个账户的状态。 |
@@ -264,13 +273,13 @@ FooSnippets 和 RVXFlare 作为参考，不在本次计划中修改。Android、
 | 兼容回归 | 原 Gumroad/admin 授权、手动 token、E2EE、发笔记、离线重试、Review、搜索及前后台重连保持正常；其他端使用现有协议。 |
 | 系统与环境 | iPhone/iPad 布局、iOS 15 API 兼容、Debug/Release 参数、真实 Sandbox/TestFlight 和 Production 数据隔离。 |
 
-测试重点放在身份、幂等、持久化失败和切换竞态，不用仅重复实现步骤的测试代替行为验收。本轮只编写计划，表中各项均未宣称已经通过。
+测试重点放在身份、幂等、持久化失败和切换竞态，不用仅重复实现步骤的测试代替行为验收。此表定义门槛；实际通过项和未完成项见验收记录。
 
 ## 9. 发布配置与尚待确定项
 
 | 项目 | 确定时机 |
 | --- | --- |
-| 年费金额、币种/区域定价及最终 Product ID | 创建或修改 ASC 商品之前。 |
+| 年费暂定 US$8/年（USD）；区域价格及最终 Product ID 待配置 | 用户已确定基准金额和币种，尚未创建或设置 ASC 商品。 |
 | 订阅组、商品名称/本地化、使用条款及隐私政策链接 | 购买界面与审核材料定稿之前。 |
 | Billing Grace Period、试用/优惠、Family Sharing | ASC 配置前明确；不默认为已启用。宽限期处理按实际配置验收。 |
 | App Apple ID、Sandbox 服务域名、两套通知地址 | 服务端环境配置和真机联调之前；bundle ID 以现有工程 `cn.keevol.keenotes` 为基线核对。 |
@@ -289,3 +298,5 @@ FooSnippets 和 RVXFlare 作为参考，不在本次计划中修改。Android、
 - [Apple：首次提交 In-App Purchase](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-in-app-purchase)
 
 这些资料用于确认平台接口与流程；项目当前行为仍以第 2 节列出的源码为依据。实际实施前重新核对相关 API、运行时和 ASC 配置。
+
+最终位置调整：History 紧跟配置标题，Purchase 靠右；现有小号按钮、50%主题蓝和灰色样式保持，构建及模拟器截图核验通过。

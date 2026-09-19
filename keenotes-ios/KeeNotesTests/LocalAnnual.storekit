@@ -1,0 +1,19 @@
+{
+  "identifier" : "KEENOTES-LOCAL-TEST-ONLY",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : { "_failTransactionsEnabled" : false, "_locale" : "en_US", "_storefront" : "USA", "_timeRate" : 0 },
+  "subscriptionGroups" : [ {
+    "id" : "LOCAL-ANNUAL-GROUP",
+    "localizations" : [],
+    "name" : "Local test only",
+    "subscriptions" : [ {
+      "adHocOffers" : [], "codeOffers" : [], "displayPrice" : "1.00", "familyShareable" : false,
+      "groupNumber" : 1, "internalID" : "LOCAL-ANNUAL", "introductoryOffer" : null,
+      "localizations" : [ { "description" : "Local fixture, not a production price", "displayName" : "Local annual fixture", "locale" : "en_US" } ],
+      "productID" : "local.test.annual", "recurringSubscriptionPeriod" : "P1Y",
+      "referenceName" : "Local annual fixture", "subscriptionGroupID" : "LOCAL-ANNUAL-GROUP", "type" : "RecurringSubscription"
+    } ]
+  } ],
+  "version" : { "major" : 3, "minor" : 0 }
+}

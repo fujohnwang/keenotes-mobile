@@ -109,3 +109,90 @@
 
 - 本轮仅新增实施计划书，未修改功能代码。IAP 采用独立年订阅/token，通用输入与 Save Settings 保持主入口；历史显示 endpoint、token 尾 4 位、通用/IAP tag，二次确认后启用。
 - 计划先实现 Keychain 历史保留，再接 IAP；凭据历史不备份笔记。tuple 变化且有 pending 时暂缓切换，避免跨账户发送；价格、Product ID 与 ASC 选项待配置。
+- UI 已确认采用方案 2：设置页右上角订阅入口打开独立 sheet，Server Configuration 标题右侧提供历史 sheet 入口；保留原设置结构和草稿，减少现有页面改动。已同步流程、模块范围与验收项，本轮仍仅更新文档。
+
+## IAP 分任务实施与监督（2026-09-14）
+
+- 按用户授权拆为 iOS、Workers 两个独立 worktree 任务；本任务负责固定接口契约、两轮独立审查、源码快照复跑与 UI 验收，不提交 Git。进度和失败证据统一记录在 docs/keenotes-ios-iap-acceptance.md。
+- Apple 停用凭据的恢复区分 automatic / user_initiated，后台通知和补交付不能重新启用用户停用的 token。IAP 网络单独采用系统 TLS，保留原自托管连接兼容性。
+- 本地模拟交付、真实 Keychain/SQLite/workerd、系统 StoreKitTest 和真实 Apple Sandbox 分别验收；最终独立 iOS 29 项、Workers 32 项通过，已按 SHA256 核对集成回原仓库。商品/价格/Apple 密钥未配置以及当前 StoreKitTest 失败不能算通过，真实端到端验收仍未完成。
+- 用户最新约束：停止 Simulator 测试，不下载运行时；后续设备验证仅允许联机 ip17。清理本轮专用设备/可重建缓存，保留日志、截图与结果包，后台跟进不重复已通过测试。
+
+## iOS 凭据历史与 IAP 实施（2026-09-14）
+
+- 当前配置、历史和切换 journal 同项写入 Keychain，SQLite transaction marker 支持退出恢复；切换等待在途操作，有 pending 时禁止 tuple 变化，避免跨账户发送。
+- HTTP 成功而 pending 清理失败时保留原 request_id，不恢复为可重复发送的新草稿；旧账户缓存、迟到查询和回调均按配置版本隔离。
+- IAP 凭据独立持久化后才 finish，后台交付不填草稿；PIN 不发往交付服务。IAP 使用独立系统 TLS，通用同步保留现有兼容策略；生产/沙盒地址和正式商品均待配置。
+- WebSocket 批次解码/Argon2 由独立 actor 串行执行。工程局部修改保留 1.8.2、原签名团队和 iOS 15 target；详见 keenotes-ios/IAP_VALIDATION.md，未提交 Git。
+
+- 用户暂定正式年费 US$8/年（USD，2026-09-14）。已同步计划与验收待办；尚未写入 ASC，不硬编码客户端显示价格，不改本地 fixture。剩余为商品/服务端配置、ip17 真实 Apple 联调及发布。
+
+- 用户随后授权生产 Workers 部署与 ASC/TestFlight 测试，并改为同一生产服务处理真实 Sandbox 测试身份；按固定路径选择环境，保持 token/笔记隔离，不新建测试资源。只沿用 Business 设定，不复用其他项目密钥。SKU及USD8年费已在ASC创建/回读；KeeNotes专用IAPkey已生成，私钥只放服务端。最新状态见 docs/keenotes-iap-release.md。
+
+## iOS 1.9.0 发布产物准备（2026-09-14）
+
+- 仅同步 pbxproj/project.yml 的正式 SKU、同域双 provision 路径、既有隐私/Apple EULA 链接，版本 1.9.0 (1)；价格仍取 StoreKit，不硬编码。
+- 已生成同一份 Release arm64 archive，开发签名和五项配置已核验；Xcode-managed profile 需要 Automatic 归档。未安装设备、未使用 Simulator、未提交 Git。
+- 签名导出问题已解决：查重后按授权创建 KeeNotes 专用手工 App Store profile，绑定既有 Distribution 证书；从同 archive 导出 1.9.0 (1) IPA，签名、entitlements 和五项配置核验通过。未创建/撤销证书、未上传；证据在 /tmp/keenotes-iap-release-20260914/ios-build/release-report.md。
+
+- IAP 密钥补救：Chrome 下载验证后重建专用 key 7L6NS8ZNPA，文件保存在本项目 .secrets（700/600、Git ignored、格式校验通过）；旧 8RWVNVAU2V 撤销等待明确授权。不要使用或寻找其他项目私钥。
+- 单 Worker 双 Apple 环境最终独立测试 38/38 PASS，慢 Production 请求不再阻断 Sandbox。ASC 已配置 USD 8/年及175地区价格/可售范围；真实 Sandbox 交易验收仍未完成。
+
+- 部署备份改用Cloudflare已有TimeTravel恢复点：全量敏感数据本地导出被自动审批拒绝并取消；006仅新增schema，存量三表行数未变。无整库restore。1.9.0(1)已上传VALID并加入内部组，沿用1.8.2的加密声明（原加密源码无变更）。
+
+- 用户明确确认先部署再做Sandbox后，Worker已发布版本6e38bb5f-e802-4f77-9a4d-6f070d617054；真实Apple通知与ip17交易仍在验收，不以部署成功代替端到端通过。
+
+- 用户最新改为只用一个 iPhone 模拟器；停止 ip17 与邮件邀请操作，复用已有 iOS 26.5 / iPhone 17（6A3B455A-6971-4FF1-A64D-B71160B1F2A9），不下载 runtime、不创建 iPad 或并行测试克隆。本地 StoreKit 测试与真实 Apple Sandbox 交易分别记录；生产 Worker 和双环境真实 TEST 回调已验收通过。
+
+- Simulator 补验：复用唯一 iPhone 17（iOS 26.5），不下载 runtime；LocalStoreKit scheme 与 project.yml 对齐为仅 LocalStoreKitTests、关闭 parallel。该配置漂移不等同于 Code 3 根因，本地 Xcode 交易不代表 Apple Sandbox。
+- 单台Simulator补验最终3+1项关键UI通过；新增Save/history/后台草稿用例以持久结果断言。现有configurationRevision重建设置页会清掉Save成功提示，已报复审未改生产代码；系统StoreKitTest在CLI/IDE均Code3，真实Sandbox仍待验。证据在 /tmp/keenotes-iap-release-20260914/ios-simulator/。
+- 后续P2已按复审修复：设置页保持identity，Note/Review仍按账户revision重建；history成功回调显示反馈，不添加可能覆盖新草稿的revision监听。4项UI+2项相关行为回归全部通过；系统StoreKit Code3仍独立待解。
+- 隐私页已通过 Chrome 确认可达；现文与服务端笔记存储、Apple 交易处理及“停用而非删除”行为不一致。代码核对/局部草案保存在 docs/keenotes-iap-privacy-review.md，未修改线上政策或替用户设定保留期。
+
+- 1.9.0(2) 已完成 Release archive/App Store IPA 导出；沿用既有签名，arm64、五项IAP配置、无测试资源及最终99项源文件hash核验通过。P2相关6项测试通过；上传交根监督任务，真实Sandbox验收仍独立待完成。报告 /tmp/keenotes-iap-release-20260914/build-2/release-report.md。
+
+- 审核截图使用ASC synced正式USD8/P1Y目录与SystemAppleStore，基于旧Debug1.9.0(1)且SubscriptionView与最终Release一致；未买正式SKU、未Save，不算真实Sandbox证据。手写临时scheme绝对路径引起Xcode退出，改由GUI生成相对引用后完成；已清理临时工程配置，99项生产hash及原scheme/fixture核验通过。证据 /tmp/keenotes-iap-release-20260914/ios-simulator/review-screenshot/report.md。
+- 最新1.9.0(2)已进入既有内部TestFlight组，VALID / IN_BETA_TESTING及测试说明回读通过。直接上传超时后使用asc调用Xcode从同archive重新导出上传；仅该进程PATH优先系统rsync。单一现有iPhone17、无下载/新设备；系统StoreKit unfinished失败及真实Sandbox交易仍未关闭，未提交Git或公开审核。
+
+- 本地StoreKit诊断仅改测试文件：KEENOTES_STOREKIT_DIAGNOSTICS=1跳过控制器创建/清理，保留原unfinished断言，记录安全ID字段及测试manager的finish次数；观测模式不等同原隔离测试通过。单方法build-for-testing成功，未运行测试，99项生产源及已发布1.9.0(2)IPA保持不变；执行交根任务。
+
+- StoreKit 18:05 观测返回 17:10 已完成旧订阅：JWS 六项白名单齐全，unfinished 为空；不能替代首次新购的隔离验收。新对照仅在 diagnostics 开关下接收 local.test. SKU，并临时只改 fixture 的 productID；保留原 contains 断言及其它目录字节，生产/正式 SKU/Release IPA 未变。根任务 GUI 执行后需恢复 fixture 与临时 scheme 环境。
+
+- 2026-09-19 JavaFX 更新提示排查：以 v1.8.6 原始更新/侧栏代码和独立临时配置验证，接口返回 1.8.7、回调与普通页面显示正常。600 高度展开 Settings/Review 会使提示越出窗口，加入 characters 前也同样复现；更新仅启动时检查一次且失败不重试。尚未确认用户现场触发条件，未改生产代码。
+
+- 2026-09-19 更新提示修复：提示保留独立完整高度，doodle 只使用剩余空间；高度不足时仅导航区域滚动，避免提示越界/重叠。更新改用 JavaFX Service + PauseTransition，启动延迟 3 秒，失败间隔 30 秒最多重试 3 次；成功停止，dev 跳过，退出取消 timer/Task/HTTP 并释放客户端资源。
+- 编译及 SidebarUpdateTest 的 6 项检查通过（临时配置、模拟网络）；覆盖深浅主题、人物/概览开关、全部导航模式、570–1000 高度，以及重试上限与退出取消。原生 FX 检查需显式启用 -Dkeenotes.fx.tests=true；视觉体验由用户手工验收，未提交 Git。
+
+- Issue #139：仅在 SidebarCompanionsView 追加敲键随机轻跳，保留鼠标跟随、眨眼及显示开关；90ms 限频，单角色动画不叠加，忽略修饰键/快捷键组合且不消费事件。按剩余高度限制幅度并裁剪，避免越出 doodle 区域；隐藏/失焦/移出 Scene/销毁时停止复位，移除键盘及位移监听。
+- 编译及隔离 FX 检查通过：输入事件传递、限频、跳跃边界/落地、隐藏恢复、Scene 卸载重挂、重复 dispose。视觉细节由用户手工验收，未提交 Git。
+
+- 中文输入法 bounce：OpenJFX 25 macOS 组词期间会抑制部分 KEY_PRESSED，KEY_RELEASED 仍转发；追加松开事件兜底，以 KeyCode 集合去重，不读取输入法状态/文字、不引入 native hook。正常按下仍即时触发，被拦截时在松开触发；限频及原有动画保持。生命周期重置清空按键集合，Scene 解绑移除两类监听。编译及仅松开事件/普通按键去重/快捷键/生命周期重放通过；未冒充真实中文输入法手工验收，未提交 Git。
+
+- 2026-09-19：已恢复9/14遗留fixture/scheme，旧/tmp及默认GUI DerivedData证据已丢失，历史结果仅可引用对话记录。经授权准备单轮宿主隔离：沿用blank fixture、真实SystemAppleStore测试、新独立本地商品/订阅组，原unfinished断言不变并检查新交易身份/日期；仅build-for-testing成功，GUI验收交根任务。证据保存Git ignored的test-results/iap-20260919，完成后恢复临时配置；未动生产源或Worker。
+
+- 2026-09-19 GUI隔离宿主单项1/1 PASS：新独立交易2在finish前可见unfinished，持久化后finish一次并清空；证据已留项目目录。普通宿主配对仅换新本地商品/独立组并移除blank参数，测试代码不变，构建成功交根任务；本轮生产hash未变。构建前diffcheck通过，构建后重复检查受Xcode license状态阻断，未代为接受协议。
+
+- 2026-09-19后续：根任务发现工具链切换至Xcode27，取消尚未执行的普通宿主配对，不能与26.6隔离PASS当作严格对照。已恢复原fixture/scheme字节，诊断/新交易检查默认关闭，PBX/project.yml/正式scheme无自动改写；diffcheck已恢复通过，构建证据保留。未追加构建或测试。
+
+- 2026-09-19 IAP 补验：只复用原 iPhone17/iOS26.5，新增 DEBUG 受控迟到交付与截图 UI 用例；27 项业务/UI 已取得通过结果（3 项先因本地 fixture 未启动失败，启动后仅补跑这3项通过）。系统 StoreKit 首次新购观察 1/1 通过，原 SKTestSession Code3 仍保留；真实 Sandbox/TestFlight 从未实测。临时 scheme/商品已恢复，Worker/Release 配置未变，未提交 Git。
+- 交互稿位于 docs/iap-interaction-demo（实际截图＋连线/HTML）；系统截图隐藏安全输入值，UI 断言验证其保留。主线 fixture 价不代表正式 USD8/年。Xcode 本机工作期间26.6→27.0，按用户明确同意处理许可、取消新平台下载；不将不同工具版本视为单变量对照。完整结果见 docs/keenotes-iap-20260919-verification.md。
+
+- 2026-09-19 IAP UI 本地化：订阅入口改为 callout semibold/品牌色并放宽英文文字宽度；历史入口为较小灰色文字、保留点击区域。新增76条系统标准 en/zh-Hans资源，覆盖IAP/凭据历史/确认/错误/连接反馈，不按国家选择语言；购买与同步流程不变。旧中文UI用例固定zh-Hans并采用稳定identifier，新增英中跨地区验收及英文主线截图用例；本子任务只静态校验，构建和单模拟器验收交根任务。按用户授权仅将PBX/project.yml隐私链接改为https://kns.afoo.me/privacy，未改版本或提交Git。
+
+- 2026-09-19 双语 UI 补验：首轮最后错误提示被键盘遮挡，测试整屏滚动越过状态行；保留失败 xcresult/录像/层级，只让两语言用例在 Save 前按 Return 并等待键盘收起，错误全文断言不变。演示导出支持合并主回归与补跑、仅选每项最新 Passed 记录且归档各轮失败摘要；未自行运行 build/sim。
+
+- 2026-09-19 送审准备：用户明确选择只用现有模拟器后提交；1.9.0(3) 的35项业务/UI均取得PASS（33+2语言定位补跑），原SKTestSession环境Code3与真实Sandbox未测边界保留。Worker隐私页已部署并更新App/ASC链接；发布用IPA含中英资源、无测试fixture或.storekit。导出指定既有profile对应证书SHA1，并仅在导出进程优先系统rsync，以避开同名证书/Homebrew冲突；未新增证书或修改系统PATH。
+
+- 2026-09-19 19:40（上海）已将1.9.0(3)、年订阅和订阅组三项同审；submission 4479ec8e-92b0-453b-97ca-035cc81a7979，ASC/版本均WAITING_FOR_REVIEW，MANUAL发布。正式美国价格$8/年；未宣称Apple审核通过或真实Sandbox交易验收通过。回执/IPA保存在dist/iap-asc-review-20260919，交互稿已更新实际英文主线与中英附录。未提交Git。
+
+- 2026-09-19 UI微调：Purchase/购买为品牌色44pt按钮，History为浅底图标次级按钮；历史行添加类型图标、semibold地址、monospaced尾4位、橙/蓝tag、右侧当前勾选及selected辅助标记。视觉截断不影响完整endpoint的辅助访问/确认框；保存/切换服务源hash不变。4项既有UI＋深色英文补跑1次通过，原模拟器已恢复light/large。独立预览docs/iap-ui-polish-20260919，旧build3送审证据保留；本轮尚未上传或撤回当前审核，未提交Git。
+
+- 2026-09-19 UI 后续调整：Purchase／购买改用系统默认按钮，与 History 并排放在 Server Configuration 标题下；两行 section header 避免英文拥挤。顶部恢复纯标题，共享 TopHeaderView 移除已无调用的文字/突出样式扩展；Save Settings 保持主要视觉层级。只改入口位置与外观，保留 action/identifier、双语、历史确认行为；未变更 ASC 审核或提交 Git。
+- 配置区入口移动后的构建及既有英文UI回归1/1通过；中英文浅色/英文深色设置实图已更新，恢复light。实施计划和UI预览同步新位置；未将旧入口截图冒充新版。
+- 最新覆盖上述分行方案：配置标题与 Purchase、History 同一行；英文标题通过本地化资源固定换行，完整标题保留辅助访问标签。两个入口统一automatic样式及44pt点击区域；构建通过，更新中英文/深色实图，未重复业务测试。
+- 按最终视觉层级 Save > Purchase > History 收敛：small bordered 圆角按钮＋footnote，移除撑高标签的最小高度；Purchase 按用户最终要求使用50%透明度主题蓝底、primary文字，History 浅灰；沿用系统按钮，仅Purchase为borderedProminent。同一行标题布局/行为不变，构建与中英/深浅实图检查通过；未新增测试、改 ASC 或提交 Git。
+- 最终仅调位置：History 紧跟配置标题，Spacer 后 Purchase 靠右；已确认的字号、形状、颜色和 action 均保持。原单模拟器构建/截图核验，未改 ASC 或提交 Git。
+- History 入口改为 clock.arrow.circlepath 图标，保留本地化 VoiceOver 名称与 identifier；配置标题改回普通本地化文本，删除专用强制换行资源。按钮位置/颜色/动作不变；构建通过，按用户要求不截图、不新增测试。
+- History 图标改为 plain，无底色/边框；透明 padding 与 contentShape 保留点击余量，辅助名称/action 不变。构建运行通过，未截图。
+- Purchase 按用户要求移除主题色 opacity(0.5)，恢复不透明；其余样式/位置/行为不变，未截图。
+- Purchase 文字改为白色，匹配已恢复不透明的主题蓝底；其它不变，未截图。

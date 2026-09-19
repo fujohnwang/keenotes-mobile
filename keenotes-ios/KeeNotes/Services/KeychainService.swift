@@ -3,14 +3,45 @@ import Security
 
 /// Keychain wrapper for storing sensitive credentials (token, encryption password).
 /// Uses kSecAttrAccessibleWhenUnlockedThisDeviceOnly for security without biometry prompts.
-final class KeychainService {
+final class KeychainService: SecureStringStorage {
     
     static let shared = KeychainService()
     
-    private let service = "cn.keevol.keenotes"
+    private let service: String
     
-    private init() {}
+    init(service: String = Bundle.main.bundleIdentifier ?? "cn.keevol.keenotes") { self.service = service }
     
+    enum StorageError: LocalizedError {
+        case status(OSStatus), invalidData
+        var errorDescription: String? { NSLocalizedString("Unable to read or save the Keychain. Your original credentials are preserved.", comment: "IAP and connection configuration") }
+    }
+
+    func read(account: String) throws -> String? {
+        var query = baseQuery(account: account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else { throw StorageError.status(status) }
+        guard let data = result as? Data, let value = String(data: data, encoding: .utf8) else {
+            throw StorageError.invalidData
+        }
+        return value
+    }
+
+    func write(_ value: String, account: String) throws {
+        let data = Data(value.utf8)
+        let status = SecItemUpdate(baseQuery(account: account) as CFDictionary,
+                                   [kSecValueData as String: data] as CFDictionary)
+        if status == errSecSuccess { return }
+        guard status == errSecItemNotFound else { throw StorageError.status(status) }
+        var query = baseQuery(account: account)
+        query[kSecValueData as String] = data
+        let added = SecItemAdd(query as CFDictionary, nil)
+        guard added == errSecSuccess else { throw StorageError.status(added) }
+    }
+
     // MARK: - Public API
     
     /// Save a string value to Keychain. Returns true on success.

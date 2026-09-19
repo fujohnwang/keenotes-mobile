@@ -1,136 +1,79 @@
 import Foundation
 import Combine
 
-/// 离线暂存笔记的调度服务
-/// - 暂存发送失败的笔记
-/// - 定时重试发送（30分钟间隔）
-/// - WebSocket 重连时立即触发重试
-class PendingNoteService: ObservableObject {
+@MainActor
+final class PendingNoteService: ObservableObject {
     private let databaseService: DatabaseService
     private let apiService: ApiService
     private let webSocketService: WebSocketService
-
+    private let access: ConfigurationAccess
     private var retryTimer: Timer?
+    private var retryTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
-    private var isRetrying = false
 
-    private static let retryIntervalSeconds: TimeInterval = 30 * 60 // 30 minutes
-
-    init(databaseService: DatabaseService, apiService: ApiService, webSocketService: WebSocketService) {
+    init(databaseService: DatabaseService, apiService: ApiService, webSocketService: WebSocketService, access: ConfigurationAccess) {
         self.databaseService = databaseService
         self.apiService = apiService
         self.webSocketService = webSocketService
-
-        // WebSocket 重连成功时触发重试
-        webSocketService.$connectionState
-            .removeDuplicates()
-            .filter { $0 == .connected }
-            .sink { [weak self] _ in
-                self?.onNetworkRestored()
-            }
-            .store(in: &cancellables)
+        self.access = access
+        webSocketService.$connectionState.removeDuplicates().filter { $0 == .connected }
+            .sink { [weak self] _ in self?.retryPendingNotes() }.store(in: &cancellables)
     }
 
+    deinit { retryTimer?.invalidate(); retryTask?.cancel() }
     func startRetryScheduler() {
         guard retryTimer == nil else { return }
-        retryTimer = Timer.scheduledTimer(
-            withTimeInterval: Self.retryIntervalSeconds,
-            repeats: true
-        ) { [weak self] _ in
-            self?.retryPendingNotes()
+        retryTimer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.retryPendingNotes() }
         }
-        print("[PendingNoteService] Retry scheduler started (interval: 30 min)")
+    }
+    func stopRetryScheduler() { retryTimer?.invalidate(); retryTimer = nil; retryTask?.cancel() }
+
+    /// Caller retains a configuration lease through this entire method. Persist before
+    /// HTTP so termination or an uncertain response leaves a retryable request_id.
+    enum DeliveryResult { case sent, queued, sentAwaitingCleanup }
+
+    func deliver(_ note: PreparedNote, online: Bool) async throws -> DeliveryResult {
+        guard note.configurationGeneration == access.generation else { throw ConfigurationError.staleOperation }
+        let id = try await databaseService.insertPendingNote(note)
+        guard online else { return .queued }
+        let result = await apiService.postPreparedNote(note)
+        guard note.configurationGeneration == access.generation else { return .queued }
+        if result.success {
+            do { try await databaseService.deletePendingNote(id: id) }
+            catch { return .sentAwaitingCleanup }
+            return .sent
+        }
+        if result.networkError && access.isReady { webSocketService.markConnectionSuspect(reason: "http-post") }
+        return .queued
     }
 
-    func stopRetryScheduler() {
-        retryTimer?.invalidate()
-        retryTimer = nil
-    }
-
-    /// 暂存一条笔记到本地
-    func savePendingNote(content: String, channel: String = "mobile-ios") {
-        Task {
+    func retryPendingNotes() {
+        guard retryTask == nil, let lease = try? access.begin() else { return }
+        let generation = access.generation
+        retryTask = Task { [weak self] in
+            guard let self else { return }
+            defer { access.end(lease); retryTask = nil }
             do {
-                let preparedNote = try apiService.prepareNote(content: content, channel: channel)
-                try await databaseService.insertPendingNote(preparedNote)
-                print("[PendingNoteService] Note saved to pending")
-            } catch {
-                print("[PendingNoteService] Failed to save pending note: \(error)")
-            }
-        }
-    }
-
-    func savePendingNote(_ preparedNote: PreparedNote) {
-        Task {
-            do {
-                try await databaseService.insertPendingNote(preparedNote)
-                print("[PendingNoteService] Prepared note saved to pending")
-            } catch {
-                print("[PendingNoteService] Failed to save prepared pending note: \(error)")
-            }
-        }
-    }
-
-    /// 网络恢复时立即触发一次重试
-    private func onNetworkRestored() {
-        Task {
-            let count = (try? await databaseService.getPendingNoteCount()) ?? 0
-            if count > 0 {
-                print("[PendingNoteService] Network restored, retrying \(count) pending notes")
-                retryPendingNotes()
-            }
-        }
-    }
-
-    /// 逐条重试发送 pending notes
-    private func retryPendingNotes() {
-        guard !isRetrying else { return }
-        isRetrying = true
-
-        Task {
-            defer { isRetrying = false }
-
-            guard let pendingNotes = try? await databaseService.getPendingNotes(),
-                  !pendingNotes.isEmpty else { return }
-
-            print("[PendingNoteService] Retrying \(pendingNotes.count) pending notes...")
-
-            for note in pendingNotes {
-                let result: ApiService.PostResult
-                if let encryptedContent = note.encryptedContent,
-                   let requestId = note.requestId,
-                   !encryptedContent.isEmpty,
-                   !requestId.isEmpty {
-                    let preparedNote = PreparedNote(
-                        content: note.content,
-                        encryptedContent: encryptedContent,
-                        channel: note.channel,
-                        createdAt: note.createdAt,
-                        requestId: requestId
-                    )
-                    result = await apiService.postPreparedNote(preparedNote)
-                } else {
-                    result = await apiService.postNote(content: note.content)
-                }
-
-                if result.success {
-                    if let noteId = note.id {
-                        try? await databaseService.deletePendingNote(id: noteId)
-                        print("[PendingNoteService] Pending note sent, id=\(noteId)")
+                for note in try await databaseService.getPendingNotes() {
+                    guard !Task.isCancelled, access.isReady, generation == access.generation else { return }
+                    let prepared: PreparedNote
+                    if let encrypted = note.encryptedContent, let request = note.requestId, !encrypted.isEmpty, !request.isEmpty {
+                        prepared = PreparedNote(content: note.content, encryptedContent: encrypted, channel: note.channel,
+                                                createdAt: note.createdAt, requestId: request, configurationGeneration: generation)
+                    } else {
+                        prepared = try apiService.prepareNote(content: note.content, channel: note.channel)
                     }
-                } else {
-                    print("[PendingNoteService] Retry failed: \(result.message), stopping")
-                    if result.networkError {
-                        webSocketService.markConnectionSuspect(reason: "pending-retry-network-error")
+                    let result = await apiService.postPreparedNote(prepared)
+                    guard generation == access.generation else { return }
+                    if result.success, let id = note.id { try await databaseService.deletePendingNote(id: id) }
+                    else {
+                        if result.networkError && access.isReady { webSocketService.markConnectionSuspect(reason: "pending-retry") }
+                        return
                     }
-                    break
                 }
-            }
+            } catch { /* Keep durable pending data; next connection/manual retry can recover. */ }
         }
     }
-
-    /// 检查网络是否可用
-    var isNetworkAvailable: Bool {
-        webSocketService.connectionState == .connected
-    }
+    var isNetworkAvailable: Bool { webSocketService.connectionState == .connected }
 }

@@ -1,0 +1,80 @@
+[
+  {
+    "event": "begin",
+    "hostProductID": "cn.keevol.keenotes.remote.yearly",
+    "mode": "observation_preserving_transactions",
+    "testProductID": "local.test.annual.hostisolation20260919a",
+    "timestamp": 1789813516.19046,
+    "uiFixtureArgumentPresent": true
+  },
+  {
+    "environment": "Xcode",
+    "event": "purchase",
+    "id": "2",
+    "jwsFields": {
+      "environment": "Xcode",
+      "expiresDate": 1821349540491,
+      "originalTransactionId": "2",
+      "productId": "local.test.annual.hostisolation20260919a",
+      "purchaseDate": 1789813540491,
+      "transactionId": "2"
+    },
+    "jwsPayloadDecoded": true,
+    "missingJWSFields": [],
+    "productID": "local.test.annual.hostisolation20260919a",
+    "purchaseStartedAtMs": 1789813516270.018,
+    "timestamp": 1789813547.4059181
+  },
+  {
+    "event": "unfinished_before_assert",
+    "outcomes": [
+      {
+        "environment": "Xcode",
+        "id": "2",
+        "productID": "local.test.annual.hostisolation20260919a",
+        "verification": "verified"
+      }
+    ],
+    "timestamp": 1789813547.507492
+  },
+  {
+    "event": "raw_current_after_assert",
+    "timestamp": 1789813547.518282,
+    "transactions": [
+      {
+        "environment": "Xcode",
+        "expirationDateMs": 1821349540491,
+        "id": "2",
+        "productID": "local.test.annual.hostisolation20260919a",
+        "purchaseDateMs": 1789813540491,
+        "rawID": "2",
+        "rawOriginalID": "2",
+        "verification": "verified"
+      }
+    ]
+  },
+  {
+    "count": 1,
+    "event": "test_manager_finish_begin",
+    "id": "2",
+    "timestamp": 1789813547.562695
+  },
+  {
+    "count": 1,
+    "event": "test_manager_finish_end",
+    "id": "2",
+    "timestamp": 1789813547.604504
+  },
+  {
+    "event": "unfinished_after_handle",
+    "outcomes": [],
+    "testManagerFinishCount": 1,
+    "timestamp": 1789813547.6103868
+  },
+  {
+    "event": "end",
+    "isolatedSession": false,
+    "testManagerFinishCount": 1,
+    "timestamp": 1789813547.617484
+  }
+]
