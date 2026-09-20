@@ -216,3 +216,35 @@
 - MCP 示例空白是本轮 Tab 布局回归：内部 unmanaged 容器阻断高度失效传播，展开后仍按折叠高度裁剪。订阅内容布局变化以重算当前 Tab 高度，dispose 时解除；补上原生 FX 展开/收起及文本裁剪回归，上轮只验证了折叠状态。
 - 关键词和语义索引分别提供重建、取消、重试及状态；失败重试按 family 隔离。取消全量仍等待当前请求退出，避免影响同类型增量任务；关闭语义搜索则取消向量请求。原生 FX 覆盖单选/None、剪切板复制及重建并行/取消隔离。
 - 搜索列表恢复笔记时间倒序，同时间按 ID 倒序、缺失时间最后；关键词预览及 hybrid 最终结果统一在后台 hydration 后排序。Lucene/RRF 仍决定最多 100 条候选，不改变索引、不需重建；覆盖相关性与时间冲突、同时间及缺失时间回归。
+
+### Local Search 排版重构：Keyword / Semantic 两个顶层 section（2026-09-20）
+
+- 按用户确认的「大标题 + 分隔线」方案：`Keyword Search Settings` 和 `Semantic Search Settings` 升为顶层 section，`Embedding models` 降为 semantic section 内的子块，两个 index 面板各自归入所属 section。
+- 第二轮按反馈：删掉页顶 `Local Search` 标题与副标题；Semantic section 内顺序改为 `Semantic index` 在前、`Embedding models` 在后。对调后原来的提示 "Select a model **above**" 方位词失效，改为 "Select a model, then rebuild…"（去掉方位词避免再次对调时又错）。
+- 代价：两个 index 面板不再并排（原先 FlowPane 宽屏两列），因此删掉 `indexWidth` binding 和 `indexes` 容器，面板改为撑满 section 宽度。窄屏下每个面板更高，但溢出断言在 600/800/1200 三档均通过。
+- 顶层 section 用 `Region` 画 1px 分隔线而不是 `Separator`：`Separator` 的 line 在 Modena 里是双层 border + insets，覆盖起来比一个 `-fx-background-color` 的 Region 麻烦，颜色也更难跟随主题变量。
+- 保留原有 id / style class（`#rebuild-*`、`#keyword-index-panel`、`.search-index-panel`、`.model-card-cell` 等），测试里新增 `#keyword-search-section` / `#semantic-search-section` 的结构断言（层级归属 + keyword 在 semantic 之上）。
+- 未做：`+ Add model` 文案保持原样（图里的 "Add" 判断为示意）；不给 section 加折叠；semantic 关闭时 section 不置灰。
+
+### 模型卡片改版（2026-09-20）
+
+- 去掉卡片的 `KW`/`EM` 图标徽章和 `Default`/`Local`/`Custom` 标签，名称放大到 19px；选中态由底部 `Selected`/`Click to select` 文字改为右上角 SVG 对勾（未选中时 `visible=false` + `managed=false`，不占位）。
+- 连带清理：`modelCard()` 里的 `local(baseUrl)` 判定随之失去唯一调用点，`local()` 方法和 `java.net.URI` import 一并删除；CSS 里 `.model-icon` / `.model-kind` / `.model-card-status` 三条规则成为死代码，也删掉。
+- 代价：原来靠 `state` 标签 `minHeight: 32` 给右下角 `Configure` 覆盖按钮留位，标签删掉后改用同高度的空 `Region` 占位；行高与之前一致，卡片保持等高。
+- 名称加了 `setWrapText(true)`：字号变大后长显示名更容易溢出，不加会直接截断。
+- 测试补断言：全局可见的对勾数量为 1，且落在 `.selected-model-card` 内。
+
+### 卡片 Configure 改右键菜单（2026-09-20）
+
+- 删掉卡片底部的 `Separator` + 32px 占位 `Region`（就是那块诡异空白），`Configure` 按钮改为卡片右键菜单项；按钮原本只为给覆盖按钮让位而存在，一起删掉后卡片高度由内容决定。
+- 连带删掉 `modelCard()` 外面的 `StackPane` 包裹层：它唯一的用途是承载 `Configure` 覆盖按钮，现在没必要了。代价是同一个节点只能有一个 id，`#select-embedding-*` 与 `#embedding-model-*` 合并为后者，测试选择器同步改名。
+- `Configure` 菜单项没有绑定 `disableProperty(saving)`：卡片本身已绑定，而 JavaFX 里 disabled 节点收不到鼠标事件，右键菜单自然不会弹出。省掉了在 `clearCards()` 里遍历 `MenuItem` 解绑的生命周期代码。
+- 右键菜单沿用全局 `.context-menu` 主题样式（dark/light/main 三份都有），未新增样式；`.model-card-cell` 及其 `.search-secondary` 规则、`clearCards()` 里的 `.button` 解绑循环均已成为死代码，一并删除。
+
+## /doctor 体检与配置调整（2026-09-20）
+
+- 根 `CLAUDE.md` 里的 `@AGEHTS.md` 是拼写错误（该文件不存在），导致项目指令 `AGENTS.md` 从未被加载过；已改为 `@AGENTS.md`。改动未提交，等你 review `git diff` 后自行决定。
+- `~/.claude/settings.json`：`permissions.defaultMode` 设为 `auto`；5 个零使用插件置 `false`；14 个零使用技能设 `skillOverrides: off`（`asc-*` 22 个和 hyperframes/media/video 10 个经用户确认后已恢复启用）；移除失效条目 `superpowers@superpowers-marketplace`。原文件备份在 `~/.claude/settings.json.doctor.bak`。
+- `~/.claude.json`：本项目 `disabledMcpServers` 增加 `pencil`、`fetch`。注意 `/mcp disable` 是**逐项目**生效，换项目要重复操作。备份在 `~/.claude.json.doctor.bak`。
+- 7 个死技能条目（2 个自引用死链 + 5 个内容全为悬空链接的目录）**未能删除**：被 deny 规则 `Bash(rm -rf:*)` / `Bash(rm -f:*)` 拦截，需你手动执行。
+- `claude update` **失败**（2.1.270 → 2.1.278）：npm 全局安装的更新路径报错且无详细信息。根因未确定（目录可写、registry 正常），需你选择走 npm 还是 `claude install` 原生安装。

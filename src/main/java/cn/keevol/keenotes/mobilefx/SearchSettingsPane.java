@@ -8,10 +8,10 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-
-import java.net.URI;
+import javafx.scene.shape.SVGPath;
 
 /** Saved models are the default view; forms only appear when adding or configuring one. */
 final class SearchSettingsPane extends VBox {
@@ -19,7 +19,6 @@ final class SearchSettingsPane extends VBox {
     private final ToggleGroup modelSelection = new ToggleGroup();
     private final BooleanProperty semanticEnabled = new SimpleBooleanProperty();
     private final FlowPane cards = new FlowPane(16, 16);
-    private final FlowPane indexes = new FlowPane(16, 16);
     private final Label message = hint("");
     private final Label keywordStatus = hint("Initializing keyword index…");
     private final Label vectorStatus = hint("");
@@ -35,10 +34,6 @@ final class SearchSettingsPane extends VBox {
         int columns = width >= 1040 ? 4 : width >= 780 ? 3 : width >= 520 ? 2 : 1;
         return Math.floor((width - (columns - 1) * 16) / columns);
     }, cards.widthProperty());
-    private final DoubleBinding indexWidth = Bindings.createDoubleBinding(() -> {
-        double width = Math.max(indexes.getWidth(), 260);
-        return width >= 820 ? Math.floor((width - 16) / 2) : width;
-    }, indexes.widthProperty());
     private EmbeddingModelDialog editor;
     private boolean disposed;
 
@@ -46,9 +41,6 @@ final class SearchSettingsPane extends VBox {
         super(24);
         setPadding(new Insets(24, 0, 8, 0));
         getStyleClass().add("search-settings");
-        VBox introduction = new VBox(6, label("Local Search", "search-page-title"),
-                hint("Find notes by keyword, with optional semantic search from your selected model."));
-
         Label modelsTitle = label("Embedding models", "search-section-title");
         Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
         Button add = button("+ Add model", false); add.setId("add-embedding-model");
@@ -65,12 +57,24 @@ final class SearchSettingsPane extends VBox {
         vectorBuild.textProperty().bind(service.vectorBuildProperty());
         keywordError.textProperty().bind(service.keywordErrorProperty());
         vectorError.textProperty().bind(service.vectorErrorProperty());
-        indexes.setMinWidth(0);
-        indexes.getChildren().addAll(indexPanel(false), indexPanel(true));
-        getChildren().addAll(introduction, providers, message, indexes);
+        getChildren().addAll(
+                section("Keyword Search Settings", "keyword-search-section", indexPanel(false)),
+                section("Semantic Search Settings", "semantic-search-section", indexPanel(true), providers, message));
         service.statusProperty().addListener(statusListener);
         service.modelCatalogProperty().addListener(catalogListener);
         showModels(catalog()); showStatus(service.statusProperty().get());
+    }
+
+    /** A top-level settings block: heading, rule, then the settings that belong to it. */
+    private static VBox section(String title, String id, Node... content) {
+        Region rule = new Region();
+        rule.getStyleClass().add("search-section-rule");
+        rule.setMaxWidth(Double.MAX_VALUE);
+        VBox section = new VBox(16, new VBox(10, label(title, "search-group-title"), rule));
+        section.getChildren().addAll(content);
+        section.setId(id);
+        section.setMinWidth(0);
+        return section;
     }
 
     private EmbeddingModelCatalog catalog() { return service.modelCatalogProperty().get(); }
@@ -94,11 +98,11 @@ final class SearchSettingsPane extends VBox {
         FlowPane actions = new FlowPane(10, 10, rebuild, cancel, retry);
         VBox panel = new VBox(16, label(vector ? "Semantic index" : "Keyword index", "search-section-title"),
                 vector ? vectorStatus : keywordStatus, vector ? vectorBuild : keywordBuild, actions, error,
-                hint(vector ? "Select a model above, then rebuild to include historical notes."
+                hint(vector ? "Select a model, then rebuild to include historical notes."
                         : "Rebuild to include all historical notes. New synced notes are indexed automatically."));
         panel.setId(family + "-index-panel");
         panel.getStyleClass().add("search-index-panel");
-        panel.setMinWidth(0); panel.prefWidthProperty().bind(indexWidth);
+        panel.setMinWidth(0); panel.setMaxWidth(Double.MAX_VALUE);
         return panel;
     }
 
@@ -112,19 +116,20 @@ final class SearchSettingsPane extends VBox {
         showStatus(service.statusProperty().get());
     }
 
-    private StackPane modelCard(SavedEmbeddingModel model, boolean selected) {
+    private ToggleButton modelCard(SavedEmbeddingModel model, boolean selected) {
         String id = model == null ? "none" : model.id();
-        Label icon = label(model == null ? "KW" : "EM", "model-icon");
-        Label name = label(model == null ? "None" : model.name(), "model-card-name"); name.setMaxWidth(Double.MAX_VALUE);
-        Label kind = label(model == null ? "Default" : local(model.config().baseUrl()) ? "Local" : "Custom", "model-kind");
-        VBox heading = new VBox(6, name, kind); HBox.setHgrow(heading, Priority.ALWAYS); heading.setMinWidth(0);
-        HBox header = new HBox(12, icon, heading); header.setAlignment(Pos.CENTER_LEFT);
+        Label name = label(model == null ? "None" : model.name(), "model-card-name");
+        name.setMaxWidth(Double.MAX_VALUE); name.setWrapText(true);
+        Region headerSpacer = new Region(); HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        SVGPath check = new SVGPath();
+        check.setContent("M2 8 L6 12 L14 3");
+        check.getStyleClass().add("model-card-check");
+        check.setVisible(selected); check.setManaged(selected);
+        HBox header = new HBox(12, name, headerSpacer, check); header.setAlignment(Pos.CENTER_LEFT);
         Label modelId = label(model == null ? "Keyword search only" : model.config().model(), "model-id"); modelId.setWrapText(true);
         Label endpoint = hint(model == null ? "No model requests. Saved models stay available." : model.config().baseUrl());
-        VBox details = new VBox(6, modelId, endpoint); details.setMinHeight(62);
-        Label state = label(selected ? "Selected" : "Click to select", "model-card-status");
-        state.setMinHeight(32);
-        VBox content = new VBox(16, header, details, new Separator(), state);
+        VBox details = new VBox(6, modelId, endpoint);
+        VBox content = new VBox(16, header, details);
         content.prefWidthProperty().bind(cardWidth.subtract(42));
         content.setMouseTransparent(true);
         ToggleButton select = new ToggleButton() {
@@ -137,7 +142,7 @@ final class SearchSettingsPane extends VBox {
         select.setWrapText(true); // Propagate width-dependent sizing from the card's graphic.
         select.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         select.setAlignment(Pos.TOP_LEFT);
-        select.setId("select-embedding-" + id);
+        select.setId("embedding-model-" + id);
         select.setAccessibleText(model == null ? "None, keyword search only" : "Use " + model.name() + " for semantic search");
         select.getStyleClass().add("embedding-model-card");
         if (selected) select.getStyleClass().add("selected-model-card");
@@ -152,20 +157,15 @@ final class SearchSettingsPane extends VBox {
                     "Semantic search enabled. Rebuild the semantic index to include all notes.");
         });
         select.setMinWidth(0); select.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        StackPane card = new StackPane(select);
         if (model != null) {
-            // A sibling button keeps editing separate from selecting the full card.
-            Button configure = button("Configure", false); configure.setOnAction(e -> edit(model));
-            configure.disableProperty().bind(saving);
-            configure.setMaxSize(USE_PREF_SIZE, USE_PREF_SIZE);
-            StackPane.setAlignment(configure, Pos.BOTTOM_RIGHT);
-            StackPane.setMargin(configure, new Insets(0, 20, 20, 0));
-            card.getChildren().add(configure);
+            // Editing lives on the card's context menu so clicking the card only ever selects it.
+            // No disable binding needed: a disabled card does not receive mouse events while saving.
+            MenuItem configure = new MenuItem("Configure");
+            configure.setOnAction(e -> edit(model));
+            select.setContextMenu(new ContextMenu(configure));
         }
-        card.getStyleClass().add("model-card-cell");
-        card.setId("embedding-model-" + id);
-        card.setMinWidth(0); card.prefWidthProperty().bind(cardWidth);
-        return card;
+        select.prefWidthProperty().bind(cardWidth);
+        return select;
     }
 
     private void edit(SavedEmbeddingModel model) {
@@ -189,10 +189,6 @@ final class SearchSettingsPane extends VBox {
                 + (status.vectorBase() ? "" : "\nHistorical index not built") : "Semantic search is off");
     }
 
-    private static boolean local(String url) {
-        try { String host = URI.create(url).getHost(); return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host) || "[::1]".equals(host); }
-        catch (IllegalArgumentException e) { return false; }
-    }
     static Label hint(String text) { Label label = label(text, "field-hint"); label.setWrapText(true); return label; }
     static Label label(String text, String style) { Label label = new Label(text); label.getStyleClass().add(style); return label; }
     static Button button(String text, boolean primary) {
@@ -202,7 +198,6 @@ final class SearchSettingsPane extends VBox {
         modelSelection.getToggles().clear();
         cards.getChildren().forEach(node -> {
             if (node instanceof Region region) region.prefWidthProperty().unbind();
-            node.lookupAll(".button").forEach(control -> control.disableProperty().unbind());
             node.lookupAll(".toggle-button").forEach(control -> {
                 control.disableProperty().unbind();
                 ((Region) ((ToggleButton) control).getGraphic()).prefWidthProperty().unbind();
@@ -218,7 +213,6 @@ final class SearchSettingsPane extends VBox {
         keywordError.textProperty().unbind(); vectorError.textProperty().unbind();
         clearCards();
         lookupAll(".button").forEach(node -> node.disableProperty().unbind());
-        indexes.getChildren().forEach(node -> ((Region) node).prefWidthProperty().unbind());
-        cardWidth.dispose(); indexWidth.dispose();
+        cardWidth.dispose();
     }
 }

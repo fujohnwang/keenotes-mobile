@@ -45,3 +45,4 @@ dist/
 
 # Local IAP diagnostic evidence; never commit.
 /test-results/iap-20260919/
+.claude/settings.local.json

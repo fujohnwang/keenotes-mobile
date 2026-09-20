@@ -143,9 +143,17 @@ public class SearchFxTest {
                 assertTrue("Model cards must size to their content", ((ToggleButton) node).getHeight() < 320);
             }
             assertEquals("Wide layouts should show None and three model cards on one row", 1L,
-                    view.lookupAll(".model-card-cell").stream().map(node -> node.getBoundsInParent().getMinY()).distinct().count());
+                    view.lookupAll(".embedding-model-card").stream().map(node -> node.getBoundsInParent().getMinY()).distinct().count());
             assertEquals(1, view.lookupAll(".selected-model-card").size());
-            assertTrue(((ToggleButton) view.lookup("#select-embedding-none")).isSelected());
+            // Selection is shown by a check icon on the card, not by text.
+            assertEquals("Only the selected card shows the check mark", 1L,
+                    view.lookupAll(".model-card-check").stream().filter(javafx.scene.Node::isVisible).count());
+            assertTrue(view.lookup(".selected-model-card").lookupAll(".model-card-check").stream().anyMatch(javafx.scene.Node::isVisible));
+            assertNotNull("Saved models offer Configure on the card's context menu",
+                    ((ToggleButton) view.lookup("#embedding-model-ollama")).getContextMenu().getItems().getFirst());
+            assertNull("The None card has nothing to configure",
+                    ((ToggleButton) view.lookup("#embedding-model-none")).getContextMenu());
+            assertTrue(((ToggleButton) view.lookup("#embedding-model-none")).isSelected());
             assertTrue(view.lookupAll(".radio-button").isEmpty());
             assertTrue(tabs.getTabs().getLast().getContent().lookupAll(".text-field").isEmpty());
             assertTrue(view.lookupAll(".search-selection-panel").isEmpty());
@@ -153,6 +161,19 @@ public class SearchFxTest {
             assertTrue(view.lookup("#rebuild-semantic").isDisabled());
             assertNotNull(view.lookup("#keyword-index-panel").lookup("#retry-keyword"));
             assertNotNull(view.lookup("#semantic-index-panel").lookup("#retry-semantic"));
+            // Keyword and semantic settings are two top-level sections; models and the
+            // semantic index both belong to the semantic one.
+            var keywordSection = view.lookup("#keyword-search-section");
+            var semanticSection = view.lookup("#semantic-search-section");
+            assertNotNull(keywordSection);
+            assertNotNull(semanticSection);
+            assertNotNull(keywordSection.lookup("#keyword-index-panel"));
+            assertNull(keywordSection.lookup("#semantic-index-panel"));
+            assertNotNull(semanticSection.lookup("#semantic-index-panel"));
+            assertEquals(4, semanticSection.lookupAll(".embedding-model-card").size());
+            assertTrue("Keyword Search Settings must sit above Semantic Search Settings", top(keywordSection) < top(semanticSection));
+            assertTrue("Semantic index must sit above the embedding model cards in its own section",
+                    top(semanticSection.lookup("#semantic-index-panel")) < top(semanticSection.lookup(".embedding-model-card")));
             saveSnapshot(scroll, "ai-settings-dark");
             scene.getStylesheets().setAll(resource("common"), resource("light"));
             scroll.applyCss(); scroll.layout(); saveSnapshot(scroll, "ai-settings-light");
@@ -164,7 +185,7 @@ public class SearchFxTest {
             tabs.getSelectionModel().select(1); scroll.applyCss(); scroll.layout();
             for (int width : new int[]{800, 600, 1200}) {
                 scroll.resize(width, 1000); scroll.layout(); scroll.layout();
-                for (var card : view.lookupAll(".model-card-cell"))
+                for (var card : view.lookupAll(".embedding-model-card"))
                     assertTrue("Model card exceeds viewport at width " + width, card.localToScene(card.getLayoutBounds()).getMaxX() <= width);
                 for (var panel : view.lookupAll(".search-index-panel"))
                     assertTrue("Index panel exceeds viewport at width " + width, panel.localToScene(panel.getLayoutBounds()).getMaxX() <= width);
@@ -196,16 +217,15 @@ public class SearchFxTest {
             assertTrue(fx(() -> service.modelCatalogProperty().get().enabled()));
             fx(() -> {
                 assertFalse(view.lookup("#rebuild-semantic").isDisabled());
-                assertFalse(((ToggleButton) view.lookup("#select-embedding-none")).isSelected());
+                assertFalse(((ToggleButton) view.lookup("#embedding-model-none")).isSelected());
                 assertEquals(1, view.lookupAll(".selected-model-card").size());
-                var selected = (ToggleButton) view.lookup("#select-embedding-" + id);
+                var selected = (ToggleButton) view.lookup("#embedding-model-" + id);
                 selected.fire();
                 assertTrue("Clicking the selected card must retain its selection", selected.isSelected());
                 return null;
             });
             fx(() -> {
-                var card = view.lookup("#embedding-model-" + id);
-                card.lookupAll(".button").stream().map(node -> (Button) node).filter(button -> button.getText().equals("Configure")).findFirst().orElseThrow().fire();
+                configure(view, id);
                 DialogPane dialog = editor();
                 assertEquals("embedding-model-b", ((TextField) dialog.lookup("#embedding-model-id")).getText());
                 ((TextField) dialog.lookup("#embedding-display-name")).setText("Renamed local model");
@@ -213,15 +233,14 @@ public class SearchFxTest {
             });
             awaitFx(() -> service.modelCatalogProperty().get().selected().name().equals("Renamed local model"));
             assertEquals(4, fx(() -> service.modelCatalogProperty().get().models().size()).intValue());
-            fx(() -> { ((ToggleButton) view.lookup("#select-embedding-none")).fire(); return null; });
+            fx(() -> { ((ToggleButton) view.lookup("#embedding-model-none")).fire(); return null; });
             awaitFx(() -> !service.modelCatalogProperty().get().enabled());
             assertNull(fx(() -> service.modelCatalogProperty().get().selected()));
             assertEquals(4, fx(() -> service.modelCatalogProperty().get().models().size()).intValue());
             fx(() -> {
-                var card = view.lookup("#embedding-model-" + id);
-                card.lookupAll(".button").stream().map(node -> (Button) node).filter(button -> button.getText().equals("Configure")).findFirst().orElseThrow().fire();
+                configure(view, id);
                 assertFalse("Configure must not select the model", service.modelCatalogProperty().get().enabled());
-                assertTrue(((ToggleButton) view.lookup("#select-embedding-none")).isSelected());
+                assertTrue(((ToggleButton) view.lookup("#embedding-model-none")).isSelected());
                 ((Button) editor().lookupButton(javafx.scene.control.ButtonType.CANCEL)).fire();
                 return null;
             });
@@ -389,6 +408,15 @@ public class SearchFxTest {
         while (!fx(condition)) { assertTrue("Timed out waiting for model settings", System.nanoTime() < deadline); Thread.sleep(20); }
     }
     private static String resource(String theme) { return SearchFxTest.class.getResource("/styles/" + theme + ".css").toExternalForm(); }
+    /** Editing a saved model goes through the card's context menu; None has nothing to configure. */
+    private static void configure(AIView view, String id) {
+        ((ToggleButton) view.lookup("#embedding-model-" + id)).getContextMenu().getItems().getFirst().fire();
+    }
+
+    private static double top(javafx.scene.Node node) {
+        return node.localToScene(node.getBoundsInLocal()).getMinY();
+    }
+
     private static void saveSnapshot(javafx.scene.Parent root, String name) throws Exception {
         var snapshot = root.snapshot(null, null);
         var image = new java.awt.image.BufferedImage((int) snapshot.getWidth(), (int) snapshot.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);

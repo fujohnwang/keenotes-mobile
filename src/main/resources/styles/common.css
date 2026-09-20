@@ -718,9 +718,23 @@
     -fx-font-weight: bold;
     -fx-text-fill: -fx-text-primary;
 }
-.search-section-title,
-.model-card-name {
+.search-section-title {
     -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-text-primary;
+}
+.model-card-name {
+    -fx-font-size: 19px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-text-primary;
+}
+.search-section-rule {
+    -fx-min-height: 1;
+    -fx-pref-height: 1;
+    -fx-background-color: -fx-border;
+}
+.search-group-title {
+    -fx-font-size: 18px;
     -fx-font-weight: bold;
     -fx-text-fill: -fx-text-primary;
 }
@@ -746,31 +760,16 @@
     -fx-background-color: -fx-surface, -fx-accent-glow;
     -fx-border-color: -fx-primary;
 }
-.model-card-status { -fx-text-fill: -fx-text-secondary; -fx-font-size: 12px; }
-.embedding-model-card:selected .model-card-status {
-    -fx-text-fill: -fx-primary;
-    -fx-font-weight: bold;
+.model-card-check {
+    -fx-fill: transparent;
+    -fx-stroke: -fx-primary;
+    -fx-stroke-width: 2;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
 }
 .model-id {
     -fx-font-size: 14px;
     -fx-text-fill: -fx-text-primary;
-}
-.model-icon {
-    -fx-min-width: 38;
-    -fx-min-height: 38;
-    -fx-alignment: center;
-    -fx-background-color: derive(-fx-primary, -65%);
-    -fx-text-fill: white;
-    -fx-background-radius: 10;
-    -fx-font-size: 12px;
-    -fx-font-weight: bold;
-}
-.model-kind {
-    -fx-font-size: 11px;
-    -fx-text-fill: -fx-text-secondary;
-    -fx-background-color: -fx-surface-elevated;
-    -fx-padding: 3 7;
-    -fx-background-radius: 6;
 }
 .search-index-panel .button {
     -fx-padding: 8 11;
@@ -791,10 +790,6 @@
     -fx-stroke-line-join: round;
 }
 .mcp-copy-button:hover .mcp-copy-icon { -fx-stroke: -fx-primary; }
-.model-card-cell .search-secondary {
-    -fx-padding: 7 11;
-    -fx-font-size: 12px;
-}
 .embedding-model-dialog {
     -fx-background-color: -fx-background;
     -fx-padding: 20;
