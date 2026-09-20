@@ -121,6 +121,7 @@ public class Main extends Application {
 
             // 1. 初始化LocalCacheService（数据库初始化）
             ServiceManager.getInstance().getLocalCacheService();
+            ServiceManager.getInstance().getLocalSearchService();
 
             // 2. 添加服务状态监听器
             ServiceManager.getInstance().addListener((status, message) -> {

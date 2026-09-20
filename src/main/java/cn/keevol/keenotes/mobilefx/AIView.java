@@ -4,14 +4,32 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.control.Button;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.StackPane;
+import javafx.scene.shape.SVGPath;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.util.Subscription;
 
 /**
  * AI Integration view for MCP server and AI assistant configurations
  */
 public class AIView extends VBox {
+    private final SearchSettingsPane searchSettings = new SearchSettingsPane();
+    private final Subscription tabContentLayoutSubscription;
+    private final PauseTransition copyFeedback = new PauseTransition(Duration.seconds(2));
+
+    public void dispose() {
+        tabContentLayoutSubscription.unsubscribe();
+        copyFeedback.stop();
+        searchSettings.dispose();
+    }
     
     private final SettingsService settings;
     private final TextField mcpServerPortField;
@@ -33,23 +51,51 @@ public class AIView extends VBox {
         // Content area with padding
         VBox contentArea = new VBox(20);
         contentArea.setPadding(new Insets(24));
+        contentArea.setMaxWidth(1168);
         
         // MCP Server section
         VBox mcpSection = createMcpSection();
         
-        contentArea.getChildren().add(mcpSection);
+        TabPane tabs = new TabPane(new Tab("MCP", mcpSection), new Tab("Local Search", searchSettings)) {
+            @Override public javafx.geometry.Orientation getContentBias() { return javafx.geometry.Orientation.HORIZONTAL; }
+            @Override protected double computePrefHeight(double width) {
+                if (width < 0) width = Math.max(getWidth(), 600);
+                Tab selected = getSelectionModel().getSelectedItem();
+                javafx.scene.Node header = lookup(".tab-header-area");
+                double headerHeight = header == null ? 54 : header.prefHeight(width);
+                double contentWidth = Math.max(0, width - snappedLeftInset() - snappedRightInset());
+                return snappedTopInset() + headerHeight + snappedBottomInset()
+                        + (selected == null || selected.getContent() == null ? 0 : selected.getContent().prefHeight(contentWidth));
+            }
+        };
+        tabs.setId("ai-settings-tabs");
+        tabs.getStyleClass().add("ai-settings-tabs");
+        tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        tabs.setTabMinHeight(36);
+        tabs.setMinHeight(USE_PREF_SIZE);
+        tabs.setMaxHeight(USE_PREF_SIZE);
+        tabs.getSelectionModel().selectedItemProperty().addListener((o, old, selected) -> tabs.requestLayout());
+        // The skin's unmanaged content containers stop layout invalidation from reaching
+        // the TabPane. Forward it so expanding content also updates our preferred height.
+        java.util.function.BiConsumer<Boolean, Boolean> contentLayoutChanged = (old, needsLayout) -> {
+            if (needsLayout) tabs.requestLayout();
+        };
+        tabContentLayoutSubscription = Subscription.combine(
+                searchSettings.needsLayoutProperty().subscribe(contentLayoutChanged),
+                mcpSection.needsLayoutProperty().subscribe(contentLayoutChanged));
+        contentArea.getChildren().add(tabs);
         
         getChildren().add(contentArea);
     }
     
     private VBox createMcpSection() {
         VBox section = new VBox(12);
-        section.setPadding(new Insets(16));
-        section.setMaxWidth(700);
+        section.setPadding(new Insets(24, 0, 8, 0));
+        section.setMaxWidth(Double.MAX_VALUE);
         section.getStyleClass().add("import-section");
         
-        Label sectionLabel = new Label("MCP Server (Model Context Protocol)");
-        sectionLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-text-primary;");
+        Label sectionLabel = new Label("MCP Server");
+        sectionLabel.getStyleClass().add("search-page-title");
         
         Label descLabel = new Label("Expose KeeNotes as an MCP server for AI assistants (Claude, Kiro, etc.). Default port: 1999");
         descLabel.getStyleClass().add("field-hint");
@@ -57,14 +103,14 @@ public class AIView extends VBox {
         
         Label portLabel = new Label("MCP Server Port");
         portLabel.getStyleClass().add("field-label");
-        portLabel.setMinWidth(259);
-        portLabel.setMaxWidth(259);
+        portLabel.setMinWidth(145);
+        portLabel.setMaxWidth(145);
         portLabel.setAlignment(Pos.CENTER_RIGHT);
         
         mcpServerPortField.getStyleClass().add("input-field");
         mcpServerPortField.setText(String.valueOf(settings.getMcpServerPort()));
         HBox.setHgrow(mcpServerPortField, Priority.ALWAYS);
-        mcpServerPortField.setMaxWidth(Double.MAX_VALUE);
+        mcpServerPortField.setMaxWidth(180);
         
         mcpStatusLabel.getStyleClass().add("field-hint");
         
@@ -149,8 +195,8 @@ public class AIView extends VBox {
         });
         
         Label endpointSpacer = new Label();
-        endpointSpacer.setMinWidth(259);
-        endpointSpacer.setMaxWidth(259);
+        endpointSpacer.setMinWidth(145);
+        endpointSpacer.setMaxWidth(145);
         
         HBox endpointRow = new HBox(16, endpointSpacer, mcpEndpointLabel);
         endpointRow.setAlignment(Pos.CENTER_LEFT);
@@ -159,8 +205,8 @@ public class AIView extends VBox {
         mcpStatusLabel.getStyleClass().add("field-hint");
         
         Label statusSpacer = new Label();
-        statusSpacer.setMinWidth(259);
-        statusSpacer.setMaxWidth(259);
+        statusSpacer.setMinWidth(145);
+        statusSpacer.setMaxWidth(145);
         
         HBox statusRow = new HBox(16, statusSpacer, mcpStatusLabel);
         statusRow.setAlignment(Pos.CENTER_LEFT);
@@ -183,10 +229,10 @@ public class AIView extends VBox {
         VBox section = new VBox(8);
         section.setPadding(new Insets(12, 0, 0, 0));
         
-        // Spacer for alignment (259px like other rows)
+        // Spacer for alignment (145px like other rows)
         Label headerSpacer = new Label();
-        headerSpacer.setMinWidth(259);
-        headerSpacer.setMaxWidth(259);
+        headerSpacer.setMinWidth(145);
+        headerSpacer.setMaxWidth(145);
         
         // Example header (clickable to show/hide)
         Label exampleHeader = new Label("▶ Example Configuration");
@@ -223,12 +269,37 @@ public class AIView extends VBox {
         configText.getStyleClass().add("input-field");
         configText.setStyle("-fx-font-family: 'Monaco', 'Menlo', 'Consolas', monospace; -fx-font-size: 11px;");
         
-        VBox contentBox = new VBox(8, exampleDesc, configText);
+        SVGPath copyIcon = new SVGPath();
+        String copyPath = "M5 5 H15 V15 H5 Z M2 11 V2 H11";
+        copyIcon.setContent(copyPath);
+        copyIcon.getStyleClass().add("mcp-copy-icon");
+        Button copy = new Button();
+        copy.setId("copy-mcp-example");
+        copy.setGraphic(copyIcon);
+        copy.getStyleClass().add("mcp-copy-button");
+        copy.setAccessibleText("Copy example configuration");
+        Tooltip copyTooltip = new Tooltip("Copy example configuration");
+        copy.setTooltip(copyTooltip);
+        copyFeedback.setOnFinished(e -> { copyIcon.setContent(copyPath); copyTooltip.setText("Copy example configuration"); });
+        copy.setOnAction(e -> {
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(configText.getText());
+            if (javafx.scene.input.Clipboard.getSystemClipboard().setContent(content)) {
+                copyIcon.setContent("M2 8 L6 12 L14 3");
+                copyTooltip.setText("Copied");
+                copyFeedback.playFromStart();
+            }
+        });
+        StackPane exampleEditor = new StackPane(configText, copy);
+        StackPane.setAlignment(copy, Pos.TOP_RIGHT);
+        StackPane.setMargin(copy, new Insets(8));
+        copy.setMaxSize(USE_PREF_SIZE, USE_PREF_SIZE);
+        VBox contentBox = new VBox(8, exampleDesc, exampleEditor);
         
         // Spacer for content alignment
         Label contentSpacer = new Label();
-        contentSpacer.setMinWidth(259);
-        contentSpacer.setMaxWidth(259);
+        contentSpacer.setMinWidth(145);
+        contentSpacer.setMaxWidth(145);
         
         HBox contentRow = new HBox(16, contentSpacer, contentBox);
         contentRow.setAlignment(Pos.TOP_LEFT);

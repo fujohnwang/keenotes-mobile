@@ -19,6 +19,7 @@
         <javafx.platform>mac-aarch64</javafx.platform>
         <gluonfx.plugin.version>1.0.25</gluonfx.plugin.version>
         <attach.version>4.0.21</attach.version>
+        <lucene.version>10.5.1</lucene.version>
         <main.class>cn.keevol.keenotes.mobilefx.Main</main.class>
         <!-- 支持更高版本的 Java -->
         <maven.compiler.source>25</maven.compiler.source>
@@ -171,6 +172,21 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
             <dependencies>
+                <dependency>
+                    <groupId>org.apache.lucene</groupId>
+                    <artifactId>lucene-core</artifactId>
+                    <version>${lucene.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.apache.lucene</groupId>
+                    <artifactId>lucene-analysis-common</artifactId>
+                    <version>${lucene.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>com.huaban</groupId>
+                    <artifactId>jieba-analysis</artifactId>
+                    <version>1.0.2</version>
+                </dependency>
                 <!-- SQLite JDBC for desktop -->
                 <dependency>
                     <groupId>org.xerial</groupId>

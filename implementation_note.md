@@ -196,3 +196,23 @@
 - History 图标改为 plain，无底色/边框；透明 padding 与 contentShape 保留点击余量，辅助名称/action 不变。构建运行通过，未截图。
 - Purchase 按用户要求移除主题色 opacity(0.5)，恢复不透明；其余样式/位置/行为不变，未截图。
 - Purchase 文字改为白色，匹配已恢复不透明的主题蓝底；其它不变，未截图。
+
+## JavaFX 本地混合搜索（#140）
+
+- 单一搜索框改为 Lucene + Java jieba；只有 provider 已配置且启用才做 hybrid，SQL LIKE 搜索删除。远程同步提交时在现有 SQLite 同事务记录任务，分词、索引、HTTP 全部后台执行；不增加业务 append_seq、不改远程协议。
+- 关键词/向量独立 Base + Delta，全量采用固定正文快照并手动触发；取消保留构建检查点，增量继续。向量按 note 请求以隔离失败，同 profile/input 复用；代价是完整模型重算时 HTTP 请求数较多、重建快照额外占磁盘。
+- 模型迁移必须覆盖旧视图才发布；候选 Delta 未赶上时保留旧模型并允许重试。已配置 profile 的凭据沿用 CryptoHelper 加密保存在 settings，支持迁移中重启；API Key 不进入搜索元数据。
+- 搜索 codec 保留 Lucene 标准磁盘格式，将默认 1024 维上限扩到 16384；3072 维写入、重建及重启查询有测试覆盖。
+- 过期查询取消独立 HTTP Call；清空缓存轮换 epoch，拒绝旧结果并延迟回收正在退出的旧构建目录。缺失 Base 可手动重建；增量失败自动重试 3 次后需手动重试。
+- 十万条合成短笔记 + 768 维模拟向量通过容量冒烟：关键词构建约 17 秒、向量构建约 105 秒、索引约 327 MiB；不含真实模型推理/网络时间。详细约束及验证命令见 `docs/desktop-local-search.md`。
+
+- 2026-09-20 按用户选项2：先手动发布已批准 IAP 1.9.0(3)，回读 READY_FOR_DISTRIBUTION；随后将最终 UI 打包为1.9.1(4)，09:52提交，版本及submission cbbd04aa-c8bf-46a2-9be7-593eec4034f6均WAITING_FOR_REVIEW，保留MANUAL发布。独立审查＋原单模拟器3/3回归通过；未截图，临时测试调整已恢复，正式IPA无fixture。ASC stage需传metadata根目录，已修正并复用同一版本；详情docs/keenotes-iap-release-20260920.md，未提交Git。
+
+## AI 设置布局与多模型管理
+
+- AI 设置按 MCP / Local Search 排列，默认打开 MCP；示例右上角一键复制完整 JSON，使用可清理的 PauseTransition 显示成功反馈。Tab 高度按当前内容计算；隐藏的 Settings 子页不再参与布局。
+- Local Search 将 None 和已保存模型统一为整卡可点选的 ToggleButton，无 radio 圆点；选中使用边框/底色/文字提示，宽屏最多四列并自动换行。Configure 为卡片上的独立按钮，只打开编辑；选择 None 保留配置和索引并关闭语义搜索，旧的关闭状态迁移为 None。
+- 沿用原 settings 文件与 CryptoHelper 保存加密凭据；旧单模型配置自动映射为第一张卡片，保留 profile 和启用状态。新增配置只保存为候选，选择模型继续走原有索引迁移流程；显示名称不改变向量 profile。
+- MCP 示例空白是本轮 Tab 布局回归：内部 unmanaged 容器阻断高度失效传播，展开后仍按折叠高度裁剪。订阅内容布局变化以重算当前 Tab 高度，dispose 时解除；补上原生 FX 展开/收起及文本裁剪回归，上轮只验证了折叠状态。
+- 关键词和语义索引分别提供重建、取消、重试及状态；失败重试按 family 隔离。取消全量仍等待当前请求退出，避免影响同类型增量任务；关闭语义搜索则取消向量请求。原生 FX 覆盖单选/None、剪切板复制及重建并行/取消隔离。
+- 搜索列表恢复笔记时间倒序，同时间按 ID 倒序、缺失时间最后；关键词预览及 hybrid 最终结果统一在后台 hydration 后排序。Lucene/RRF 仍决定最多 100 条候选，不改变索引、不需重建；覆盖相关性与时间冲突、同时间及缺失时间回归。

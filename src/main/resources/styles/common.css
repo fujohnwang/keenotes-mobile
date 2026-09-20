@@ -636,3 +636,173 @@
     -fx-cursor: hand;
     -fx-underline: true;
 }
+
+/* Local search settings: use the same theme variables in both desktop themes. */
+.search-settings .action-button,
+.search-settings .search-secondary {
+    -fx-padding: 10 16;
+    -fx-font-size: 14px;
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+    -fx-cursor: hand;
+}
+.search-settings .search-secondary {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-text-fill: -fx-text-primary;
+}
+.search-settings .search-secondary:hover {
+    -fx-background-color: -fx-surface-elevated;
+}
+.search-settings .titled-pane {
+    -fx-text-fill: -fx-text-primary;
+}
+.search-settings .titled-pane > .title,
+.search-settings .check-box > .box {
+    -fx-background-color: -fx-surface-elevated;
+    -fx-border-color: -fx-border;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+}
+.search-settings .titled-pane > .title > .arrow-button > .arrow,
+.search-settings .check-box:selected > .box > .mark {
+    -fx-background-color: -fx-primary;
+}
+.search-settings .titled-pane > .content,
+.search-settings .text-area .content {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+}
+
+/* AI settings: tab navigation, saved provider cards, and secondary configuration forms. */
+.ai-settings-tabs {
+    -fx-background-color: transparent;
+    -fx-tab-min-width: 124px;
+    -fx-open-tab-animation: none;
+    -fx-close-tab-animation: none;
+}
+.ai-settings-tabs > .tab-header-area {
+    -fx-padding: 0;
+}
+.ai-settings-tabs > .tab-header-area > .tab-header-background {
+    -fx-background-color: transparent;
+    -fx-border-color: -fx-border;
+    -fx-border-width: 0 0 1 0;
+}
+.ai-settings-tabs .tab {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 8 20;
+    -fx-border-width: 0 0 2 0;
+    -fx-border-color: transparent;
+}
+.ai-settings-tabs .tab .tab-label {
+    -fx-text-fill: -fx-text-secondary;
+    -fx-font-size: 14px;
+}
+.ai-settings-tabs .tab:selected {
+    -fx-border-color: -fx-primary;
+}
+.ai-settings-tabs .tab:selected .tab-label {
+    -fx-text-fill: -fx-primary;
+    -fx-font-weight: bold;
+}
+.ai-settings-tabs .tab .focus-indicator {
+    -fx-border-width: 0;
+}
+.ai-settings-tabs > .tab-content-area {
+    -fx-background-color: transparent;
+}
+.search-page-title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-text-primary;
+}
+.search-section-title,
+.model-card-name {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-text-primary;
+}
+.search-index-panel,
+.embedding-model-card {
+    -fx-background-color: -fx-surface;
+    -fx-border-color: -fx-border;
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+    -fx-padding: 20;
+}
+.embedding-model-card {
+    -fx-cursor: hand;
+    -fx-background-insets: 0;
+}
+.embedding-model-card:hover, .embedding-model-card:focused {
+    -fx-border-color: -fx-primary;
+}
+.embedding-model-card:focused {
+    -fx-effect: dropshadow(gaussian, -fx-accent-glow, 8, 0, 0, 0);
+}
+.embedding-model-card:selected {
+    -fx-background-color: -fx-surface, -fx-accent-glow;
+    -fx-border-color: -fx-primary;
+}
+.model-card-status { -fx-text-fill: -fx-text-secondary; -fx-font-size: 12px; }
+.embedding-model-card:selected .model-card-status {
+    -fx-text-fill: -fx-primary;
+    -fx-font-weight: bold;
+}
+.model-id {
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-text-primary;
+}
+.model-icon {
+    -fx-min-width: 38;
+    -fx-min-height: 38;
+    -fx-alignment: center;
+    -fx-background-color: derive(-fx-primary, -65%);
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.model-kind {
+    -fx-font-size: 11px;
+    -fx-text-fill: -fx-text-secondary;
+    -fx-background-color: -fx-surface-elevated;
+    -fx-padding: 3 7;
+    -fx-background-radius: 6;
+}
+.search-index-panel .button {
+    -fx-padding: 8 11;
+    -fx-font-size: 12px;
+}
+.mcp-copy-button {
+    -fx-background-color: transparent;
+    -fx-padding: 7;
+    -fx-cursor: hand;
+    -fx-background-radius: 6;
+}
+.mcp-copy-button:hover, .mcp-copy-button:focused { -fx-background-color: -fx-surface-elevated; }
+.mcp-copy-icon {
+    -fx-fill: transparent;
+    -fx-stroke: -fx-text-secondary;
+    -fx-stroke-width: 1.5;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+.mcp-copy-button:hover .mcp-copy-icon { -fx-stroke: -fx-primary; }
+.model-card-cell .search-secondary {
+    -fx-padding: 7 11;
+    -fx-font-size: 12px;
+}
+.embedding-model-dialog {
+    -fx-background-color: -fx-background;
+    -fx-padding: 20;
+}
+.embedding-model-dialog > .button-bar > .container {
+    -fx-padding: 16 0 0 0;
+}
+.embedding-model-dialog .scroll-pane,
+.embedding-model-dialog .scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}

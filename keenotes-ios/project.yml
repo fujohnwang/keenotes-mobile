@@ -32,7 +32,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: cn.keevol.keenotes
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
-        MARKETING_VERSION: "1.9.0"
+        MARKETING_VERSION: "1.9.1"
         DEVELOPMENT_TEAM: NG744CF46S
         # Configure published values only after ASC/backend setup; no placeholder production SKU.
         IAP_ANNUAL_PRODUCT_ID: "cn.keevol.keenotes.remote.yearly"
@@ -40,7 +40,7 @@ targets:
         IAP_SANDBOX_PROVISION_URL: "https://kns.afoo.me/iap/apple/sandbox/provision"
         IAP_TERMS_URL: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
         IAP_PRIVACY_URL: "https://kns.afoo.me/privacy"
-        CURRENT_PROJECT_VERSION: 3
+        CURRENT_PROJECT_VERSION: 4
         SWIFT_OBJC_BRIDGING_HEADER: KeeNotes/CArgon2/KeeNotes-Bridging-Header.h
         CLANG_ENABLE_MODULES: YES
     dependencies:

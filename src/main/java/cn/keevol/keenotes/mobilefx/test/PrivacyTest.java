@@ -103,7 +103,13 @@ public class PrivacyTest {
             System.out.println("✓ 插入3条测试笔记");
 
             // 测试搜索
-            List<LocalCacheService.NoteData> searchResults = cache.searchNotes("搜索");
+            List<LocalCacheService.NoteData> searchResults;
+            try (var search = new cn.keevol.keenotes.mobilefx.search.LocalSearchEngine(cache.getDatabasePath(),
+                    cn.keevol.keenotes.mobilefx.search.EmbeddingClient.unavailable())) {
+                search.drainKeywords();
+                searchResults = cache.getNotesByIds(search.search("搜索",
+                        cn.keevol.keenotes.mobilefx.search.EmbeddingConfig.disabled()).ids());
+            }
             System.out.println("✓ 搜索'搜索': " + searchResults.size() + " 条结果");
             if (searchResults.size() != 2) {
                 throw new RuntimeException("搜索结果数量错误！预期2条，实际" + searchResults.size());

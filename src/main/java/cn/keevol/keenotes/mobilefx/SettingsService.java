@@ -7,6 +7,9 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.scene.text.Font;
+import cn.keevol.keenotes.mobilefx.search.EmbeddingConfig;
+import cn.keevol.keenotes.mobilefx.search.EmbeddingModelCatalog;
+import cn.keevol.keenotes.mobilefx.search.SavedEmbeddingModel;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -75,8 +78,12 @@ public class SettingsService {
     private final BooleanProperty showOnThisDayInYearsPastProperty = new SimpleBooleanProperty(true);
 
     private SettingsService() {
+        this(resolveSettingsPath());
+    }
+
+    SettingsService(Path settingsPath) {
         properties = new Properties();
-        settingsPath = resolveSettingsPath();
+        this.settingsPath = settingsPath;
         loadSettings();
         // Initialize property from loaded settings
         showOverviewCardProperty.set(getShowOverviewCard());
@@ -94,7 +101,7 @@ public class SettingsService {
         return instance;
     }
 
-    private Path resolveSettingsPath() {
+    private static Path resolveSettingsPath() {
         Path fallbackPath = Path.of(System.getProperty("user.home"), ".keenotes", SETTINGS_FILE);
         System.out.println("[Settings] Using fallback storage: " + fallbackPath);
         return fallbackPath;
@@ -154,6 +161,81 @@ public class SettingsService {
         return !(endpoint == null || endpoint.isBlank() || 
                  token == null || token.isBlank() ||
                  encryptionPassword == null || encryptionPassword.isBlank());
+    }
+
+    public synchronized EmbeddingConfig getEmbeddingConfig() {
+        return new EmbeddingConfig(Boolean.parseBoolean(properties.getProperty("search.embedding.enabled", "false")),
+                properties.getProperty("search.embedding.baseUrl", ""), properties.getProperty("search.embedding.model", ""),
+                CryptoHelper.decrypt(properties.getProperty("search.embedding.apiKey", "")),
+                properties.getProperty("search.embedding.documentPrefix", ""), properties.getProperty("search.embedding.queryPrefix", ""));
+    }
+
+    public synchronized void setEmbeddingConfig(EmbeddingConfig config) {
+        EmbeddingConfig previous = getEmbeddingConfig();
+        if (previous.configured()) properties.setProperty("search.embedding.credentials." + previous.profile(),
+                previous.apiKey().isEmpty() ? "" : CryptoHelper.encrypt(previous.apiKey()));
+        properties.setProperty("search.embedding.enabled", Boolean.toString(config.enabled()));
+        properties.setProperty("search.embedding.baseUrl", config.baseUrl());
+        properties.setProperty("search.embedding.model", config.model());
+        properties.setProperty("search.embedding.apiKey", config.apiKey().isEmpty() ? "" : CryptoHelper.encrypt(config.apiKey()));
+        properties.setProperty("search.embedding.documentPrefix", config.documentPrefix());
+        properties.setProperty("search.embedding.queryPrefix", config.queryPrefix());
+        if (config.configured()) properties.setProperty("search.embedding.credentials." + config.profile(),
+                config.apiKey().isEmpty() ? "" : CryptoHelper.encrypt(config.apiKey()));
+    }
+
+    public synchronized String getEmbeddingApiKey(String profile) {
+        EmbeddingConfig current = getEmbeddingConfig();
+        if (current.profile().equals(profile)) return current.apiKey();
+        return CryptoHelper.decrypt(properties.getProperty("search.embedding.credentials." + profile, ""));
+    }
+
+    public synchronized EmbeddingModelCatalog getEmbeddingModelCatalog() {
+        EmbeddingConfig current = getEmbeddingConfig();
+        String savedIds = properties.getProperty("search.embedding.savedModels");
+        // Read-through migration preserves the existing profile, credentials and enable state.
+        if (savedIds == null) {
+            return current.configured()
+                    ? new EmbeddingModelCatalog(List.of(new SavedEmbeddingModel("legacy", current.model(), current)), "legacy", current.enabled())
+                    : new EmbeddingModelCatalog(List.of(), "", false);
+        }
+        List<SavedEmbeddingModel> models = new ArrayList<>();
+        for (String id : savedIds.split(",")) {
+            if (id.isBlank()) continue;
+            String prefix = "search.embedding.saved." + id + ".";
+            EmbeddingConfig config = new EmbeddingConfig(false, properties.getProperty(prefix + "baseUrl", ""),
+                    properties.getProperty(prefix + "model", ""), CryptoHelper.decrypt(properties.getProperty(prefix + "apiKey", "")),
+                    properties.getProperty(prefix + "documentPrefix", ""), properties.getProperty(prefix + "queryPrefix", ""));
+            models.add(new SavedEmbeddingModel(id, properties.getProperty(prefix + "name", config.model()), config));
+        }
+        String selected = properties.getProperty("search.embedding.selectedModel", "");
+        // Legacy callers can still update the flat active configuration. Do not show a stale selection.
+        String selectedId = selected;
+        if (models.stream().noneMatch(m -> m.id().equals(selectedId) && m.config().profile().equals(current.profile()))) selected = "";
+        return new EmbeddingModelCatalog(models, selected, current.enabled() && !selected.isEmpty());
+    }
+
+    public synchronized void setEmbeddingModelCatalog(EmbeddingModelCatalog catalog) {
+        for (SavedEmbeddingModel model : catalog.models()) {
+            if (!model.config().configured()) throw new IllegalArgumentException("Set API Base URL and Model");
+            model.config().endpoint();
+        }
+        Properties saved = new Properties();
+        for (SavedEmbeddingModel model : catalog.models()) {
+            String prefix = "search.embedding.saved." + model.id() + ".";
+            EmbeddingConfig config = model.config();
+            saved.setProperty(prefix + "name", model.name());
+            saved.setProperty(prefix + "baseUrl", config.baseUrl());
+            saved.setProperty(prefix + "model", config.model());
+            saved.setProperty(prefix + "apiKey", config.apiKey().isEmpty() ? "" : CryptoHelper.encrypt(config.apiKey()));
+            saved.setProperty(prefix + "documentPrefix", config.documentPrefix());
+            saved.setProperty(prefix + "queryPrefix", config.queryPrefix());
+        }
+        setEmbeddingConfig(catalog.configuration());
+        properties.keySet().removeIf(key -> key.toString().startsWith("search.embedding.saved."));
+        properties.putAll(saved);
+        properties.setProperty("search.embedding.savedModels", String.join(",", catalog.models().stream().map(SavedEmbeddingModel::id).toList()));
+        properties.setProperty("search.embedding.selectedModel", catalog.selectedId());
     }
 
     public int getReviewDays() {

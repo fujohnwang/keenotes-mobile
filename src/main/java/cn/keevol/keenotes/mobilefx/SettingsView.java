@@ -45,6 +45,8 @@ public class SettingsView extends BorderPane {
 
         // Add all views to content area
         contentArea.getChildren().addAll(generalView, preferencesView, aiView, dataImportView, shareView, debugView);
+        contentArea.setAlignment(Pos.TOP_CENTER);
+        contentArea.getChildren().forEach(view -> view.managedProperty().bind(view.visibleProperty()));
 
         // Initially show general view
         generalView.setVisible(true);
@@ -71,6 +73,7 @@ public class SettingsView extends BorderPane {
     public void dispose() {
         stopActiveFadeIn();
         dataImportView.dispose();
+        ((AIView) aiView).dispose();
     }
 
     /**

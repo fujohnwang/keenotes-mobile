@@ -1,6 +1,7 @@
 package cn.keevol.keenotes.mobilefx;
 
 import cn.keevol.keenotes.mobilefx.utils.DateTimeUtil;
+import cn.keevol.keenotes.mobilefx.search.SearchStore;
 import javafx.application.Platform;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -39,6 +40,7 @@ public class LocalCacheService {
     private final CryptoService cryptoService;
     private volatile boolean initialized = false;
     private volatile boolean closed = false;
+    private volatile String searchEpoch;
 
     // 所有 JDBC 操作的同步锁 — Connection 不是线程安全的，
     // 重连期间 cryptoExecutor 写库和 UI reload 线程读库会并发访问同一个 Connection
@@ -149,6 +151,9 @@ public class LocalCacheService {
     public boolean isInitialized() {
         return initialized;
     }
+
+    public Path getDatabasePath() { return Path.of(dbPathString); }
+    public String getSearchEpoch() { return searchEpoch; }
 
     private void ensureInitialized() {
         if (closed) {
@@ -273,6 +278,10 @@ public class LocalCacheService {
             ensureColumnExists(stmt, "pending_notes", "encrypted_content", "TEXT");
             ensureColumnExists(stmt, "pending_notes", "request_id", "TEXT");
         }
+        SearchStore.ensureSchema(conn);
+        try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery("SELECT value FROM search_meta WHERE key='epoch'")) {
+            if (rs.next()) searchEpoch = rs.getString(1);
+        }
     }
 
     private void ensureColumnExists(Statement stmt, String tableName, String columnName, String columnDefinition)
@@ -375,6 +384,7 @@ public class LocalCacheService {
                 }
 
                 pstmt.executeBatch();
+                for (NoteData note : notes) SearchStore.recordSynced(connection, note.id, note.content, note.searchable);
                 connection.commit();
             } catch (SQLException e) {
                 failure = e;
@@ -408,19 +418,7 @@ public class LocalCacheService {
     }
 
     public void insertNote(NoteData note) throws SQLException {
-        ensureInitialized();
-        String sql = "INSERT OR REPLACE INTO notes_cache (id, content, channel, created_at, encrypted_content) VALUES (?, ?, ?, ?, ?)";
-
-        synchronized (dbLock) {
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setLong(1, note.id);
-                pstmt.setString(2, note.content);
-                pstmt.setString(3, note.channel);
-                pstmt.setString(4, note.createdAt);
-                pstmt.setString(5, note.encryptedContent);
-                pstmt.executeUpdate();
-            }
-        }
+        batchInsertNotes(List.of(note), false);
 
         // Update note count property
         refreshNoteCount();
@@ -439,36 +437,6 @@ public class LocalCacheService {
         } catch (Exception e) {
             // Ignore errors
         }
-    }
-
-    public List<NoteData> searchNotes(String query) {
-        ensureInitialized();
-        List<NoteData> results = new ArrayList<>();
-        if (query == null || query.trim().isEmpty()) {
-            return results;
-        }
-
-        String sql = "SELECT id, content, channel, created_at FROM notes_cache WHERE content LIKE ? ORDER BY created_at DESC LIMIT 100";
-
-        synchronized (dbLock) {
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setString(1, "%" + query + "%");
-                ResultSet rs = pstmt.executeQuery();
-
-                while (rs.next()) {
-                    results.add(new NoteData(
-                            rs.getLong("id"),
-                            rs.getString("content"),
-                            rs.getString("channel"),
-                            rs.getString("created_at"),
-                            null
-                    ));
-                }
-            } catch (SQLException e) {
-                logger.warning("searchNotes failed: " + e.getMessage());
-            }
-        }
-        return results;
     }
 
     public List<NoteData> getNotesForReview(int days) {
@@ -616,6 +584,23 @@ public class LocalCacheService {
             }
         }
         return results;
+    }
+
+    /** Hydrate search hits in ranking order; no search logic or LIKE fallback lives in SQLite. */
+    public List<NoteData> getNotesByIds(List<Long> ids) throws SQLException {
+        ensureInitialized();
+        if (ids.isEmpty()) return List.of();
+        String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+        java.util.Map<Long, NoteData> notes = new java.util.HashMap<>();
+        synchronized (dbLock) {
+            try (PreparedStatement p = connection.prepareStatement("SELECT id,content,channel,created_at FROM notes_cache WHERE id IN (" + placeholders + ")")) {
+                for (int i = 0; i < ids.size(); i++) p.setLong(i + 1, ids.get(i));
+                try (ResultSet rs = p.executeQuery()) {
+                    while (rs.next()) notes.put(rs.getLong(1), new NoteData(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), null));
+                }
+            }
+        }
+        return ids.stream().map(notes::get).filter(java.util.Objects::nonNull).toList();
     }
 
     public void updateLastSyncId(long lastSyncId) throws SQLException {
@@ -910,10 +895,17 @@ public class LocalCacheService {
         ensureInitialized();
         synchronized (dbLock) {
             try (Statement stmt = connection.createStatement()) {
+                connection.setAutoCommit(false);
                 stmt.executeUpdate("DELETE FROM notes_cache");
                 stmt.executeUpdate("UPDATE sync_state SET last_sync_id = -1, last_sync_time = NULL WHERE id = 1");
+                SearchStore.clear(connection);
+                connection.commit();
+                try (ResultSet rs = stmt.executeQuery("SELECT value FROM search_meta WHERE key='epoch'")) { rs.next(); searchEpoch = rs.getString(1); }
             } catch (SQLException e) {
+                try { connection.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }
                 throw new RuntimeException("Failed to clear cache data", e);
+            } finally {
+                try { connection.setAutoCommit(true); } catch (SQLException e) { throw new RuntimeException(e); }
             }
         }
 
@@ -1054,12 +1046,20 @@ public class LocalCacheService {
         public final String createdAt;
         public final String encryptedContent;
 
+        public final boolean searchable;
+
         public NoteData(long id, String content, String channel, String createdAt, String encryptedContent) {
+            this(id, content, channel, createdAt, encryptedContent,
+                    content != null && (encryptedContent == null || !content.equals(encryptedContent)));
+        }
+
+        public NoteData(long id, String content, String channel, String createdAt, String encryptedContent, boolean searchable) {
             this.id = id;
             this.content = content;
             this.channel = channel;
             this.createdAt = createdAt;
             this.encryptedContent = encryptedContent;
+            this.searchable = searchable;
         }
 
         @Override

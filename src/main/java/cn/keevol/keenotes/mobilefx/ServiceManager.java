@@ -10,6 +10,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 确保UI可以快速启动，即使网络不通或配置未完成
  */
 public class ServiceManager {
+    private LocalSearchService localSearchService;
+
+    public synchronized LocalSearchService getLocalSearchService() {
+        if (localSearchService == null) localSearchService = new LocalSearchService(getLocalCacheService(), getSettingsService());
+        return localSearchService;
+    }
 
     /**
      * 初始化状态枚举
@@ -290,6 +296,7 @@ public class ServiceManager {
         
         // 1. 触发缓存初始化
         getLocalCacheService();
+        getLocalSearchService();
         
         // 2. 初始化 PendingNoteService
         getPendingNoteService();
@@ -413,6 +420,7 @@ public class ServiceManager {
      */
     public void shutdown() {
         System.out.println("[ServiceManager] Starting shutdown...");
+        if (localSearchService != null) localSearchService.close();
 
         // 先关闭 PendingNoteService（它会使用 local cache 和 api service，必须先停）
         if (pendingNoteService != null) {

@@ -664,16 +664,19 @@ public class WebSocketClientService {
                             String createdAt = note.getString("created_at");
 
                             String decryptedContent;
+                            boolean searchable;
                             try {
                                 decryptedContent = cryptoService.decrypt(encryptedContent);
+                                searchable = true;
                             } catch (Exception e) {
                                 logger.warning("Failed to decrypt note " + id + ": " + describeThrowableChain(e)
                                         + ", storing encrypted content");
                                 decryptedContent = encryptedContent;
+                                searchable = false;
                             }
 
                             batchNotes.add(new LocalCacheService.NoteData(
-                                    id, decryptedContent, channel, createdAt, encryptedContent));
+                                    id, decryptedContent, channel, createdAt, encryptedContent, searchable));
                         } catch (Exception e) {
                             logger.warning("Failed to parse note: " + describeThrowableChain(e));
                         }
@@ -753,16 +756,19 @@ public class WebSocketClientService {
                 logger.info("Parsed realtime note metadata: id=" + id);
 
                 String decryptedContent;
+                boolean searchable;
                 try {
                     decryptedContent = cryptoService.decrypt(encryptedContent);
+                    searchable = true;
                 } catch (Exception e) {
                     logger.warning("Failed to decrypt note " + id + ": " + describeThrowableChain(e)
                             + ", storing encrypted content");
                     decryptedContent = encryptedContent;
+                    searchable = false;
                 }
 
                 LocalCacheService.NoteData note = new LocalCacheService.NoteData(
-                        id, decryptedContent, channel, createdAt, encryptedContent);
+                        id, decryptedContent, channel, createdAt, encryptedContent, searchable);
                 if (!isConnectionGenerationCurrent(connectionGen)) {
                     logger.fine("Discarding stale decrypted realtime update for generation=" + connectionGen);
                     return;

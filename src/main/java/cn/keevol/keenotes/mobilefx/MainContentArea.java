@@ -41,7 +41,6 @@ public class MainContentArea extends StackPane {
 
     private static final String SLOT_RECENT = "recent";
     private static final String SLOT_REVIEW = "review";
-    private static final String SLOT_SEARCH = "search";
     private static final String SLOT_ON_THIS_DAY = "on-this-day";
     private static final String SLOT_PENDING = "pending";
 
@@ -61,6 +60,9 @@ public class MainContentArea extends StackPane {
     // Search mode components
     private SearchInputPanel searchInputPanel;
     private NotesDisplayPanel searchResultsPanel;
+    private Label searchInfo;
+    private long searchGeneration;
+    private javafx.concurrent.Task<LocalSearchService.ViewResult> searchTask;
 
     // Review mode components
     private NotesDisplayPanel reviewNotesPanel;
@@ -121,6 +123,8 @@ public class MainContentArea extends StackPane {
 
         // Listen to account switch events to re-register WebSocket listener
         accountSwitchedListener = (obs, oldVal, newVal) -> {
+            invalidateSearch();
+            if (searchResultsPanel != null) searchResultsPanel.clear();
             Platform.runLater(() -> {
                 logger.info("Account switched, re-registering WebSocket listener");
                 // Get new WebSocket service instance
@@ -307,6 +311,8 @@ public class MainContentArea extends StackPane {
      * Call when this component is no longer in use.
      */
     public void dispose() {
+        invalidateSearch();
+        if (searchInputPanel != null) searchInputPanel.dispose();
         stopActiveFadeTransitions();
         uiLoads.cancelAll();
         uiLoads.shutdown();
@@ -572,7 +578,12 @@ public class MainContentArea extends StackPane {
         searchResultsPanel.setOnReviseNote(this::handleReviseAsNewNote);
         VBox.setVgrow(searchResultsPanel, Priority.ALWAYS);
 
-        panel.getChildren().addAll(searchInputPanel, searchResultsPanel);
+        searchInfo = new Label();
+        searchInfo.setWrapText(true);
+        searchInfo.getStyleClass().add("field-hint");
+        searchInfo.managedProperty().bind(searchInfo.textProperty().isNotEmpty());
+        searchInfo.visibleProperty().bind(searchInfo.managedProperty());
+        panel.getChildren().addAll(searchInputPanel, searchInfo, searchResultsPanel);
 
         // Don't show any text initially - the hint is already in SearchInputPanel
 
@@ -582,48 +593,35 @@ public class MainContentArea extends StackPane {
     /**
      * Handle search query
      */
+    private void invalidateSearch() {
+        searchGeneration++;
+        if (searchTask != null) searchTask.cancel(false);
+    }
+
     private void handleSearch(String query) {
-        if (query == null || query.trim().isEmpty()) {
+        invalidateSearch();
+        searchInfo.setText("");
+        if (query == null || query.isBlank()) {
             searchResultsPanel.clear();
             return;
         }
-
-        final String trimmedQuery = query.trim();
+        final long generation = searchGeneration;
+        final String text = query.trim();
+        LocalSearchService search = ServiceManager.getInstance().getLocalSearchService();
         searchResultsPanel.showLoading("Searching");
-        uiLoads.submit(SLOT_SEARCH, () -> loadSearchData(trimmedQuery), result -> applySearchLoadResult(trimmedQuery, result),
-                e -> searchResultsPanel.showError("Error searching notes: " + e.getMessage()));
-    }
-
-    private SearchLoadResult loadSearchData(String query) {
-        ServiceManager serviceManager = ServiceManager.getInstance();
-        ServiceManager.InitializationState state = serviceManager.getLocalCacheState();
-        if (state != ServiceManager.InitializationState.READY) {
-            return new SearchLoadResult(state, serviceManager.getLocalCacheErrorMessage(), List.of());
-        }
-        LocalCacheService cache = serviceManager.getLocalCacheService();
-        return new SearchLoadResult(state, null, cache.searchNotes(query));
-    }
-
-    private void applySearchLoadResult(String query, SearchLoadResult result) {
-        if (result.state == ServiceManager.InitializationState.READY) {
-            localCache = ServiceManager.getInstance().getLocalCacheService();
-            if (result.notes.isEmpty()) {
-                searchResultsPanel.showEmptyState("No results found for \"" + query + "\"");
-            } else {
-                searchResultsPanel.displayNotes(result.notes);
-            }
-            return;
-        }
-        if (result.state == ServiceManager.InitializationState.INITIALIZING) {
-            searchResultsPanel.showLoading("Cache is initializing");
-            uiLoads.scheduleDelayed(SLOT_SEARCH + "-retry", 2000, () -> handleSearch(query));
-        } else if (result.state == ServiceManager.InitializationState.ERROR) {
-            searchResultsPanel.showError("Cache error: " + result.errorMessage);
-        } else {
-            searchResultsPanel.showLoading("Initializing cache");
-            ServiceManager.getInstance().getLocalCacheService();
-            uiLoads.scheduleDelayed(SLOT_SEARCH + "-retry", 1000, () -> handleSearch(query));
-        }
+        Consumer<LocalSearchService.ViewResult> apply = result -> {
+            if (generation != searchGeneration || !search.isCurrent(result)) return;
+            String coverage = result.partial() ? "Historical index incomplete. Rebuild in Settings → AI. " : "";
+            searchInfo.setText(coverage + result.message());
+            if (result.notes().isEmpty()) searchResultsPanel.showEmptyState("No results found for \"" + text + "\"");
+            else searchResultsPanel.displayNotes(result.notes());
+        };
+        searchTask = search.search(text, apply);
+        var task = searchTask;
+        task.setOnSucceeded(event -> apply.accept(task.getValue()));
+        task.setOnFailed(event -> {
+            if (generation == searchGeneration) searchResultsPanel.showError("Search failed: " + LocalSearchService.message(task.getException()));
+        });
     }
 
     /**
@@ -1353,19 +1351,6 @@ public class MainContentArea extends StackPane {
             this.state = state;
             this.errorMessage = errorMessage;
             this.totalCount = totalCount;
-        }
-    }
-
-    private static final class SearchLoadResult {
-        final ServiceManager.InitializationState state;
-        final String errorMessage;
-        final List<LocalCacheService.NoteData> notes;
-
-        SearchLoadResult(ServiceManager.InitializationState state, String errorMessage,
-                List<LocalCacheService.NoteData> notes) {
-            this.state = state;
-            this.errorMessage = errorMessage;
-            this.notes = notes;
         }
     }
 

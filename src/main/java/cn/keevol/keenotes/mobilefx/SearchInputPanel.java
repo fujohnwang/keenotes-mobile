@@ -33,7 +33,7 @@ public class SearchInputPanel extends VBox {
         
         // Search field with hint as placeholder
         searchField = new TextField();
-        searchField.setPromptText("Enter keywords to search your notes");
+        searchField.setPromptText("Search your notes");
         searchField.getStyleClass().add("search-field");
         HBox.setHgrow(searchField, Priority.ALWAYS);
         
@@ -117,5 +117,12 @@ public class SearchInputPanel extends VBox {
      */
     public void setQuery(String query) {
         searchField.setText(query);
+    }
+
+    public void dispose() {
+        searchDebounce.stop();
+        searchDebounce.setOnFinished(null);
+        searchField.setOnAction(null);
+        searchField.setOnKeyPressed(null);
     }
 }
