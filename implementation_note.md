@@ -248,3 +248,27 @@
 - `~/.claude.json`：本项目 `disabledMcpServers` 增加 `pencil`、`fetch`。注意 `/mcp disable` 是**逐项目**生效，换项目要重复操作。备份在 `~/.claude.json.doctor.bak`。
 - 7 个死技能条目（2 个自引用死链 + 5 个内容全为悬空链接的目录）**未能删除**：被 deny 规则 `Bash(rm -rf:*)` / `Bash(rm -f:*)` 拦截，需你手动执行。
 - `claude update` **失败**（2.1.270 → 2.1.278）：npm 全局安装的更新路径报错且无详细信息。根因未确定（目录可写、registry 正常），需你选择走 npm 还是 `claude install` 原生安装。
+
+## FxRuntimeMonitor 窗口日志降噪（2026-09-21）
+
+- 只把 `FxRuntimeMonitor` 里 4 处窗口焦点/生命周期日志从 `info` 改成 `fine` **不会生效**：`AppLogger` 把 root logger 和 console/file 两个 handler 都设为 `Level.ALL`（`AppLogger.java:79,85,94`），FINE 照样写进 `~/keenotes.log`。
+- 因此在类里加了 static block，显式 `logger.setLevel(INFO)`，只作用于本 logger，不影响其它类。想复现焦点抖动时加 JVM 参数 `-Dkeenotes.debug.fx=true` 即可恢复全部输出（无需改代码重编）。这是本仓库第一处 `Level.FINE` 用法，也没有既有的 debug 开关约定可复用。
+
+### 怎么打开这个调试开关（已实测，别踩坑）
+
+- ❌ **`mvn clean javafx:run -Dkeenotes.debug.fx=true` 无效**。`javafx-maven-plugin` 会 fork 出一个独立 JVM，只传 `options`（pom 里配的 VM 参数列表）+ module-path + classpath；Maven 命令行上的 `-D` 不会被带过去。实测对照：跑起来的 app 进程（PID 12391）命令行里只有 `--module-path/--add-modules/-classpath/主类`，Maven 自己的 `-Dclassworlds.conf=` 等一个都没出现。
+- ❌ `-Djavafx.options=...` 也不行：`mvn help:describe -Dplugin=org.openjfx:javafx-maven-plugin:0.0.8 -Ddetail -Dgoal=run` 显示 `options` 是唯一没有 User property 绑定的参数。
+- ✅ **可行**：`JAVA_TOOL_OPTIONS="-Dkeenotes.debug.fx=true" mvn clean javafx:run`。两段链路都已实测：forked 的 app JVM 继承了父进程全部环境变量（`ps eww <pid>` 能看到 77 个，PATH/HOME/JAVA_HOME 齐全），而 JVM 启动器会自动读取 `JAVA_TOOL_OPTIONS` 里的 `-D`（`JAVA_TOOL_OPTIONS=-Dx=y java -version` 会打印 `Picked up JAVA_TOOL_OPTIONS`）。
+- ✅ 打包后的 fat jar（`spring-boot-maven-plugin` repackage）直接在 `-jar` 前加：`java -Dkeenotes.debug.fx=true -jar target/keenotes-mobile-*.jar`。
+- 改 pom 的 `<options><option>-Dkeenotes.debug.fx=true</option></options>` 也行，但等于**永久**打开调试日志，不推荐；要开时用上面的环境变量，别改 pom。
+- 打开后会多出 `Level.FINE` 标签的行。注意日志真实文件名是 **`~/keenotes.log.0`**，没有 `~/keenotes.log`：`AppLogger.java:92` 用的是 `new FileHandler(pattern, limit, count, append)`，这个构造器产出的文件是 `pattern.0/1/2`，`.0` 是当前写入的那个（已实测）。老日志在 `~/keenotes.log.1`、`.2`。
+
+### 为什么当前日志文件是 `keenotes.log.0` 而不是 `keenotes.log`
+
+- 这是 JUL 的文档化行为，不是 AppLogger 写错。`FileHandler` javadoc：如果 pattern 里没有 `%g` 而 count > 1，世代号会被加到文件名末尾的点号之后；实现见 `FileHandler.generate()` 里的 `if (count > 1 && !sawg) word.append('.').append(generation)`。写法上无论显式写 `%g`（得到 `keenotes.log0`）还是不写（得到 `keenotes.log.0`），**只要 count > 1 当前文件就必然带序号**。AppLogger 的 `MAX_FILE_COUNT=3` 决定了这一点。
+- 设计动机：JUL 把当前文件也当成生成序列的一员（`files[i] = generate(pattern, i, unique)`），滚动就是级联 rename `files[i] → files[i+1]` 然后重开 `files[0]`，所以 `.0` 天然就是"正在写"的槽位、`.count-1` 最老。若当前文件叫原名，`rotate()` 就得多一条特例分支。logback/log4j2 用的是相反习惯（当前 `app.log`、历史 `.1/.2`），所以看着反直觉。
+- 想改成 `keenotes.log` 只有 count=1 一条路，但那时 limit 一到 `rotate()` 里的 `open(files[0], false)` 是 append=false，**直接清空文件**（数据丢失）。安全组合只有 count=1 + limit=0，即永不滚动、无上限增长。JUL 不支持"当前用原名 + 历史带序号"（`rotate()`/`files` 均 private，子类也改不了），要那个效果只能换 logback/log4j2 —— 为一个文件名引依赖不划算。结论：维持现状，记住看 `.0` 就行。
+- `~/keenotes.log.0.1` 这个幽灵文件的来历：FileHandler 发现目标文件被别的进程占着（`.lck`）时，会把 unique 号追加在**自动生成的世代号之后**（`if (unique > 0 && !sawu)`），所以 `.0.1` = generation 0 + unique 1，意味着**曾有两个 KeeNotes 实例同时运行**，第二个实例的日志落到了这里，没有污染主日志。反过来说：`~/` 下出现 `keenotes.log.0.1`、`.0.2` 就说明同机跑过多个实例。
+- 实践含义：并行跑第二个实例做实验不会覆盖主日志，但是否会因此抢共享资源（本地导入端口 / MCP 端口）未验证，别当成安全的并行手段。
+- `logger.info("Window close requested")`、`FX watchdog resumed after scheduler gap=`、`FX runtime monitor stopped` 保持 INFO：都是每次运行至多一条，且排查时有用。真正被静默的只有 `Window focused/iconified/showing` 和 `Window lifecycle event=` 这类高频行。
+- `logWindowState()` 内部的 `captureWindowState()` 仍然无条件执行（它的返回值 `lastWindowState` 会拼进卡死告警里），降级只影响打印，不影响行为。

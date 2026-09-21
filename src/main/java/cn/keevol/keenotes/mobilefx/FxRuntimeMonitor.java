@@ -23,6 +23,13 @@ import java.util.logging.Logger;
 final class FxRuntimeMonitor {
 
     private static final Logger logger = AppLogger.getLogger(FxRuntimeMonitor.class);
+
+    static {
+        // 窗口焦点/生命周期事件按 FINE 输出；AppLogger 全局为 Level.ALL，需在此显式降级才真正静默。
+        // 排查焦点抖动等问题时加 -Dkeenotes.debug.fx=true 重新打开。
+        logger.setLevel(Boolean.getBoolean("keenotes.debug.fx") ? Level.ALL : Level.INFO);
+    }
+
     private static final long CHECK_INTERVAL_SECONDS = 2;
     private static final long STALL_THRESHOLD_NANOS = TimeUnit.SECONDS.toNanos(8);
     private static final long SCHEDULER_GAP_NANOS = TimeUnit.SECONDS.toNanos(6);
@@ -60,15 +67,15 @@ final class FxRuntimeMonitor {
         });
 
         focusedListener = (observable, oldValue, newValue) -> {
-            logger.info("Window focused: " + oldValue + " -> " + newValue);
+            logger.fine("Window focused: " + oldValue + " -> " + newValue);
             updateMonitoringState();
         };
         iconifiedListener = (observable, oldValue, newValue) -> {
-            logger.info("Window iconified: " + oldValue + " -> " + newValue);
+            logger.fine("Window iconified: " + oldValue + " -> " + newValue);
             updateMonitoringState();
         };
         showingListener = (observable, oldValue, newValue) -> {
-            logger.info("Window showing: " + oldValue + " -> " + newValue);
+            logger.fine("Window showing: " + oldValue + " -> " + newValue);
             updateMonitoringState();
         };
         closeRequestHandler = event -> logger.info("Window close requested");
@@ -278,7 +285,7 @@ final class FxRuntimeMonitor {
 
     private void logWindowState(String event) {
         lastWindowState = captureWindowState();
-        logger.info("Window lifecycle event=" + event + " " + lastWindowState);
+        logger.fine("Window lifecycle event=" + event + " " + lastWindowState);
     }
 
     private String captureWindowState() {
