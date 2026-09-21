@@ -101,7 +101,10 @@ public class SearchFxTest {
             LocalCacheService cache = ServiceManager.getInstance().getLocalCacheService();
             cache.batchInsertNotes(List.of(new LocalCacheService.NoteData(2, "数据库语义搜索", "desktop", "2026-09-19", null)), false);
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-            while (!fx(() -> service.statusProperty().get() != null && service.statusProperty().get().vectors() > 0)) {
+            while (!fx(() -> {
+                var status = service.statusProperty().get();
+                return status != null && status.vectors().base() + status.vectors().delta() > 0;
+            })) {
                 assertTrue("Vector worker did not index the committed note", System.nanoTime() < deadline);
                 Thread.sleep(50);
             }

@@ -179,6 +179,11 @@ final class IndexFamily implements AutoCloseable {
 
     synchronized int count() { return visibleCount; }
 
+    // Base only ever holds eligible docs; Delta also keeps ineligible tombstones, so both count eligibility.
+    // ponytail: rescanned per status poll (~1/s); fold into recount() if the index ever outgrows that.
+    synchronized int baseCount() { return (int) base.values().stream().filter(DocState::eligible).count(); }
+    synchronized int deltaCount() { return (int) delta.values().stream().filter(DocState::eligible).count(); }
+
     private void recount() {
         visibleCount = (int) base.values().stream().filter(DocState::eligible).count();
         delta.forEach((id, state) -> {

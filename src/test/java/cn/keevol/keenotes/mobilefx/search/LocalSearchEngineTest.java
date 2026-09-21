@@ -66,12 +66,22 @@ public class LocalSearchEngineTest {
                     engine.drainKeywords();
                     assertEquals(List.of(5L), engine.search("缓存", EmbeddingConfig.disabled()).ids());
                     assertTrue(engine.search("数据库", EmbeddingConfig.disabled()).ids().isEmpty());
+                    // The snapshot is still building, so only the incremental layer reports the new note.
+                    LocalSearchEngine.Layer building = engine.status(EmbeddingConfig.disabled()).keywords();
+                    assertEquals(0, building.base());
+                    assertEquals(1, building.delta());
+                    assertFalse(building.built());
                 } catch (Exception e) { throw new RuntimeException(e); }
             });
             assertEquals(List.of(100L), engine.search("数据库", EmbeddingConfig.disabled()).ids());
             assertEquals(List.of(5L), engine.search("缓存", EmbeddingConfig.disabled()).ids());
             engine.rebuildKeywords(() -> false, (done, total) -> { });
             assertEquals(2, engine.search("笔记", EmbeddingConfig.disabled()).ids().size());
+            // The second snapshot covers both notes, so the now-redundant Delta entry is dropped.
+            LocalSearchEngine.Layer published = engine.status(EmbeddingConfig.disabled()).keywords();
+            assertEquals(2, published.base());
+            assertEquals(0, published.delta());
+            assertTrue(published.built());
         }
     }
 
@@ -149,10 +159,10 @@ public class LocalSearchEngineTest {
             engine.configure(config);
             sync(db, 1, "数据库", true);
             engine.drainKeywords(); engine.drainVectors(config);
-            assertEquals(1, engine.status(config).vectorPending());
+            assertEquals(1, engine.status(config).vectors().pending());
             assertEquals(List.of(1L), engine.search("数据库", config).ids());
             fail.set(false); engine.retryVectorFailures(); engine.drainVectors(config);
-            assertEquals(0, engine.status(config).vectorPending());
+            assertEquals(0, engine.status(config).vectors().pending());
             assertEquals(List.of(1L), engine.search("relational storage", config).ids());
         }
     }
@@ -171,12 +181,12 @@ public class LocalSearchEngineTest {
             assertEquals(1, store.pending(SearchStore.KEYWORD, SearchStore.KEYWORD_PROFILE, 10).size());
             assertTrue(store.pending(SearchStore.VECTOR, config.profile(), 10).isEmpty());
             engine.drainKeywords();
-            assertEquals(1, engine.status(config).vectorFailed());
+            assertEquals(1, engine.status(config).vectors().failed());
             engine.retryVectorFailures();
             assertEquals(1, store.pending(SearchStore.VECTOR, config.profile(), 10).size());
             assertTrue(store.pending(SearchStore.KEYWORD, SearchStore.KEYWORD_PROFILE, 10).isEmpty());
             engine.drainVectors(config);
-            assertEquals(0, engine.status(config).vectorPending());
+            assertEquals(0, engine.status(config).vectors().pending());
         }
     }
 

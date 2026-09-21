@@ -311,8 +311,12 @@ public final class LocalSearchEngine implements AutoCloseable {
         int[] kw = store.pendingCounts(SearchStore.KEYWORD, SearchStore.KEYWORD_PROFILE);
         int[] vec = config.configured() ? store.pendingCounts(SearchStore.VECTOR, config.profile()) : new int[]{0, 0};
         IndexFamily vector = config.usable() ? family(SearchStore.VECTOR, config.profile()).index() : null;
-        return new Status(keywords.index().count(), kw[0], kw[1], keywords.index().hasBase(),
-                vector == null ? 0 : vector.count(), vec[0], vec[1], vector != null && vector.hasBase());
+        return new Status(layer(keywords.index(), kw), layer(vector, vec));
+    }
+
+    private static Layer layer(IndexFamily index, int[] pending) {
+        return index == null ? new Layer(0, 0, pending[0], pending[1], false)
+                : new Layer(index.baseCount(), index.deltaCount(), pending[0], pending[1], index.hasBase());
     }
 
     public void retryKeywordFailures() throws SQLException { store.retryFailures(SearchStore.KEYWORD); }
@@ -328,6 +332,7 @@ public final class LocalSearchEngine implements AutoCloseable {
 
     private record Handle(IndexFamily index, String epoch, Path path) { }
     public record SearchResult(List<Long> ids, boolean partial, String message) { }
-    public record Status(int keywords, int keywordPending, int keywordFailed, boolean keywordBase,
-                         int vectors, int vectorPending, int vectorFailed, boolean vectorBase) { }
+    /** Base is the fixed historical snapshot; Delta is everything indexed since it was built. */
+    public record Layer(int base, int delta, int pending, int failed, boolean built) { }
+    public record Status(Layer keywords, Layer vectors) { }
 }

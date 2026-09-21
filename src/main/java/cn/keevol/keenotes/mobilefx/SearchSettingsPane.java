@@ -183,10 +183,14 @@ final class SearchSettingsPane extends VBox {
 
     private void showStatus(LocalSearchEngine.Status status) {
         if (status == null) return;
-        keywordStatus.setText(status.keywords() + " indexed · " + status.keywordPending() + " pending · " + status.keywordFailed() + " failed"
-                + (status.keywordBase() ? "" : "\nHistorical index not built"));
-        vectorStatus.setText(catalog().enabled() ? status.vectors() + " indexed · " + status.vectorPending() + " pending · " + status.vectorFailed() + " failed"
-                + (status.vectorBase() ? "" : "\nHistorical index not built") : "Semantic search is off");
+        keywordStatus.setText(describe(status.keywords()));
+        vectorStatus.setText(catalog().enabled() ? describe(status.vectors()) : "Semantic search is off");
+    }
+
+    /** Historical is the fixed rebuild snapshot; everything synced since lands in the incremental layer. */
+    private static String describe(LocalSearchEngine.Layer layer) {
+        return "Historical index  " + (layer.built() ? layer.base() + " notes" : "not built")
+                + "\nIncremental index  " + layer.delta() + " notes · " + layer.pending() + " pending · " + layer.failed() + " failed";
     }
 
     static Label hint(String text) { Label label = label(text, "field-hint"); label.setWrapText(true); return label; }

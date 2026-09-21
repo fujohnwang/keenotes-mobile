@@ -272,3 +272,11 @@
 - 实践含义：并行跑第二个实例做实验不会覆盖主日志，但是否会因此抢共享资源（本地导入端口 / MCP 端口）未验证，别当成安全的并行手段。
 - `logger.info("Window close requested")`、`FX watchdog resumed after scheduler gap=`、`FX runtime monitor stopped` 保持 INFO：都是每次运行至多一条，且排查时有用。真正被静默的只有 `Window focused/iconified/showing` 和 `Window lifecycle event=` 这类高频行。
 - `logWindowState()` 内部的 `captureWindowState()` 仍然无条件执行（它的返回值 `lastWindowState` 会拼进卡死告警里），降级只影响打印，不影响行为。
+
+## Local Search 状态拆成全量/增量两层（2026-09-21）
+
+- `LocalSearchEngine.Status` 从 8 个平铺字段改成 `Status(Layer keywords, Layer vectors)` + `Layer(base, delta, pending, failed, built)`。唯一消费者是 `SearchSettingsPane.showStatus`，12 个位置参数（一半是 int）太容易接错位。原 `indexed`（Base/Delta 合并后的 `visibleCount`）从 Status 里删掉了，因为新 UI 不显示它；`IndexFamily.count()` 保留，`search()` 内部还在用 `count() > 0` 判断有没有向量索引。
+- `baseCount()/deltaCount()` 用**即时 stream 扫描**，没有像 `visibleCount` 那样加缓存字段：`cleanCoveredDelta()` 删 Delta 条目时**不调用 `recount()`**（它不改变 `visibleCount`，净值 0），缓存字段会正好在这个场景下悄悄失准——而"全量重建后丢掉被覆盖的增量"恰恰是这次改动最需要显示正确的场景。status 轮询 1s/次，扫 2 万条 HashMap 是微秒级，不值得为它引入第二份要同步的状态。代码里留了 `ponytail:` 注释。已改成 `Layer` 的测试断言顺带覆盖了 `cleanCoveredDelta` 这条路径。
+- 计数语义：Base 只存 eligible 文档（`Builder.add` 跳过 ineligible），Delta 还会存 ineligible 墓碑（用来遮蔽 Base），所以两边都按 eligible 过滤，否则"增量 N notes"会把墓碑也算进去。
+- UI 变成两行：`Historical index  <N> notes` / `Incremental index  <N> notes · <N> pending · <N> failed`。全量未构建时第一行是 `Historical index  not built`——原来的 "Historical index not built" 提示没丢，只是挪进了对应的行。没有做空格对齐：`.field-hint` 是比例字体斜体，凑空格只会歪。
+- 语义搜索未启用时的边界沿用原语义：`vector` family 拿不到时 Layer 全 0，UI 仍用 `catalog().enabled()` 决定显示 "Semantic search is off"，这段行为没动。
