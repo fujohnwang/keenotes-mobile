@@ -76,3 +76,4 @@
 "Your note was sent. Local confirmation cleanup will be retried; do not send it again." = "Your note was sent. Local confirmation cleanup will be retried; do not send it again.";
 "Save failed. Your input is preserved: %@" = "Save failed. Your input is preserved: %@";
 "📤 Saved locally, will auto-send when network restores" = "📤 Saved locally, will auto-send when network restores";
+"📤 Send failed, saved locally for retry" = "📤 Send failed, saved locally for retry";

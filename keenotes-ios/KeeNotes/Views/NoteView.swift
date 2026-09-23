@@ -48,9 +48,9 @@ struct NoteView: View {
                 } else {
                 VStack(spacing: 0) {
                     // Pending notes banner
-                    if appState.databaseService.pendingNoteCount > 0 {
+                    if !appState.pendingNoteService.queuedNotes.isEmpty {
                         HStack {
-                            Text("📤 \(appState.databaseService.pendingNoteCount) note(s) pending")
+                            Text("📤 \(appState.pendingNoteService.queuedNotes.count) note(s) pending")
                                 .font(.system(size: 13))
                                 .foregroundColor(.orange)
                             Spacer()
@@ -345,13 +345,13 @@ struct NoteView: View {
             UIPasteboard.general.string = ZeroWidthSteganography.embedIfNeeded(
                 content: sentContent, hiddenMessage: appState.settingsService.hiddenMessage)
         }
-        let online = appState.webSocketService.connectionState == .connected
         Task {
             defer { appState.settingsService.access.end(lease) }
             do {
-                switch try await appState.pendingNoteService.deliver(prepared, online: online) {
+                switch try await appState.pendingNoteService.deliver(prepared) {
                 case .sent: break
-                case .queued: showToast(NSLocalizedString("📤 Saved locally, will auto-send when network restores", comment: "IAP and connection configuration"))
+                case .queuedOffline: showToast(NSLocalizedString("📤 Saved locally, will auto-send when network restores", comment: "IAP and connection configuration"))
+                case .queued: showToast(NSLocalizedString("📤 Send failed, saved locally for retry", comment: "Note delivery"))
                 case .sentAwaitingCleanup: showToast(NSLocalizedString("Your note was sent. Local confirmation cleanup will be retried; do not send it again.", comment: "IAP and connection configuration"))
                 }
             } catch {
@@ -551,7 +551,7 @@ extension UIResponder {
 struct PendingNotesListView: View {
     @EnvironmentObject var appState: AppState
     @Binding var showingPendingList: Bool
-    @State private var pendingNotes: [PendingNote] = []
+    private var pendingNotes: [PendingNote] { appState.pendingNoteService.queuedNotes }
 
     private var horizontalPadding: CGFloat { DeviceType.horizontalPadding }
 
@@ -594,13 +594,6 @@ struct PendingNotesListView: View {
                 }
                 .listStyle(.plain)
             }
-        }
-        .onAppear { loadPendingNotes() }
-    }
-
-    private func loadPendingNotes() {
-        Task {
-            pendingNotes = (try? await appState.databaseService.getPendingNotes()) ?? []
         }
     }
 }

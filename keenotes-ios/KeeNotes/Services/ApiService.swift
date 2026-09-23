@@ -54,13 +54,15 @@ class ApiService {
         let noteId: Int64?
         let echoContent: String?
         let networkError: Bool
+        let isOffline: Bool
 
-        init(success: Bool, message: String, noteId: Int64?, echoContent: String?, networkError: Bool = false) {
+        init(success: Bool, message: String, noteId: Int64?, echoContent: String?, networkError: Bool = false, isOffline: Bool = false) {
             self.success = success
             self.message = message
             self.noteId = noteId
             self.echoContent = echoContent
             self.networkError = networkError
+            self.isOffline = isOffline
         }
     }
 
@@ -161,7 +163,8 @@ class ApiService {
                 message: "Network error: \(error.localizedDescription)",
                 noteId: nil,
                 echoContent: nil,
-                networkError: true
+                networkError: true,
+                isOffline: (error as? URLError)?.code == .notConnectedToInternet
             )
         }
     }

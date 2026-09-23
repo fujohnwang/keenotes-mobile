@@ -132,7 +132,7 @@ final class ProvisioningBoundaryTests: XCTestCase {
         try await db.dbQueue!.write { try $0.execute(sql: "CREATE TRIGGER refuse_pending_delete BEFORE DELETE ON pending_notes BEGIN SELECT RAISE(ABORT, 'injected'); END") }
         let lease = try settings.access.begin(); defer { settings.access.end(lease) }
         let prepared = try api.prepareNote(content: "already sent")
-        let result = try await pending.deliver(prepared, online: true)
+        let result = try await pending.deliver(prepared)
         XCTAssertEqual(result, .sentAwaitingCleanup, "This result must not take the unpersisted-error/draft-restoration path")
         let queued = try await db.getPendingNotes()
         XCTAssertEqual(queued.count, 1)

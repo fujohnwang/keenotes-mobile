@@ -10,12 +10,16 @@ final class PendingNoteService: ObservableObject {
     private var retryTimer: Timer?
     private var retryTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
+    private var sendingRequestIDs = Set<String>()
+    @Published private(set) var queuedNotes: [PendingNote] = []
 
     init(databaseService: DatabaseService, apiService: ApiService, webSocketService: WebSocketService, access: ConfigurationAccess) {
         self.databaseService = databaseService
         self.apiService = apiService
         self.webSocketService = webSocketService
         self.access = access
+        databaseService.$pendingNotes
+            .sink { [weak self] in self?.updateQueuedNotes($0) }.store(in: &cancellables)
         webSocketService.$connectionState.removeDuplicates().filter { $0 == .connected }
             .sink { [weak self] _ in self?.retryPendingNotes() }.store(in: &cancellables)
     }
@@ -31,12 +35,18 @@ final class PendingNoteService: ObservableObject {
 
     /// Caller retains a configuration lease through this entire method. Persist before
     /// HTTP so termination or an uncertain response leaves a retryable request_id.
-    enum DeliveryResult { case sent, queued, sentAwaitingCleanup }
+    enum DeliveryResult { case sent, queuedOffline, queued, sentAwaitingCleanup }
 
-    func deliver(_ note: PreparedNote, online: Bool) async throws -> DeliveryResult {
+    func deliver(_ note: PreparedNote) async throws -> DeliveryResult {
         guard note.configurationGeneration == access.generation else { throw ConfigurationError.staleOperation }
+        // Register before the first await: persistence must not expose this request to UI/retry.
+        sendingRequestIDs.insert(note.requestId)
+        defer {
+            sendingRequestIDs.remove(note.requestId)
+            updateQueuedNotes(databaseService.pendingNotes)
+        }
         let id = try await databaseService.insertPendingNote(note)
-        guard online else { return .queued }
+        // WebSocket is the sync channel, not an HTTP reachability check.
         let result = await apiService.postPreparedNote(note)
         guard note.configurationGeneration == access.generation else { return .queued }
         if result.success {
@@ -45,7 +55,11 @@ final class PendingNoteService: ObservableObject {
             return .sent
         }
         if result.networkError && access.isReady { webSocketService.markConnectionSuspect(reason: "http-post") }
-        return .queued
+        return result.isOffline ? .queuedOffline : .queued
+    }
+
+    private func updateQueuedNotes(_ notes: [PendingNote]) {
+        queuedNotes = notes.filter { !sendingRequestIDs.contains($0.requestId ?? "") }
     }
 
     func retryPendingNotes() {
@@ -55,7 +69,8 @@ final class PendingNoteService: ObservableObject {
             guard let self else { return }
             defer { access.end(lease); retryTask = nil }
             do {
-                for note in try await databaseService.getPendingNotes() {
+                // Same projection as outbox: first attempts only become eligible after failure.
+                for note in queuedNotes {
                     guard !Task.isCancelled, access.isReady, generation == access.generation else { return }
                     let prepared: PreparedNote
                     if let encrypted = note.encryptedContent, let request = note.requestId, !encrypted.isEmpty, !request.isEmpty {
@@ -75,5 +90,4 @@ final class PendingNoteService: ObservableObject {
             } catch { /* Keep durable pending data; next connection/manual retry can recover. */ }
         }
     }
-    var isNetworkAvailable: Bool { webSocketService.connectionState == .connected }
 }

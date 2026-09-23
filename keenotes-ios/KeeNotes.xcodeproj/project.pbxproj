@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10919001A10919001A1091901 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A10919001A10919001A1091902 /* Localizable.strings */; };
 		069DCB9FFB22B832FC30A3F4 /* LocalStoreKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BB2782313E35A706CF0A3B9 /* LocalStoreKitTests.swift */; };
 		0A1B2C3D4E5F60718293EF01 /* AnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1B2C3D4E5F60718293EF02 /* AnalyticsView.swift */; };
 		0A2B3C4D5E6F70819293EF03 /* TopHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A2B3C4D5E6F70819293EF04 /* TopHeaderView.swift */; };
@@ -43,6 +42,7 @@
 		9D701C870054B5F393523248 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F82DCFD422112FD691B2DCE6 /* Foundation.framework */; };
 		9E1AA8C7DADD4E82A4D437BC /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87901956656FA3E18B94F424 /* ReviewView.swift */; };
 		9EA15B6878E258344F35169D /* WebSocketMessageDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CC06A851CE34DF6C0FC28A2 /* WebSocketMessageDecoder.swift */; };
+		A10919001A10919001A1091901 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A10919001A10919001A1091902 /* Localizable.strings */; };
 		A1B2C3D4E5F6071829304A5B /* WizardStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A6978081920A3B /* WizardStep.swift */; };
 		A1B2C3D4E5F60718293EF12 /* LoopLepr.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293EF11 /* LoopLepr.mp3 */; };
 		A1B2C3D4E5F60718293EF14 /* Win Battle.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293EF13 /* Win Battle.mp3 */; };
@@ -94,8 +94,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A10919001A10919001A1091903 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
-		A10919001A10919001A1091904 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		03605D0E1E6AE5D607639961 /* blamka-round-ref.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blamka-round-ref.h"; sourceTree = "<group>"; };
 		0A1B2C3D4E5F60718293EF02 /* AnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsView.swift; sourceTree = "<group>"; };
 		0A2B3C4D5E6F70819293EF04 /* TopHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopHeaderView.swift; sourceTree = "<group>"; };
@@ -133,6 +131,8 @@
 		87901956656FA3E18B94F424 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
 		8E07C8BA817350735F9023F6 /* blamka-round-opt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "blamka-round-opt.h"; sourceTree = "<group>"; };
 		9946B1EE523C44AB196C6446 /* ref.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ref.c; sourceTree = "<group>"; };
+		A10919001A10919001A1091903 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		A10919001A10919001A1091904 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293EF11 /* LoopLepr.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = LoopLepr.mp3; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293EF13 /* Win Battle.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Win Battle.mp3"; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293EF15 /* Defend Castle.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Defend Castle.mp3"; sourceTree = "<group>"; };
@@ -143,7 +143,7 @@
 		B4C5D6E7F8091A2B3C4D5E6 /* PosterShareRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterShareRenderer.swift; sourceTree = "<group>"; };
 		B5515BAE55139991A54308D6 /* KeeNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KeeNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B78FBDF7758104E7013983F7 /* CredentialHistoryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CredentialHistoryView.swift; sourceTree = "<group>"; };
-		BAFE9D1A22E7DDE194D8105F /* LocalAnnual.storekit */ = {isa = PBXFileReference; includeInIndex = 1; path = LocalAnnual.storekit; sourceTree = "<group>"; };
+		BAFE9D1A22E7DDE194D8105F /* LocalAnnual.storekit */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; path = LocalAnnual.storekit; sourceTree = "<group>"; };
 		BC48816DBEEFEE56707E5302 /* NoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteView.swift; sourceTree = "<group>"; };
 		C41FB2074330D7D199860EB8 /* encoding.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = encoding.h; sourceTree = "<group>"; };
 		C5D6E7F8091A2B3C4D5E6F7 /* PosterVideoComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterVideoComposer.swift; sourceTree = "<group>"; };
@@ -274,7 +274,6 @@
 				BAFE9D1A22E7DDE194D8105F /* LocalAnnual.storekit */,
 				84F432024EECE06162770384 /* ConnectionRaceTests.swift */,
 			);
-			name = KeeNotesTests;
 			path = KeeNotesTests;
 			sourceTree = "<group>";
 		};
@@ -305,7 +304,6 @@
 			children = (
 				1CDBFE296373284742FE2BB3 /* SettingsFlowUITests.swift */,
 			);
-			name = KeeNotesUITests;
 			path = KeeNotesUITests;
 			sourceTree = "<group>";
 		};
@@ -746,63 +744,75 @@
 			name = Debug;
 		};
 		95478F1170343C331996AF6B /* Release */ = {
-	buildSettings = {
-		"ASSETCATALOG_COMPILER_APPICON_NAME" = AppIcon;
-		"CLANG_ENABLE_MODULES" = YES;
-		"CODE_SIGN_IDENTITY" = "iPhone Developer";
-		"CURRENT_PROJECT_VERSION" = 4;
-		"DEVELOPMENT_TEAM" = NG744CF46S;
-		"GENERATE_INFOPLIST_FILE" = YES;
-		"IAP_ANNUAL_PRODUCT_ID" = "cn.keevol.keenotes.remote.yearly";
-		"IAP_PRIVACY_URL" = "https://kns.afoo.me/privacy";
-		"IAP_PRODUCTION_PROVISION_URL" = "https://kns.afoo.me/iap/apple/provision";
-		"IAP_SANDBOX_PROVISION_URL" = "https://kns.afoo.me/iap/apple/sandbox/provision";
-		"IAP_TERMS_URL" = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
-		"INFOPLIST_FILE" = "KeeNotes/Info.plist";
-		"INFOPLIST_KEY_CFBundleDisplayName" = KeeNotes;
-		"INFOPLIST_KEY_LSApplicationCategoryType" = "public.app-category.productivity";
-		"LD_RUNPATH_SEARCH_PATHS" = (
-			"$(inherited)",
-			"@executable_path/Frameworks",
-		);
-		"MARKETING_VERSION" = "1.9.1";
-		"PRODUCT_BUNDLE_IDENTIFIER" = "cn.keevol.keenotes";
-		SDKROOT = iphoneos;
-		"SWIFT_OBJC_BRIDGING_HEADER" = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
-		"TARGETED_DEVICE_FAMILY" = "1,2";
-	};
-	isa = XCBuildConfiguration;
-	name = Release;
-};
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NG744CF46S;
+				GENERATE_INFOPLIST_FILE = YES;
+				IAP_ANNUAL_PRODUCT_ID = cn.keevol.keenotes.remote.yearly;
+				IAP_PRIVACY_URL = "https://kns.afoo.me/privacy";
+				IAP_PRODUCTION_PROVISION_URL = "https://kns.afoo.me/iap/apple/provision";
+				IAP_SANDBOX_PROVISION_URL = "https://kns.afoo.me/iap/apple/sandbox/provision";
+				IAP_TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+				INFOPLIST_FILE = KeeNotes/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = KeeNotes;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "KeeNotes needs microphone access for voice input to create notes.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "KeeNotes needs permission to save note posters and poster videos to your photo library.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "KeeNotes needs speech recognition to convert your voice into text notes.";
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = armv7;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.9.2;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
+				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		97E649B5C76B1E13F3476E97 /* Debug */ = {
-	buildSettings = {
-		"ASSETCATALOG_COMPILER_APPICON_NAME" = AppIcon;
-		"CLANG_ENABLE_MODULES" = YES;
-		"CODE_SIGN_IDENTITY" = "iPhone Developer";
-		"CURRENT_PROJECT_VERSION" = 4;
-		"DEVELOPMENT_TEAM" = NG744CF46S;
-		"GENERATE_INFOPLIST_FILE" = YES;
-		"IAP_ANNUAL_PRODUCT_ID" = "cn.keevol.keenotes.remote.yearly";
-		"IAP_PRIVACY_URL" = "https://kns.afoo.me/privacy";
-		"IAP_PRODUCTION_PROVISION_URL" = "https://kns.afoo.me/iap/apple/provision";
-		"IAP_SANDBOX_PROVISION_URL" = "https://kns.afoo.me/iap/apple/sandbox/provision";
-		"IAP_TERMS_URL" = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
-		"INFOPLIST_FILE" = "KeeNotes/Info.plist";
-		"INFOPLIST_KEY_CFBundleDisplayName" = KeeNotes;
-		"INFOPLIST_KEY_LSApplicationCategoryType" = "public.app-category.productivity";
-		"LD_RUNPATH_SEARCH_PATHS" = (
-			"$(inherited)",
-			"@executable_path/Frameworks",
-		);
-		"MARKETING_VERSION" = "1.9.1";
-		"PRODUCT_BUNDLE_IDENTIFIER" = "cn.keevol.keenotes";
-		SDKROOT = iphoneos;
-		"SWIFT_OBJC_BRIDGING_HEADER" = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
-		"TARGETED_DEVICE_FAMILY" = "1,2";
-	};
-	isa = XCBuildConfiguration;
-	name = Debug;
-};
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NG744CF46S;
+				GENERATE_INFOPLIST_FILE = YES;
+				IAP_ANNUAL_PRODUCT_ID = cn.keevol.keenotes.remote.yearly;
+				IAP_PRIVACY_URL = "https://kns.afoo.me/privacy";
+				IAP_PRODUCTION_PROVISION_URL = "https://kns.afoo.me/iap/apple/provision";
+				IAP_SANDBOX_PROVISION_URL = "https://kns.afoo.me/iap/apple/sandbox/provision";
+				IAP_TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+				INFOPLIST_FILE = KeeNotes/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = KeeNotes;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "KeeNotes needs microphone access for voice input to create notes.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "KeeNotes needs permission to save note posters and poster videos to your photo library.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "KeeNotes needs speech recognition to convert your voice into text notes.";
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = armv7;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.9.2;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.keevol.keenotes;
+				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "KeeNotes/CArgon2/KeeNotes-Bridging-Header.h";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		A1226A4FAA6BC11847978952 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {

@@ -181,7 +181,7 @@ class AppState: ObservableObject {
                     settingsDraft.loadOnce(settingsService.configuration)
                     await initializeFirstNoteDate()
                     pendingNoteService.startRetryScheduler()
-                    await databaseService.refreshPendingNoteCount()
+                    await databaseService.refreshPendingNotes()
                     await loadOnThisDayNotes()
                     webSocketService.connect()
                 } catch { /* Coordinator exposes recoverable error in Settings. */ }

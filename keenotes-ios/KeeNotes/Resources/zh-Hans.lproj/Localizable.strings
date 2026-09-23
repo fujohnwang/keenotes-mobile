@@ -76,3 +76,4 @@
 "Your note was sent. Local confirmation cleanup will be retried; do not send it again." = "笔记已发送，本地确认清理将重试，无需重复发送。";
 "Save failed. Your input is preserved: %@" = "保存失败，输入已保留：%@";
 "📤 Saved locally, will auto-send when network restores" = "📤 已保存到本机，网络恢复后将自动发送";
+"📤 Send failed, saved locally for retry" = "📤 发送失败，已保存到本机待重试";

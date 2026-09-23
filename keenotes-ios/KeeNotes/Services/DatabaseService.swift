@@ -388,7 +388,10 @@ class DatabaseService: ObservableObject {
 
     // MARK: - Pending Notes (Offline Cache)
 
-    @Published var pendingNoteCount: Int = 0
+    /// All durable records, including the first HTTP attempt. UI filters active sends.
+    @MainActor @Published private(set) var pendingNotes: [PendingNote] = []
+    @MainActor private var pendingSnapshotSource: DatabaseQueue?
+    @MainActor private var pendingSnapshotVersion = -1
 
     func insertPendingNote(content: String, channel: String = "mobile-ios") async throws {
         guard let dbQueue = dbQueue else { throw DatabaseError.notInitialized }
@@ -402,7 +405,7 @@ class DatabaseService: ObservableObject {
             var note = PendingNote(content: content, channel: channel, createdAt: now)
             try note.insert(db)
         }
-        await refreshPendingNoteCount()
+        await refreshPendingNotes()
     }
 
     @discardableResult
@@ -420,7 +423,7 @@ class DatabaseService: ObservableObject {
             try note.insert(db)
             return db.lastInsertedRowID
         }
-        await refreshPendingNoteCount()
+        await refreshPendingNotes()
         return id
     }
 
@@ -436,7 +439,7 @@ class DatabaseService: ObservableObject {
         try await dbQueue.write { db in
             try db.execute(sql: "DELETE FROM pending_notes WHERE id = ?", arguments: [id])
         }
-        await refreshPendingNoteCount()
+        await refreshPendingNotes()
     }
 
     func getPendingNoteCount() async throws -> Int {
@@ -446,12 +449,24 @@ class DatabaseService: ObservableObject {
         }
     }
 
-    func refreshPendingNoteCount() async {
+    @MainActor
+    func refreshPendingNotes() async {
+        guard let queue = dbQueue else { return }
         do {
-            let count = try await getPendingNoteCount()
-            await MainActor.run { self.pendingNoteCount = count }
+            let (notes, version) = try await queue.read { db in
+                (try PendingNote.order(PendingNote.Columns.createdAt.asc).fetchAll(db), db.totalChangesCount)
+            }
+            guard queue === dbQueue else { return }
+            if pendingSnapshotSource !== queue {
+                pendingSnapshotSource = queue
+                pendingSnapshotVersion = -1
+            }
+            // Concurrent sends may resume out of order; never republish a pre-delete snapshot.
+            guard version >= pendingSnapshotVersion else { return }
+            pendingSnapshotVersion = version
+            pendingNotes = notes
         } catch {
-            print("[DB] Failed to refresh pendingNoteCount: \(error)")
+            print("[DB] Failed to refresh pending notes: \(error)")
         }
     }
 

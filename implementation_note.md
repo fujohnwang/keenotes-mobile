@@ -280,3 +280,10 @@
 - 计数语义：Base 只存 eligible 文档（`Builder.add` 跳过 ineligible），Delta 还会存 ineligible 墓碑（用来遮蔽 Base），所以两边都按 eligible 过滤，否则"增量 N notes"会把墓碑也算进去。
 - UI 变成两行：`Historical index  <N> notes` / `Incremental index  <N> notes · <N> pending · <N> failed`。全量未构建时第一行是 `Historical index  not built`——原来的 "Historical index not built" 提示没丢，只是挪进了对应的行。没有做空格对齐：`.field-hint` 是比例字体斜体，凑空格只会歪。
 - 语义搜索未启用时的边界沿用原语义：`vector` family 拿不到时 Layer 全 0，UI 仍用 `catalog().enabled()` 决定显示 "Semantic search is off"，这段行为没动。
+
+## iOS 正常发送与离线暂存分离（2026-09-23）
+
+- 修复 1.9.0 引入的 outbox 闪现：保留 HTTP 前落盘，用内存中的 request_id 集合排除首次发送中的记录；横幅、列表、自动重试共用待重试列表。无需数据库迁移，进程退出后留存记录会重新进入 outbox；账号切换仍检查全部持久化记录。
+- HTTP 不再由 WebSocket 连接状态拦截。仅 `URLError.notConnectedToInternet` 提示离线；超时、服务器错误显示“发送失败，已保存到本机待重试”。沿用请求超时和重连/定时重试机制。
+- 数据库发布完整待发快照，使用同一 SQLite connection 的 `totalChangesCount` 拒绝乱序旧快照，避免并发发送后已删除记录重新出现；代价是内存保留待发列表，而非只有计数。
+- 先在已有 iPhone 17 Pro / iOS 26.5 模拟器复现 3 项失败，再验证修复后 21 项测试通过（HTTP mock；覆盖离线恢复、并发、持久化恢复、清理失败与配置切换），原独立复现脚本的 3 项也全部转绿。结果：`/private/tmp/keenotes-outbox-validation/regression.xcresult`；未提交 Git。
