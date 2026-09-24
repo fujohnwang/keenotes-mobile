@@ -8,6 +8,7 @@ import javafx.concurrent.Task;
 import java.util.List;
 import java.util.Comparator;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -98,8 +99,8 @@ public final class LocalSearchService implements AutoCloseable {
                                 Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(Comparator.comparingLong((LocalCacheService.NoteData note) -> note.id).reversed()))
                 .toList();
-        if (!Objects.equals(epoch, cache.getSearchEpoch())) return new ViewResult(List.of(), epoch, true, "Search data changed.");
-        return new ViewResult(notes, epoch, result.partial(), result.message());
+        if (!Objects.equals(epoch, cache.getSearchEpoch())) return new ViewResult(List.of(), Set.of(), Set.of(), epoch, true, "Search data changed.");
+        return new ViewResult(notes, result.keywordIds(), result.semanticIds(), epoch, result.partial(), result.message());
     }
 
     public boolean isCurrent(ViewResult result) { return !closed.get() && Objects.equals(result.epoch(), cache.getSearchEpoch()); }
@@ -255,5 +256,6 @@ public final class LocalSearchService implements AutoCloseable {
         });
     }
 
-    public record ViewResult(List<LocalCacheService.NoteData> notes, String epoch, boolean partial, String message) { }
+    public record ViewResult(List<LocalCacheService.NoteData> notes, Set<Long> keywordIds, Set<Long> semanticIds,
+                             String epoch, boolean partial, String message) { }
 }

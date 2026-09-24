@@ -73,6 +73,33 @@ public class SearchFxTest {
         });
     }
 
+    @Test public void searchTagsFollowReusedCardSources() throws Exception {
+        fx(() -> {
+            var note = new LocalCacheService.NoteData(5901, "search tag", "desktop", "2026-09-24", null);
+            var card = new NoteCardView(note);
+            var tags = card.lookupAll(".search-source-tag").stream()
+                    .map(node -> (javafx.scene.control.Label) node)
+                    .collect(java.util.stream.Collectors.toMap(javafx.scene.control.Label::getText, label -> label));
+            assertEquals(2, tags.size());
+            var tagGroup = tags.get("KS").getParent();
+            var header = (javafx.scene.layout.HBox) tagGroup.getParent();
+            int firstAction = java.util.stream.IntStream.range(0, header.getChildren().size())
+                    .filter(i -> header.getChildren().get(i) instanceof Button).findFirst().orElseThrow();
+            assertEquals(firstAction - 1, header.getChildren().indexOf(tagGroup));
+            card.setSearchSources(true, false);
+            assertTrue(tags.get("KS").isManaged());
+            assertFalse(tags.get("SS").isManaged());
+            card.update(note);
+            card.setSearchSources(true, true);
+            assertTrue(tags.get("KS").isManaged());
+            assertTrue(tags.get("SS").isManaged());
+            card.setSearchSources(false, false);
+            assertFalse(tags.get("KS").isManaged());
+            assertFalse(tags.get("SS").isManaged());
+            return null;
+        });
+    }
+
     @Test public void obsoleteSlowSemanticQueriesDoNotDelayKeywordPreviewsOrSavingSettings() throws Exception {
         var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
         var requestExecutor = Executors.newCachedThreadPool();
@@ -388,13 +415,18 @@ public class SearchFxTest {
             fx(() -> { service.rebuildVectors(); return null; });
             awaitFx(() -> !service.vectorRebuildingProperty().get());
             assertEquals("Completed", fx(() -> service.vectorBuildProperty().get()));
-            CompletableFuture<List<Long>> preview = new CompletableFuture<>();
-            var hybrid = fx(() -> service.search("chronologyprobe", first ->
-                    preview.complete(first.notes().stream().map(note -> note.id).toList()))).get(5, TimeUnit.SECONDS);
-            assertEquals("Keyword preview should keep the same chronological order", expected, preview.get(5, TimeUnit.SECONDS));
+            CompletableFuture<LocalSearchService.ViewResult> preview = new CompletableFuture<>();
+            var hybrid = fx(() -> service.search("chronologyprobe", preview::complete)).get(5, TimeUnit.SECONDS);
+            var keywordPreview = preview.get(5, TimeUnit.SECONDS);
+            assertEquals("Keyword preview should keep the same chronological order", expected,
+                    keywordPreview.notes().stream().map(note -> note.id).toList());
+            assertTrue(keywordPreview.semanticIds().isEmpty());
+            assertTrue(keywordPreview.keywordIds().containsAll(expected));
             assertTrue("The final result must exercise semantic search", semanticQueries.get() > 0);
             assertEquals("Hybrid results should also display newest first", expected,
                     hybrid.notes().stream().map(note -> note.id).filter(expected::contains).toList());
+            assertTrue(hybrid.keywordIds().containsAll(expected));
+            assertFalse(hybrid.semanticIds().isEmpty());
         } finally {
             fx(() -> service.saveConfiguration(EmbeddingConfig.disabled())).get(5, TimeUnit.SECONDS);
             server.stop(0);

@@ -43,6 +43,7 @@ public class NoteListCell extends ListCell<LocalCacheService.NoteData> {
             } else {
                 card.update(item);
             }
+            card.setSearchSources(panel.isKeywordResult(item.id), panel.isSemanticResult(item.id));
             setGraphic(card);
 
             // Handle optimistic note animation

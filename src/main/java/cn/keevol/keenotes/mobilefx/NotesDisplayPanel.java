@@ -44,6 +44,8 @@ public class NotesDisplayPanel extends VBox {
     // ListView (virtualized, replaces VBox + ScrollPane)
     private final ListView<LocalCacheService.NoteData> listView;
     private final ObservableList<LocalCacheService.NoteData> noteItems;
+    private Set<Long> keywordResultIds = Set.of();
+    private Set<Long> semanticResultIds = Set.of();
     private final Label statusLabel;
     private final VBox fixedHeaderContainer;
     private HBox headerRow;
@@ -543,6 +545,15 @@ public class NotesDisplayPanel extends VBox {
     }
 
     public void displayNotes(List<LocalCacheService.NoteData> notes, String periodInfo) {
+        displayNotes(notes, periodInfo, Set.of(), Set.of());
+    }
+
+    public void displaySearchResults(List<LocalCacheService.NoteData> notes, Set<Long> keywordIds, Set<Long> semanticIds) {
+        displayNotes(notes, null, keywordIds, semanticIds);
+    }
+
+    private void displayNotes(List<LocalCacheService.NoteData> notes, String periodInfo,
+                              Set<Long> keywordIds, Set<Long> semanticIds) {
         cancelDbLoad();
         stopDotsAnimation();
         loadGeneration++;
@@ -557,6 +568,8 @@ public class NotesDisplayPanel extends VBox {
             return;
         }
 
+        keywordResultIds = keywordIds;
+        semanticResultIds = semanticIds;
         String countText = notes.size() + " note(s)";
         if (periodInfo != null && !periodInfo.isEmpty()) {
             countText += " - " + periodInfo;
@@ -566,6 +579,9 @@ public class NotesDisplayPanel extends VBox {
         createHeaderRow(countText);
         replaceNotesAtomically(notes);
     }
+
+    boolean isKeywordResult(long id) { return keywordResultIds.contains(id); }
+    boolean isSemanticResult(long id) { return semanticResultIds.contains(id); }
 
     /**
      * Load more notes from database (true pagination, triggered by scroll)
@@ -791,6 +807,8 @@ public class NotesDisplayPanel extends VBox {
         noteLoadCallback = null;
         stopDotsAnimation();
         noteItems.clear();
+        keywordResultIds = Set.of();
+        semanticResultIds = Set.of();
         renderedRealNoteIds.clear();
 
         createHeaderRow("");
@@ -861,6 +879,8 @@ public class NotesDisplayPanel extends VBox {
         noteLoadCallback = null;
         stopDotsAnimation();
         noteItems.clear();
+        keywordResultIds = Set.of();
+        semanticResultIds = Set.of();
         renderedRealNoteIds.clear();
         fixedHeaderContainer.setVisible(false);
         fixedHeaderContainer.setManaged(false);

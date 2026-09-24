@@ -98,6 +98,12 @@ public class LocalSearchEngineTest {
             assertEquals(2, client.documents);
             assertTrue(engine.search("放松身体", EmbeddingConfig.disabled()).ids().isEmpty());
             assertEquals(0, client.queries);
+            var keywordOnly = engine.search("缓存", EmbeddingConfig.disabled());
+            assertEquals(java.util.Set.of(1L), keywordOnly.keywordIds());
+            assertTrue(keywordOnly.semanticIds().isEmpty());
+            var hybrid = engine.search("缓存", on);
+            assertTrue(hybrid.keywordIds().contains(1L));
+            assertTrue(hybrid.semanticIds().contains(1L));
             assertEquals(Long.valueOf(2), engine.search("放松身体", on).ids().getFirst());
             engine.rebuildVectors(on, () -> false, (done, total) -> { });
             assertEquals("Full rebuild must reuse matching vectors", 2, client.documents);

@@ -51,6 +51,15 @@
     -fx-border-radius: 12px;
 }
 
+.search-source-tag {
+    -fx-background-color: -fx-primary;
+    -fx-background-radius: 4px;
+    -fx-text-fill: -fx-background;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 6;
+}
+
 .search-result-title {
     -fx-font-size: 15px;
     -fx-font-weight: bold;

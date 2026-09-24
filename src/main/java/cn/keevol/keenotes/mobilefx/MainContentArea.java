@@ -614,7 +614,7 @@ public class MainContentArea extends StackPane {
             String coverage = result.partial() ? "Historical index incomplete. Rebuild in Settings → AI. " : "";
             searchInfo.setText(coverage + result.message());
             if (result.notes().isEmpty()) searchResultsPanel.showEmptyState("No results found for \"" + text + "\"");
-            else searchResultsPanel.displayNotes(result.notes());
+            else searchResultsPanel.displaySearchResults(result.notes(), result.keywordIds(), result.semanticIds());
         };
         searchTask = search.search(text, apply);
         var task = searchTask;

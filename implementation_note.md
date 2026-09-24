@@ -287,3 +287,15 @@
 - HTTP 不再由 WebSocket 连接状态拦截。仅 `URLError.notConnectedToInternet` 提示离线；超时、服务器错误显示“发送失败，已保存到本机待重试”。沿用请求超时和重连/定时重试机制。
 - 数据库发布完整待发快照，使用同一 SQLite connection 的 `totalChangesCount` 拒绝乱序旧快照，避免并发发送后已删除记录重新出现；代价是内存保留待发列表，而非只有计数。
 - 先在已有 iPhone 17 Pro / iOS 26.5 模拟器复现 3 项失败，再验证修复后 21 项测试通过（HTTP mock；覆盖离线恢复、并发、持久化恢复、清理失败与配置切换），原独立复现脚本的 3 项也全部转绿。结果：`/private/tmp/keenotes-outbox-validation/regression.xcresult`；未提交 Git。
+
+## iOS 1.9.2 构建配置与提审（2026-09-23）
+
+- 启用 generated asset symbol extensions 和 Missing Localizability 检查；仅测试 targets 提升至 iOS 17，App 保留 iOS 15。记录已审阅 Xcode 27 推荐设置；同步 `project.yml` 的版本为用户设置的 1.9.2（1），避免重新生成工程时回退。
+- GRDB 6.29.3 的 watchOS 4 弃用告警来自依赖 manifest，按确认方案暂留；本次不升级数据库依赖、不修改缓存。21 项回归通过，Release archive/export 成功。
+- 导出曾因系统 rsync 与 Homebrew rsync 混用而失败，仅该导出命令使用系统 PATH 后成功；未改全局环境。提审回执与产物路径见 `docs/keenotes-ios-release-1.9.2-20260923.md`；未提交 Git。
+- 1.9.2（1）已于 17:41 通过 asc CLI 提交，状态 `WAITING_FOR_REVIEW`，保持手动发布。首次提审超时留下空草稿，补充版本核查证据后复用成功；最终确认唯一审核项为 1.9.2。ASC 校验 0 阻塞，App Privacy 网页已确认发布。
+
+## JavaFX 搜索结果来源标签（2026-09-24）
+
+- 搜索结果卡片右上角、原有操作图标左侧显示 KS（关键词）和 SS（语义）；两种都命中时同时显示。关键词预览只显示 KS，最终混合结果按实际命中来源显示。普通笔记列表无标签。
+- 复用原有卡片和列表，来源按 note ID 传递；标签不会影响搜索排序与最多 100 条的候选限制。

@@ -270,10 +270,11 @@ public final class LocalSearchEngine implements AutoCloseable {
 
     public SearchResult search(String query, EmbeddingConfig config, SearchCancellation cancellation) throws SQLException, IOException {
         cancellation.check();
-        if (query == null || query.isBlank()) return new SearchResult(List.of(), false, "");
+        if (query == null || query.isBlank()) return new SearchResult(List.of(), Set.of(), Set.of(), false, "");
         Handle keyword = family(SearchStore.KEYWORD, SearchStore.KEYWORD_PROFILE);
         List<Long> keywords = keyword.index().keywords(query, 100);
         List<Long> result = keywords;
+        List<Long> vectors = List.of();
         boolean partial = !keyword.index().hasBase();
         String message = "";
         if (config.usable() && desired.usable()) {
@@ -284,7 +285,10 @@ public final class LocalSearchEngine implements AutoCloseable {
                 partial |= !vector.index().hasBase();
                 if (vector.index().count() > 0) {
                     float[] queryVector = embeddings.embedQuery(queryConfig, query, cancellation);
-                    if (allowed(queryConfig)) result = fuse(keywords, vector.index().vectors(queryVector, 100));
+                    if (allowed(queryConfig)) {
+                        vectors = vector.index().vectors(queryVector, 100);
+                        result = fuse(keywords, vectors);
+                    }
                 } else message = "No semantic index yet; showing keyword matches.";
                 if (!queryConfig.profile().equals(config.profile())) message = "Using the previous embedding model until the new index is rebuilt.";
             } catch (IOException | IllegalArgumentException e) {
@@ -292,8 +296,8 @@ public final class LocalSearchEngine implements AutoCloseable {
             }
         }
         cancellation.check();
-        if (!keyword.epoch().equals(store.epoch())) return new SearchResult(List.of(), true, "Search data changed. Search again.");
-        return new SearchResult(result, partial, message);
+        if (!keyword.epoch().equals(store.epoch())) return new SearchResult(List.of(), Set.of(), Set.of(), true, "Search data changed. Search again.");
+        return new SearchResult(result, Set.copyOf(keywords), Set.copyOf(vectors), partial, message);
     }
 
     static List<Long> fuse(List<Long> keywords, List<Long> vectors) {
@@ -331,7 +335,7 @@ public final class LocalSearchEngine implements AutoCloseable {
     }
 
     private record Handle(IndexFamily index, String epoch, Path path) { }
-    public record SearchResult(List<Long> ids, boolean partial, String message) { }
+    public record SearchResult(List<Long> ids, Set<Long> keywordIds, Set<Long> semanticIds, boolean partial, String message) { }
     /** Base is the fixed historical snapshot; Delta is everything indexed since it was built. */
     public record Layer(int base, int delta, int pending, int failed, boolean built) { }
     public record Status(Layer keywords, Layer vectors) { }

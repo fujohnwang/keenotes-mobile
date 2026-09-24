@@ -53,6 +53,9 @@ public class NoteCardView extends StackPane {
     private final Text textMeasure;
     private final Label dateLabel;
     private final Label channelLabel;
+    private final Label keywordTag;
+    private final Label semanticTag;
+    private final HBox searchSourceTags;
     private final Button shareButton;
     private final SVGPath shareIcon;
     private final Button reviseButton;
@@ -143,7 +146,17 @@ public class NoteCardView extends StackPane {
         });
         updateActionButtonStyles();
 
-        headerRow.getChildren().addAll(dateLabel, channelLabel, headerSpacer, reviseButton, shareButton);
+        keywordTag = new Label("KS");
+        keywordTag.getStyleClass().add("search-source-tag");
+        keywordTag.setTooltip(new Tooltip("Keyword search"));
+        semanticTag = new Label("SS");
+        semanticTag.getStyleClass().add("search-source-tag");
+        semanticTag.setTooltip(new Tooltip("Semantic search"));
+        searchSourceTags = new HBox(4, keywordTag, semanticTag);
+        searchSourceTags.setAlignment(Pos.CENTER_RIGHT);
+        setSearchSources(false, false);
+
+        headerRow.getChildren().addAll(dateLabel, channelLabel, headerSpacer, searchSourceTags, reviseButton, shareButton);
 
         // Full content using TextArea (read-only, selectable)
         contentArea = new TextArea(noteData.content);
@@ -458,6 +471,15 @@ public class NoteCardView extends StackPane {
 
     public LocalCacheService.NoteData getNoteData() {
         return noteData;
+    }
+
+    public void setSearchSources(boolean keyword, boolean semantic) {
+        keywordTag.setVisible(keyword);
+        keywordTag.setManaged(keyword);
+        semanticTag.setVisible(semantic);
+        semanticTag.setManaged(semantic);
+        searchSourceTags.setVisible(keyword || semantic);
+        searchSourceTags.setManaged(keyword || semantic);
     }
 
     /**
