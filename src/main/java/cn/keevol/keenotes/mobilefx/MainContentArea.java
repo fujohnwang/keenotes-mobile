@@ -611,7 +611,7 @@ public class MainContentArea extends StackPane {
         searchResultsPanel.showLoading("Searching");
         Consumer<LocalSearchService.ViewResult> apply = result -> {
             if (generation != searchGeneration || !search.isCurrent(result)) return;
-            String coverage = result.partial() ? "Historical index incomplete. Rebuild in Settings → AI. " : "";
+            String coverage = result.partial() ? "Additional search results may be incomplete. Rebuild indexes in Settings → AI. " : "";
             searchInfo.setText(coverage + result.message());
             if (result.notes().isEmpty()) searchResultsPanel.showEmptyState("No results found for \"" + text + "\"");
             else searchResultsPanel.displaySearchResults(result.notes(), result.keywordIds(), result.semanticIds());

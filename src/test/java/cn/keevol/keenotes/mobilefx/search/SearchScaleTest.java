@@ -19,9 +19,9 @@ public class SearchScaleTest {
         Path db = temp.getRoot().toPath().resolve("scale.db");
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db); Statement s = c.createStatement()) {
             s.execute("PRAGMA journal_mode=WAL");
-            s.execute("CREATE TABLE notes_cache(id INTEGER PRIMARY KEY,content TEXT,encrypted_content TEXT)");
+            s.execute("CREATE TABLE notes_cache(id INTEGER PRIMARY KEY,content TEXT,encrypted_content TEXT,created_at TEXT)");
             c.setAutoCommit(false);
-            try (PreparedStatement p = c.prepareStatement("INSERT INTO notes_cache VALUES(?,?,NULL)")) {
+            try (PreparedStatement p = c.prepareStatement("INSERT INTO notes_cache VALUES(?,?,NULL,'2026-09-19')")) {
                 for (int i = 1; i <= size; i++) {
                     p.setInt(1, i);
                     p.setString(2, "笔记 " + i + " 数据库缓存与计算机系统优化，周末公园散步。keyword" + i);
@@ -47,14 +47,14 @@ public class SearchScaleTest {
             long start = System.nanoTime();
             engine.rebuildKeywords(() -> false, (done, total) -> {});
             long keywordMs = (System.nanoTime() - start) / 1_000_000;
-            assertEquals(size, engine.status(config).keywords());
+            assertEquals(size, engine.status(config).keywords().base());
             assertEquals(List.of(98765L), engine.search("keyword98765", EmbeddingConfig.disabled()).ids());
             start = System.nanoTime();
             engine.rebuildVectors(config, () -> false, (done, total) -> {
                 if (done % 10000 == 0) System.out.println("Capacity vectors: " + done + "/" + total);
             });
             long vectorMs = (System.nanoTime() - start) / 1_000_000;
-            assertEquals(size, engine.status(config).vectors());
+            assertEquals(size, engine.status(config).vectors().base());
             List<Long> times = new ArrayList<>();
             for (int i = 0; i < 20; i++) {
                 start = System.nanoTime();

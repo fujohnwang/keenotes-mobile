@@ -46,7 +46,10 @@ public class LocalSearchEngineTest {
             assertEquals(List.of(10L), engine.search("数据库", EmbeddingConfig.disabled()).ids());
             assertEquals(List.of(12L), engine.search("计算机", EmbeddingConfig.disabled()).ids());
             assertEquals(List.of(12L), engine.search("cache", EmbeddingConfig.disabled()).ids());
-            assertTrue(engine.search("ach", EmbeddingConfig.disabled()).ids().isEmpty());
+            var substring = engine.search("ach", EmbeddingConfig.disabled());
+            assertEquals(List.of(12L), substring.ids());
+            assertEquals(java.util.Set.of(12L), substring.wildcardIds());
+            assertTrue(substring.keywordIds().isEmpty());
         }
         try (LocalSearchEngine engine = new LocalSearchEngine(db, EmbeddingClient.unavailable())) {
             assertEquals(List.of(10L), engine.search("数据库", EmbeddingConfig.disabled()).ids());
@@ -65,7 +68,9 @@ public class LocalSearchEngineTest {
                     sync(db, 5, "新增缓存笔记", true);
                     engine.drainKeywords();
                     assertEquals(List.of(5L), engine.search("缓存", EmbeddingConfig.disabled()).ids());
-                    assertTrue(engine.search("数据库", EmbeddingConfig.disabled()).ids().isEmpty());
+                    var historical = engine.search("数据库", EmbeddingConfig.disabled());
+                    assertEquals(List.of(100L), historical.ids());
+                    assertTrue("SQL already covers history, but the new Base is not published", historical.keywordIds().isEmpty());
                     // The snapshot is still building, so only the incremental layer reports the new note.
                     LocalSearchEngine.Layer building = engine.status(EmbeddingConfig.disabled()).keywords();
                     assertEquals(0, building.base());
@@ -265,7 +270,81 @@ public class LocalSearchEngineTest {
     }
 
     @Test public void fusionUsesNoteIdsAndDeduplicatesEachRanking() {
-        assertEquals(List.of(42L, 9L, 7L), LocalSearchEngine.fuse(List.of(42L, 7L, 42L), List.of(9L, 42L)));
+        var scores = LocalSearchEngine.fuse(List.of(42L, 7L, 42L), List.of(9L, 42L), List.of(10L, 42L));
+        assertEquals(4, scores.size());
+        assertEquals(3.0 / 61 + 2.0 / 62 + 1.0 / 62, scores.get(42L), 1e-12);
+        assertEquals(3.0 / 62, scores.get(7L), 1e-12);
+        assertEquals(2.0 / 61, scores.get(9L), 1e-12);
+        assertEquals(1.0 / 61, scores.get(10L), 1e-12);
+    }
+
+    @Test public void wildcardSearchCoversUnindexedHistoryAndPreservesLikeSemantics() throws Exception {
+        Path db = database();
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db); Statement s = c.createStatement()) {
+            s.execute("INSERT INTO notes_cache VALUES(1,'Historical CACHE owners'' notes','desktop','2026-09-19',NULL)");
+            s.execute("INSERT INTO notes_cache VALUES(2,'hidden ciphertext','desktop','2026-09-20','hidden ciphertext')");
+            s.execute("INSERT INTO notes_cache VALUES(3,'   ','desktop','2026-09-21',NULL)");
+        }
+        sync(db, 4, "hidden decryption failure", false);
+        try (LocalSearchEngine engine = new LocalSearchEngine(db, EmbeddingClient.unavailable())) {
+            assertEquals(List.of(1L), engine.search("ach", EmbeddingConfig.disabled()).ids());
+            assertEquals(List.of(1L), engine.search("owners'", EmbeddingConfig.disabled()).ids());
+            assertEquals(List.of(1L), engine.search("C_C%E", EmbeddingConfig.disabled()).ids());
+            assertTrue(engine.search("' OR 1=1 --", EmbeddingConfig.disabled()).ids().isEmpty());
+            assertTrue(engine.search("hidden", EmbeddingConfig.disabled()).ids().isEmpty());
+            assertEquals(List.of(1L), engine.search("%", EmbeddingConfig.disabled()).ids());
+            assertTrue(engine.search("  ", EmbeddingConfig.disabled()).ids().isEmpty());
+        }
+    }
+
+    @Test public void threeSearchBranchesContributeAndOverlapsAppearOnce() throws Exception {
+        Path db = database();
+        var config = new EmbeddingConfig(true, "http://localhost/v1", "test", "", "", "");
+        try (LocalSearchEngine engine = new LocalSearchEngine(db, new CountingEmbeddings())) {
+            engine.configure(config);
+            sync(db, 1, "precision recall " + "context ".repeat(50), true);
+            sync(db, 2, "precision recall", true);
+            sync(db, 3, "precision context recall", true);
+            sync(db, 4, "precision", true);
+            sync(db, 5, "公园散步", true); // Best vector match, no literal/keyword match.
+            engine.drainKeywords(); engine.drainVectors(config);
+            engine.drainVectors(config); // The vector worker processes four notes per batch.
+            var result = engine.search("precision recall", config);
+            assertEquals(List.of(2L, 1L, 3L, 4L, 5L), result.ids());
+            assertEquals(java.util.Set.of(1L, 2L), result.wildcardIds());
+            assertEquals(java.util.Set.of(1L, 2L, 3L, 4L), result.keywordIds());
+            assertTrue(result.semanticIds().containsAll(result.ids()));
+        }
+    }
+
+    @Test public void combinedRecallCanOutrankSqlAndLimitAppliesAfterFusion() throws Exception {
+        Path db = database();
+        for (int id = 9; id <= 109; id++) sync(db, id, "note", true);
+        var wildcards = java.util.stream.LongStream.rangeClosed(10, 109).boxed().toList();
+        var scores = LocalSearchEngine.fuse(wildcards, List.of(9L), List.of(9L));
+        assertTrue(scores.get(9L) > scores.get(109L));
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db); Statement s = c.createStatement()) {
+            s.execute("UPDATE notes_cache SET created_at='2026-09-25' WHERE id=9");
+        }
+        var result = new SearchStore(db).rank(scores, 100);
+        assertEquals(100, result.size());
+        assertEquals("Equal relevance uses date rather than SQL membership", Long.valueOf(9), result.getFirst());
+        assertEquals(Long.valueOf(10), result.get(1));
+        assertFalse(result.contains(109L));
+    }
+
+    @Test public void scoreTiesUseDateThenIdWithMissingDatesLastBeforeLimiting() throws Exception {
+        Path db = database();
+        for (int id = 1; id <= 5; id++) sync(db, id, "note", true);
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db); Statement s = c.createStatement()) {
+            s.execute("UPDATE notes_cache SET created_at='2025-01-01' WHERE id=1");
+            s.execute("UPDATE notes_cache SET created_at='2030-01-01' WHERE id=4");
+            s.execute("UPDATE notes_cache SET created_at=NULL WHERE id=5");
+        }
+        var scores = java.util.Map.of(1L, 1.0, 2L, 1.0, 3L, 1.0, 4L, 0.5, 5L, 1.0);
+        SearchStore store = new SearchStore(db);
+        assertEquals(List.of(3L, 2L, 1L, 5L, 4L), store.rank(scores, 100));
+        assertEquals(List.of(3L, 2L), store.rank(scores, 2));
     }
 
     @Test public void restartingDuringModelMigrationResolvesThePublishedProvidersCredentials() throws Exception {

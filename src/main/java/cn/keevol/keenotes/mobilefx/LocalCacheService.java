@@ -586,7 +586,7 @@ public class LocalCacheService {
         return results;
     }
 
-    /** Hydrate search hits in ranking order; no search logic or LIKE fallback lives in SQLite. */
+    /** Hydrate search hits in ranking order, as determined by LocalSearchEngine. */
     public List<NoteData> getNotesByIds(List<Long> ids) throws SQLException {
         ensureInitialized();
         if (ids.isEmpty()) return List.of();

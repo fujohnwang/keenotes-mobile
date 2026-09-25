@@ -6,7 +6,7 @@ import javafx.beans.property.*;
 import javafx.concurrent.Task;
 
 import java.util.List;
-import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -80,7 +80,7 @@ public final class LocalSearchService implements AutoCloseable {
                 checkRunning();
                 String epoch = cache.getSearchEpoch();
                 EmbeddingConfig requestConfig = config;
-                LocalSearchEngine.SearchResult keyword = engine.search(query, EmbeddingConfig.disabled());
+                LocalSearchEngine.SearchResult keyword = engine.search(query, EmbeddingConfig.disabled(), cancellation);
                 ViewResult first = hydrate(epoch, keyword);
                 if (!isCancelled() && requestConfig.usable()) ui(() -> { if (!isCancelled()) preview.accept(first); });
                 if (isCancelled() || !requestConfig.usable()) return first;
@@ -92,15 +92,15 @@ public final class LocalSearchService implements AutoCloseable {
     }
 
     private ViewResult hydrate(String epoch, LocalSearchEngine.SearchResult result) throws Exception {
-        // Relevance selects the candidates; the desktop list keeps its newest-first order.
-        // createdAt uses the cache's sortable UTC storage format (yyyy-MM-dd HH:mm:ss).
-        List<LocalCacheService.NoteData> notes = cache.getNotesByIds(result.ids()).stream()
-                .sorted(Comparator.comparing((LocalCacheService.NoteData note) -> note.createdAt,
-                                Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(Comparator.comparingLong((LocalCacheService.NoteData note) -> note.id).reversed()))
-                .toList();
+        // Preserve the fused relevance order, including date/ID tie-breaks from the engine.
+        List<LocalCacheService.NoteData> notes = cache.getNotesByIds(result.ids());
         if (!Objects.equals(epoch, cache.getSearchEpoch())) return new ViewResult(List.of(), Set.of(), Set.of(), epoch, true, "Search data changed.");
-        return new ViewResult(notes, result.keywordIds(), result.semanticIds(), epoch, result.partial(), result.message());
+        // SQL matches need no tag, even if Lucene or the vector index also found them.
+        Set<Long> keywordTags = new HashSet<>(result.keywordIds());
+        Set<Long> semanticTags = new HashSet<>(result.semanticIds());
+        keywordTags.removeAll(result.wildcardIds());
+        semanticTags.removeAll(result.wildcardIds());
+        return new ViewResult(notes, Set.copyOf(keywordTags), Set.copyOf(semanticTags), epoch, result.partial(), result.message());
     }
 
     public boolean isCurrent(ViewResult result) { return !closed.get() && Objects.equals(result.epoch(), cache.getSearchEpoch()); }

@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** Index bookkeeping in the existing cache DB. No remote cursor or business ID semantics are changed. */
@@ -73,6 +74,47 @@ public final class SearchStore {
     }
 
     public String epoch() throws SQLException { return meta("epoch"); }
+
+    /** Original SQL wildcard matching, including historical notes not yet in Lucene. */
+    List<Long> wildcards(String query, int limit) throws SQLException {
+        String sql = "SELECT n.id FROM notes_cache n LEFT JOIN search_source s ON s.note_id=n.id "
+                + "WHERE n.content LIKE ? AND trim(n.content)<>'' "
+                + "AND COALESCE(s.eligible,CASE WHEN n.content=n.encrypted_content THEN 0 ELSE 1 END)=1 "
+                + "ORDER BY n.created_at DESC,n.id DESC LIMIT ?";
+        try (Connection c = connect(); PreparedStatement p = c.prepareStatement(sql)) {
+            // Preserve LIKE's original % / _ semantics; the query remains a bound parameter.
+            p.setString(1, "%" + query + "%");
+            p.setInt(2, limit);
+            List<Long> result = new ArrayList<>();
+            try (ResultSet rs = p.executeQuery()) {
+                while (rs.next()) result.add(rs.getLong(1));
+            }
+            return result;
+        }
+    }
+
+    /** Resolve score ties against note dates before applying the shared result limit. */
+    List<Long> rank(Map<Long, Double> scores, int limit) throws SQLException {
+        if (scores.isEmpty()) return List.of();
+        String values = String.join(",", java.util.Collections.nCopies(scores.size(), "(?,?)"));
+        String sql = "WITH candidates(id,score) AS (VALUES " + values + ") "
+                + "SELECT n.id FROM candidates c JOIN notes_cache n ON n.id=c.id "
+                + "ORDER BY c.score DESC,n.created_at DESC,n.id DESC LIMIT ?";
+        try (Connection c = connect(); PreparedStatement p = c.prepareStatement(sql)) {
+            int parameter = 1;
+            for (var entry : scores.entrySet()) {
+                p.setLong(parameter++, entry.getKey());
+                p.setDouble(parameter++, entry.getValue());
+            }
+            p.setInt(parameter, limit);
+            List<Long> result = new ArrayList<>();
+            try (ResultSet rs = p.executeQuery()) {
+                while (rs.next()) result.add(rs.getLong(1));
+            }
+            return result;
+        }
+    }
+
     String meta(String key) throws SQLException {
         try (Connection c = connect(); PreparedStatement p = c.prepareStatement("SELECT value FROM search_meta WHERE key=?")) {
             p.setString(1, key);

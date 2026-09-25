@@ -42,12 +42,13 @@ public class SearchFxTest {
     @Test public void syncedNoteBecomesSearchableAndSettingsRenders() throws Exception {
         LocalSearchService service = fx(() -> ServiceManager.getInstance().getLocalSearchService());
         LocalCacheService cache = ServiceManager.getInstance().getLocalCacheService();
+        fx(() -> service.saveConfiguration(EmbeddingConfig.disabled())).get(5, TimeUnit.SECONDS);
         cache.initialize();
-        cache.batchInsertNotes(List.of(new LocalCacheService.NoteData(1, "数据库缓存笔记", "desktop", "2026-09-19", null)), false);
+        cache.batchInsertNotes(List.of(new LocalCacheService.NoteData(1, "incrementalsmokeprobe 数据库缓存笔记", "desktop", "2026-09-19", null)), false);
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         LocalSearchService.ViewResult result;
         do {
-            result = fx(() -> service.search("数据库", preview -> assertTrue(Platform.isFxApplicationThread()))).get(5, TimeUnit.SECONDS);
+            result = fx(() -> service.search("incrementalsmokeprobe", preview -> assertTrue(Platform.isFxApplicationThread()))).get(5, TimeUnit.SECONDS);
             if (!result.notes().isEmpty()) break;
             Thread.sleep(50);
         } while (System.nanoTime() < deadline);
@@ -376,7 +377,7 @@ public class SearchFxTest {
         }
     }
 
-    @Test public void searchResultsDisplayNewestFirstInsteadOfRelevanceOrder() throws Exception {
+    @Test public void wildcardMatchesHaveNoTagsInPreviewOrHybrid() throws Exception {
         LocalSearchService service = fx(() -> ServiceManager.getInstance().getLocalSearchService());
         LocalCacheService cache = ServiceManager.getInstance().getLocalCacheService();
         fx(() -> service.saveConfiguration(EmbeddingConfig.disabled())).get(5, TimeUnit.SECONDS);
@@ -388,7 +389,7 @@ public class SearchFxTest {
                 new LocalCacheService.NoteData(4805, "chronologyprobe " + "context ".repeat(40), "desktop", "2026-09-14 12:57:54", null),
                 new LocalCacheService.NoteData(4806, "chronologyprobe", "desktop", null, null));
         cache.batchInsertNotes(notes, false);
-        List<Long> expected = List.of(4805L, 4802L, 4801L, 4804L, 4803L, 4806L);
+        var expected = java.util.Set.of(4805L, 4802L, 4801L, 4804L, 4803L, 4806L);
         LocalSearchService.ViewResult result;
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
         do {
@@ -397,8 +398,11 @@ public class SearchFxTest {
             assertTrue("Notes were not indexed", System.nanoTime() < deadline);
             Thread.sleep(50);
         } while (true);
-        assertEquals("Keyword results should be newest first, with stable ties and missing dates last",
-                expected, result.notes().stream().map(note -> note.id).toList());
+        assertEquals(expected, result.notes().stream().map(note -> note.id).collect(java.util.stream.Collectors.toSet()));
+        assertTrue(result.keywordIds().isEmpty());
+        assertTrue(result.semanticIds().isEmpty());
+        cache.batchInsertNotes(List.of(new LocalCacheService.NoteData(4807, "semantic-only candidate",
+                "desktop", "2030-01-01", null)), false);
         var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
         var semanticQueries = new java.util.concurrent.atomic.AtomicInteger();
         server.createContext("/v1/embeddings", exchange -> {
@@ -418,19 +422,40 @@ public class SearchFxTest {
             CompletableFuture<LocalSearchService.ViewResult> preview = new CompletableFuture<>();
             var hybrid = fx(() -> service.search("chronologyprobe", preview::complete)).get(5, TimeUnit.SECONDS);
             var keywordPreview = preview.get(5, TimeUnit.SECONDS);
-            assertEquals("Keyword preview should keep the same chronological order", expected,
-                    keywordPreview.notes().stream().map(note -> note.id).toList());
+            assertEquals(expected, keywordPreview.notes().stream().map(note -> note.id).collect(java.util.stream.Collectors.toSet()));
             assertTrue(keywordPreview.semanticIds().isEmpty());
-            assertTrue(keywordPreview.keywordIds().containsAll(expected));
+            assertTrue(keywordPreview.keywordIds().isEmpty());
             assertTrue("The final result must exercise semantic search", semanticQueries.get() > 0);
-            assertEquals("Hybrid results should also display newest first", expected,
-                    hybrid.notes().stream().map(note -> note.id).filter(expected::contains).toList());
-            assertTrue(hybrid.keywordIds().containsAll(expected));
-            assertFalse(hybrid.semanticIds().isEmpty());
+            assertEquals("Overlapping hits appear only once", expected.size(),
+                    hybrid.notes().stream().map(note -> note.id).filter(expected::contains).count());
+            assertTrue(hybrid.keywordIds().isEmpty());
+            assertTrue(expected.stream().noneMatch(hybrid.semanticIds()::contains));
+            assertTrue(hybrid.semanticIds().contains(4807L));
         } finally {
             fx(() -> service.saveConfiguration(EmbeddingConfig.disabled())).get(5, TimeUnit.SECONDS);
             server.stop(0);
         }
+    }
+
+    @Test public void fusedRelevanceOrderIsPreservedByTheViewWithTagsOnlyOnRecallMatches() throws Exception {
+        LocalSearchService service = fx(() -> ServiceManager.getInstance().getLocalSearchService());
+        LocalCacheService cache = ServiceManager.getInstance().getLocalCacheService();
+        fx(() -> service.saveConfiguration(EmbeddingConfig.disabled())).get(5, TimeUnit.SECONDS);
+        cache.batchInsertNotes(List.of(
+                new LocalCacheService.NoteData(5101, "specificityprobe matchwords " + "context ".repeat(50), "desktop", "2020-01-01", null),
+                new LocalCacheService.NoteData(5102, "specificityprobe context matchwords", "desktop", "2021-01-01", null),
+                new LocalCacheService.NoteData(5103, "matchwords specificityprobe " + "context ".repeat(50), "desktop", "2030-01-01", null)), false);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
+        LocalSearchService.ViewResult result;
+        do {
+            result = fx(() -> service.search("specificityprobe matchwords", preview -> { })).get(5, TimeUnit.SECONDS);
+            if (result.notes().size() == 3) break;
+            assertTrue("Keyword recall did not become visible", System.nanoTime() < deadline);
+            Thread.sleep(50);
+        } while (true);
+        assertEquals(List.of(5101L, 5102L, 5103L), result.notes().stream().map(note -> note.id).toList());
+        assertEquals(java.util.Set.of(5102L, 5103L), result.keywordIds());
+        assertTrue(result.semanticIds().isEmpty());
     }
 
     private static DialogPane editor() {

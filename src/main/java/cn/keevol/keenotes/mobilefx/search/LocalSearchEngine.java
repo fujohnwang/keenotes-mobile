@@ -14,6 +14,7 @@ import java.util.function.Function;
 
 /** Blocking operations. The desktop facade schedules every call off the JavaFX application thread. */
 public final class LocalSearchEngine implements AutoCloseable {
+    private static final int RESULT_LIMIT = 100;
     private final SearchStore store;
     private final EmbeddingClient embeddings;
     private final Path root;
@@ -270,10 +271,10 @@ public final class LocalSearchEngine implements AutoCloseable {
 
     public SearchResult search(String query, EmbeddingConfig config, SearchCancellation cancellation) throws SQLException, IOException {
         cancellation.check();
-        if (query == null || query.isBlank()) return new SearchResult(List.of(), Set.of(), Set.of(), false, "");
+        if (query == null || query.isBlank()) return new SearchResult(List.of(), Set.of(), Set.of(), Set.of(), false, "");
         Handle keyword = family(SearchStore.KEYWORD, SearchStore.KEYWORD_PROFILE);
-        List<Long> keywords = keyword.index().keywords(query, 100);
-        List<Long> result = keywords;
+        List<Long> wildcards = store.wildcards(query, RESULT_LIMIT);
+        List<Long> keywords = keyword.index().keywords(query, RESULT_LIMIT);
         List<Long> vectors = List.of();
         boolean partial = !keyword.index().hasBase();
         String message = "";
@@ -286,28 +287,34 @@ public final class LocalSearchEngine implements AutoCloseable {
                 if (vector.index().count() > 0) {
                     float[] queryVector = embeddings.embedQuery(queryConfig, query, cancellation);
                     if (allowed(queryConfig)) {
-                        vectors = vector.index().vectors(queryVector, 100);
-                        result = fuse(keywords, vectors);
+                        vectors = vector.index().vectors(queryVector, RESULT_LIMIT);
                     }
-                } else message = "No semantic index yet; showing keyword matches.";
+                } else message = "No semantic index yet; showing wildcard and keyword matches.";
                 if (!queryConfig.profile().equals(config.profile())) message = "Using the previous embedding model until the new index is rebuilt.";
             } catch (IOException | IllegalArgumentException e) {
-                message = "Semantic search unavailable; showing keyword matches. " + safeError(e);
+                message = "Semantic search unavailable; showing wildcard and keyword matches. " + safeError(e);
             }
         }
         cancellation.check();
-        if (!keyword.epoch().equals(store.epoch())) return new SearchResult(List.of(), Set.of(), Set.of(), true, "Search data changed. Search again.");
-        return new SearchResult(result, Set.copyOf(keywords), Set.copyOf(vectors), partial, message);
+        List<Long> ranked = store.rank(fuse(wildcards, keywords, vectors), RESULT_LIMIT);
+        if (!keyword.epoch().equals(store.epoch())) return new SearchResult(List.of(), Set.of(), Set.of(), Set.of(), true, "Search data changed. Search again.");
+        return new SearchResult(ranked, Set.copyOf(wildcards),
+                Set.copyOf(keywords), Set.copyOf(vectors), partial, message);
     }
 
-    static List<Long> fuse(List<Long> keywords, List<Long> vectors) {
+    static Map<Long, Double> fuse(List<Long> wildcards, List<Long> keywords, List<Long> vectors) {
         Map<Long, Double> scores = new HashMap<>();
-        for (List<Long> branch : List.of(keywords, vectors)) {
-            Set<Long> seen = new HashSet<>();
-            for (int i = 0; i < branch.size(); i++) if (seen.add(branch.get(i))) scores.merge(branch.get(i), 1.0 / (61 + i), Double::sum);
-        }
-        return scores.entrySet().stream().sorted(Map.Entry.<Long, Double>comparingByValue().reversed()
-                .thenComparing(Map.Entry.<Long, Double>comparingByKey().reversed())).limit(100).map(Map.Entry::getKey).toList();
+        // Fixed weighted RRF (k=60). SQL has the strongest signal, without pinning hits.
+        addScores(scores, wildcards, 3.0);
+        addScores(scores, keywords, 2.0);
+        addScores(scores, vectors, 1.0);
+        return scores;
+    }
+
+    private static void addScores(Map<Long, Double> scores, List<Long> branch, double weight) {
+        Set<Long> seen = new HashSet<>();
+        for (int i = 0; i < branch.size(); i++)
+            if (seen.add(branch.get(i))) scores.merge(branch.get(i), weight / (61 + i), Double::sum);
     }
 
     public Status status(EmbeddingConfig config) throws SQLException, IOException {
@@ -335,7 +342,7 @@ public final class LocalSearchEngine implements AutoCloseable {
     }
 
     private record Handle(IndexFamily index, String epoch, Path path) { }
-    public record SearchResult(List<Long> ids, Set<Long> keywordIds, Set<Long> semanticIds, boolean partial, String message) { }
+    public record SearchResult(List<Long> ids, Set<Long> wildcardIds, Set<Long> keywordIds, Set<Long> semanticIds, boolean partial, String message) { }
     /** Base is the fixed historical snapshot; Delta is everything indexed since it was built. */
     public record Layer(int base, int delta, int pending, int failed, boolean built) { }
     public record Status(Layer keywords, Layer vectors) { }

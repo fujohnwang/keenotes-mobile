@@ -126,7 +126,7 @@ final class SearchSettingsPane extends VBox {
         check.getStyleClass().add("model-card-check");
         check.setVisible(selected); check.setManaged(selected);
         HBox header = new HBox(12, name, headerSpacer, check); header.setAlignment(Pos.CENTER_LEFT);
-        Label modelId = label(model == null ? "Keyword search only" : model.config().model(), "model-id"); modelId.setWrapText(true);
+        Label modelId = label(model == null ? "Wildcard + keyword search" : model.config().model(), "model-id"); modelId.setWrapText(true);
         Label endpoint = hint(model == null ? "No model requests. Saved models stay available." : model.config().baseUrl());
         VBox details = new VBox(6, modelId, endpoint);
         VBox content = new VBox(16, header, details);
@@ -143,7 +143,7 @@ final class SearchSettingsPane extends VBox {
         select.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         select.setAlignment(Pos.TOP_LEFT);
         select.setId("embedding-model-" + id);
-        select.setAccessibleText(model == null ? "None, keyword search only" : "Use " + model.name() + " for semantic search");
+        select.setAccessibleText(model == null ? "None, wildcard and keyword search" : "Use " + model.name() + " for semantic search");
         select.getStyleClass().add("embedding-model-card");
         if (selected) select.getStyleClass().add("selected-model-card");
         select.setToggleGroup(modelSelection); select.setSelected(selected);
