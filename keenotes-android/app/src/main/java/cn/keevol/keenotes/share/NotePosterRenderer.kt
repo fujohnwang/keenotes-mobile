@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory
 import android.graphics.BlendMode
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
@@ -30,19 +32,13 @@ object NotePosterRenderer {
     const val VIDEO_HEIGHT = 1920
     const val ASPECT_RATIO = 9f / 16f
 
-    private val paperColor = Color.rgb(0xFD, 0xFC, 0xFB)
-    private val inkText = Color.rgb(26, 24, 22)
-    private val footerText = Color.argb(88, 26, 24, 22)
-    private val badgeFill = Color.argb(12, 0, 0, 0)
-    private val badgeStroke = Color.argb(14, 0, 0, 0)
-    private val divider = Color.argb(15, 0, 0, 0)
-
     fun renderPosterImage(
         context: Context,
         note: Note,
         hiddenMessage: String,
         inkTheme: PosterInkTheme,
-        width: Int = EXPORT_WIDTH
+        width: Int = EXPORT_WIDTH,
+        colorTheme: PosterColorTheme = PosterColorTheme.PAPER
     ): Bitmap {
         return renderPosterImage(
             context = context,
@@ -50,7 +46,8 @@ object NotePosterRenderer {
             posterDate = formatPosterDate(note.createdAt),
             hiddenMessage = hiddenMessage,
             inkTheme = inkTheme,
-            width = width
+            width = width,
+            colorTheme = colorTheme
         )
     }
 
@@ -60,7 +57,8 @@ object NotePosterRenderer {
         posterDate: String,
         hiddenMessage: String,
         inkTheme: PosterInkTheme,
-        width: Int = EXPORT_WIDTH
+        width: Int = EXPORT_WIDTH,
+        colorTheme: PosterColorTheme = PosterColorTheme.PAPER
     ): Bitmap {
         val content = noteContent
         val author = hiddenMessage.trim().takeIf { it.isNotEmpty() }
@@ -75,17 +73,17 @@ object NotePosterRenderer {
         val footerFontSize = scaled(11, scale).toFloat()
 
         val contentPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = inkText
+            color = colorTheme.text
             textSize = contentFontSize
             typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
         }
         val footerPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = footerText
+            color = colorTheme.footer
             textSize = footerFontSize
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
         }
         val badgePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(148, 26, 24, 22)
+            color = colorTheme.badgeText
             textSize = footerFontSize
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
         }
@@ -122,19 +120,19 @@ object NotePosterRenderer {
 
         canvas.save()
         canvas.clipPath(posterPath)
-        canvas.drawColor(paperColor)
+        canvas.drawColor(colorTheme.background)
         paintPaperGrain(canvas, width, height, scale)
-        paintInkTheme(context, canvas, inkTheme, contentLength, width, height)
+        paintInkTheme(context, canvas, inkTheme, contentLength, width, height, colorTheme)
         paintVignette(canvas, width, height)
         paintContent(canvas, layout, content, cardPadding, textY)
 
-        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = divider }
+        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colorTheme.divider }
         canvas.drawRect(0f, footerY.toFloat(), width.toFloat(), (footerY + dividerHeight).toFloat(), dividerPaint)
-        paintFooter(canvas, author, posterDate, footerPaint, badgePaint, cardPadding, footerY, footerVerticalPadding, width)
+        paintFooter(canvas, author, posterDate, footerPaint, badgePaint, cardPadding, footerY, footerVerticalPadding, width, colorTheme)
         canvas.restore()
 
         val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(210, 255, 255, 255)
+            color = colorTheme.outline
             style = Paint.Style.STROKE
             strokeWidth = max(1f, 0.8f * scale)
         }
@@ -143,15 +141,15 @@ object NotePosterRenderer {
         return bitmap
     }
 
-    fun renderVideoFrame(posterImage: Bitmap): Bitmap {
+    fun renderVideoFrame(posterImage: Bitmap, colorTheme: PosterColorTheme = PosterColorTheme.PAPER): Bitmap {
         val frame = Bitmap.createBitmap(VIDEO_WIDTH, VIDEO_HEIGHT, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(frame)
         val frameRect = RectF(0f, 0f, VIDEO_WIDTH.toFloat(), VIDEO_HEIGHT.toFloat())
-        canvas.drawColor(paperColor)
+        canvas.drawColor(colorTheme.background)
 
         val smallBackground = Bitmap.createBitmap(270, 480, Bitmap.Config.ARGB_8888)
         Canvas(smallBackground).apply {
-            drawColor(paperColor)
+            drawColor(colorTheme.background)
             drawBitmapCover(posterImage, RectF(0f, 0f, width.toFloat(), height.toFloat()), Paint(Paint.ANTI_ALIAS_FLAG))
         }
         val blurred = boxBlur(smallBackground, 10)
@@ -214,13 +212,23 @@ object NotePosterRenderer {
         theme: PosterInkTheme,
         contentLength: Int,
         width: Int,
-        height: Int
+        height: Int,
+        colorTheme: PosterColorTheme
     ) {
         val ink = BitmapFactory.decodeResource(context.resources, theme.drawableRes) ?: return
         val inkHeight = exportHeightFor(width)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            alpha = theme.alphaFor(contentLength)
-            blendMode = BlendMode.MULTIPLY
+            alpha = (theme.alphaFor(contentLength) * if (colorTheme.isDark) 0.65f else 1f).roundToInt()
+            blendMode = if (colorTheme.isDark) BlendMode.SCREEN else BlendMode.MULTIPLY
+            if (colorTheme.isDark) {
+                // Inversion + screen makes the paper neutral and the strokes light on dark colors.
+                colorFilter = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(
+                    -1f, 0f, 0f, 0f, 255f,
+                    0f, -1f, 0f, 0f, 255f,
+                    0f, 0f, -1f, 0f, 255f,
+                    0f, 0f, 0f, 1f, 0f
+                )))
+            }
             isFilterBitmap = true
         }
         try {
@@ -267,7 +275,8 @@ object NotePosterRenderer {
         cardPadding: Int,
         footerY: Int,
         footerVerticalPadding: Int,
-        width: Int
+        width: Int,
+        colorTheme: PosterColorTheme
     ) {
         val badgeText = "KeeNotes"
         val badgeMetrics = badgePaint.fontMetrics
@@ -281,11 +290,11 @@ object NotePosterRenderer {
         val badgeRect = RectF(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight)
 
         val badgeBackground = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = badgeFill
+            color = colorTheme.badgeFill
             style = Paint.Style.FILL
         }
         val badgeOutline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = badgeStroke
+            color = colorTheme.badgeStroke
             style = Paint.Style.STROKE
             strokeWidth = 1f
         }

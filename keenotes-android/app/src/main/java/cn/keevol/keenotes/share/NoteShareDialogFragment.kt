@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.Gravity
@@ -22,12 +23,15 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.lifecycleScope
 import cn.keevol.keenotes.KeeNotesApp
 import cn.keevol.keenotes.R
 import cn.keevol.keenotes.data.entity.Note
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -49,6 +53,11 @@ class NoteShareDialogFragment : DialogFragment() {
 
     private var hiddenMessage: String = ""
     private var inkTheme: PosterInkTheme = PosterInkTheme.MEI
+    private var colorTheme = PosterColorTheme.PAPER
+    private var paletteControls: LinearLayout? = null
+    private var paletteName: TextView? = null
+    private val paletteChoices = mutableListOf<Pair<View, View>>()
+    private var renderGeneration = 0
     private var currentPoster: Bitmap? = null
     private var renderJob: Job? = null
     private var statusJob: Job? = null
@@ -77,6 +86,7 @@ class NoteShareDialogFragment : DialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        ViewCompat.requestApplyInsets(view)
         loadSettingsAndRender()
     }
 
@@ -89,9 +99,14 @@ class NoteShareDialogFragment : DialogFragment() {
     }
 
     override fun onDestroyView() {
+        view?.let { ViewCompat.setOnApplyWindowInsetsListener(it, null) }
         statusJob?.cancel()
+        renderGeneration++
         renderJob?.cancel()
         currentPoster = null
+        paletteControls = null
+        paletteName = null
+        paletteChoices.clear()
         super.onDestroyView()
     }
 
@@ -112,6 +127,11 @@ class NoteShareDialogFragment : DialogFragment() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
         ))
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            column.setPadding(dp(20) + bars.left, dp(18) + bars.top, dp(20) + bars.right, dp(18) + bars.bottom)
+            insets
+        }
 
         val toolbar = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -152,10 +172,15 @@ class NoteShareDialogFragment : DialogFragment() {
         }
         toolbar.addView(closeButton)
 
-        val scrollView = ScrollView(context).apply {
+        val scrollView = object : ScrollView(context) {
+            override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+                super.onSizeChanged(w, h, oldw, oldh)
+                fitPosterPreview(w, h - paddingTop - paddingBottom)
+            }
+        }.apply {
             overScrollMode = ScrollView.OVER_SCROLL_IF_CONTENT_SCROLLS
             clipToPadding = false
-            setPadding(0, dp(12), 0, dp(56))
+            setPadding(0, dp(12), 0, dp(16))
         }
         val previewFrame = FrameLayout(context)
         scrollView.addView(previewFrame, FrameLayout.LayoutParams(
@@ -179,6 +204,11 @@ class NoteShareDialogFragment : DialogFragment() {
             1f
         ))
 
+        column.addView(createPaletteCarousel(), LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+
         statusText = TextView(context).apply {
             visibility = View.GONE
             setTextColor(Color.WHITE)
@@ -191,7 +221,7 @@ class NoteShareDialogFragment : DialogFragment() {
             ViewGroup.LayoutParams.WRAP_CONTENT,
             Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
         ).apply {
-            bottomMargin = dp(36)
+            bottomMargin = dp(110)
             leftMargin = dp(20)
             rightMargin = dp(20)
         })
@@ -208,6 +238,94 @@ class NoteShareDialogFragment : DialogFragment() {
 
         setBusy(true)
         return root
+    }
+
+    private fun fitPosterPreview(width: Int, height: Int) {
+        if (width <= 0 || height <= 0 || !::posterImageView.isInitialized) return
+        // Fit a normal 9:16 poster; longer exports keep scrolling at this same width.
+        val fittedWidth = minOf(width, dp(390), (height * NotePosterRenderer.ASPECT_RATIO).toInt()).coerceAtLeast(1)
+        if (posterImageView.layoutParams.width != fittedWidth) {
+            posterImageView.layoutParams = posterImageView.layoutParams.apply { this.width = fittedWidth }
+        }
+    }
+
+    private fun createPaletteCarousel(): View {
+        val context = requireContext()
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+        }
+        val row = LinearLayout(context).apply {
+            gravity = Gravity.CENTER
+            orientation = LinearLayout.HORIZONTAL
+        }
+        paletteControls = row
+        val previous = createIconButton(R.drawable.ic_arrow_up, "上一个海报配色") {
+            selectColorTheme(colorTheme.offset(-1))
+        }.apply {
+            rotation = -90f
+            background = null
+        }
+        row.addView(previous)
+        PosterColorTheme.values().forEach { theme ->
+            val ring = View(context).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.TRANSPARENT)
+                    setStroke(dp(2), Color.WHITE)
+                }
+            }
+            val swatch = View(context).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(theme.background)
+                    setStroke(dp(1), Color.argb(110, 255, 255, 255))
+                }
+            }
+            val choice = FrameLayout(context).apply {
+                contentDescription = theme.label
+                isFocusable = true
+                isClickable = true
+                addView(ring, FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER))
+                addView(swatch, FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER))
+                setOnClickListener { selectColorTheme(theme) }
+            }
+            paletteChoices.add(choice to ring)
+            row.addView(choice, LinearLayout.LayoutParams(dp(44), dp(44)))
+        }
+        val next = createIconButton(R.drawable.ic_arrow_up, "下一个海报配色") {
+            selectColorTheme(colorTheme.offset(1))
+        }.apply {
+            rotation = 90f
+            background = null
+        }
+        row.addView(next)
+        container.addView(row)
+        paletteName = TextView(context).apply {
+            setTextColor(Color.argb(220, 255, 255, 255))
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(4), 0, dp(4))
+        }
+        container.addView(paletteName)
+        updatePaletteControls()
+        return container
+    }
+
+    private fun updatePaletteControls() {
+        paletteChoices.forEachIndexed { index, (choice, ring) ->
+            val selected = index == colorTheme.ordinal
+            choice.isSelected = selected
+            ring.visibility = if (selected) View.VISIBLE else View.INVISIBLE
+        }
+        paletteName?.text = colorTheme.label
+    }
+
+    private fun selectColorTheme(theme: PosterColorTheme) {
+        if (isBusy || colorTheme == theme) return
+        colorTheme = theme
+        updatePaletteControls()
+        refreshPreview()
     }
 
     private fun createIconButton(
@@ -243,23 +361,33 @@ class NoteShareDialogFragment : DialogFragment() {
     }
 
     private fun refreshPreview() {
+        val generation = ++renderGeneration
         renderJob?.cancel()
+        currentPoster = null
         setBusy(true)
         val appContext = requireContext().applicationContext
         val noteSnapshot = note
         val hiddenSnapshot = hiddenMessage
         val themeSnapshot = inkTheme
+        val colorSnapshot = colorTheme
         renderJob = viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val poster = withContext(Dispatchers.Default) {
-                    NotePosterRenderer.renderPosterImage(appContext, noteSnapshot, hiddenSnapshot, themeSnapshot)
+                    NotePosterRenderer.renderPosterImage(appContext, noteSnapshot, hiddenSnapshot, themeSnapshot, colorTheme = colorSnapshot)
                 }
-                currentPoster = poster
-                posterImageView.setImageBitmap(poster)
+                if (generation == renderGeneration) {
+                    currentPoster = poster
+                    posterImageView.setImageBitmap(poster)
+                }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                showStatus("Poster render failed", autoHide = false)
+                if (generation == renderGeneration) {
+                    posterImageView.setImageDrawable(null)
+                    showStatus("Poster render failed", autoHide = false)
+                }
             } finally {
-                setBusy(false)
+                if (generation == renderGeneration) setBusy(false)
             }
         }
     }
@@ -313,6 +441,7 @@ class NoteShareDialogFragment : DialogFragment() {
 
     private fun saveVideo() {
         val poster = currentPoster ?: return
+        val colorSnapshot = colorTheme
         setBusy(true)
         showStatus("Generating video...", autoHide = false)
         val appContext = requireContext().applicationContext
@@ -322,7 +451,7 @@ class NoteShareDialogFragment : DialogFragment() {
             var outputFile: java.io.File? = null
             try {
                 videoFrame = withContext(Dispatchers.Default) {
-                    NotePosterRenderer.renderVideoFrame(poster)
+                    NotePosterRenderer.renderVideoFrame(poster, colorSnapshot)
                 }
                 outputFile = PosterVideoExporter.exportToCache(appContext, videoFrame, displayName.removeSuffix(".mp4"))
                 withContext(Dispatchers.IO) {
@@ -352,6 +481,17 @@ class NoteShareDialogFragment : DialogFragment() {
         ).forEach {
             it.isEnabled = !busy
             it.alpha = if (busy) 0.45f else 1f
+        }
+        paletteControls?.let { row ->
+            for (index in 0 until row.childCount) {
+                row.getChildAt(index).isEnabled = !busy
+            }
+            row.alpha = if (busy) 0.45f else 1f
+        }
+        if (!busy && currentPoster == null) {
+            savePosterButtonOrNull()?.isEnabled = false
+            sharePosterButtonOrNull()?.isEnabled = false
+            saveVideoButtonOrNull()?.isEnabled = false
         }
         if (::closeButton.isInitialized) {
             closeButton.isEnabled = true

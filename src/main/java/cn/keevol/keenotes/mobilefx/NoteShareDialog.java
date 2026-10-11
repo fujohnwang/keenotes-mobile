@@ -1,9 +1,13 @@
 package cn.keevol.keenotes.mobilefx;
 
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
@@ -23,8 +27,10 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
+import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -35,12 +41,16 @@ import java.time.format.DateTimeFormatter;
 
 public class NoteShareDialog extends Dialog<Void> {
     private static final DateTimeFormatter SAVE_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss");
+    private static final double STATUS_ROW_HEIGHT = 40;
 
     private final LocalCacheService.NoteData noteData;
     private final Window owner;
     private final String hiddenMessage;
     private PosterInkTheme inkTheme;
     private BufferedImage currentPoster;
+    private final ObjectProperty<PosterColorTheme> colorTheme = new SimpleObjectProperty<>(PosterColorTheme.PAPER);
+    private Task<BufferedImage> renderTask;
+    private VBox carouselControls;
 
     private final ImageView posterPreview = new ImageView();
     private final Label statusLabel = new Label();
@@ -64,18 +74,40 @@ public class NoteShareDialog extends Dialog<Void> {
         configureDialogCloseBehavior();
         getDialogPane().setContent(createContent());
         getDialogPane().setPrefWidth(560);
-        getDialogPane().setPrefHeight(760);
+        getDialogPane().setMinHeight(0);
         getDialogPane().setStyle(resolveDialogPaneStyle());
+        setOnShowing(event -> getDialogPane().setPrefHeight(resolveScreenBounds().getHeight() * 0.8));
+        setOnShown(event -> {
+            Rectangle2D bounds = resolveScreenBounds();
+            // Set the outer window height after decorations have been measured.
+            setHeight(bounds.getHeight() * 0.8);
+            setY(bounds.getMinY() + (bounds.getHeight() - getHeight()) / 2);
+        });
+        setOnHidden(event -> {
+            if (renderTask != null) {
+                renderTask.cancel();
+                renderTask = null;
+            }
+        });
         refreshPreview();
-        configureVideoAvailability();
+    }
+
+    private Rectangle2D resolveScreenBounds() {
+        if (owner == null) return Screen.getPrimary().getVisualBounds();
+        return Screen.getScreensForRectangle(
+                        owner.getX() + owner.getWidth() / 2,
+                        owner.getY() + owner.getHeight() / 2, 1, 1)
+                .stream().findFirst().orElse(Screen.getPrimary()).getVisualBounds();
     }
 
     private VBox createContent() {
         VBox root = new VBox(14);
+        root.setMinHeight(0);
         root.setPadding(new Insets(18));
         root.setStyle(resolveRootStyle());
 
         HBox toolbar = createToolbar();
+        toolbar.setMinHeight(Region.USE_PREF_SIZE);
 
         posterPreview.setFitWidth(390);
         posterPreview.setPreserveRatio(true);
@@ -83,28 +115,116 @@ public class NoteShareDialog extends Dialog<Void> {
 
         StackPane previewWrapper = new StackPane(posterPreview);
         previewWrapper.setAlignment(Pos.TOP_CENTER);
-        previewWrapper.setMinWidth(Region.USE_PREF_SIZE);
+        previewWrapper.setMinWidth(0);
         previewWrapper.setStyle("-fx-background-color: transparent;");
 
         ScrollPane previewScroll = new ScrollPane(previewWrapper);
         previewScroll.setFitToWidth(true);
         previewScroll.setPannable(true);
-        previewScroll.setMaxHeight(590);
+        previewScroll.setMinHeight(0);
+        previewScroll.setMaxHeight(Double.MAX_VALUE);
         previewScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        // Mirror the space taken by the right scrollbar so the poster stays on the dialog's center line.
+        var scrollbarGutter = Bindings.createDoubleBinding(() -> {
+            double viewportWidth = previewScroll.getViewportBounds().getWidth();
+            if (viewportWidth <= 0) return 0.0;
+            Insets insets = previewScroll.getInsets();
+            return Math.max(0, previewScroll.getWidth() - viewportWidth - insets.getLeft() - insets.getRight());
+        }, previewScroll.widthProperty(), previewScroll.viewportBoundsProperty(), previewScroll.insetsProperty());
+        previewWrapper.paddingProperty().bind(Bindings.createObjectBinding(
+                () -> new Insets(0, 0, 0, scrollbarGutter.get()), scrollbarGutter));
+        posterPreview.fitWidthProperty().bind(Bindings.createDoubleBinding(
+                () -> Math.max(1, Math.min(previewScroll.getViewportBounds().getWidth() - scrollbarGutter.get(),
+                        previewScroll.getViewportBounds().getHeight() * NotePosterRenderer.ASPECT_RATIO)),
+                previewScroll.viewportBoundsProperty(), scrollbarGutter));
         VBox.setVgrow(previewScroll, Priority.ALWAYS);
 
         statusLabel.setWrapText(true);
+        statusLabel.setId("poster-status-label");
+        statusLabel.setMaxWidth(Region.USE_PREF_SIZE);
+        statusLabel.setMaxHeight(STATUS_ROW_HEIGHT);
+        statusLabel.setAlignment(Pos.CENTER);
+        statusLabel.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
         statusLabel.setStyle(resolveStatusStyle(false));
+        Tooltip statusTooltip = new Tooltip();
+        statusTooltip.textProperty().bind(statusLabel.textProperty());
+        statusLabel.setTooltip(statusTooltip);
 
+        progressIndicator.setMinSize(28, 28);
+        progressIndicator.setPrefSize(28, 28);
         progressIndicator.setMaxSize(28, 28);
         progressIndicator.setVisible(false);
-        progressIndicator.setManaged(false);
+        progressIndicator.setId("poster-status-progress");
 
-        HBox statusRow = new HBox(10, progressIndicator, statusLabel);
-        statusRow.setAlignment(Pos.CENTER_LEFT);
+        // Center the text independently; the indicator sits beside it without shifting it.
+        StackPane statusRow = new StackPane(statusLabel, progressIndicator);
+        statusRow.setId("poster-status-row");
+        statusRow.setAlignment(Pos.CENTER);
+        statusRow.setPadding(new Insets(0, 38, 0, 38));
+        progressIndicator.translateXProperty().bind(statusLabel.widthProperty()
+                .add(progressIndicator.widthProperty()).divide(-2).subtract(10));
+        statusRow.setMinHeight(STATUS_ROW_HEIGHT);
+        statusRow.setPrefHeight(STATUS_ROW_HEIGHT);
+        statusRow.setMaxHeight(STATUS_ROW_HEIGHT);
 
-        root.getChildren().addAll(toolbar, previewScroll, statusRow);
+        carouselControls = createCarouselControls();
+        carouselControls.setMinHeight(Region.USE_PREF_SIZE);
+        root.getChildren().addAll(toolbar, statusRow, previewScroll, carouselControls);
         return root;
+    }
+
+    private VBox createCarouselControls() {
+        String arrowStyle = "-fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 0; -fx-cursor: hand;";
+        Button previous = createToolbarButton("", createIcon("M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"));
+        previous.setStyle(arrowStyle);
+        previous.setPickOnBounds(true);
+        previous.setAccessibleText("上一个海报配色");
+        previous.setId("poster-theme-previous");
+        previous.setMinSize(44, 44);
+        previous.setOnAction(event -> selectColorTheme(colorTheme.get().offset(-1)));
+        HBox controls = new HBox(4, previous);
+        controls.setAlignment(Pos.CENTER);
+        Color ringColor = Color.web(ThemeService.getInstance().isDarkTheme() ? "#E6EDF3" : "#24292F");
+        for (PosterColorTheme theme : PosterColorTheme.values()) {
+            Circle swatch = new Circle(8, Color.web(theme.backgroundCss()));
+            swatch.setStroke(Color.web("#8B949E"));
+            Circle ring = new Circle(13, Color.TRANSPARENT);
+            ring.setStroke(ringColor);
+            ring.setStrokeWidth(2);
+            ring.visibleProperty().bind(colorTheme.isEqualTo(theme));
+            Button choice = new Button();
+            choice.setGraphic(new StackPane(ring, swatch));
+            choice.setMinSize(44, 44);
+            choice.setPrefSize(44, 44);
+            choice.setStyle("-fx-background-color: transparent; -fx-padding: 0; -fx-cursor: hand;");
+            choice.setId("poster-theme-" + theme.name().toLowerCase(java.util.Locale.ROOT));
+            choice.setTooltip(new Tooltip(theme.getLabel()));
+            choice.accessibleTextProperty().bind(Bindings.createStringBinding(
+                    () -> theme.getLabel() + (colorTheme.get() == theme ? "，已选中" : ""), colorTheme));
+            choice.setOnAction(event -> selectColorTheme(theme));
+            controls.getChildren().add(choice);
+        }
+        Button next = createToolbarButton("", createIcon("M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12z"));
+        next.setStyle(arrowStyle);
+        next.setPickOnBounds(true);
+        next.setAccessibleText("下一个海报配色");
+        next.setId("poster-theme-next");
+        next.setMinSize(44, 44);
+        next.setOnAction(event -> selectColorTheme(colorTheme.get().offset(1)));
+        controls.getChildren().add(next);
+        Label name = new Label();
+        name.setId("poster-theme-name");
+        name.textProperty().bind(Bindings.createStringBinding(() -> colorTheme.get().getLabel(), colorTheme));
+        name.setStyle(resolveStatusStyle(false));
+        VBox carousel = new VBox(3, controls, name);
+        carousel.setAlignment(Pos.CENTER);
+        return carousel;
+    }
+
+    private void selectColorTheme(PosterColorTheme theme) {
+        if (colorTheme.get() == theme) return;
+        colorTheme.set(theme);
+        refreshPreview();
     }
 
     private HBox createToolbar() {
@@ -154,19 +274,42 @@ public class NoteShareDialog extends Dialog<Void> {
     }
 
     private void refreshPreview() {
-        try {
-            currentPoster = NotePosterRenderer.renderPosterImage(noteData, hiddenMessage, inkTheme);
-            posterPreview.setImage(NotePosterRenderer.toFxImage(currentPoster));
-            setStatus("当前背景：" + inkTheme.getLabel(), false);
-            copyPosterButton.setDisable(false);
-            savePosterButton.setDisable(false);
-            saveVideoButton.setDisable(!NotePosterVideoExporter.isFfmpegAvailable());
-        } catch (Exception e) {
-            setStatus("海报预览生成失败：" + e.getMessage(), true);
-            copyPosterButton.setDisable(true);
-            savePosterButton.setDisable(true);
-            saveVideoButton.setDisable(true);
-        }
+        if (renderTask != null) renderTask.cancel();
+        currentPoster = null;
+        setBusy(true);
+        PosterInkTheme inkSnapshot = inkTheme;
+        PosterColorTheme colorSnapshot = colorTheme.get();
+        Task<BufferedImage> task = new Task<>() {
+            @Override
+            protected BufferedImage call() throws Exception {
+                return NotePosterRenderer.renderPosterImage(noteData, hiddenMessage, inkSnapshot, colorSnapshot);
+            }
+        };
+        renderTask = task;
+        task.setOnSucceeded(event -> {
+            if (renderTask != task) return;
+            try {
+                BufferedImage poster = task.getValue();
+                posterPreview.setImage(NotePosterRenderer.toFxImage(poster));
+                currentPoster = poster;
+                setStatus("当前背景：" + inkSnapshot.getLabel(), false);
+                setBusy(false);
+                configureVideoAvailability();
+            } catch (Exception error) {
+                showRenderFailure(error);
+            }
+        });
+        task.setOnFailed(event -> {
+            if (renderTask == task) showRenderFailure(task.getException());
+        });
+        AppExecutors.media().execute(task);
+    }
+
+    private void showRenderFailure(Throwable error) {
+        currentPoster = null;
+        posterPreview.setImage(null);
+        setBusy(false);
+        setStatus("海报预览生成失败：" + (error == null ? "未知错误" : error.getMessage()), true);
     }
 
     private void configureVideoAvailability() {
@@ -180,7 +323,6 @@ public class NoteShareDialog extends Dialog<Void> {
     private void cycleTheme() {
         inkTheme = inkTheme.next();
         refreshPreview();
-        configureVideoAvailability();
     }
 
     private void copyPoster() {
@@ -316,12 +458,13 @@ public class NoteShareDialog extends Dialog<Void> {
     }
 
     private void setBusy(boolean busy) {
+        // Visibility does not affect the centered text or the fixed status row height.
         progressIndicator.setVisible(busy);
-        progressIndicator.setManaged(busy);
         cycleThemeButton.setDisable(busy);
-        copyPosterButton.setDisable(busy);
-        savePosterButton.setDisable(busy);
-        saveVideoButton.setDisable(busy || !NotePosterVideoExporter.isFfmpegAvailable());
+        carouselControls.setDisable(busy);
+        copyPosterButton.setDisable(busy || currentPoster == null);
+        savePosterButton.setDisable(busy || currentPoster == null);
+        saveVideoButton.setDisable(busy || currentPoster == null || !NotePosterVideoExporter.isFfmpegAvailable());
     }
 
     private void requestClose() {

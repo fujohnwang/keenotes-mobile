@@ -28,13 +28,6 @@ public final class NotePosterRenderer {
     public static final int EXPORT_WIDTH = 1080;
     public static final double ASPECT_RATIO = 9.0 / 16.0;
 
-    private static final int PAPER_RGB = 0xFDFCFB;
-    private static final Color INK_TEXT = new Color(26, 24, 22);
-    private static final Color FOOTER_TEXT = new Color(26, 24, 22, 88);
-    private static final Color BADGE_FILL = new Color(0, 0, 0, 12);
-    private static final Color BADGE_STROKE = new Color(0, 0, 0, 14);
-    private static final Color DIVIDER = new Color(0, 0, 0, 15);
-
     private NotePosterRenderer() {
     }
 
@@ -43,7 +36,13 @@ public final class NotePosterRenderer {
             String hiddenMessage,
             PosterInkTheme inkTheme
     ) throws IOException {
-        return renderPosterImage(noteData.content, formatPosterDate(noteData.createdAt), hiddenMessage, inkTheme, EXPORT_WIDTH);
+        return renderPosterImage(noteData, hiddenMessage, inkTheme, PosterColorTheme.PAPER);
+    }
+
+    public static BufferedImage renderPosterImage(
+            LocalCacheService.NoteData noteData, String hiddenMessage, PosterInkTheme inkTheme, PosterColorTheme colorTheme
+    ) throws IOException {
+        return renderPosterImage(noteData.content, formatPosterDate(noteData.createdAt), hiddenMessage, inkTheme, EXPORT_WIDTH, colorTheme);
     }
 
     public static BufferedImage renderPosterImage(
@@ -52,6 +51,13 @@ public final class NotePosterRenderer {
             String hiddenMessage,
             PosterInkTheme inkTheme,
             int width
+    ) throws IOException {
+        return renderPosterImage(noteContent, posterDate, hiddenMessage, inkTheme, width, PosterColorTheme.PAPER);
+    }
+
+    public static BufferedImage renderPosterImage(
+            String noteContent, String posterDate, String hiddenMessage,
+            PosterInkTheme inkTheme, int width, PosterColorTheme colorTheme
     ) throws IOException {
         String content = noteContent == null ? "" : noteContent;
         String author = trimToNull(hiddenMessage);
@@ -98,31 +104,31 @@ public final class NotePosterRenderer {
         int cornerRadius = scaled(32, scale);
         Shape posterShape = new RoundRectangle2D.Double(0, 0, width, height, cornerRadius, cornerRadius);
         g.setClip(posterShape);
-        g.setColor(new Color(PAPER_RGB));
+        g.setColor(colorTheme.background());
         g.fillRect(0, 0, width, height);
 
         paintPaperGrain(g, width, height, scale);
-        paintInkTheme(g, inkTheme, contentLength, width, height);
+        paintInkTheme(g, inkTheme, contentLength, width, height, colorTheme);
         paintVignette(g, width, height);
 
         BufferedImage textLayer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D textGraphics = textLayer.createGraphics();
         try {
             configureGraphics(textGraphics);
-            paintContent(textGraphics, lines, contentFont, contentMetrics, cardPadding, textY, lineAdvance);
+            paintContent(textGraphics, lines, contentFont, contentMetrics, cardPadding, textY, lineAdvance, colorTheme.text());
         } finally {
             textGraphics.dispose();
         }
         g.drawImage(textLayer, 0, 0, null);
         paintFooter(g, author, posterDate, footerFont, badgeFont,
-                cardPadding, footerY, footerHeight, footerVerticalPadding, width);
+                cardPadding, footerY, footerHeight, footerVerticalPadding, width, colorTheme);
 
-        g.setColor(DIVIDER);
+        g.setColor(colorTheme.divider());
         g.fillRect(0, footerY, width, dividerHeight);
 
         g.setClip(null);
         g.setStroke(new BasicStroke(Math.max(1f, (float) (0.8 * scale))));
-        g.setColor(new Color(255, 255, 255, 210));
+        g.setColor(colorTheme.outline());
         g.draw(posterShape);
         g.dispose();
         return image;
@@ -206,7 +212,7 @@ public final class NotePosterRenderer {
         }
     }
 
-    private static void paintInkTheme(Graphics2D g, PosterInkTheme theme, int contentLength, int width, int height) throws IOException {
+    private static void paintInkTheme(Graphics2D g, PosterInkTheme theme, int contentLength, int width, int height, PosterColorTheme colorTheme) throws IOException {
         try (InputStream input = NotePosterRenderer.class.getResourceAsStream(theme.getResourcePath())) {
             if (input == null) {
                 return;
@@ -215,8 +221,23 @@ public final class NotePosterRenderer {
             if (ink == null) {
                 return;
             }
+            if (colorTheme.isDark()) {
+                // Turn the white paper into transparency and the black strokes into light ink.
+                // This preserves the source artwork without laying a white rectangle over dark palettes.
+                BufferedImage lightInk = new BufferedImage(ink.getWidth(), ink.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < ink.getHeight(); y++) {
+                    for (int x = 0; x < ink.getWidth(); x++) {
+                        int pixel = ink.getRGB(x, y);
+                        int luminance = (((pixel >> 16) & 255) * 54 + ((pixel >> 8) & 255) * 183 + (pixel & 255) * 19) / 256;
+                        int alpha = (255 - luminance) * (pixel >>> 24) / 255;
+                        lightInk.setRGB(x, y, (alpha << 24) | 0xFFFFFF);
+                    }
+                }
+                ink = lightInk;
+            }
             Composite previousComposite = g.getComposite();
-            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, theme.opacityFor(contentLength)));
+            float opacity = theme.opacityFor(contentLength) * (colorTheme.isDark() ? 0.65f : 1f);
+            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity));
             int inkHeight = exportHeightFor(width);
             int y = height - inkHeight;
             g.drawImage(ink, 0, y, width, inkHeight, null);
@@ -241,14 +262,15 @@ public final class NotePosterRenderer {
             FontMetrics metrics,
             int x,
             int y,
-            int lineAdvance
+            int lineAdvance,
+            Color textColor
     ) {
         if (lines.isEmpty()) {
             return;
         }
 
         g.setFont(font);
-        g.setColor(INK_TEXT);
+        g.setColor(textColor);
         int baseline = y + metrics.getAscent();
         for (String line : lines) {
             g.drawString(line, x, baseline);
@@ -266,7 +288,8 @@ public final class NotePosterRenderer {
             int footerY,
             int footerHeight,
             int footerVerticalPadding,
-            int width
+            int width,
+            PosterColorTheme colorTheme
     ) {
         String leftText = author == null ? posterDate : author + " · " + posterDate;
         BufferedImage footerTextLayer = new BufferedImage(width, footerHeight, BufferedImage.TYPE_INT_ARGB);
@@ -288,17 +311,17 @@ public final class NotePosterRenderer {
             int badgeY = footerY + (footerHeight - badgeHeight) / 2;
             int badgeArc = badgeHeight;
 
-            g.setColor(BADGE_FILL);
+            g.setColor(colorTheme.badgeFill());
             g.fillRoundRect(badgeX, badgeY, badgeWidth, badgeHeight, badgeArc, badgeArc);
-            g.setColor(BADGE_STROKE);
+            g.setColor(colorTheme.badgeStroke());
             g.drawRoundRect(badgeX, badgeY, badgeWidth, badgeHeight, badgeArc, badgeArc);
             g.setFont(badgeFont);
-            g.setColor(new Color(26, 24, 22, 148));
+            g.setColor(colorTheme.badgeText());
             g.drawString(badgeText, badgeX + badgeHorizontalPadding,
                     badgeY + badgeVerticalPadding + badgeMetrics.getAscent());
 
             footerTextGraphics.setFont(footerFont);
-            footerTextGraphics.setColor(INK_TEXT);
+            footerTextGraphics.setColor(new Color(colorTheme.footer().getRGB() & 0xFFFFFF));
             int availableLeftWidth = Math.max(0, badgeX - cardPadding - Math.max(12, footerMetrics.getHeight()));
             footerTextGraphics.drawString(ellipsize(leftText, footerMetrics, availableLeftWidth), cardPadding, baseline);
         } finally {
@@ -307,7 +330,7 @@ public final class NotePosterRenderer {
 
         Composite previousComposite = g.getComposite();
         try {
-            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, FOOTER_TEXT.getAlpha() / 255f));
+            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, colorTheme.footer().getAlpha() / 255f));
             g.drawImage(footerTextLayer, 0, footerY, null);
         } finally {
             g.setComposite(previousComposite);

@@ -61,21 +61,35 @@ enum PosterInkTheme: CaseIterable, Equatable {
 struct InkWashThemeOverlay: View {
     let theme: PosterInkTheme
     let contentLength: Int
+    var colorTheme: PosterColorTheme = .paper
 
     var body: some View {
         GeometryReader { geometry in
             let inkHeight = geometry.size.width / PosterShareRenderer.aspectRatio
 
-            Image(theme.assetName)
-                .resizable()
-                .scaledToFit()
-                .frame(width: geometry.size.width, height: inkHeight)
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .bottom)
-                .opacity(theme.opacity(for: contentLength))
-                .blendMode(.multiply)
-                .clipped()
+            Group {
+                if colorTheme.isDark {
+                    inkImage(inkHeight: inkHeight, size: geometry.size)
+                        .colorInvert()
+                        .opacity(theme.opacity(for: contentLength) * 0.65)
+                        .blendMode(.screen)
+                } else {
+                    inkImage(inkHeight: inkHeight, size: geometry.size)
+                        .opacity(theme.opacity(for: contentLength))
+                        .blendMode(.multiply)
+                }
+            }
+            .clipped()
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private func inkImage(inkHeight: CGFloat, size: CGSize) -> some View {
+        Image(theme.assetName)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size.width, height: inkHeight)
+            .frame(width: size.width, height: size.height, alignment: .bottom)
     }
 }

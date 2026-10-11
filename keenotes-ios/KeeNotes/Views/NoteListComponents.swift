@@ -294,6 +294,8 @@ struct NoteSharePosterOverlay: View {
     @State private var isSaving = false
     @State private var isExportingVideo = false
     @State private var inkTheme: PosterInkTheme
+    @State private var colorTheme: PosterColorTheme = .paper
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let posterWidth: CGFloat = 390
 
@@ -327,6 +329,7 @@ struct NoteSharePosterOverlay: View {
             - 44
             - 18
             - 36
+            - 88 // Fixed carousel controls and their spacing.
         return max(candidateHeight.isFinite && candidateHeight > 0 ? candidateHeight : 220, 220)
     }
 
@@ -388,6 +391,7 @@ struct NoteSharePosterOverlay: View {
                                     formattedDate: posterDate,
                                     hiddenMessage: hiddenMessage,
                                     inkTheme: inkTheme,
+                                    colorTheme: colorTheme,
                                     minimumHeight: minimumHeight
                                 )
                                 .frame(width: displayWidth)
@@ -435,6 +439,8 @@ struct NoteSharePosterOverlay: View {
                         .padding(.bottom, 24)
                     }
                     .frame(maxHeight: posterPreviewMaxHeight(for: geometry))
+
+                    paletteCarousel
                 }
 
                 if let message = imageSaver.toastMessage {
@@ -447,7 +453,7 @@ struct NoteSharePosterOverlay: View {
                             .padding(.vertical, 10)
                             .background(Color.black.opacity(0.75))
                             .clipShape(Capsule())
-                            .padding(.bottom, 42)
+                            .padding(.bottom, 122)
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -462,6 +468,60 @@ struct NoteSharePosterOverlay: View {
             }
         }
         .background(ClearFullScreenCoverBackground())
+    }
+
+    private var paletteCarousel: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 4) {
+                paletteArrow("chevron.left", label: "上一个海报配色", delta: -1)
+                ForEach(PosterColorTheme.allCases, id: \.rawValue) { theme in
+                    Button {
+                        selectColorTheme(theme)
+                    } label: {
+                        Circle()
+                            .fill(theme.background)
+                            .frame(width: 16, height: 16)
+                            .overlay(Circle().stroke(Color.white.opacity(0.45), lineWidth: 0.5))
+                            .frame(width: 28, height: 28)
+                            .overlay(Circle().stroke(colorTheme == theme ? Color.white : .clear, lineWidth: 2))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(theme.label)
+                    .accessibilityAddTraits(colorTheme == theme ? .isSelected : [])
+                    .accessibilityIdentifier("posterTheme-\(theme.rawValue)")
+                }
+                paletteArrow("chevron.right", label: "下一个海报配色", delta: 1)
+            }
+            Text(colorTheme.label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.85))
+                .accessibilityIdentifier("posterThemeName")
+        }
+        .disabled(isBusy)
+    }
+
+    private func paletteArrow(_ image: String, label: String, delta: Int) -> some View {
+        Button {
+            selectColorTheme(colorTheme.offset(delta))
+        } label: {
+            Image(systemName: image)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(delta < 0 ? "posterThemePrevious" : "posterThemeNext")
+    }
+
+    private func selectColorTheme(_ theme: PosterColorTheme) {
+        guard !isBusy, theme != colorTheme else { return }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+            colorTheme = theme
+        }
     }
 
     private func cycleInkTheme() {
@@ -480,6 +540,7 @@ struct NoteSharePosterOverlay: View {
             posterDate: posterDate,
             hiddenMessage: hiddenMessage,
             inkTheme: inkTheme,
+            colorTheme: colorTheme,
             width: posterWidth
         ) else {
             imageSaver.showMessage("Save failed")
@@ -504,6 +565,7 @@ struct NoteSharePosterOverlay: View {
                 posterDate: posterDate,
                 hiddenMessage: hiddenMessage,
                 inkTheme: inkTheme,
+                colorTheme: colorTheme,
                 width: posterWidth
             ) else {
                 imageSaver.showMessage("Save failed")
@@ -526,6 +588,7 @@ struct NoteSharePosterContent: View {
     let formattedDate: String
     let hiddenMessage: String
     var inkTheme: PosterInkTheme = .mei
+    var colorTheme: PosterColorTheme = .paper
     var minimumHeight: CGFloat = PosterShareRenderer.exportHeight(for: PosterShareRenderer.exportWidth)
 
     private var authorText: String? {
@@ -583,14 +646,15 @@ struct NoteSharePosterContent: View {
 
         ZStack {
             posterShape
-                .fill(PosterPalette.paperColor)
+                .fill(colorTheme.background)
 
             PaperGrainOverlay()
                 .opacity(0.32)
 
             InkWashThemeOverlay(
                 theme: inkTheme,
-                contentLength: contentLength
+                contentLength: contentLength,
+                colorTheme: colorTheme
             )
 
             RadialGradient(
@@ -608,7 +672,7 @@ struct NoteSharePosterContent: View {
 
                 Text(noteContent)
                     .font(.system(size: contentFontSize, weight: .bold, design: .serif))
-                    .foregroundColor(Color(red: 0.10, green: 0.095, blue: 0.085))
+                    .foregroundColor(colorTheme.text)
                     .lineSpacing(contentLineSpacing)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -617,7 +681,7 @@ struct NoteSharePosterContent: View {
                 Spacer(minLength: contentVerticalPadding)
 
                 Rectangle()
-                    .fill(Color.black.opacity(0.06))
+                    .fill(colorTheme.divider)
                     .frame(height: 0.5)
 
                 HStack(spacing: 10) {
@@ -633,24 +697,24 @@ struct NoteSharePosterContent: View {
                         Text(formattedDate)
                             .lineLimit(1)
                     }
-                    .foregroundColor(Color.black.opacity(0.34))
+                    .foregroundColor(colorTheme.footer)
                     .layoutPriority(1)
 
                     Spacer(minLength: 12)
 
                     Text("KeeNotes")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundColor(Color(red: 0.10, green: 0.095, blue: 0.085).opacity(0.58))
+                        .foregroundColor(colorTheme.badgeText)
                         .lineLimit(1)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(
                             Capsule()
-                                .fill(Color.black.opacity(0.045))
+                                .fill(colorTheme.badgeFill)
                         )
                         .overlay(
                             Capsule()
-                                .stroke(Color.black.opacity(0.055), lineWidth: 0.5)
+                                .stroke(colorTheme.badgeStroke, lineWidth: 0.5)
                         )
                         .accessibilityLabel("KeeNotes")
                 }
@@ -663,7 +727,7 @@ struct NoteSharePosterContent: View {
         .clipShape(posterShape)
         .overlay(
             posterShape
-                .stroke(Color.white.opacity(0.82), lineWidth: 0.8)
+                .stroke(colorTheme.outline, lineWidth: 0.8)
         )
     }
 }
