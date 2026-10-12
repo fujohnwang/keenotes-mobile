@@ -94,7 +94,7 @@ class NoteShareDialogFragment : DialogFragment() {
         super.onStart()
         dialog?.window?.apply {
             setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setBackgroundDrawable(ColorDrawable(Color.BLACK))
         }
     }
 
@@ -113,7 +113,7 @@ class NoteShareDialogFragment : DialogFragment() {
     private fun createContentView(): View {
         val context = requireContext()
         val root = FrameLayout(context).apply {
-            setBackgroundColor(Color.argb(150, 0, 0, 0))
+            setBackgroundColor(Color.BLACK)
             setOnClickListener { dismissAllowingStateLoss() }
         }
 
