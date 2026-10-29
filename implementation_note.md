@@ -327,3 +327,9 @@
 - 桌面端保留 JDK 25，JavaFX 从 25.0.2 升级到当前稳定补丁版 27.0.1；macOS 因而使用 JavaFX 27 默认的 Metal 管线，不增加 ES2 对照或强制 Prism 参数。
 - `dependency-reduced-pom.xml` 仍是旧 shade 构建遗留且不参与当前 Maven 构建，沿用既有决策不手工同步该生成物。
 - JDK 25 编译与 fat JAR 通过；默认测试统计 47 项（0 failure/error、19 项按开关跳过），另有 14 项独立原生 JavaFX 回归通过。海报回归 4 项中 1 项在当前显示环境下仍卡在旧的 `fitWidth > 390` 断言，临时覆盖回 JavaFX 25.0.2 结果相同，确认不是本次升级引入。
+
+## macOS DMG 安装箭头（2026-10-29）
+
+- 正式版 DMG 在两个图标之间增加灰蓝色圆角右箭头；本地签名打包与 GitHub Release 共用 `scripts/release/assets/dmg-background.tiff`，保留 500×300 窗口和原图标位置。
+- TIFF 内含 1×/2× 图像，避免 Retina 模糊；同目录保留 SVG 源图。背景随包放入隐藏的 `.background`，发布时无需安装图像工具；修改 SVG 后需重新生成 TIFF。未签名开发包沿用原 jpackage 流程。
+- Shell 语法、AppleScript 编译、两处布局一致性及测试 DMG 内背景文件/Applications 链接校验通过。本机缺少向 Finder 发送 Apple events 的权限（-1743），未完成自动布局及重新挂载后的视觉验证；未提交 Git。

@@ -181,7 +181,8 @@ macos_build_signed_dmg() {
   local dmg_final="${DIST_DIR}/KeeNotes-${name_suffix}-${version}.dmg"
   local source_dir="${DIST_DIR}/dmg-source"
 
-  mkdir -p "$source_dir"
+  mkdir -p "${source_dir}/.background"
+  cp "${REPO_ROOT}/scripts/release/assets/dmg-background.tiff" "${source_dir}/.background/background.tiff"
   cp -R "${DIST_DIR}/KeeNotes.app" "$source_dir/"
   ln -sf /Applications "${source_dir}/Applications"
 
@@ -201,6 +202,7 @@ tell application "Finder"
     set viewOptions to the icon view options of container window
     set arrangement of viewOptions to not arranged
     set icon size of viewOptions to 100
+    set background picture of viewOptions to file ".background:background.tiff"
     set position of item "KeeNotes.app" of container window to {150, 150}
     set position of item "Applications" of container window to {350, 150}
     update without registering applications
