@@ -5,6 +5,7 @@ import javafx.application.Platform;
 import javafx.beans.property.*;
 import javafx.concurrent.Task;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Objects;
@@ -79,20 +80,18 @@ public final class LocalSearchService implements AutoCloseable {
                 LocalSearchEngine engine = ready.get();
                 checkRunning();
                 String epoch = cache.getSearchEpoch();
-                EmbeddingConfig requestConfig = config;
-                LocalSearchEngine.SearchResult keyword = engine.search(query, EmbeddingConfig.disabled(), cancellation);
-                ViewResult first = hydrate(epoch, keyword);
-                if (!isCancelled() && requestConfig.usable()) ui(() -> { if (!isCancelled()) preview.accept(first); });
-                if (isCancelled() || !requestConfig.usable()) return first;
-                return hydrate(epoch, engine.search(query, requestConfig, cancellation));
+                var result = engine.search(query, config, cancellation, keyword -> {
+                    ViewResult first = hydrate(epoch, keyword);
+                    ui(() -> { if (!isCancelled()) preview.accept(first); });
+                });
+                return hydrate(epoch, result);
             }
         };
         queries.execute(task);
         return task;
     }
 
-    private ViewResult hydrate(String epoch, LocalSearchEngine.SearchResult result) throws Exception {
-        // Preserve the fused relevance order, including date/ID tie-breaks from the engine.
+    private ViewResult hydrate(String epoch, LocalSearchEngine.SearchResult result) throws SQLException {
         List<LocalCacheService.NoteData> notes = cache.getNotesByIds(result.ids());
         if (!Objects.equals(epoch, cache.getSearchEpoch())) return new ViewResult(List.of(), Set.of(), Set.of(), epoch, true, "Search data changed.");
         // SQL matches need no tag, even if Lucene or the vector index also found them.

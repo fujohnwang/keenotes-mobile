@@ -1,13 +1,22 @@
 package cn.keevol.keenotes.mobilefx;
 
 import javafx.application.Platform;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.canvas.Canvas;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Button;
 import javafx.scene.control.DialogPane;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.skin.TextAreaSkin;
+import javafx.scene.control.skin.VirtualFlow;
+import javafx.scene.image.WritableImage;
+import javafx.scene.shape.Line;
+import javafx.stage.Stage;
 import cn.keevol.keenotes.mobilefx.search.*;
 import org.junit.*;
 
@@ -99,6 +108,88 @@ public class SearchFxTest {
             assertFalse(tags.get("SS").isManaged());
             return null;
         });
+    }
+
+    @Test public void tallCardRendersTextWhileScrollingAndKeepsItsSendAnimation() throws Exception {
+        String body = "A complete line of synthetic text in the scrolling note.\n".repeat(440) + "Last line";
+        var shortNote = new LocalCacheService.NoteData(11, "Short note", "test", "2026-11-21", null);
+        var longNote = new LocalCacheService.NoteData(12, body, "test", "2026-11-21", null);
+        var pending = new LocalCacheService.NoteData(-1, body, "test", "2026-11-21", null);
+        var panel = fx(NotesDisplayPanel::new);
+        var stage = fx(Stage::new);
+        try {
+            var flow = fx(() -> {
+                panel.displaySearchResults(List.of(longNote, shortNote), java.util.Set.of(), java.util.Set.of());
+                var scene = new Scene(panel, 820, 480);
+                scene.getStylesheets().addAll(resource("common"), resource("dark"));
+                stage.setScene(scene);
+                stage.show();
+                return (VirtualFlow<?>) panel.lookup(".virtual-flow");
+            });
+            awaitFx(() -> firstCard(flow).getHeight() > 8 * flow.getHeight());
+            fx(() -> {
+                var card = firstCard(flow);
+                assertEquals(body, ((TextArea) card.lookup(".note-content-area")).getText());
+                assertTrue("Tall cards must not allocate a full-height canvas", card.getChildren().stream()
+                        .noneMatch(node -> node instanceof Canvas canvas && canvas.getHeight() >= card.getHeight()));
+                return null;
+            });
+            for (int frame = 0; frame < 24; frame++) {
+                int step = frame < 12 ? 330 : -330;
+                fx(() -> {
+                    assertTrue("List must scroll through the note", Math.abs(flow.scrollPixels(step)) > 0);
+                    return null;
+                });
+                assertBodyInNextFrame(stage);
+            }
+            fx(() -> { panel.addOptimisticNote(pending); return null; });
+            awaitFx(() -> firstCard(flow).getNoteData() == pending && firstCard(flow).lookup(".note-send-border") != null);
+            var border = fx(() -> (Parent) firstCard(flow).lookup(".note-send-border"));
+            awaitFx(() -> border.getChildrenUnmodifiable().stream()
+                    .anyMatch(node -> node instanceof Line line && line.isVisible() && line.getEndX() > line.getStartX()));
+            assertBodyInNextFrame(stage);
+            fx(() -> {
+                panel.replaceOptimisticNoteWithReal(new LocalCacheService.NoteData(13, body, "test", "2026-11-21", null));
+                return null;
+            });
+            awaitFx(() -> border.getChildrenUnmodifiable().stream()
+                    .allMatch(node -> node.isVisible() && node.getOpacity() > 0 && node.getOpacity() < 1));
+            awaitFx(() -> firstCard(flow).getNoteData().id == 13 && firstCard(flow).lookup(".note-send-border") == null);
+            fx(() -> {
+                var card = firstCard(flow);
+                flow.scrollPixels(card.localToScene(card.getLayoutBounds()).getMaxY()
+                        - flow.localToScene(flow.getLayoutBounds()).getMaxY() + 30);
+                var text = (TextArea) card.lookup(".note-content-area");
+                var lastChar = ((TextAreaSkin) text.getSkin()).getCharacterBounds(body.length() - 1);
+                var lastPoint = text.localToScene(lastChar.getMaxX(), lastChar.getMaxY());
+                assertTrue("The last line must scroll into view", flow.localToScene(flow.getLayoutBounds()).contains(lastPoint));
+                text.selectRange(body.lastIndexOf("Last line"), body.length());
+                assertEquals("Last line", text.getSelectedText());
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); panel.dispose(); return null; });
+        }
+    }
+
+    private static NoteCardView firstCard(VirtualFlow<?> flow) {
+        return (NoteCardView) ((ListCell<?>) flow.getVisibleCell(0)).getGraphic();
+    }
+
+    private static void assertBodyInNextFrame(Stage stage) throws Exception {
+        var frame = new CompletableFuture<WritableImage>();
+        fx(() -> {
+            stage.getScene().snapshot(result -> { frame.complete(result.getImage()); return null; }, null);
+            return null;
+        });
+        var pixels = frame.get(5, TimeUnit.SECONDS).getPixelReader();
+        int edges = 0;
+        for (int y = 210; y < 310; y += 2) {
+            for (int x = 140; x < 380; x += 2) {
+                if (Math.abs(pixels.getColor(x, y).getBrightness() - pixels.getColor(x + 2, y).getBrightness()) > 0.25) edges++;
+            }
+        }
+        assertTrue("Expected text edges across the middle of the visible card, found " + edges, edges > 60);
     }
 
     @Test public void obsoleteSlowSemanticQueriesDoNotDelayKeywordPreviewsOrSavingSettings() throws Exception {
@@ -389,7 +480,7 @@ public class SearchFxTest {
                 new LocalCacheService.NoteData(4805, "chronologyprobe " + "context ".repeat(40), "desktop", "2026-09-14 12:57:54", null),
                 new LocalCacheService.NoteData(4806, "chronologyprobe", "desktop", null, null));
         cache.batchInsertNotes(notes, false);
-        var expected = java.util.Set.of(4805L, 4802L, 4801L, 4804L, 4803L, 4806L);
+        var expected = List.of(4805L, 4802L, 4801L, 4804L, 4803L, 4806L);
         LocalSearchService.ViewResult result;
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
         do {
@@ -398,7 +489,7 @@ public class SearchFxTest {
             assertTrue("Notes were not indexed", System.nanoTime() < deadline);
             Thread.sleep(50);
         } while (true);
-        assertEquals(expected, result.notes().stream().map(note -> note.id).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(expected, result.notes().stream().map(note -> note.id).toList());
         assertTrue(result.keywordIds().isEmpty());
         assertTrue(result.semanticIds().isEmpty());
         cache.batchInsertNotes(List.of(new LocalCacheService.NoteData(4807, "semantic-only candidate",
@@ -422,10 +513,11 @@ public class SearchFxTest {
             CompletableFuture<LocalSearchService.ViewResult> preview = new CompletableFuture<>();
             var hybrid = fx(() -> service.search("chronologyprobe", preview::complete)).get(5, TimeUnit.SECONDS);
             var keywordPreview = preview.get(5, TimeUnit.SECONDS);
-            assertEquals(expected, keywordPreview.notes().stream().map(note -> note.id).collect(java.util.stream.Collectors.toSet()));
+            assertEquals(expected, keywordPreview.notes().stream().map(note -> note.id).toList());
             assertTrue(keywordPreview.semanticIds().isEmpty());
             assertTrue(keywordPreview.keywordIds().isEmpty());
             assertTrue("The final result must exercise semantic search", semanticQueries.get() > 0);
+            assertEquals(expected, hybrid.notes().stream().limit(expected.size()).map(note -> note.id).toList());
             assertEquals("Overlapping hits appear only once", expected.size(),
                     hybrid.notes().stream().map(note -> note.id).filter(expected::contains).count());
             assertTrue(hybrid.keywordIds().isEmpty());
@@ -437,7 +529,7 @@ public class SearchFxTest {
         }
     }
 
-    @Test public void fusedRelevanceOrderIsPreservedByTheViewWithTagsOnlyOnRecallMatches() throws Exception {
+    @Test public void viewKeepsSqlHitsFirstAndShowsSourceTagsOnSupplementalMatches() throws Exception {
         LocalSearchService service = fx(() -> ServiceManager.getInstance().getLocalSearchService());
         LocalCacheService cache = ServiceManager.getInstance().getLocalCacheService();
         fx(() -> service.saveConfiguration(EmbeddingConfig.disabled())).get(5, TimeUnit.SECONDS);

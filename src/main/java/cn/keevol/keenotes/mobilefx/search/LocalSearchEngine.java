@@ -60,7 +60,7 @@ public final class LocalSearchEngine implements AutoCloseable {
         return handle;
     }
 
-    private synchronized void ensureCurrent() throws SQLException, IOException {
+    private synchronized String ensureCurrent() throws SQLException, IOException {
         if (closed) throw new IllegalStateException("Search is closed");
         String current = store.epoch();
         if (!current.equals(epoch)) {
@@ -69,6 +69,7 @@ public final class LocalSearchEngine implements AutoCloseable {
             loadActiveConfig();
             store.configure(desired, activeVector == null ? null : activeVector.profile());
         }
+        return epoch;
     }
 
     public synchronized void configure(EmbeddingConfig config) throws SQLException, IOException {
@@ -270,15 +271,34 @@ public final class LocalSearchEngine implements AutoCloseable {
     }
 
     public SearchResult search(String query, EmbeddingConfig config, SearchCancellation cancellation) throws SQLException, IOException {
+        return search(query, config, cancellation, null);
+    }
+
+    @FunctionalInterface
+    public interface SearchPreview {
+        void accept(SearchResult result) throws SQLException;
+    }
+
+    public SearchResult search(String query, EmbeddingConfig config, SearchCancellation cancellation, SearchPreview preview)
+            throws SQLException, IOException {
         cancellation.check();
         if (query == null || query.isBlank()) return new SearchResult(List.of(), Set.of(), Set.of(), Set.of(), false, "");
-        Handle keyword = family(SearchStore.KEYWORD, SearchStore.KEYWORD_PROFILE);
+        String searchEpoch = ensureCurrent();
         List<Long> wildcards = store.wildcards(query, RESULT_LIMIT);
+        cancellation.check();
+        if (wildcards.size() == RESULT_LIMIT) {
+            return rankedResult(searchEpoch, wildcards, List.of(), List.of(), false, "");
+        }
+        Handle keyword = family(SearchStore.KEYWORD, SearchStore.KEYWORD_PROFILE);
         List<Long> keywords = keyword.index().keywords(query, RESULT_LIMIT);
         List<Long> vectors = List.of();
         boolean partial = !keyword.index().hasBase();
         String message = "";
         if (config.usable() && desired.usable()) {
+            if (preview != null) {
+                preview.accept(rankedResult(searchEpoch, wildcards, keywords, List.of(), partial, ""));
+                cancellation.check();
+            }
             EmbeddingConfig active = activeVector;
             EmbeddingConfig queryConfig = active == null || active.profile().equals(config.profile()) ? config : active;
             try {
@@ -296,16 +316,25 @@ public final class LocalSearchEngine implements AutoCloseable {
             }
         }
         cancellation.check();
-        List<Long> ranked = store.rank(fuse(wildcards, keywords, vectors), RESULT_LIMIT);
-        if (!keyword.epoch().equals(store.epoch())) return new SearchResult(List.of(), Set.of(), Set.of(), Set.of(), true, "Search data changed. Search again.");
-        return new SearchResult(ranked, Set.copyOf(wildcards),
-                Set.copyOf(keywords), Set.copyOf(vectors), partial, message);
+        return rankedResult(searchEpoch, wildcards, keywords, vectors, partial, message);
     }
 
-    static Map<Long, Double> fuse(List<Long> wildcards, List<Long> keywords, List<Long> vectors) {
+    private SearchResult rankedResult(String searchEpoch, List<Long> wildcards, List<Long> keywords,
+                                      List<Long> vectors, boolean partial, String message) throws SQLException {
+        List<Long> ranked = new ArrayList<>(wildcards);
+        Set<Long> wildcardIds = Set.copyOf(wildcards);
+        if (!keywords.isEmpty() || !vectors.isEmpty()) {
+            var scores = supplementalScores(keywords, vectors);
+            scores.keySet().removeAll(wildcardIds);
+            ranked.addAll(store.rank(scores, RESULT_LIMIT - wildcards.size()));
+        }
+        if (!searchEpoch.equals(store.epoch())) return new SearchResult(List.of(), Set.of(), Set.of(), Set.of(), true, "Search data changed. Search again.");
+        return new SearchResult(ranked, wildcardIds, Set.copyOf(keywords), Set.copyOf(vectors), partial, message);
+    }
+
+    static Map<Long, Double> supplementalScores(List<Long> keywords, List<Long> vectors) {
         Map<Long, Double> scores = new HashMap<>();
-        // Fixed weighted RRF (k=60). SQL has the strongest signal, without pinning hits.
-        addScores(scores, wildcards, 3.0);
+        // Weighted reciprocal rank fusion (k=60) for the supplemental results.
         addScores(scores, keywords, 2.0);
         addScores(scores, vectors, 1.0);
         return scores;

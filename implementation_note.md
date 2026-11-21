@@ -333,3 +333,26 @@
 - 正式版 DMG 在两个图标之间增加灰蓝色圆角右箭头；本地签名打包与 GitHub Release 共用 `scripts/release/assets/dmg-background.tiff`，保留 500×300 窗口和原图标位置。
 - TIFF 内含 1×/2× 图像，避免 Retina 模糊；同目录保留 SVG 源图。背景随包放入隐藏的 `.background`，发布时无需安装图像工具；修改 SVG 后需重新生成 TIFF。未签名开发包沿用原 jpackage 流程。
 - Shell 语法、AppleScript 编译、两处布局一致性及测试 DMG 内背景文件/Applications 链接校验通过。本机缺少向 Finder 发送 Apple events 的权限（-1743），未完成自动布局及重新挂载后的视觉验证；未提交 Git。
+
+## iOS 文字选择与滑动导航冲突（2026-11-11）
+
+- 有非空文字选区时暂停滑动切 tab/子页返回；取消选择后恢复，底部 tab 点击仍可用。保留 SwiftUI 原生文字布局、选择和既有滑动阈值。
+- 使用 UIKit 公开选区 API，并在触摸开始时记录状态，避免拖动句柄将选区缩为空后同一次触摸误触发导航；被动触摸观察器拒绝识别任何手势，随视图移除解除注册。
+- 真机回归使用独立 Keychain/UserDefaults 与临时数据库中的测试笔记，不写入用户笔记。iPhone 17 Pro / iOS 27.0：旧代码复现拖右句柄跳到 Note，修复后左右句柄实际移动、选中文字时禁止滑动导航、取消选择恢复、底部 tab 点击均通过；最终完整 UI/E2E 11/11 通过，结果 `/private/tmp/keenotes-selection-validation/final-ui.xcresult`。未提交 Git。
+
+## iOS 1.9.4 提审（2026-11-11）
+
+- 工程及 `project.yml` 同步 1.9.4（1），包含上述选择手势修复；Release archive/export 与签名校验通过。What’s New 按用户原文设为 `improve UX on text selection`，canonical 文案保存在 `metadata/version/1.9.4/en-US.json`。
+- asc 已于 10:10（Asia/Shanghai）提交并回读确认 `WAITING_FOR_REVIEW`；按用户确认设置 `AFTER_APPROVAL` 自动发布。校验无阻塞，沿用既有加密申报，网页确认 App Privacy 已发布。
+- 详细 ID、产物和查询命令见 `docs/keenotes-ios-release-1.9.4-20261111.md`。未提交 Git。
+
+## JavaFX 搜索优先显示 SQL 命中（2026-11-21）
+
+- 预览和最终列表共用一次 SQL 查询，按创建时间、ID 倒序保留命中。关键词与语义结果按原有 2∶1 权重排序，按笔记 ID 去重后补足 100 条。
+- SQL 已满 100 条时直接返回，跳过关键词查询和语义请求。现有索引可直接使用。
+
+## JavaFX 长笔记滚动闪烁（2026-11-21）
+
+- 发送时才创建四条线段和四个圆弧，保留顺时针进度和同步后的淡出。每段独立淡出，避免 Metal 为整张长卡分配纹理。
+- 440 行合成笔记在旧实现上复现了纹理尺寸异常。修复后在 2× 屏幕双向滚动，120 个已确认来自测试窗口的采样帧均有正文，未再记录该异常；末行可滚到并选中。
+- 桌面回归 46 项通过，1 项容量测试按配置跳过。海报预览宽度的 1 项断言失败，已用修改前的源码独立复现。

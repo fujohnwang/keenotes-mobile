@@ -2,12 +2,7 @@ package cn.keevol.keenotes.mobilefx;
 
 import javafx.scene.control.ListCell;
 
-/**
- * ListView cell that REUSES a single NoteCardView per cell instance.
- * VirtualFlow recycles cells; update() avoids creating new TextArea/Canvas per
- * scroll,
- * preventing GPU texture exhaustion.
- */
+/** VirtualFlow reuses the card and its selectable text area as the list scrolls. */
 public class NoteListCell extends ListCell<LocalCacheService.NoteData> {
 
     private final NotesDisplayPanel panel;
@@ -32,6 +27,7 @@ public class NoteListCell extends ListCell<LocalCacheService.NoteData> {
                 wasOptimistic = false;
             }
         } else {
+            boolean samePendingNote = wasOptimistic && card != null && card.getNoteData() == item;
             boolean resolvingOptimistic = wasOptimistic && card != null && item.id > 0
                     && item.content.equals(card.getNoteData().content);
 
@@ -49,9 +45,7 @@ public class NoteListCell extends ListCell<LocalCacheService.NoteData> {
             // Handle optimistic note animation
             boolean isOptimistic = (item == panel.getOptimisticNoteData());
             if (isOptimistic) {
-                // Only start animation when transitioning from non-optimistic to optimistic
-                // This prevents animation from resetting when scrolling through the list
-                if (!wasOptimistic) {
+                if (!samePendingNote) {
                     card.startBorderAnimation();
                     panel.setOptimisticCard(card);
                     wasOptimistic = true;

@@ -1,5 +1,59 @@
 import XCTest
 
+final class ReviewSelectionUITests: XCTestCase {
+    func testSelectionPreventsTabSwipes() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-fixture", "review-selection", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Review"].waitForExistence(timeout: 10))
+        app.buttons["Review"].tap()
+        let note = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Alpha bravo charlie")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 10))
+        note.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 125, dy: 10)).press(forDuration: 1.2)
+        let copy = app.menuItems["Copy"]
+        XCTAssertTrue(copy.waitForExistence(timeout: 5))
+        let leading = app.otherElements["com.apple.text.grabber.leading"]
+        let trailing = app.otherElements["com.apple.text.grabber.trailing"]
+        XCTAssertTrue(leading.exists)
+        XCTAssertTrue(trailing.exists)
+        let header = app.staticTexts["KeeNotes Review"]
+        dragHandle(trailing, by: 100)
+        XCTAssertTrue(header.exists, "Dragging the trailing handle must not open Note")
+        XCTAssertTrue(trailing.exists)
+        dragHandle(leading, by: -80)
+        XCTAssertTrue(header.exists, "Dragging the leading handle must not open Settings")
+        XCTAssertTrue(leading.exists)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "review-text-selection"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        header.swipeLeft()
+        XCTAssertTrue(header.exists)
+        note.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 20, dy: 50)).tap()
+        XCTAssertTrue(leading.waitForNonExistence(timeout: 5))
+        header.swipeLeft()
+        XCTAssertTrue(app.buttons["subscriptionEntry"].waitForExistence(timeout: 5), "Swiping must resume after clearing the selection")
+        app.buttons["Review"].tap()
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        note.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 125, dy: 10)).press(forDuration: 1.2)
+        XCTAssertTrue(leading.waitForExistence(timeout: 5))
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.buttons["subscriptionEntry"].waitForExistence(timeout: 5), "Dock buttons must work while text is selected")
+    }
+
+    private func dragHandle(_ handle: XCUIElement, by distance: CGFloat) {
+        let originalX = handle.frame.minX
+        // The native handle exposes a round grip and a thin selection bar.
+        let grip = handle.children(matching: .other).allElementsBoundByIndex.max {
+            $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height
+        }!
+        let start = grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: distance, dy: 0)), withVelocity: .slow, thenHoldForDuration: 0.1)
+        XCTAssertGreaterThan(abs(handle.frame.minX - originalX), 50, "The native selection handle must actually move")
+    }
+}
+
 final class SettingsFlowUITests: XCTestCase {
     private func launch(_ mode: String = "configured", language: String = "zh-Hans", region: String = "zh_CN") -> XCUIApplication {
         continueAfterFailure = false

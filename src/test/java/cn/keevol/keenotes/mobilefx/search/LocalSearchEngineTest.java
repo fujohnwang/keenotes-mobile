@@ -6,7 +6,9 @@ import org.junit.rules.TemporaryFolder;
 
 import java.nio.file.Path;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.*;
 
@@ -269,11 +271,10 @@ public class LocalSearchEngineTest {
         }
     }
 
-    @Test public void fusionUsesNoteIdsAndDeduplicatesEachRanking() {
-        var scores = LocalSearchEngine.fuse(List.of(42L, 7L, 42L), List.of(9L, 42L), List.of(10L, 42L));
-        assertEquals(4, scores.size());
-        assertEquals(3.0 / 61 + 2.0 / 62 + 1.0 / 62, scores.get(42L), 1e-12);
-        assertEquals(3.0 / 62, scores.get(7L), 1e-12);
+    @Test public void supplementalScoresDeduplicateEachRankingAndCombineOverlaps() {
+        var scores = LocalSearchEngine.supplementalScores(List.of(9L, 42L, 9L), List.of(10L, 42L, 10L));
+        assertEquals(3, scores.size());
+        assertEquals(2.0 / 62 + 1.0 / 62, scores.get(42L), 1e-12);
         assertEquals(2.0 / 61, scores.get(9L), 1e-12);
         assertEquals(1.0 / 61, scores.get(10L), 1e-12);
     }
@@ -317,20 +318,42 @@ public class LocalSearchEngineTest {
         }
     }
 
-    @Test public void combinedRecallCanOutrankSqlAndLimitAppliesAfterFusion() throws Exception {
+    @Test public void sqlMatchesKeepTheirOrderAndOnlySpareSlotsGoToOtherMatches() throws Exception {
         Path db = database();
-        for (int id = 9; id <= 109; id++) sync(db, id, "note", true);
-        var wildcards = java.util.stream.LongStream.rangeClosed(10, 109).boxed().toList();
-        var scores = LocalSearchEngine.fuse(wildcards, List.of(9L), List.of(9L));
-        assertTrue(scores.get(9L) > scores.get(109L));
-        try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db); Statement s = c.createStatement()) {
-            s.execute("UPDATE notes_cache SET created_at='2026-09-25' WHERE id=9");
+        var config = new EmbeddingConfig(true, "http://localhost/v1", "test", "", "", "");
+        var client = new CountingEmbeddings();
+        String query = "precision recall";
+        try (var engine = new LocalSearchEngine(db, client)) {
+            engine.configure(config);
+            sync(db, 1, "precision", true);
+            sync(db, 2, "recall", true);
+            sync(db, 3, "公园散步", true);
+            sync(db, 4, query, true);
+            engine.drainKeywords();
+            engine.drainVectors(config);
+
+            List<Long> sqlIds = new ArrayList<>(List.of(4L));
+            for (long id = 5; id <= 101; id++) {
+                sync(db, id, query, true);
+                sqlIds.addFirst(id);
+            }
+            var hybrid = engine.search(query, config);
+            assertEquals(100, hybrid.ids().size());
+            assertEquals(sqlIds, hybrid.ids().subList(0, 98));
+            assertEquals(Set.of(1L, 2L), Set.copyOf(hybrid.ids().subList(98, 100)));
+            assertEquals(1, client.queries);
+
+            for (long id = 102; id <= 104; id++) {
+                sync(db, id, query, true);
+                sqlIds.addFirst(id);
+                if (sqlIds.size() < 100) continue;
+                var full = engine.search(query, config);
+                assertEquals(sqlIds.subList(0, 100), full.ids());
+                assertTrue(full.keywordIds().isEmpty());
+                assertTrue(full.semanticIds().isEmpty());
+                assertEquals("A full SQL page skips the embedding request", 1, client.queries);
+            }
         }
-        var result = new SearchStore(db).rank(scores, 100);
-        assertEquals(100, result.size());
-        assertEquals("Equal relevance uses date rather than SQL membership", Long.valueOf(9), result.getFirst());
-        assertEquals(Long.valueOf(10), result.get(1));
-        assertFalse(result.contains(109L));
     }
 
     @Test public void scoreTiesUseDateThenIdWithMissingDatesLastBeforeLimiting() throws Exception {

@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import GRDB
 import UIKit
 
 /// Explicit launch-only fixture. Uses a fresh Keychain namespace, UserDefaults suite,
@@ -29,7 +30,17 @@ struct UITestFixture {
         let config = PurchaseConfiguration(productID: "local.test.annual", productionURL: "", sandboxURL: "")
         let manager = StoreKitPurchaseService(configuration: config, store: UIAppleStore(),
                                              provisioner: UIProvisioner(waitForForeground: delayedDelivery), credentialsStore: cache)
-        return Self(settings: settings, database: DatabaseService(path: NSTemporaryDirectory() + namespace + ".sqlite"), purchase: manager)
+        let database = DatabaseService(path: NSTemporaryDirectory() + namespace + ".sqlite")
+        if mode == "review-selection" {
+            try database.initialize()
+            try database.dbQueue?.write { db in
+                try Note(id: 1,
+                         content: "Alpha bravo charlie delta echo.\nDrag either handle to adjust the selection.\nNormal swipes should still switch tabs.",
+                         channel: "ui-test",
+                         createdAt: ISO8601DateFormatter().string(from: Date())).insert(db)
+            }
+        }
+        return Self(settings: settings, database: database, purchase: manager)
     }
 }
 
