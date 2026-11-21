@@ -189,28 +189,12 @@ macos_build_signed_dmg() {
   hdiutil create -volname "$volname" -srcfolder "$source_dir" -ov -format UDRW "$dmg_rw"
 
   local mount_dir
-  mount_dir="$(hdiutil attach "$dmg_rw" | grep Volumes | awk '{print $3}')"
+  mount_dir="$(hdiutil attach -nobrowse "$dmg_rw" | sed -n 's|^.*\(/Volumes/.*\)$|\1|p')"
 
-  osascript <<EOF
-tell application "Finder"
-  tell disk "$volname"
-    open
-    set current view of container window to icon view
-    set toolbar visible of container window to false
-    set statusbar visible of container window to false
-    set the bounds of container window to {100, 100, 600, 400}
-    set viewOptions to the icon view options of container window
-    set arrangement of viewOptions to not arranged
-    set icon size of viewOptions to 100
-    set background picture of viewOptions to file ".background:background.tiff"
-    set position of item "KeeNotes.app" of container window to {150, 150}
-    set position of item "Applications" of container window to {350, 150}
-    update without registering applications
-    delay 2
-    close
-  end tell
-end tell
-EOF
+  if ! osascript "${REPO_ROOT}/scripts/release/dmg-layout.applescript" "$mount_dir"; then
+    hdiutil detach "$mount_dir"
+    return 1
+  fi
 
   hdiutil detach "$mount_dir"
   hdiutil convert "$dmg_rw" -format UDZO -o "$dmg_temp"

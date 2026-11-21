@@ -389,29 +389,13 @@ jobs:
           hdiutil create -volname "$VOLNAME" -srcfolder "$SOURCE_DIR" -ov -format UDRW "$DMG_RW"
 
           # Mount the DMG
-          MOUNT_DIR=$(hdiutil attach "$DMG_RW" | grep Volumes | awk '{print $3}')
+          MOUNT_DIR=$(hdiutil attach -nobrowse "$DMG_RW" | sed -n 's|^.*\(/Volumes/.*\)$|\1|p')
 
-          # Set window properties and icon positions using AppleScript
-          echo '
-          tell application "Finder"
-            tell disk "'$VOLNAME'"
-              open
-              set current view of container window to icon view
-              set toolbar visible of container window to false
-              set statusbar visible of container window to false
-              set the bounds of container window to {100, 100, 600, 400}
-              set viewOptions to the icon view options of container window
-              set arrangement of viewOptions to not arranged
-              set icon size of viewOptions to 100
-              set background picture of viewOptions to file ".background:background.tiff"
-              set position of item "KeeNotes.app" of container window to {150, 150}
-              set position of item "Applications" of container window to {350, 150}
-              update without registering applications
-              delay 2
-              close
-            end tell
-          end tell
-          ' | osascript
+          # Use the same Finder layout as local signed releases.
+          if ! osascript scripts/release/dmg-layout.applescript "$MOUNT_DIR"; then
+            hdiutil detach "$MOUNT_DIR"
+            exit 1
+          fi
 
           # Unmount
           hdiutil detach "$MOUNT_DIR"
