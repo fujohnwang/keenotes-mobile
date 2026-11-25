@@ -2,13 +2,13 @@ package cn.keevol.keenotes.mobilefx;
 
 import javafx.animation.PauseTransition;
 import javafx.beans.value.ChangeListener;
-import javafx.geometry.Insets;
+import javafx.event.EventHandler;
+import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
 import java.time.LocalDateTime;
@@ -26,6 +26,22 @@ public class DesktopMainView extends BorderPane {
 
     // Listener reference for dispose pattern
     private final ChangeListener<Boolean> onThisDaySettingListener;
+    private boolean awaitingNavigationCharacter;
+    private final EventHandler<KeyEvent> shortcutHandler = this::handleShortcut;
+    private final EventHandler<KeyEvent> shortcutCharacterFilter = event -> {
+        // KEY_TYPED has no key code. A new press or a release ends the previous press's text sequence.
+        if (awaitingNavigationCharacter && event.getEventType() == KeyEvent.KEY_TYPED) {
+            event.consume();
+        }
+        awaitingNavigationCharacter = false;
+    };
+    private final ChangeListener<Scene> shortcutSceneListener = (obs, oldScene, newScene) -> {
+        detachKeyboardShortcuts(oldScene);
+        if (newScene != null) {
+            newScene.addEventFilter(KeyEvent.ANY, shortcutCharacterFilter);
+            newScene.addEventHandler(KeyEvent.KEY_PRESSED, shortcutHandler);
+        }
+    };
     
     // Current mode
     private ViewMode currentMode = ViewMode.NOTE;
@@ -49,7 +65,7 @@ public class DesktopMainView extends BorderPane {
         setupLayout();
         
         // Setup keyboard shortcuts
-        setupKeyboardShortcuts();
+        sceneProperty().addListener(shortcutSceneListener);
         setupOnThisDayDateRefresh();
 
         // Initialize listener field for SettingsService
@@ -81,50 +97,44 @@ public class DesktopMainView extends BorderPane {
         setCenter(mainContent);
     }
     
-    /**
-     * Setup keyboard shortcuts
-     */
-    private void setupKeyboardShortcuts() {
-        // Register key event handler on the scene when it becomes available
-        sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene != null) {
-                newScene.setOnKeyPressed(event -> {
-                    SettingsService settings = SettingsService.getInstance();
-                    
-                    // Take Note shortcut
-                    KeyCodeCombination takeNoteShortcut = parseShortcut(settings.getTakeNoteShortcut());
-                    if (takeNoteShortcut != null && takeNoteShortcut.match(event)) {
-                        event.consume();
-                        switchToNoteAndFocus();
-                        return;
-                    }
-                    
-                    // Search shortcut
-                    KeyCodeCombination searchShortcut = parseShortcut(settings.getSearchShortcut());
-                    if (searchShortcut != null && searchShortcut.match(event)) {
-                        event.consume();
-                        switchToSearchAndFocus();
-                        return;
-                    }
-                    
-                    // Zoom in shortcut (CMD+= or CMD++)
-                    KeyCodeCombination zoomInShortcut = parseShortcut(settings.getZoomInShortcut());
-                    if (zoomInShortcut != null && zoomInShortcut.match(event)) {
-                        event.consume();
-                        settings.zoomIn();
-                        return;
-                    }
-                    
-                    // Zoom out shortcut (CMD+-)
-                    KeyCodeCombination zoomOutShortcut = parseShortcut(settings.getZoomOutShortcut());
-                    if (zoomOutShortcut != null && zoomOutShortcut.match(event)) {
-                        event.consume();
-                        settings.zoomOut();
-                        return;
-                    }
-                });
-            }
-        });
+    private void detachKeyboardShortcuts(Scene scene) {
+        awaitingNavigationCharacter = false;
+        if (scene != null) {
+            scene.removeEventFilter(KeyEvent.ANY, shortcutCharacterFilter);
+            scene.removeEventHandler(KeyEvent.KEY_PRESSED, shortcutHandler);
+        }
+    }
+
+    private void handleShortcut(KeyEvent event) {
+        SettingsService settings = SettingsService.getInstance();
+        KeyCodeCombination takeNoteShortcut = parseShortcut(settings.getTakeNoteShortcut());
+        if (takeNoteShortcut != null && takeNoteShortcut.match(event)) {
+            event.consume();
+            awaitingNavigationCharacter = true;
+            switchToNoteAndFocus();
+            return;
+        }
+
+        KeyCodeCombination searchShortcut = parseShortcut(settings.getSearchShortcut());
+        if (searchShortcut != null && searchShortcut.match(event)) {
+            event.consume();
+            awaitingNavigationCharacter = true;
+            switchToSearchAndFocus();
+            return;
+        }
+
+        KeyCodeCombination zoomInShortcut = parseShortcut(settings.getZoomInShortcut());
+        if (zoomInShortcut != null && zoomInShortcut.match(event)) {
+            event.consume();
+            settings.zoomIn();
+            return;
+        }
+
+        KeyCodeCombination zoomOutShortcut = parseShortcut(settings.getZoomOutShortcut());
+        if (zoomOutShortcut != null && zoomOutShortcut.match(event)) {
+            event.consume();
+            settings.zoomOut();
+        }
     }
 
     private void setupOnThisDayDateRefresh() {
@@ -338,6 +348,8 @@ public class DesktopMainView extends BorderPane {
      * Remove all listeners registered on singleton services.
      */
     public void dispose() {
+        sceneProperty().removeListener(shortcutSceneListener);
+        detachKeyboardShortcuts(getScene());
         SettingsService.getInstance().showOnThisDayInYearsPastProperty().removeListener(onThisDaySettingListener);
         mainContent.dispose();
         sidebar.dispose();

@@ -362,3 +362,9 @@
 - 修复 Quick Look 方形缩略图被居中裁切后，箭头从 y=150 上移到 y=50 的问题。新增 `bash scripts/release/generate-dmg-background.sh`，先居中画布再裁切，生成 500×300/72 DPI 与 1000×600/144 DPI 两档 TIFF；保留 SVG 作为源图。
 - 本地和 GitHub Release 共用 `dmg-layout.applescript`，背景设置后再保存 500×300 窗口，并关闭重开后再次保存尺寸及隐藏状态栏。使用实际挂载路径，支持同名卷产生的空格后缀；布局失败会卸载测试卷。
 - 最终 TIFF 两档图像已解码目视确认箭头居中，Shell 语法与 AppleScript 编译通过。真实打包在 Finder Apple events 权限处被拒绝（-1743），按用户后续要求改由用户验证安装界面，未声称窗口验证通过。测试卷已卸载，临时文件已清理；未提交 Git。
+
+## JavaFX 导航快捷键与草稿（2026-11-25）
+
+- Take Note 或 Search 快捷键命中后，只拦截紧随该次按键的 `KEY_TYPED`。下一次按键或松键会清除标记。
+- macOS 原生按键验证通过。搜索绑定 `Option+S` 时，往返后草稿为空。改绑 `Option+F` 后，`Option+S` 可以输入 `ß`，新快捷键切页时也保留了这个字符。
+- 桌面回归通过 48/49 项，唯一失败项是此前已复现的分享海报预览宽度断言。

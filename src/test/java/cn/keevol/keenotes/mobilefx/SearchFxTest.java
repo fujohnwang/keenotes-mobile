@@ -15,6 +15,8 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.control.skin.TextAreaSkin;
 import javafx.scene.control.skin.VirtualFlow;
 import javafx.scene.image.WritableImage;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.shape.Line;
 import javafx.stage.Stage;
 import cn.keevol.keenotes.mobilefx.search.*;
@@ -46,6 +48,83 @@ public class SearchFxTest {
             Platform.exit();
         }
         if (originalHome != null) System.setProperty("user.home", originalHome);
+    }
+
+    @Test public void navigationShortcutsKeepTheirCharactersOutOfDraftAndSearch() throws Exception {
+        var view = fx(DesktopMainView::new);
+        var settings = SettingsService.getInstance();
+        String originalSearch = settings.getSearchShortcut();
+        String originalTakeNote = settings.getTakeNoteShortcut();
+        try {
+            var scene = fx(() -> {
+                settings.setSearchShortcut("Alt+S");
+                settings.setTakeNoteShortcut("Alt+T");
+                var rootScene = new Scene(view, 900, 650);
+                view.applyCss();
+                var note = (TextArea) view.lookup(".unified-note-input");
+                note.setText("草稿");
+                note.end();
+                note.requestFocus();
+                assertSame(note, rootScene.getFocusOwner());
+                fireAltKey(rootScene, KeyCode.S, "ß");
+                assertEquals(DesktopMainView.ViewMode.SEARCH, view.getCurrentMode());
+                assertEquals("草稿", note.getText());
+                return rootScene;
+            });
+            fx(() -> {
+                var search = (TextField) view.lookup(".search-field");
+                assertSame(search, scene.getFocusOwner());
+                assertEquals("", search.getText());
+                // A shortcut that emits no character must leave the next input alone.
+                fireAltKey(scene, KeyCode.S, "");
+                fireTyped(scene, "q", false);
+                fireAltKey(scene, KeyCode.T, "†");
+                assertEquals(DesktopMainView.ViewMode.NOTE, view.getCurrentMode());
+                assertEquals("q", search.getText());
+                return null;
+            });
+            fx(() -> {
+                var note = (TextArea) view.lookup(".unified-note-input");
+                assertSame(note, scene.getFocusOwner());
+                // Ordinary text can contain exactly the same character as the shortcut.
+                fireTyped(scene, "ß", false);
+                assertEquals("草稿ß", note.getText());
+
+                settings.setSearchShortcut("Alt+F");
+                fireAltKey(scene, KeyCode.S, "ß");
+                assertEquals(DesktopMainView.ViewMode.NOTE, view.getCurrentMode());
+                if (System.getProperty("os.name").startsWith("Mac")) {
+                    assertEquals("草稿ßß", note.getText());
+                }
+                String draft = note.getText();
+                fireAltKey(scene, KeyCode.F, "ƒ");
+                assertEquals(DesktopMainView.ViewMode.SEARCH, view.getCurrentMode());
+                assertEquals(draft, note.getText());
+                return null;
+            });
+        } finally {
+            fx(() -> {
+                view.dispose();
+                settings.setSearchShortcut(originalSearch);
+                settings.setTakeNoteShortcut(originalTakeNote);
+                return null;
+            });
+        }
+    }
+
+    private static void fireAltKey(Scene scene, KeyCode code, String character) {
+        scene.getFocusOwner().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", code.getChar(), code,
+                false, false, true, false));
+        if (!character.isEmpty()) {
+            fireTyped(scene, character, true);
+        }
+        scene.getFocusOwner().fireEvent(new KeyEvent(KeyEvent.KEY_RELEASED, "", code.getChar(), code,
+                false, false, true, false));
+    }
+
+    private static void fireTyped(Scene scene, String character, boolean altDown) {
+        scene.getFocusOwner().fireEvent(new KeyEvent(KeyEvent.KEY_TYPED, character, "", KeyCode.UNDEFINED,
+                false, false, altDown, false));
     }
 
     @Test public void syncedNoteBecomesSearchableAndSettingsRenders() throws Exception {
