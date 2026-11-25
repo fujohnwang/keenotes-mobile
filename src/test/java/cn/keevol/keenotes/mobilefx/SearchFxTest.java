@@ -1,6 +1,7 @@
 package cn.keevol.keenotes.mobilefx;
 
 import javafx.application.Platform;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -17,6 +18,7 @@ import javafx.scene.control.skin.VirtualFlow;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.HBox;
 import javafx.scene.shape.Line;
 import javafx.stage.Stage;
 import cn.keevol.keenotes.mobilefx.search.*;
@@ -171,11 +173,11 @@ public class SearchFxTest {
                     .collect(java.util.stream.Collectors.toMap(javafx.scene.control.Label::getText, label -> label));
             assertEquals(2, tags.size());
             var tagGroup = tags.get("KS").getParent();
-            var header = (javafx.scene.layout.HBox) tagGroup.getParent();
-            int firstAction = java.util.stream.IntStream.range(0, header.getChildren().size())
-                    .filter(i -> header.getChildren().get(i) instanceof Button).findFirst().orElseThrow();
-            assertEquals(firstAction - 1, header.getChildren().indexOf(tagGroup));
+            var header = (HBox) tagGroup.getParent();
             card.setSearchSources(true, false);
+            var managed = header.getChildren().stream().filter(Node::isManaged).toList();
+            var firstAction = managed.stream().filter(Button.class::isInstance).findFirst().orElseThrow();
+            assertEquals(managed.indexOf(firstAction) - 1, managed.indexOf(tagGroup));
             assertTrue(tags.get("KS").isManaged());
             assertFalse(tags.get("SS").isManaged());
             card.update(note);
@@ -185,6 +187,33 @@ public class SearchFxTest {
             card.setSearchSources(false, false);
             assertFalse(tags.get("KS").isManaged());
             assertFalse(tags.get("SS").isManaged());
+            return null;
+        });
+    }
+
+    @Test public void copiedToastAlignsWithFirstVisibleCardAction() throws Exception {
+        fx(() -> {
+            var note = new LocalCacheService.NoteData(1, "Card body", "desktop", "2026-11-25", null);
+            for (var card : List.of(new NoteCardView(note, n -> {}), new NoteCardView(note))) {
+                var scene = new Scene(card, 480, 180);
+                scene.getStylesheets().addAll(resource("common"), resource("dark"));
+                card.applyCss();
+                card.layout();
+                var popup = card.lookup(".copied-popup");
+                var header = (HBox) card.lookup(".note-date").getParent();
+                var action = header.getChildren().stream()
+                        .filter(node -> node instanceof Button && node.isVisible()).findFirst().orElseThrow();
+                var before = action.localToScene(action.getLayoutBounds());
+                assertFalse(popup.isManaged());
+                popup.setVisible(true);
+                card.layout();
+                var toast = popup.localToScene(popup.getLayoutBounds());
+                var button = action.localToScene(action.getLayoutBounds());
+                assertTrue(toast.getWidth() > 0);
+                assertEquals(header.getSpacing(), button.getMinX() - toast.getMaxX(), 1);
+                assertEquals(button.getCenterY(), toast.getCenterY(), 1);
+                assertEquals(before, button);
+            }
             return null;
         });
     }

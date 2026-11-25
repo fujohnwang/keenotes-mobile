@@ -7,7 +7,7 @@
 ## NoteCard 复制区域重构记录
 
 - `NoteCardView` 的 click-to-copy 只保留在正文 `TextArea` 区域，header 行不再触发 copy，方便后续接入更多操作元素。
-- Copied toast 挂在 `NoteCardView` 根 `StackPane` 上，定位到整张卡片中心；整卡 hover 保留，但 cursor 只在正文区域显示 hand。
+- `✓ Copied` 显示在卡片标题行右侧、铅笔按钮左边。在待发送列表中，提示紧挨分享按钮左侧。提示淡出后释放布局空间。
 
 ## NoteCard 分享海报/视频记录
 

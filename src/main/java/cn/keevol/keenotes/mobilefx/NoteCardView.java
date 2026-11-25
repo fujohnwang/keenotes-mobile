@@ -143,8 +143,6 @@ public class NoteCardView extends StackPane {
         searchSourceTags.setAlignment(Pos.CENTER_RIGHT);
         setSearchSources(false, false);
 
-        headerRow.getChildren().addAll(dateLabel, channelLabel, headerSpacer, searchSourceTags, reviseButton, shareButton);
-
         // Full content using TextArea (read-only, selectable)
         contentArea = new TextArea(noteData.content);
         contentArea.setEditable(false);
@@ -230,7 +228,7 @@ public class NoteCardView extends StackPane {
             }
         });
 
-        // Copied popup (positioned at the center of the whole note card)
+        // Show copy feedback beside the header actions only while it is visible.
         copiedPopup = new Label("✓ Copied");
         copiedPopup.getStyleClass().add("copied-popup");
 
@@ -244,16 +242,18 @@ public class NoteCardView extends StackPane {
                         "-fx-background-radius: 4; " +
                         "-fx-font-size: 11px;");
         copiedPopup.setVisible(false);
+        copiedPopup.managedProperty().bind(copiedPopup.visibleProperty());
         copiedPopup.setOpacity(0);
         copiedPopup.setMouseTransparent(true);
-        StackPane.setAlignment(copiedPopup, Pos.CENTER);
+        headerRow.getChildren().addAll(dateLabel, channelLabel, headerSpacer, searchSourceTags,
+                copiedPopup, reviseButton, shareButton);
 
         StackPane contentCopyArea = new StackPane(contentArea);
         contentCopyArea.setMaxWidth(Double.MAX_VALUE);
 
         contentBox.getChildren().addAll(headerRow, contentCopyArea);
 
-        getChildren().addAll(contentBox, copiedPopup);
+        getChildren().add(contentBox);
 
         // Hover effect on card
         setOnMouseEntered(e -> {
